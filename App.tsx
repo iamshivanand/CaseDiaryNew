@@ -1,20 +1,31 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer } from "@react-navigation/native";
+import React, { useContext, useEffect } from "react";
+import { SafeAreaView } from "react-native";
+
+import { openDatabaseAsync } from "./DataBase";
+import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
+import Routes from "./Routes/Routes";
 
 export default function App() {
+  const { theme } = useContext(ThemeContext);
+
+  useEffect(() => {
+    openDatabaseAsync();
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <ThemeProvider>
+      <NavigationContainer>
+        <SafeAreaView
+          style={{
+            flex: 1,
+            backgroundColor: theme.colors.background,
+            height: "100%",
+          }}
+        >
+          <Routes />
+        </SafeAreaView>
+      </NavigationContainer>
+    </ThemeProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
