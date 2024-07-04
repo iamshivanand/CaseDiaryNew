@@ -1,7 +1,17 @@
-import React, { useState } from "react";
-import { Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { Calendar } from "react-native-calendars";
 
+import {
+  fetchFieldsAsync,
+  searchFormsAccordingToFieldsAsync,
+} from "../../DataBase";
 import CaseCard from "../CommonComponents/CaseCard";
 
 interface Props {
@@ -10,38 +20,166 @@ interface Props {
 
 const CalendarScreen: React.FC<Props> = () => {
   const currentDate = new Date();
-  console.log("hello current Date", currentDate);
   const [selected, setSelected] = useState(
     currentDate.toISOString().slice(0, 10)
   );
-  console.log("selected Date", selected);
+  const [ResultToshow, setResultToShow] = useState([]);
+  const [markedDates, setMarkedDates] = useState({});
+
+  const getResultFromDate = async (date: string) => {
+    const result = await searchFormsAccordingToFieldsAsync(
+      global.db,
+      "NextDate",
+      date
+    );
+    setResultToShow(result._array);
+  };
+
+  const fetchAllDates = async () => {
+    const result = await fetchFieldsAsync(global.db, ["NextDate"]);
+    const datesArray = result.map((item) => item.NextDate);
+
+    const formattedDates = datesArray.reduce((acc, date) => {
+      if (acc[date]) {
+        acc[date].eventsCount += 1;
+      } else {
+        acc[date] = { marked: true, eventsCount: 1 };
+      }
+      return acc;
+    }, {});
+
+    Object.keys(formattedDates).forEach((date) => {
+      formattedDates[date] = {
+        ...formattedDates[date],
+        customStyles: {
+          container: {
+            backgroundColor: "orange",
+            borderRadius: 10,
+          },
+          text: {
+            color: "white",
+          },
+        },
+      };
+    });
+
+    setMarkedDates(formattedDates);
+  };
+
+  useEffect(() => {
+    fetchAllDates();
+  }, []);
+
+  useEffect(() => {
+    getResultFromDate(selected);
+  }, [selected]);
+
+  const CustomDayComponent = ({
+    date,
+    state,
+    marking,
+  }: {
+    date: any;
+    state: string;
+    marking: any;
+  }) => {
+    const isSelected = selected === date.dateString;
+    return (
+      <TouchableOpacity
+        onPress={() => {
+          setSelected(date.dateString);
+          console.log("Selected Date:", date.dateString);
+        }}
+        style={{
+          backgroundColor: isSelected
+            ? "blue"
+            : marking
+              ? marking.customStyles.container.backgroundColor
+              : "transparent",
+          borderRadius: isSelected
+            ? 10
+            : marking
+              ? marking.customStyles.container.borderRadius
+              : 0,
+          justifyContent: "center",
+          alignItems: "center",
+          width: 32,
+          height: 32,
+        }}
+      >
+        <Text
+          style={{
+            color: isSelected
+              ? "white"
+              : marking
+                ? marking.customStyles.text.color
+                : state === "disabled"
+                  ? "gray"
+                  : "black",
+          }}
+        >
+          {date.day}
+        </Text>
+        {marking && marking.eventsCount > 1 && (
+          <Text style={{ color: "#ffffff", fontSize: 10 }}>
+            {marking.eventsCount}
+          </Text>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <View>
         <Calendar
-          // Mark specific dates with custom styles
+          markingType="custom"
           markedDates={{
-            "2024-04-27": { marked: true, dotColor: "red" },
-            "2024-04-28": { marked: true, dotColor: "green" },
+            ...markedDates,
             [selected]: {
               selected: true,
-              disableTouchEvent: true,
-              dotColor: "orange",
+              customStyles: {
+                container: {
+                  backgroundColor: "blue",
+                  borderRadius: 10,
+                },
+                text: {
+                  color: "white",
+                },
+              },
             },
           }}
-          // Handle date selection event
-          onDayPress={(day) => {
-            setSelected(day.dateString);
-          }}
+          dayComponent={({ date, state, marking }) => (
+            <CustomDayComponent date={date} state={state} marking={marking} />
+          )}
         />
       </View>
-      <View>
-        {/* <CaseCard /> */}
-        <Text>HEllo we will show the Card</Text>
-        <Text>Selected Date is {selected}</Text>
-      </View>
+      <ScrollView
+        style={styles.container}
+        scrollEventThrottle={16}
+        decelerationRate="fast"
+      >
+        <View style={styles.CardsContainer}>
+          <Text>Selected Date is {selected}</Text>
+          {ResultToshow?.map((each, index) => (
+            <CaseCard key={index} caseDetails={each} />
+          ))}
+        </View>
+      </ScrollView>
     </View>
   );
 };
 
 export default CalendarScreen;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+    paddingBottom: 150,
+    marginBottom: 0,
+  },
+  CardsContainer: {
+    alignItems: "center",
+  },
+});

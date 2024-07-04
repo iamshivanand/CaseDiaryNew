@@ -9,12 +9,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Menu, Provider, Button } from "react-native-paper";
 
+import GenericModal from "./GenericFieldPopup";
 import ConfirmationPopup from "./Popup";
-import { deleteFormAsync } from "../../DataBase";
+import { deleteFormAsync, updateFormAsync } from "../../DataBase";
 
 const windowWidth = Dimensions.get("window").width;
 interface CaseDetails {
+  uniqueId: string;
   id: number;
   caseNumber: string;
   caseType: string;
@@ -38,7 +41,8 @@ const CaseCard: React.FC<{
   const navigation = useNavigation<CaseDetailScreenNavigationProp>();
 
   const [isConfirmationVisible, setIsConfirmationVisible] = useState(false);
-
+  const [showUpdateField, setShowUpdateField] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
   const handleDeleteConfirm = () => {
     // Logic for delete action
     handleDelete();
@@ -51,46 +55,91 @@ const CaseCard: React.FC<{
 
   const handleDelete = () => {
     console.log("need to delete the ID", caseDetails.id);
-    deleteFormAsync(global.db, caseDetails?.id);
+    deleteFormAsync(global.db, caseDetails?.uniqueId);
     onDelete();
   };
   const handleEdit = () => {
     console.log("Edit button pressed");
     navigation.navigate("CaseDetail", { caseDetails });
   };
+  const handleUpdateDate = (values: { [key: string]: any }) => {
+    console.log("Next Date value:", values.NextDate);
+    updateFormAsync(global.db, caseDetails?.uniqueId, values);
+  };
   return (
-    <View style={styles.cardContainer}>
-      <View style={styles.DetailsContainer}>
-        {Object.entries(caseDetails).map(
-          ([key, value], index) =>
-            key !== "id" && (
-              <Text key={index} style={styles.cardText}>
-                {key} : {value}
-              </Text>
-            )
-        )}
-      </View>
-      <View style={styles.cardButtonContainer}>
-        <TouchableOpacity onPress={handleEdit}>
+    <Provider>
+      <TouchableOpacity onPress={handleEdit} activeOpacity={1}>
+        <View style={styles.cardContainer}>
+          <View style={styles.menuContainer}>
+            <Menu
+              visible={menuVisible}
+              onDismiss={() => setMenuVisible(false)}
+              anchor={
+                <TouchableOpacity onPress={() => setMenuVisible(true)}>
+                  <Feather name="more-vertical" size={24} color="white" />
+                </TouchableOpacity>
+              }
+              anchorPosition="bottom"
+              style={styles.menu}
+            >
+              <Menu.Item onPress={handleEdit} title="Edit" />
+              <Menu.Item
+                onPress={() => setIsConfirmationVisible(true)}
+                title="Delete"
+              />
+            </Menu>
+          </View>
+          <View style={styles.DetailsContainer}>
+            {Object.entries(caseDetails).map(
+              ([key, value], index) =>
+                (key === "CourtName" ||
+                  key === "OnBehalfOf" ||
+                  key === "FirstParty" ||
+                  key === "Undersection" ||
+                  key === "PoliceStation"||
+                  key === "NextDate") && (
+                  <Text key={index} style={styles.cardText}>
+                    {key} : {value}
+                  </Text>
+                )
+            )}
+            {/* //need to show only few things */}
+          </View>
+          <View style={styles.cardButtonContainer}>
+            {/* <TouchableOpacity onPress={handleEdit}>
           <View style={styles.primarybuttons}>
             <Text style={styles.buttonText}>Edit</Text>
             <Feather name="edit" size={20} color="white" />
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setIsConfirmationVisible(true)}>
+        </TouchableOpacity> */}
+            <TouchableOpacity onPress={() => setShowUpdateField(true)}>
+              <View style={styles.primarybuttons}>
+                <Text style={styles.buttonText}>Update</Text>
+                <Feather name="edit" size={20} color="white" />
+              </View>
+            </TouchableOpacity>
+            {/* <TouchableOpacity onPress={() => setIsConfirmationVisible(true)}>
           <View style={{ ...styles.primarybuttons, backgroundColor: "red" }}>
             <Text style={styles.buttonText}>Delete</Text>
             <AntDesign name="delete" size={20} color="white" />
           </View>
-        </TouchableOpacity>
-      </View>
-      <ConfirmationPopup
-        isVisible={isConfirmationVisible}
-        message="Are you sure you want to delete?"
-        onCancel={handleDeleteCancel}
-        onConfirm={handleDeleteConfirm}
-      />
-    </View>
+        </TouchableOpacity> */}
+          </View>
+          <ConfirmationPopup
+            isVisible={isConfirmationVisible}
+            message="Are you sure you want to delete?"
+            onCancel={handleDeleteCancel}
+            onConfirm={handleDeleteConfirm}
+          />
+          <GenericModal
+            visible={showUpdateField}
+            onClose={() => setShowUpdateField(false)}
+            onSubmit={handleUpdateDate}
+            fields={[{ name: "NextDate", type: "date", label: "Next Date" }]}
+          />
+        </View>
+      </TouchableOpacity>
+    </Provider>
   );
 };
 
@@ -108,6 +157,18 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     elevation: 3,
   },
+  menuContainer: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    zIndex: 1,
+    // flexDirection: "row",
+    // justifyContent: "flex-end",
+  },
+  menu: {
+    zIndex: 1,
+    top: 10, // Adjust this value to position the menu correctly
+  },
   DetailsContainer: {
     flex: 1,
     justifyContent: "flex-start",
@@ -115,7 +176,7 @@ const styles = StyleSheet.create({
   cardButtonContainer: {
     flex: 1,
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     alignItems: "flex-end",
   },
   cardText: {

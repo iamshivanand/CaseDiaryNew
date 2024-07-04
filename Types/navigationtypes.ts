@@ -5,4 +5,5 @@ export type RootStackParamList = {
   CaseDetail: { caseDetails: CaseDetails };
   Documents: { update?: boolean; uniqueId: string };
   Fees: { update?: boolean; uniqueId: string };
+  AddCaseDetails: { update?: boolean; initialValues?: CaseDetails };
 };

@@ -33,7 +33,8 @@
         {
           "iCloudContainerEnvironment": "Production"
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "extra": {
       "eas": {

@@ -20,7 +20,6 @@ export default function App() {
           style={{
             flex: 1,
             backgroundColor: theme.colors.background,
-            height: "100%",
           }}
         >
           <Routes />

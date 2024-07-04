@@ -33,7 +33,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </View>
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            onPress={() => navigation.navigate("AddCaseDetails")}
+            onPress={() =>
+              navigation.navigate("AddCaseDetails", { update: false })
+            }
           >
             <View style={styles.primarybuttons}>
               <Text style={styles.buttonText}>Add Case</Text>
@@ -56,27 +58,55 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             flexWrap: "wrap",
           }}
         >
-          <NumberCard
-            finalValue={30}
-            textValue="Today's Cases"
-            colorValue="green"
-          />
-          <NumberCard
-            finalValue={40}
-            textValue="Tomorrow's Cases"
-            colorValue="green"
-          />
-          <NumberCard
-            finalValue={40}
-            textValue="Yesterday's Cases"
-            colorValue="green"
-          />
-          <NumberCard
-            finalValue={40}
-            textValue="UnDated Cases" //where next hearing Date is previous then Todays Date
-            colorValue="green"
-          />
-          <NumberCard
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {
+              navigation.navigate("AllCases", { Filter: "todaysCases" });
+            }}
+          >
+            <NumberCard
+              finalValue={30}
+              textValue="Today's Cases"
+              colorValue="green"
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {
+              navigation.navigate("AllCases", { Filter: "tomorrowCases" });
+            }}
+          >
+            <NumberCard
+              finalValue={40}
+              textValue="Tomorrow's Cases"
+              colorValue="green"
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {
+              navigation.navigate("AllCases", { Filter: "yesterdayCases" });
+            }}
+          >
+            <NumberCard
+              finalValue={40}
+              textValue="Yesterday's Cases"
+              colorValue="#ffb414"
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {
+              navigation.navigate("AllCases", { Filter: "undatedCases" });
+            }}
+          >
+            <NumberCard
+              finalValue={40}
+              textValue="UnDated Cases" //where next hearing Date is previous then Todays Date
+              colorValue="green"
+            />
+          </TouchableOpacity>
+          {/* <NumberCard
             finalValue={40}
             textValue="Running Cases"
             colorValue="green"
@@ -85,7 +115,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             finalValue={40}
             textValue="Running Cases"
             colorValue="green"
-          />
+          /> */}
         </View>
       </ScrollView>
     </View>

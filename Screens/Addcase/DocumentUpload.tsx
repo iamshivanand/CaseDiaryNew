@@ -1,7 +1,7 @@
 import { RouteProp } from "@react-navigation/native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
-import * as Linking from "expo-linking";
+import * as IntentLauncher from "expo-intent-launcher";
 import React, { useEffect, useState } from "react";
 import { Button, View, TouchableOpacity, Text, FlatList } from "react-native";
 
@@ -21,31 +21,16 @@ const DocumentUpload: React.FC<Props> = ({ route }) => {
   const [document, setDocument] = useState();
   const [documentData, setDocumentData] = useState();
 
-  console.log("Documents", document);
+  //console.log("Documents", document);
   const handleDocumentPick = async () => {
     try {
-      const document = await DocumentPicker.getDocumentAsync({});
-      console.log("heloo the DOCUMENT IS ", document);
+      const document = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+      });
+      //console.log("heloo the DOCUMENT IS ", document);
 
       if (!document.canceled) {
         setDocumentUri(document.assets[0].uri);
-        let fileContent;
-        try {
-          fileContent = await FileSystem.readAsStringAsync(
-            document.assets[0].uri,
-            {
-              encoding: FileSystem.EncodingType.UTF8,
-            }
-          );
-          setDocumentData(fileContent);
-        } catch (error) {
-          console.error("Error reading file:", error);
-          return;
-        }
-
-        // Process the file content (e.g., parse JSON, display text)
-        // console.log(`File name: ${name}`);
-        console.log(`File content: ${fileContent}`);
       }
     } catch (error) {
       console.error("Error picking document:", error);
@@ -68,7 +53,6 @@ const DocumentUpload: React.FC<Props> = ({ route }) => {
           copyToFilesystem,
           folderName,
           uniqueId,
-          documentData,
         });
 
         // Here you can save the uploadedFilePath to the SQLite database along with the caseId
@@ -82,42 +66,60 @@ const DocumentUpload: React.FC<Props> = ({ route }) => {
       console.warn("No document selected.");
     }
   };
-
   const handleOpenDocument = async (documentUri) => {
-    checkFileExists(documentUri)
-      .then((exists) => {
-        if (exists) {
-          console.log("File exists.");
-          openDocument(documentUri);
-        } else {
-          console.log("File does not exist.");
-        }
-      })
-      .catch((error) => {
-        console.error("Error:", error);
-      });
-    // try {
-    //   // Open the document based on its file type
-    //   await Linking.openURL(documentUri);
-    //   //   if (fileType === "pdf") {
-    //   //     // Open PDF document with default viewer
-
-    //   //   } else {
-    //   //     console.log("Unsupported file type:", fileType);
-    //   //   }
-    // } catch (error) {
-    //   console.error("Error opening document:", error);
-    // }
-  };
-  const openDocument = async (filePath: string) => {
     try {
-      const fileUri = filePath;
-      const contentUri = await FileSystem.getContentUriAsync(fileUri);
-      await Linking.openURL(contentUri);
+      const fileExists = await checkFileExists(documentUri);
+
+      if (fileExists) {
+        console.log("File exists.");
+        console.log("Opening document with URI:", documentUri); // Log the URI before launching the intent
+
+        // Get the content URI for the file
+        const contentUri = await FileSystem.getContentUriAsync(documentUri);
+
+        // Launch the intent to open the document
+        await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+          data: contentUri,
+          flags: 1,
+          type: "application/pdf",
+        });
+      } else {
+        console.log("File does not exist.");
+      }
     } catch (error) {
       console.error("Error opening document:", error);
-      throw error;
     }
+  };
+
+  // try {
+  //   // Open the document based on its file type
+  //   await Linking.openURL(documentUri);
+  //   //   if (fileType === "pdf") {
+  //   //     // Open PDF document with default viewer
+
+  //   //   } else {
+  //   //     console.log("Unsupported file type:", fileType);
+  //   //   }
+  // } catch (error) {
+  //   console.error("Error opening document:", error);
+  // }
+
+  const openDocument = async (filePath: string) => {
+    // try {
+    //   const cUri = await FileSystem.getContentUriAsync(filePath);
+    //   await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+    //     data: cUri,
+    //     flags: 1,
+    //     type: "application/pdf",
+    //   });
+    // } catch (e) {
+    //   console.log(e.message);
+    // }
+    // try {
+    //   await FileSystem.openAsync(documentUri);
+    // } catch (error) {
+    //   console.log("open krtay hue error aa gyaa");
+    // }
   };
 
   useEffect(() => {
@@ -149,7 +151,7 @@ const DocumentUpload: React.FC<Props> = ({ route }) => {
       <FlatList
         data={document}
         renderItem={renderDocumentItem}
-        keyExtractor={(item) => item?.id?.toString()}
+        keyExtractor={(item, index) => item?.id?.toString() ?? index.toString()}
       />
     </View>
   );

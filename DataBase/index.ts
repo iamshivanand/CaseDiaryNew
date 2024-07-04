@@ -10,7 +10,6 @@ interface UploadOptions {
   copyToFilesystem: boolean;
   folderName?: string; // Optional parameter for specifying folder name
   uniqueId: string;
-  documentData: any;
 }
 
 const Samplefields = [
@@ -20,10 +19,10 @@ const Samplefields = [
     required: true,
   },
   {
-    name: "CRNNumber",
+    name: "CNRNumber",
     type: "text",
-    placeholder: "Enter CRN Number",
-    label: " CRN Number",
+    placeholder: "Enter CNR Number",
+    label: " CNR Number",
   },
   {
     name: "CourtName",
@@ -136,13 +135,18 @@ const Samplefields = [
     type: "text",
     required: false,
   },
+  {
+    name: "caseHistory",
+    type: "text",
+    required: false,
+  },
 
   // Add more fields with different types as needed
 ];
 
 export const openDatabaseAsync = async () => {
   if (!global.hasOwnProperty("db")) {
-    global.db = SQLite.openDatabase(DATABASE_NAME);
+    global.db = SQLite.openDatabaseAsync(DATABASE_NAME);
     await createTableAsync(global.db, Samplefields);
   }
   return global.db;
@@ -159,7 +163,7 @@ export interface FormData {
 }
 
 export const createTableAsync = async (
-  db: SQLite.Database,
+  db: SQLite.SQLiteDatabase,
   samplefields: { name: string; type: string; required?: boolean }[]
 ) => {
   return new Promise<void>((resolve, reject) => {
@@ -178,7 +182,6 @@ export const createTableAsync = async (
         `,
           [],
           (_, result) => {
-            console.log("Table created successfully!");
             resolve(); // Resolve the promise upon successful table creation
           },
           (_, error) => {
@@ -215,7 +218,7 @@ export const getTableColumnsAsync = async (db: SQLite.Database) => {
               }
             }
             resolve(columns);
-            console.log("columns are", columns);
+            // console.log("columns are", columns);
           },
           (_, error) => {
             console.error("Error getting table columns:", error);
@@ -238,7 +241,7 @@ export const insertFormAsync = async (
   data: { [key: string]: any }
 ) => {
   return new Promise<void>((resolve, reject) => {
-    console.log("hello values insetForm", data);
+    // console.log("hello values insetForm", data);
     const fields = Object.keys(data);
     const placeholders = fields.map(() => "?").join(", ");
 
@@ -252,7 +255,7 @@ export const insertFormAsync = async (
           fields.map((field) => data[field]),
           (_, result) => {
             if (result.rowsAffected === 1) {
-              console.log("Form inserted successfully!");
+              // console.log("Form inserted successfully!");
               return resolve(); // Resolve the promise upon successful insertion
             } else {
               console.warn("Failed to insert form!");
@@ -284,7 +287,7 @@ export const getFormsAsync = async (db: SQLite.Database) => {
       `,
         [],
         (_, result) => {
-          console.log("result is ", result);
+          // console.log("result is ", result);
           resolve(result.rows); // Resolve the promise with the retrieved rows
         },
         (_, error) => {
@@ -337,58 +340,119 @@ export const searchFormsAsync = async (
   });
   return results;
 };
+export const searchFormsAccordingToFieldsAsync = async (
+  db: SQLite.Database,
+  fieldName: string,
+  searchValue: string,
+  comparisonOperator: string = "=" 
+) => {
+  const query = `
+    SELECT * FROM cases WHERE ${fieldName} ${comparisonOperator} ?
+  `;
+
+  const results = await new Promise<any>((resolve, reject) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        query,
+        [searchValue],
+        (_, result) => {
+          resolve(result.rows); // Resolve the promise with the retrieved rows
+        },
+        (_, error) => {
+          console.error("Error fetching forms:", error);
+          reject(error); // Reject the promise with the error
+          return true;
+        }
+      );
+    });
+  });
+  return results;
+};
 
 export const updateFormAsync = async (
   db: SQLite.Database,
-  id: string | number,
-  data: FormData
+  uniqueId: string | number,
+  data: any
 ): Promise<boolean> => {
   return new Promise<boolean>((resolve, reject) => {
     db.transaction(
       (tx) => {
-        const updateFields = Object.keys(data)
-          .filter((key) => key !== "id")
-          .map((key) => `${key} = ?`)
-          .join(", ");
-        const values = Object.values(data).filter((val) => val !== undefined); // Filter out undefined values
-        console.log("values in update function", updateFields);
+        console.log("Hello from update Database", data.NextDate);
 
-        // Ensure we have at least one field to update
-        if (updateFields.length === 0) {
-          console.warn("No fields provided for update.");
-          resolve(false); // Indicate failure
-          return;
-        }
-
-        values.push(id); // Add id for WHERE clause
-
+        // First, fetch the current data
         tx.executeSql(
-          `
-          UPDATE cases
-          SET ${updateFields}
-          WHERE uniqueId = ?
-        `,
-          values,
+          `SELECT * FROM cases WHERE uniqueId = ?`,
+          [uniqueId],
           (_, result) => {
-            if (result.rowsAffected === 1) {
-              console.log("Form updated successfully!");
-              resolve(true); // Indicate success
-            } else {
-              console.warn("Failed to update form!", result);
-              resolve(false); // Indicate failure
+            const currentData = result.rows.item(0);
+
+            if (data?.NextDate && currentData?.NextDate !== data?.NextDate) {
+              data.PreviousDate = currentData?.NextDate;
+
+              // Maintain case history
+              const history = JSON.parse(currentData?.caseHistory || "[]");
+              history.push({
+                date: new Date().toISOString(),
+                field: "NextDate",
+                oldValue: currentData?.NextDate,
+                newValue: data?.NextDate,
+              });
+              data.caseHistory = JSON.stringify(history);
             }
+
+            const updateFields = Object.keys(data)
+              .filter((key) => key !== "uniqueId")
+              .map((key) => `${key} = ?`)
+              .join(", ");
+            const values: (string | number)[] = Object.values(data).filter(
+              (val): val is string | number => val !== undefined
+            );
+            console.log("Hello UpdateFields are", updateFields, values);
+
+            if (updateFields.length === 0) {
+              console.warn("No fields provided for update.");
+              resolve(false);
+              return;
+            }
+
+            values.push(uniqueId);
+
+            tx.executeSql(
+              `
+              UPDATE cases
+              SET ${updateFields}
+              WHERE uniqueId = ?
+            `,
+              values,
+              (_, result) => {
+                if (result.rowsAffected === 1) {
+                  resolve(true);
+                } else {
+                  console.warn("Failed to update form!", result);
+                  resolve(false);
+                }
+              },
+              (_, error) => {
+                console.error("Error updating form:", error);
+                reject(error);
+                return true;
+              }
+            );
+          },
+          (_, error) => {
+            console.error("Error fetching current data:", error);
+            reject(error);
+            return true;
           }
         );
       },
-      // Error callback
       (error) => {
         console.error("Transaction error:", error);
-        reject(error); // Reject the promise with the error
+        reject(error);
       }
     );
   });
 };
-
 export const deleteFormAsync = async (db: SQLite.Database, id: string) => {
   db.transaction((tx) => {
     tx.executeSql(
@@ -414,23 +478,15 @@ const uploadFile = async (options: UploadOptions) => {
     copyToFilesystem,
     folderName,
     uniqueId,
-    documentData,
   } = options;
-  const directory = FileSystem.documentDirectory + "Documents/";
 
   try {
-    const base64Content = documentData.toString("base64");
-    await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-    const savedUri = directory + fileName + `.${fileType}`;
-    const hello = await FileSystem.writeAsStringAsync(savedUri, base64Content, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    // console.log("Upload Hello", hello);
-    updateFormAsync(global.db, uniqueId, { DocumentPath: savedUri });
-    return savedUri;
+    const appSandboxUri =
+      FileSystem.documentDirectory + `documents/${fileName}.${fileType}`;
+    await FileSystem.copyAsync({ from: fileUri, to: appSandboxUri });
+    await updateFormAsync(global.db, uniqueId, { DocumentPath: appSandboxUri });
   } catch (error) {
-    console.error("Error uploading file:", error);
-    throw error;
+    console.log("Error aa gyaa bhaiya");
   }
 };
 
@@ -444,4 +500,91 @@ export const checkFileExists = async (filePath: string) => {
     console.error("Error checking file existence:", error);
     throw error;
   }
+};
+
+export const getSuggestions = async (db: SQLite.Database, fields) => {
+  const suggestions = {};
+  const fieldsWithNames = fields?.filter((field) => field.name);
+
+  await Promise.all(
+    fieldsWithNames.map(async (field) => {
+      try {
+        const results = await new Promise((resolve, reject) => {
+          db.transaction((tx) => {
+            tx.executeSql(
+              `SELECT DISTINCT ${field.name} FROM cases WHERE ${field.name} IS NOT NULL AND ${field.name} != ''`,
+              [],
+              (_, result) => {
+                const values = new Set();
+                for (let i = 0; i < result.rows.length; i++) {
+                  values.add(result.rows.item(i)[field.name]);
+                }
+                resolve(Array.from(values)); // Convert set back to array
+              },
+              (_, error) => {
+                console.error(
+                  `Error fetching suggestions for field ${field.name}:`,
+                  error
+                );
+                reject(error);
+                return true;
+              }
+            );
+          });
+        });
+
+        suggestions[field.name] = results;
+      } catch (error) {
+        console.error(
+          `Error fetching suggestions for field ${field.name}:`,
+          error
+        );
+      }
+    })
+  );
+
+  return suggestions;
+};
+
+export const fetchFieldsAsync = async (
+  db: SQLite.Database,
+  fields: string[]
+): Promise<any[]> => {
+  // Validate that the fields exist in the Samplefields array
+  const validFields = fields.filter((field) =>
+    Samplefields.some((sampleField) => sampleField.name === field)
+  );
+
+  if (validFields.length === 0) {
+    throw new Error("No valid fields specified.");
+  }
+
+  // Generate the SELECT clause
+  const selectClause = validFields.join(", ");
+
+  const query = `SELECT ${selectClause} FROM cases`;
+
+  // Execute the query and fetch the data
+  const results = await new Promise<any[]>((resolve, reject) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        query,
+        [],
+        (_, result) => {
+          const rows = [];
+          for (let i = 0; i < result.rows.length; i++) {
+            rows.push(result.rows.item(i));
+          }
+          resolve(rows); // Resolve the promise with the retrieved rows
+        },
+        (_, error) => {
+          console.error("Error fetching fields:", error);
+          reject(error); // Reject the promise with the error
+          return true;
+        }
+      );
+    });
+  });
+
+  return results;
 };

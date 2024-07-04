@@ -16,11 +16,19 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
+import Autocomplete from "react-native-autocomplete-input";
 import * as Yup from "yup";
 
-import { insertFormAsync, updateFormAsync, FormData } from "../../DataBase";
+import {
+  insertFormAsync,
+  updateFormAsync,
+  FormData,
+  getSuggestions,
+} from "../../DataBase";
 import { RootStackParamList } from "../../Types/navigationtypes";
+import { formatDate } from "../../utils/commonFunctions";
 import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen";
+import SuggestionInput from "../CommonComponents/SuggestionsInput";
 
 interface Field {
   name: string;
@@ -46,12 +54,47 @@ interface Props {
   navigation?: AddCaseScreenNavigationProp;
 }
 
+const suggestionsInputFields = [
+  {
+    name: "CourtName",
+    type: "text",
+    placeholder: "Enter Court Name",
+    label: "Court Name",
+    //manual add
+  },
+  {
+    name: "OnBehalfOf",
+    type: "text",
+    placeholder: "On Behalf of",
+    label: "On Behalf of",
+    //this should contain the manual add
+  },
+  {
+    name: "Undersection",
+    type: "text",
+    placeholder: "UnderSection",
+    label: "UnderSection",
+  },
+  {
+    name: "PoliceStation",
+    type: "text",
+    placeholder: "Enter Police Station",
+    label: "Police Station",
+  },
+  {
+    name: "CaseStatus",
+    type: "text",
+    label: "Case Status",
+    placeholder: " Case Status",
+  },
+];
+
 const Samplefields = [
   {
-    name: "CRNNumber",
+    name: "CNRNumber",
     type: "text",
-    placeholder: "Enter CRN Number",
-    label: " CRN Number",
+    placeholder: "Enter CNR Number",
+    label: " CNR Number",
   },
   {
     name: "CourtName",
@@ -60,7 +103,6 @@ const Samplefields = [
     label: "Court Name",
     //manual add
   },
-  { name: "dateFiled", type: "date", label: "Date Filed" },
   {
     name: "caseType",
     type: "select",
@@ -72,6 +114,7 @@ const Samplefields = [
     ],
     //options should be added manually
   },
+  { name: "dateFiled", type: "date", label: "Date Filed" },
   {
     name: "CaseNo",
     type: "text",
@@ -176,25 +219,43 @@ const FormField: React.FC<{
   values: CaseDetails | { [key: string]: string };
   errors: { [key: string]: string | undefined };
   openDatePicker: () => void;
-}> = ({ field, handleChange, handleBlur, values, errors, openDatePicker }) => {
+  suggestionArray: string[];
+}> = ({
+  field,
+  handleChange,
+  handleBlur,
+  values,
+  errors,
+  openDatePicker,
+  suggestionArray,
+}) => {
   switch (field.type) {
     case "text":
       return (
-        <View>
-          <Text style={styles.label}>{field.label}</Text>
-          <TextInput
-            id={field.name}
-            style={styles.inputField}
-            onChangeText={handleChange(field.name)}
-            onBlur={() => handleBlur(field.name)}
-            value={values[field.name]}
-            placeholder={field.placeholder}
-            data-name={field.name}
-          />
-          {errors[field.name] && (
-            <Text style={{ color: "red" }}>{errors[field.name]}</Text>
-          )}
-        </View>
+        // <View>
+        //   <Text style={styles.label}>{field.label}</Text>
+        //   <TextInput
+        //     id={field.name}
+        //     style={styles.inputField}
+        //     onChangeText={handleChange(field.name)}
+        //     onBlur={() => handleBlur(field.name)}
+        //     value={values[field.name]}
+        //     placeholder={field.placeholder}
+        //     data-name={field.name}
+        //   />
+        //   {errors[field.name] && (
+        //     <Text style={{ color: "red" }}>{errors[field.name]}</Text>
+        //   )}
+        // </View>
+        <SuggestionInput
+          key={field.name}
+          label={field.label}
+          placeholder={field.placeholder}
+          value={values[field.name]}
+          suggestions={suggestionArray}
+          onChangeText={handleChange(field.name)}
+          onBlur={handleBlur(field.name)}
+        />
       );
     case "select":
       return (
@@ -253,31 +314,62 @@ const AddCase: React.FC<Props> = ({ fields = Samplefields, route }) => {
   const [selectedDateField, setSelectedDateField] = useState<string | null>(
     null
   );
+  const [suggestions, setSuggestions] = useState({});
   useEffect(() => {
     // Reset selectedDateField state when the component re-renders
     setSelectedDateField(null);
+  }, []);
+  useEffect(() => {
+    async function FetchSuggestion() {
+      try {
+        const data = await getSuggestions(global.db, suggestionsInputFields);
+        console.log("Suggestion bala data is ", data);
+        setSuggestions(data);
+      } catch (error) {
+        console.log("error fetching the Suggestions", error);
+      }
+    }
+    FetchSuggestion();
   }, []);
 
   const handleDatePickerChange = (
     fieldName: string,
     event: DateTimePickerEvent,
-    selectedDate?: Date
+    selectedDate?: Date,
+    setFieldValue?: (field: string, value: any) => void
   ) => {
-    if (event.type === "set") {
-      //   onSubmit({ [fieldName]: selectedDate?.toISOString() || "" });
-      setSelectedDateField(null);
-    } else if (event.type === "dismissed") {
-      setSelectedDateField(null);
+    if (event.type === "set" && selectedDate) {
+      console.log("selectedDate is :", selectedDate);
+      setFieldValue(fieldName, formatDate(selectedDate.toISOString()));
     }
+    setSelectedDateField(null);
   };
-
+  const getChangedValues = (
+    initialValues: CaseDetails,
+    currentValues: { [key: string]: string }
+  ) => {
+    return Object.keys(currentValues).reduce(
+      (acc, key) => {
+        if (currentValues[key] !== initialValues[key]) {
+          acc[key] = currentValues[key];
+        }
+        return acc;
+      },
+      {} as { [key: string]: string }
+    );
+  };
   const handleFinalSubmit = async (values: { [key: string]: string }) => {
     console.log("Final form values:", values); // Log the final form values
     try {
       if (update) {
         // Perform update operation
         //to update need to pass unique Id field
-        await updateFormAsync(global.db, uniqueId, values);
+        //can filter the values those are changed
+        const changedValues = getChangedValues(
+          initialValues as CaseDetails,
+          values
+        );
+        await updateFormAsync(global.db, uniqueId, changedValues);
         navigation.navigate("CaseDetail", {
           caseDetails: values as CaseDetails,
         });
@@ -298,7 +390,7 @@ const AddCase: React.FC<Props> = ({ fields = Samplefields, route }) => {
     setSelectedDateField(fieldName);
   };
   return (
-    <ScrollView>
+    <ScrollView keyboardShouldPersistTaps="always">
       <View style={styles.AddCaseContainer}>
         <Text>{update ? "Update" : "Add"} a case</Text>
         <Text>Fill the below form to {update ? "Update" : "add new"} Case</Text>
@@ -311,7 +403,7 @@ const AddCase: React.FC<Props> = ({ fields = Samplefields, route }) => {
                     (acc, field) => ({
                       ...acc,
                       [field.name]:
-                        field.type === "date" ? new Date().toISOString() : "",
+                        field.type === "date" ? formatDate(new Date()) : "",
                     }),
                     {}
                   )
@@ -319,7 +411,14 @@ const AddCase: React.FC<Props> = ({ fields = Samplefields, route }) => {
             validationSchema={validationSchema}
             onSubmit={handleFinalSubmit}
           >
-            {({ handleChange, handleBlur, handleSubmit, values, errors }) => (
+            {({
+              handleChange,
+              handleBlur,
+              handleSubmit,
+              values,
+              setFieldValue,
+              errors,
+            }) => (
               <View>
                 {fields?.map((field, index) => (
                   <View key={index}>
@@ -330,6 +429,7 @@ const AddCase: React.FC<Props> = ({ fields = Samplefields, route }) => {
                       values={values}
                       errors={errors}
                       openDatePicker={() => openDatePicker(field.name)}
+                      suggestionArray={suggestions[field.name]}
                     />
                     {selectedDateField === field.name && (
                       <DateTimePicker
@@ -345,7 +445,8 @@ const AddCase: React.FC<Props> = ({ fields = Samplefields, route }) => {
                           handleDatePickerChange(
                             field.name,
                             event,
-                            selectedDate
+                            selectedDate,
+                            setFieldValue
                           )
                         }
                       />

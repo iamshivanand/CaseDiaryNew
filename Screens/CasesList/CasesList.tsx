@@ -1,4 +1,5 @@
 import { AntDesign } from "@expo/vector-icons";
+import { useRoute, RouteProp } from "@react-navigation/native";
 import React, { useContext, useEffect, useState } from "react";
 import {
   Dimensions,
@@ -9,16 +10,28 @@ import {
   View,
 } from "react-native";
 
-import { getFormsAsync, searchFormsAsync } from "../../DataBase";
+import {
+  getFormsAsync,
+  searchFormsAccordingToFieldsAsync,
+  searchFormsAsync,
+} from "../../DataBase";
 import { ThemeContext } from "../../Providers/ThemeProvider";
+import { formatDate } from "../../utils/commonFunctions";
 import CaseCard from "../CommonComponents/CaseCard";
 
 const windowWidth = Dimensions.get("window").width;
+interface RouteParams {
+  Filter?: string;
+}
+type CasesListRouteProp = RouteProp<{ params: RouteParams }, "params">;
 
-const CasesList = ({ navigation }) => {
+const CasesList = ({ navigation, routes }) => {
+  const route = useRoute<CasesListRouteProp>();
+  const { params } = route;
   const { theme } = useContext(ThemeContext);
   const [TotalCases, setTotalCases] = useState([]);
   const [searchText, setSearchText] = useState("");
+  console.log("type text ", params?.Filter);
 
   const handleSearch = async (text) => {
     setSearchText(text);
@@ -30,8 +43,64 @@ const CasesList = ({ navigation }) => {
       console.error("Error fetching forms:", error);
     }
   };
+  const handleSearchForFilters = async (
+    FieldName: string,
+    searchValue: string,
+    comparisonOperator: string = "="
+  ) => {
+    try {
+      const result = await searchFormsAccordingToFieldsAsync(
+        global.db,
+        FieldName,
+        searchValue,
+        comparisonOperator
+      );
+      console.log("result from this is ", result._array);
+      setTotalCases(result._array);
+    } catch (error) {
+      console.error("Error fetching forms:", error);
+    }
+  };
   useEffect(() => {
-    fetchData();
+    // eslint-disable-next-line no-unused-expressions
+    // type ? handleSearch(type)
+    let currentDate;
+    let yesterday;
+    let tomorrow;
+    let yesterdayDate;
+    let tomorrowDate;
+    switch (params?.Filter) {
+      case "todaysCases":
+        currentDate = formatDate(new Date());
+        console.log("current date is ", currentDate);
+        handleSearchForFilters("NextDate", currentDate);
+        // handleSearch(currentDate);
+        break;
+      case "tomorrowCases":
+        currentDate = new Date();
+        tomorrow = new Date(currentDate);
+        tomorrow.setDate(currentDate.getDate() + 1);
+        tomorrowDate = formatDate(tomorrow);
+        handleSearchForFilters("NextDate", tomorrowDate);
+        break;
+      case "yesterdayCases":
+        currentDate = new Date();
+        yesterday = new Date(currentDate);
+        yesterday.setDate(currentDate.getDate() - 1);
+        yesterdayDate = formatDate(yesterday);
+        console.log("yesterdays date", yesterdayDate);
+        handleSearchForFilters("NextDate", yesterdayDate);
+        break;
+      case "undatedCases":
+        currentDate = new Date();
+        yesterday = new Date(currentDate);
+        yesterday.setDate(currentDate.getDate() - 1);
+        yesterdayDate = formatDate(yesterday);
+        handleSearchForFilters("NextDate", yesterdayDate, "<");
+        break;
+      default:
+        fetchData();
+    }
   }, []);
   const handleDelete = () => {
     fetchData();
@@ -39,7 +108,7 @@ const CasesList = ({ navigation }) => {
   const fetchData = async () => {
     try {
       const result = await getFormsAsync(global.db);
-      console.log(" result now is ",result);
+      console.log(" result now is ", result);
       setTotalCases(result._array.reverse());
     } catch (error) {
       console.error("Error fetching forms:", error);

@@ -1,7 +1,6 @@
 import { FontAwesome } from "@expo/vector-icons";
 import React, { useContext } from "react";
 import {
-  View,
   Text,
   TouchableOpacity,
   StyleProp,
@@ -9,6 +8,7 @@ import {
   useWindowDimensions,
   StatusBar,
   Platform,
+  SafeAreaView,
 } from "react-native";
 
 import { ThemeContext } from "../../Providers/ThemeProvider";
@@ -30,14 +30,15 @@ const Header: React.FC<CustomHeaderProps> = ({
   const headerHeight = Platform.OS === "android" ? height * 0.08 : 60;
 
   return (
-    <View
+    <SafeAreaView
       style={[
         {
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
           padding: 10,
-          marginTop: statusBarHeight,
+          marginTop: 5,
+          //marginTop: statusBarHeight - 20,
           height: headerHeight,
           backgroundColor: theme.colors.background,
         },
@@ -47,10 +48,10 @@ const Header: React.FC<CustomHeaderProps> = ({
       <Text style={{ fontSize: 20, fontWeight: "bold" }}>Welcome Back</Text>
       {onPress && (
         <TouchableOpacity onPress={onPress}>
-          <FontAwesome name="user" size={34} color="black" />
+          <FontAwesome name="user" size={34} color="green" />
         </TouchableOpacity>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
