@@ -1,52 +1,114 @@
 // jest-setup.js
-// You can add global mocks or setup configurations here.
 
-// Mock for react-native-get-random-values if uuid gives trouble in Jest
-// Needed because uuid uses it under the hood.
+// This file is run by `setupFilesAfterEnv` in jest.config.js
+
+// Mock for react-native-get-random-values, as uuid might depend on it.
 jest.mock('react-native-get-random-values', () => ({
-  getRandomBase64: jest.fn(),
-  // If you are using other functions from this library, mock them as well.
-  // For uuid, getRandomBase64 is often enough if it's the only one indirectly used.
-  // A more complete mock for uuid might involve actually returning random values.
-  // For basic tests, just ensuring it doesn't crash is key.
+  getRandomBase64: jest.fn(() => 'mockRandomBase64'), // Return a consistent mock value
 }));
 
 // Mock for expo-document-picker
 jest.mock('expo-document-picker', () => ({
-  getDocumentAsync: jest.fn(() => Promise.resolve({ canceled: true, assets: null })), // Default mock for cancelled picking
+  getDocumentAsync: jest.fn(() => Promise.resolve({ type: 'cancel', assets: null, canceled: true })),
 }));
 
-// Mock for expo-file-system (basic, expand as needed)
+// Mock for expo-file-system
 jest.mock('expo-file-system', () => ({
-  documentDirectory: 'file:///mockDocumentDirectory/', // Expo's FS paths often have file:// prefix
-  getInfoAsync: jest.fn((uri) => {
-    // console.log(`Mock FS: getInfoAsync for ${uri}`);
-    // Simulate file existence based on a known path or a convention
-    if (uri.includes('CaseDiaryTestDb') || (typeof uri === 'string' && uri.startsWith('file:///mockDocumentDirectory/documents/'))) {
-        // For tests, assume files "exist" if they are in our mock dir or are the DB file
-        // This might need to be more sophisticated if tests depend on non-existence.
-        return Promise.resolve({ exists: true, isDirectory: uri.endsWith('/') });
+  documentDirectory: 'file:///mockDocumentDirectory/',
+  cacheDirectory: 'file:///mockCacheDirectory/',
+  getInfoAsync: jest.fn(uri => {
+    if (uri.includes('CaseDiaryTestDb') || (typeof uri === 'string' && (uri.startsWith('file:///mockDocumentDirectory/documents/') || uri.startsWith('file:///mockCacheDirectory/')))) {
+      return Promise.resolve({ exists: true, isDirectory: uri.endsWith('/'), uri });
     }
-    return Promise.resolve({ exists: false, isDirectory: false });
+    return Promise.resolve({ exists: false, isDirectory: false, uri });
   }),
   makeDirectoryAsync: jest.fn(() => Promise.resolve()),
-  copyAsync: jest.fn(() => Promise.resolve()), // Assume copy always succeeds
-  deleteAsync: jest.fn(() => Promise.resolve()), // Assume delete always succeeds
+  copyAsync: jest.fn(({ from, to }) => Promise.resolve()), // Assume copy always succeeds
+  deleteAsync: jest.fn(() => Promise.resolve()),
+  readAsStringAsync: jest.fn(() => Promise.resolve("mock file content")),
+  writeAsStringAsync: jest.fn(() => Promise.resolve()),
   getContentUriAsync: jest.fn(uri => Promise.resolve('content://mocked/' + uri.split('/').pop())),
+  downloadAsync: jest.fn((uri, fileUri, options) => Promise.resolve({ uri: fileUri, status: 200, md5: 'mockmd5', headers: {} })),
 }));
 
 // Mock for expo-intent-launcher
 jest.mock('expo-intent-launcher', () => ({
-    startActivityAsync: jest.fn(() => Promise.resolve(null)), // `startActivityAsync` returns Promise<IntentLauncher.IntentLauncherResult>
+  startActivityAsync: jest.fn(() => Promise.resolve({ resultCode: 0, data: null, extra: null })),
 }));
 
-// Optional: Clear all mocks before each test if you want clean slate,
-// but Jest does this by default for jest.fn() call counts etc.
-// beforeEach(() => {
-//   jest.clearAllMocks();
+// Mock for expo-sqlite - this will be used if __mocks__/expo-sqlite.js is not found or if explicitly unmocked.
+// However, we have a manual mock in __mocks__/expo-sqlite.js, which Jest should pick up automatically.
+// So, this explicit mock here is more of a fallback or for clarity if needed.
+// jest.mock('expo-sqlite', () => {
+//   const mockDb = {
+//     transaction: jest.fn(callback => {
+//       const tx = {
+//         executeSql: jest.fn((sql, params, successCallback, errorCallback) => {
+//           // Basic mock, can be expanded
+//           if (successCallback) {
+//             successCallback(tx, { rows: { _array: [], length: 0 }, rowsAffected: 0, insertId: 0 });
+//           }
+//         }),
+//       };
+//       callback(tx);
+//     }),
+//     closeAsync: jest.fn(),
+//     deleteAsync: jest.fn(),
+//   };
+//   return {
+//     openDatabase: jest.fn((name, version, description, size, callback) => mockDb),
+//     SQLiteDatabase: jest.fn(() => mockDb) // For type checking if needed
+//   };
 // });
 
-// Note: The __mocks__/expo-sqlite.js will be automatically picked up by Jest.
-// No need to explicitly mock it here unless you want to override that manual mock.
+// Mock for react-native-safe-area-context
+jest.mock('react-native-safe-area-context', () => {
+  const inset = { top: 0, right: 0, bottom: 0, left: 0 };
+  return {
+    SafeAreaProvider: jest.fn(({ children }) => children),
+    SafeAreaConsumer: jest.fn(({ children }) => children(inset)),
+    useSafeAreaInsets: jest.fn(() => inset),
+    useSafeAreaFrame: jest.fn(() => ({ x: 0, y: 0, width: 390, height: 844 })), // Mock frame
+    initialWindowMetrics: {
+      frame: { x: 0, y: 0, width: 0, height: 0 },
+      insets: { top: 0, left: 0, right: 0, bottom: 0 },
+    },
+  };
+});
 
-// console.log('jest-setup.js loaded'); // Keep this for debugging if tests still fail to find it
+// Mock for @react-navigation/native
+jest.mock('@react-navigation/native', () => {
+  const actualNav = jest.requireActual('@react-navigation/native');
+  return {
+    ...actualNav,
+    useNavigation: () => ({
+      navigate: jest.fn(),
+      dispatch: jest.fn(),
+      goBack: jest.fn(),
+      setParams: jest.fn(),
+      addListener: jest.fn((event, callback) => {
+        if (event === 'focus' || event === 'blur') {
+          // Simulate focus/blur immediately for tests if needed, or provide a way to trigger
+          // callback();
+        }
+        return jest.fn(); // Unsubscribe function
+      }),
+      isFocused: jest.fn(() => true),
+    }),
+    useRoute: () => ({
+      params: {},
+    }),
+    useFocusEffect: jest.fn(actualNav.useFocusEffect), // Keep actual implementation
+    useIsFocused: jest.fn(() => true), // Default to focused
+  };
+});
+
+// It might be useful to mock other @react-navigation modules if they cause issues
+// e.g., @react-navigation/stack, @react-navigation/bottom-tabs
+
+// If using AsyncStorage directly or indirectly
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+);
+
+// console.log('jest-setup.js: All custom mocks applied.');
