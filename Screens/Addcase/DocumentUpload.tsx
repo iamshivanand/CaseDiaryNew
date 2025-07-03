@@ -1,160 +1,259 @@
-import { RouteProp } from "@react-navigation/native";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
-import * as IntentLauncher from "expo-intent-launcher";
-import React, { useEffect, useState } from "react";
-import { Button, View, TouchableOpacity, Text, FlatList } from "react-native";
+import React, { useState, useCallback } from 'react';
+import { View, StyleSheet, FlatList, Alert, Platform } L } from 'react-native';
+import { Button, List, Text, useTheme, IconButton, ActivityIndicator, Divider } from 'react-native-paper';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import * as IntentLauncher from 'expo-intent-launcher';
+import { RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
 
-import uploadFile, { checkFileExists, getFormsAsync } from "../../DataBase"; // Import the uploadFile function
-import { RootStackParamList } from "../../Types/navigationtypes";
-import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen";
+import * as db from '../../DataBase'; // Corrected import
+import { CaseDocument } from '../../DataBase/schema';
+// Assuming RootStackParamList is correctly defined in your types
+// For AddCaseDetails flow, uniqueId is passed. We need caseId for existing cases.
+// The screen should ideally receive caseId if the case exists, or uniqueId if it's a new case.
+// Let's adjust props to reflect this possibility.
+export type DocumentUploadRouteParams = {
+  uniqueId: string; // For new cases, before DB ID is generated
+  caseId?: number;   // For existing cases
+  // update?: boolean; // From original props, seems less relevant now
+};
 
-interface Props {
-  update?: boolean;
-  initialValues?: CaseDetails;
-  route: RouteProp<RootStackParamList, "Documents">;
-}
+type DocumentUploadScreenRouteProp = RouteProp<{ Documents: DocumentUploadRouteParams }, 'Documents'>;
 
-const DocumentUpload: React.FC<Props> = ({ route }) => {
-  const { update, uniqueId } = route?.params;
-  const [documentUri, setDocumentUri] = useState(null);
-  const [document, setDocument] = useState();
-  const [documentData, setDocumentData] = useState();
+const DocumentUpload: React.FC = () => {
+  const theme = useTheme();
+  const route = useRoute<DocumentUploadScreenRouteProp>();
 
-  //console.log("Documents", document);
-  const handleDocumentPick = async () => {
+  // caseId will be present if we are editing an existing case.
+  // uniqueId is for new cases, but we can't save documents with it directly to CaseDocuments table
+  // as it requires a case_id.
+  const { caseId, uniqueId } = route.params;
+
+  const [documents, setDocuments] = useState<CaseDocument[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Mock user ID, replace with actual auth data when available
+  const MOCK_CURRENT_USER_ID = 1;
+
+  const loadDocuments = useCallback(async () => {
+    if (!caseId) { // If no caseId, it's a new case, no documents to load from DB yet
+      setDocuments([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
-      const document = await DocumentPicker.getDocumentAsync({
-        type: "application/pdf",
+      const docs = await db.getCaseDocuments(caseId);
+      setDocuments(docs);
+    } catch (error) {
+      console.error("Error loading documents:", error);
+      Alert.alert("Error", "Could not load documents.");
+    } finally {
+      setLoading(false);
+    }
+  }, [caseId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadDocuments();
+    }, [loadDocuments])
+  );
+
+  const handlePickAndUploadDocument = async () => {
+    if (!caseId) {
+      Alert.alert("Save Case First", "Please save the main case details before adding documents.");
+      // TODO: Implement temporary storage for documents if adding to a new (unsaved) case.
+      // For now, we only allow adding documents to an existing case with a caseId.
+      return;
+    }
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "*/*", // Allow all file types, or specify (e.g., 'application/pdf', 'image/*')
+        copyToCacheDirectory: true, // Important for expo-file-system to access it reliably
       });
-      //console.log("heloo the DOCUMENT IS ", document);
 
-      if (!document.canceled) {
-        setDocumentUri(document.assets[0].uri);
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
       }
-    } catch (error) {
-      console.error("Error picking document:", error);
-    }
-  };
 
-  const handleUploadDocument = async () => {
-    if (documentUri) {
-      try {
-        const fileName = `document_${uniqueId}`; // Generate a unique file name based on caseId
-        const fileType = documentUri.split(".").pop(); // Get the file type from the uri
-        const fileUri = documentUri;
-        const copyToFilesystem = true;
-        const folderName = "documents"; // Folder name to save the document
-
-        const uploadedFilePath = await uploadFile({
-          fileName,
-          fileType,
-          fileUri,
-          copyToFilesystem,
-          folderName,
-          uniqueId,
-        });
-
-        // Here you can save the uploadedFilePath to the SQLite database along with the caseId
-        // Example: saveToDatabase(uploadedFilePath, caseId);
-
-        console.log("Document uploaded and saved to:", uploadedFilePath);
-      } catch (error) {
-        console.error("Error uploading document:", error);
+      const asset = result.assets[0];
+      if (!asset.uri) {
+        Alert.alert("Error", "Could not get document URI.");
+        return;
       }
-    } else {
-      console.warn("No document selected.");
-    }
-  };
-  const handleOpenDocument = async (documentUri) => {
-    try {
-      const fileExists = await checkFileExists(documentUri);
 
-      if (fileExists) {
-        console.log("File exists.");
-        console.log("Opening document with URI:", documentUri); // Log the URI before launching the intent
+      setIsUploading(true);
 
-        // Get the content URI for the file
-        const contentUri = await FileSystem.getContentUriAsync(documentUri);
+      // Determine fileType more reliably if possible, asset.mimeType might be good
+      const fileType = asset.mimeType || asset.name?.split('.').pop() || 'unknown';
 
-        // Launch the intent to open the document
-        await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
-          data: contentUri,
-          flags: 1,
-          type: "application/pdf",
-        });
+      const uploadedDocId = await db.uploadCaseDocument({
+        originalFileName: asset.name || `document_${Date.now()}`,
+        fileType: fileType,
+        fileUri: asset.uri, // Use asset.uri which is a local cache URI
+        caseId: caseId,
+        userId: MOCK_CURRENT_USER_ID, // Pass current user ID
+        fileSize: asset.size,
+      });
+
+      if (uploadedDocId) {
+        Alert.alert("Success", "Document uploaded.");
+        loadDocuments(); // Refresh list
       } else {
-        console.log("File does not exist.");
+        Alert.alert("Error", "Failed to upload document.");
       }
     } catch (error) {
-      console.error("Error opening document:", error);
+      console.error("Error picking or uploading document:", error);
+      Alert.alert("Error", "An error occurred during document upload.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
-  // try {
-  //   // Open the document based on its file type
-  //   await Linking.openURL(documentUri);
-  //   //   if (fileType === "pdf") {
-  //   //     // Open PDF document with default viewer
-
-  //   //   } else {
-  //   //     console.log("Unsupported file type:", fileType);
-  //   //   }
-  // } catch (error) {
-  //   console.error("Error opening document:", error);
-  // }
-
-  const openDocument = async (filePath: string) => {
-    // try {
-    //   const cUri = await FileSystem.getContentUriAsync(filePath);
-    //   await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
-    //     data: cUri,
-    //     flags: 1,
-    //     type: "application/pdf",
-    //   });
-    // } catch (e) {
-    //   console.log(e.message);
-    // }
-    // try {
-    //   await FileSystem.openAsync(documentUri);
-    // } catch (error) {
-    //   console.log("open krtay hue error aa gyaa");
-    // }
+  const confirmDeleteDocument = (doc: CaseDocument) => {
+    Alert.alert(
+      "Confirm Delete",
+      `Are you sure you want to delete "${doc.original_display_name}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => handleDeleteDocument(doc.id) }
+      ]
+    );
   };
 
-  useEffect(() => {
-    // Fetch the list of documents when the component mounts
-    fetchDocuments();
-  }, []);
-
-  const fetchDocuments = async () => {
+  const handleDeleteDocument = async (documentId: number) => {
+    setLoading(true); // Or a specific deleting loader
     try {
-      // Open the SQLite database
-      const fetchedDocuments = await getFormsAsync(global.db); // Fetch documents from the database
-      console.log("Fetched Documents", fetchedDocuments);
-      setDocument(fetchedDocuments._array); // Set the documents state with the fetched documents
+      const success = await db.deleteCaseDocument(documentId);
+      if (success) {
+        Alert.alert("Success", "Document deleted.");
+        loadDocuments(); // Refresh list
+      } else {
+        Alert.alert("Error", "Failed to delete document.");
+      }
     } catch (error) {
-      console.error("Error fetching documents:", error);
+      console.error("Error deleting document:", error);
+      Alert.alert("Error", "Could not delete document.");
+    } finally {
+      setLoading(false);
     }
   };
-  const renderDocumentItem = ({ item }) => (
-    <TouchableOpacity onPress={() => handleOpenDocument(item?.DocumentPath)}>
-      <Text>{item?.DocumentPath}</Text>
-    </TouchableOpacity>
+
+  const handleOpenDocument = async (doc: CaseDocument) => {
+    if (!doc.stored_filename) {
+        Alert.alert("Error", "Document path not found.");
+        return;
+    }
+    const localUri = db.getFullDocumentPath(doc.stored_filename);
+    if (!localUri) {
+         Alert.alert("Error", "Could not construct document path.");
+        return;
+    }
+
+    try {
+        const fileInfo = await FileSystem.getInfoAsync(localUri);
+        if (!fileInfo.exists) {
+            Alert.alert("Error", "File does not exist at the specified path. It might have been moved or deleted.");
+            return;
+        }
+
+        const contentUri = await FileSystem.getContentUriAsync(localUri);
+
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+            data: contentUri,
+            flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+            type: doc.file_type || '*/*', // MIME type
+        });
+    } catch (error) {
+        console.error("Error opening document:", error);
+        Alert.alert("Error", "Could not open document. Ensure you have an app that can open this file type.");
+    }
+  };
+
+
+  const renderItem = ({ item }: { item: CaseDocument }) => (
+    <List.Item
+      title={item.original_display_name}
+      description={`Type: ${item.file_type || 'N/A'}, Size: ${item.file_size ? (item.file_size / 1024).toFixed(2) + ' KB' : 'N/A'}`}
+      titleStyle={{ color: theme.colors.onSurface }}
+      descriptionStyle={{ color: theme.colors.onSurfaceVariant }}
+      left={props => <List.Icon {...props} icon={ item.file_type?.startsWith('image') ? "file-image-outline" : "file-document-outline"} />}
+      right={props => (
+        <IconButton
+          {...props}
+          icon="delete-outline"
+          iconColor={theme.colors.error}
+          onPress={() => confirmDeleteDocument(item)}
+        />
+      )}
+      onPress={() => handleOpenDocument(item)}
+    />
   );
 
   return (
-    <View>
-      <Button title="Pick Document" onPress={handleDocumentPick} />
-      <Button title="Upload Document" onPress={handleUploadDocument} />
-      <Text>List of Documents:</Text>
-      <FlatList
-        data={document}
-        renderItem={renderDocumentItem}
-        keyExtractor={(item, index) => item?.id?.toString() ?? index.toString()}
-      />
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Button
+        mode="contained"
+        onPress={handlePickAndUploadDocument}
+        style={styles.addButton}
+        icon="plus"
+        loading={isUploading}
+        disabled={isUploading || !caseId} // Disable if no caseId (new case not yet saved)
+      >
+        Add Document
+      </Button>
+      {!caseId && (
+        <Text style={styles.noticeText}>
+            Save the main case details first to enable document uploads.
+        </Text>
+      )}
+
+      {loading && documents.length === 0 ? (
+        <ActivityIndicator animating={true} size="large" style={styles.loader} />
+      ) : (
+        <FlatList
+          data={documents}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id.toString()}
+          ItemSeparatorComponent={() => <Divider />}
+          ListEmptyComponent={
+            !loading && caseId ? <Text style={styles.emptyText}>No documents attached to this case yet.</Text> : null
+          }
+          contentContainerStyle={styles.listContentContainer}
+        />
+      )}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 8,
+  },
+  addButton: {
+    margin: 8,
+  },
+  noticeText: {
+    textAlign: 'center',
+    marginVertical: 10,
+    paddingHorizontal: 16,
+    fontStyle: 'italic',
+  },
+  loader: {
+    marginTop: 20,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 16,
+    color: '#777',
+  },
+  listContentContainer: {
+    flexGrow: 1, // Ensures ListEmptyComponent is centered if list is empty
+  }
+});
 
 export default DocumentUpload;
