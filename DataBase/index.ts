@@ -11,9 +11,22 @@ let dbInstance: SQLite.SQLiteDatabase | null = null;
 
 // --- Database Initialization and Connection Management ---
 
+/**
+ * ONLY FOR TEST ENVIRONMENTS. Clears the singleton dbInstance.
+ */
+export const __TEST_ONLY_resetDbInstance = () => {
+  console.log(`NODE_ENV in __TEST_ONLY_resetDbInstance: ${process.env.NODE_ENV}`); // Debugging line
+  if (process.env.NODE_ENV === 'test') {
+    dbInstance = null;
+  } else {
+    console.warn("__TEST_ONLY_resetDbInstance called outside of test environment. This is not allowed.");
+  }
+};
+
 export const getDb = async (): Promise<SQLite.SQLiteDatabase> => {
   if (dbInstance === null) {
     try {
+      // console.log("dbInstance is null, opening new DB connection."); // Debugging line
       const instance = await SQLite.openDatabaseAsync(DATABASE_NAME);
       console.log("Database opened successfully.");
       dbInstance = instance;

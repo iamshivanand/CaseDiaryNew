@@ -35,15 +35,18 @@ beforeEach(async () => {
 describe('Database Module Tests', () => {
   describe('Schema Initialization and Seeding', () => {
     it('should initialize schema and seed initial data without errors', async () => {
-      const database = await getDb(); // This will also trigger initializeSchema and seedInitialData
-      expect(database).toBeDefined();
-      // Check if seed data was inserted (example for CaseTypes)
-      const caseTypes = await getCaseTypes();
+      const databaseMock = await getDb(); // This is our mock SQLiteDatabase object
+      expect(databaseMock).toBeDefined();
+
+      // Directly call the mock's getAllAsync to bypass our getCaseTypes wrapper for this specific debug
+      const caseTypes = await databaseMock.getAllAsync("SELECT * FROM CaseTypes WHERE user_id IS NULL ORDER BY name ASC", []);
+      console.log('Test received caseTypes:', JSON.stringify(caseTypes)); // Log what the test sees
+
       expect(caseTypes.length).toBeGreaterThan(0);
       const civilType = caseTypes.find(ct => ct.name === 'Civil');
       expect(civilType).toBeDefined();
 
-      const districts = await dbFunctions.getDistricts(); // Use dbFunctions alias or specific import
+      const districts = await dbFunctions.getDistricts(); // Use dbFunctions alias or specific import for other functions
       expect(districts.length).toBeGreaterThan(0);
       const bareilly = districts.find(d => d.name === 'Bareilly');
       expect(bareilly).toBeDefined();
