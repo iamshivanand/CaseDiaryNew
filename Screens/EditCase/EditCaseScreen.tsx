@@ -49,11 +49,15 @@ const EditCaseScreen: React.FC = () => {
     }
   );
 
-  const [documents, setDocuments] = useState<Document[]>(initialCaseDataFromParams?.documents || [
+  // DEBUGGING STEP: Forcing dummy data for documents to isolate the source of the rendering error.
+  const [documents, setDocuments] = useState<Document[]>([
     { id: 1, case_id: 1, fileName: 'Merger Agreement Final.pdf', uploadDate: '2023-09-15T10:30:00.000Z', fileType: 'application/pdf', fileSize: 2048000, stored_filename: 'doc_1_1.pdf' },
     { id: 2, case_id: 1, fileName: 'Client Intake Form.docx', uploadDate: '2023-09-10T14:00:00.000Z', fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileSize: 512000, stored_filename: 'doc_1_2.docx' },
     { id: 3, case_id: 1, fileName: 'Evidence Photos (Set 1).zip', uploadDate: '2023-10-02T09:15:00.000Z', fileType: 'application/zip', fileSize: 15360000, stored_filename: 'doc_1_3.zip' },
   ]);
+  // Original line:
+  // const [documents, setDocuments] = useState<Document[]>(initialCaseDataFromParams?.documents || [ /* dummy data */ ]);
+
 
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>(initialCaseDataFromParams?.timelineEvents || [
     { id: 'tl1', date: '2023-10-20T00:00:00.000Z', description: 'Initial consultation with the client. Discussed case details and potential strategies.' },
