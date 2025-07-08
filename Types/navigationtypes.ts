@@ -1,28 +1,72 @@
-import { CaseDetails } from "../Screens/CaseDetailsScreen/CaseDetailsScreen";
+import { NavigatorScreenParams } from '@react-navigation/native'; // Needed for nested navigators
+import { CaseDetails } from "../Screens/CaseDetailsScreen/CaseDetailsScreen"; // Summary type
+import { CaseData, Document, TimelineEvent } from "./appTypes"; // Comprehensive types
 
-export type RootStackParamList = {
-  AddCase: { update?: boolean; initialValues?: CaseDetails; uniqueId: string };
-  CaseDetail: { caseDetails: CaseDetails }; // Consider passing caseId (number) instead of full object
-  Documents: { update?: boolean; uniqueId: string }; // Consider caseId here too
-  Fees: { update?: boolean; uniqueId: string }; // Consider caseId here too
-  AddCaseDetails: { update?: boolean; initialValues?: CaseDetails }; // This might be the main add/edit case screen
+// Stack for the "Home" or "Cases" Tab
+export type HomeStackParamList = {
+  HomeScreen: undefined; // Main screen for this tab
+  AllCases: undefined;   // List of all cases
+  CaseDetail: { caseDetails: CaseDetails }; // Shows details of a single case
+  EditCase: { // Screen to edit an existing case
+    initialCaseData?: Partial<CaseData> & {
+      documents?: Document[],
+      timelineEvents?: TimelineEvent[]
+    }
+  };
+  // Assuming AddCase.tsx is the main entry for adding a new case flow
+  AddCase: { uniqueId?: string }; // uniqueId might be generated before starting
+  // AddCaseDetails, Documents, Fees would be part of the AddCase stack if it's multi-step
+  // For simplicity, AddCaseDetails might be a screen within this HomeStack too,
+  // or AddCase itself is a stack. Let's keep AddCaseDetails here for now.
+  AddCaseDetails: { update?: boolean; initialValues?: CaseDetails; uniqueId?: string };
+  // Documents and Fees routes might also be part of this stack if they are separate screens
+  Documents: { update?: boolean; uniqueId: string };
+  Fees: { update?: boolean; uniqueId: string };
+};
 
-  // Main App Structure (from Routes.tsx and Apppro.tsx)
-  MainApp: undefined; // Represents the tab navigator or main app container
-  AllCases: undefined; // Screen to list all cases
+// Stack for the "Search" Tab
+export type SearchStackParamList = {
+  SearchScreen: undefined;
+  // Example: SearchResults: { query: string };
+  // Example: SearchCaseDetail: { caseDetails: CaseDetails }; // If search results navigate to a detail view
+};
 
-  // Settings & Lookup Management
+// Stack for the "Calendar" Tab
+export type CalendarStackParamList = {
+  CalendarScreen: undefined;
+  // Example: EventDetail: { eventId: string };
+};
+
+// Stack for the "Profile" Tab (can include Settings)
+export type ProfileStackParamList = {
+  ProfileScreen: undefined;
   SettingsScreen: undefined;
   ManageLookupCategoryScreen: {
-    categoryName: 'CaseTypes' | 'Courts' | 'Districts' | 'PoliceStations'; // Add more as created
+    categoryName: 'CaseTypes' | 'Courts' | 'Districts' | 'PoliceStations';
     title: string;
   };
-
-  // Potentially other screens from Apppro.tsx if it's a navigator
-  // e.g., Dashboard, Calendar, Search might be part of a BottomTabNavigator
-  Dashboard: undefined;
-  Calendar: undefined;
-  Search: undefined;
-  Profile: undefined;
-  HomeScreen: undefined; // if it's a distinct screen
+  // Example: AccountDetails: undefined;
 };
+
+// This defines the routes for the BottomTabNavigator itself
+export type MainAppTabParamList = {
+  HomeTab: NavigatorScreenParams<HomeStackParamList>; // "HomeTab" is the route name for the tab
+  SearchTab: NavigatorScreenParams<SearchStackParamList>;
+  CalendarTab: NavigatorScreenParams<CalendarStackParamList>;
+  ProfileTab: NavigatorScreenParams<ProfileStackParamList>;
+  // The names "HomeTab", "SearchTab" etc. will be used in Apppro.tsx for Tab.Screen names
+};
+
+// RootStackParamList now primarily contains the MainApp (Tab Navigator)
+// and any other screens presented outside or modally above the tab structure.
+export type RootStackParamList = {
+  MainApp: NavigatorScreenParams<MainAppTabParamList>; // MainApp now refers to the entire tab navigator structure
+  // Example of a modal screen that would cover tabs:
+  // GlobalModalScreen: { message: string };
+  // AuthStack: undefined; // If you have a separate authentication flow
+};
+
+// Note: The original RootStackParamList had Dashboard, Calendar, Search, Profile, HomeScreen directly.
+// These are now integrated into their respective stacks within the MainAppTabParamList.
+// AllCases, CaseDetail, AddCaseDetails, SettingsScreen, ManageLookupCategoryScreen were also top-level,
+// they are now moved into appropriate stacks (mostly HomeStack or ProfileStack).

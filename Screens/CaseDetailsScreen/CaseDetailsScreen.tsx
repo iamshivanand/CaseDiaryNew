@@ -9,30 +9,35 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
+// Import the more comprehensive CaseData type for mapping
+import { CaseData } from "../../Types/appTypes"; // Adjust path if necessary
+import { RootStackParamList } from "../../Types/navigationtypes"; // For StackNavigationProp
 
-export interface CaseDetails {
+export interface CaseDetails { // This is the type this screen currently receives
   uniqueId: string;
   id?: number | string;
-  caseNumber?: string;
+  caseNumber?: string; // Often used as a title or primary identifier
   court?: string;
-  dateFiled?: Date;
+  dateFiled?: Date; // Note: This is a Date object
   caseType?: string;
-  // Add more properties if needed
+  // Potentially other summary fields
 }
 
-type RootStackParamList = {
-  caseDetailScreen: { caseDetails: CaseDetails };
-  AddCaseDetails?: { update?: boolean; initialValues?: CaseDetails };
-};
+// RootStackParamList is now imported from navigationtypes
+// type RootStackParamList = {
+//   CaseDetail: { caseDetails: CaseDetails }; // Changed from caseDetailScreen for consistency
+//   EditCase: { initialCaseData?: Partial<CaseData> };
+//   AddCaseDetails?: { update?: boolean; initialValues?: CaseDetails }; // Keeping for now if used elsewhere
+// };
 
 type CaseDetailScreenRouteProp = RouteProp<
   RootStackParamList,
-  "caseDetailScreen"
+  "CaseDetail" // Assuming 'CaseDetail' is the route name for this screen in navigationtypes.ts
 >;
 
 type CaseDetailScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
-  "caseDetailScreen"
+  "CaseDetail" // Assuming 'CaseDetail' is the route name
 >;
 
 type Props = {
@@ -52,12 +57,24 @@ const CaseDetail: React.FC<Props> = ({ route, navigation }) => {
       <View style={styles.HeadingContainer}>
         <Text style={styles.title}>Case Details</Text>
         <TouchableOpacity
-          onPress={() =>
-            navigation.navigate("AddCaseDetails", {
-              update: true,
-              initialValues: caseDetails,
-            })
-          }
+          onPress={() => {
+            // Map local caseDetails to the more comprehensive CaseData structure
+            const initialEditData: Partial<CaseData> = {
+              uniqueId: caseDetails.uniqueId,
+              id: caseDetails.id,
+              // Assuming caseDetails.caseNumber is the main identifiable string/title
+              CaseTitle: caseDetails.caseNumber,
+              // case_number: caseDetails.caseNumber, // Or if it's strictly a number/code
+              court_name: caseDetails.court, // For display; EditCaseScreen uses court_id for dropdown
+              FiledDate: caseDetails.dateFiled?.toISOString(), // Convert Date to ISO string
+              case_type_name: caseDetails.caseType, // For display; EditCaseScreen uses case_type_id
+              // Documents and TimelineEvents are not available in this simplified CaseDetails object
+              // EditCaseScreen will use its defaults or fetch them if it's enhanced to do so.
+            };
+            navigation.navigate("EditCase", {
+              initialCaseData: initialEditData,
+            });
+          }}
         >
           <View style={styles.EditButton}>
             <Text style={styles.EditButtonText}>Edit</Text>
