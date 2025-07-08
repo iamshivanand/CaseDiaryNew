@@ -15,14 +15,19 @@ interface TimelineItemProps {
 }
 
 const TimelineItem: React.FC<TimelineItemProps> = ({ item, onEdit, onDelete, isLastItem = false }) => {
-  const formattedDate = () => {
+  const displayDate = () => {
+    if (typeof item.date !== 'string' || !item.date) {
+      return 'Date N/A';
+    }
     try {
       const date = parseISO(item.date);
       return format(date, "MMM dd, yyyy");
-    } catch {
-      return item.date;
+    } catch (error) {
+      return item.date.trim() !== '' ? item.date : 'Invalid Date Format';
     }
   };
+
+  const displayDescription = typeof item.description === 'string' ? item.description : 'No description available.';
 
   return (
     <View style={TimelineItemStyles.container}>
@@ -32,7 +37,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ item, onEdit, onDelete, isL
       </View>
       <View style={TimelineItemStyles.contentContainer}>
         <View style={TimelineItemStyles.header}>
-          <Text style={TimelineItemStyles.date}>{formattedDate()}</Text>
+          <Text style={TimelineItemStyles.date}>{displayDate()}</Text>
           <View style={TimelineItemStyles.actionsContainer}>
             <IconOnlyButton
               icon={<MaterialIcons name="edit" size={20} color="#6B7280" />}
@@ -50,7 +55,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({ item, onEdit, onDelete, isL
             />
           </View>
         </View>
-        <Text style={TimelineItemStyles.description}>{item.description}</Text>
+        <Text style={TimelineItemStyles.description}>{displayDescription}</Text>
       </View>
     </View>
   );
