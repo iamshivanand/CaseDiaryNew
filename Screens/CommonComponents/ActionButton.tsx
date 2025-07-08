@@ -26,34 +26,35 @@ const ActionButton: React.FC<ActionButtonProps> = ({
 }) => {
   let buttonStyleConfig;
   let textStyleConfig;
+  let finalActivityIndicatorColor;
 
   switch (type) {
     case "primary":
       buttonStyleConfig = ActionButtonStyle.primaryButton;
       textStyleConfig = ActionButtonStyle.primaryButtonText;
+      finalActivityIndicatorColor = ActionButtonStyle.primaryButtonText.color || "#FFFFFF";
       break;
     case "secondary":
       buttonStyleConfig = ActionButtonStyle.secondaryButton;
       textStyleConfig = ActionButtonStyle.secondaryButtonText;
+      // For secondary (ghost/text buttons), use the text color for the indicator, or a default if not specified
+      finalActivityIndicatorColor = ActionButtonStyle.secondaryButtonText.color || "#1D4ED8";
       break;
     case "dashed":
       buttonStyleConfig = ActionButtonStyle.dashedButton;
       textStyleConfig = ActionButtonStyle.dashedButtonText;
+      // Dashed buttons are often similar to primary in terms of text on transparent/light bg, but icon might be primary color
+      finalActivityIndicatorColor = ActionButtonStyle.dashedButtonText.color || "#1D4ED8";
       break;
     default:
       buttonStyleConfig = ActionButtonStyle.primaryButton;
       textStyleConfig = ActionButtonStyle.primaryButtonText;
+      finalActivityIndicatorColor = ActionButtonStyle.primaryButtonText.color || "#FFFFFF";
   }
 
-  const activityIndicatorColor = (type === "primary" || type === "dashed") ? "#FFFFFF" : "#1D4ED8";
-   if (type === 'secondary' && ActionButtonStyle.secondaryButton.backgroundColor === 'transparent') {
-    // If secondary is truly ghost, indicator should be its text color
-    // activityIndicatorColor = ActionButtonStyle.secondaryButtonText.color;
-    // For now, keeping it simpler, assuming secondary might have a background or primary is dominant enough.
-    // Defaulting to primary color for ghost/light buttons.
-     activityIndicatorColor = "#1D4ED8";
-   }
-
+  // If the button text color for primary is not white (e.g. dark theme with light primary button), this ensures contrast.
+  // However, usually primary buttons have light text on dark bg or vice-versa.
+  // The logic above tries to infer from textStyleConfig.color.
 
   return (
     <TouchableOpacity
@@ -68,7 +69,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({
       activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator color={activityIndicatorColor} />
+        <ActivityIndicator color={finalActivityIndicatorColor} />
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {leftIcon && <View style={ActionButtonStyle.iconWrapper}>{leftIcon}</View>}
