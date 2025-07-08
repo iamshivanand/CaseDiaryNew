@@ -1,5 +1,4 @@
 import { Formik, FormikProps } from "formik"; // Removed FormikFieldProps as it wasn't used
-import { v4 as uuidv4 } from "uuid"; // Import uuidv4 for generating unique IDs
 import React, { useEffect } from "react"; // Removed useState as it's not directly used by AddCase anymore (Formik handles state)
 import {
   StyleSheet,
@@ -220,27 +219,57 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         } else { console.error("Failed to update case."); }
       } catch (e) { console.error("Error updating case:", e); }
     } else { // ADD LOGIC
+      // Resolve selected IDs to their string labels for potential storage
+      const selectedCourtOption = dummyCourtOptionsForAdd.find(opt => opt.value === formValues.court_id);
+      const courtNameString = selectedCourtOption && selectedCourtOption.value !== '' ? selectedCourtOption.label : null;
+
+      const selectedCaseTypeOption = dummyCaseTypeOptionsForAdd.find(opt => opt.value === formValues.case_type_id);
+      const caseTypeNameString = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : null;
+
       const insertPayload: CaseInsertData = {
         uniqueId: formValues.uniqueId || uniqueIdToUse, // Ensure uniqueId
         user_id: null, // Placeholder for user ID
         CNRNumber: formValues.CNRNumber || null,
-        court_id: formValues.court_id || null,
+
+        // Send NULL to FK ID columns to prevent FOREIGN KEY constraint error
+        court_id: null,
+        case_type_id: null,
+
+        // The actual string names would be stored in new TEXT columns in the Cases table.
+        // Since CaseInsertData doesn't have these fields yet, this is a conceptual addition.
+        // The DB schema and CaseInsertData type need to be updated by the user.
+        // Example:
+        // court_name_text: courtNameString, // (requires 'court_name_text' in CaseInsertData & DB)
+        // case_type_name_text: caseTypeNameString, // (requires 'case_type_name_text' in CaseInsertData & DB)
+
         dateFiled: formValues.FiledDate || null,
-        case_type_id: formValues.case_type_id || null,
         case_number: formValues.case_number || null,
-        OnBehalfOf: formValues.ClientName || null,
+        // case_year, crime_number, crime_year need to be in formFieldsDefinition and CaseData to be captured
+        case_year: formValues.case_year ? parseInt(formValues.case_year as string, 10) : null,
+        crime_number: formValues.crime_number || null,
+        crime_year: formValues.crime_year ? parseInt(formValues.crime_year as string, 10) : null,
+
+        OnBehalfOf: formValues.ClientName || formValues.OnBehalfOf || null, // Prioritize ClientName if available
         FirstParty: formValues.FirstParty || null,
         OppositeParty: formValues.OppositeParty || null,
         ClientContactNumber: formValues.ClientContactNumber || null,
         Accussed: formValues.Accussed || null,
         Undersection: formValues.Undersection || null,
-        OppositeAdvocate: formValues.OpposingCounsel || null,
+        // police_station_id also needs to be handled (is it an ID or name? FK exists)
+        police_station_id: typeof formValues.police_station_id === 'number' ? formValues.police_station_id : null, // Assuming it's an ID for now
+
+        OppositeAdvocate: formValues.OpposingCounsel || formValues.OppositeAdvocate || null, // Prioritize OpposingCounsel
         OppAdvocateContactNumber: formValues.OppAdvocateContactNumber || null,
-        CaseStatus: formValues.Status || null,
-        NextDate: formValues.HearingDate || null,
-        // crime_number, crime_year, case_year, police_station_id, PreviousDate etc.
-        // CaseDescription, CaseNotes are not in CaseInsertData schema
+        CaseStatus: formValues.Status || formValues.CaseStatus || null, // Prioritize Status from dropdown
+        PreviousDate: formValues.PreviousDate || null, // Needs to be added to formFieldsDefinition if used
+        NextDate: formValues.HearingDate || formValues.NextDate || null, // Prioritize HearingDate
+        // CaseDescription and CaseNotes are not in CaseInsertData/Cases schema by default.
       };
+
+      console.log("INFO: Intended Court Name (requires DB schema change to store):", courtNameString);
+      console.log("INFO: Intended Case Type Name (requires DB schema change to store):", caseTypeNameString);
+      console.log("Attempting to insert with payload (court_id & case_type_id as NULL):", JSON.stringify(insertPayload, null, 2));
+
       try {
         const newCaseId = await addCase(insertPayload);
         if (newCaseId) {
@@ -250,6 +279,9 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
             uniqueId: insertPayload.uniqueId,
             caseNumber: formValues.CaseTitle || "N/A",
             dateFiled: formValues.FiledDate ? new Date(formValues.FiledDate) : undefined,
+            // For display on CaseDetailsScreen, pass the names if possible (requires schema change to store them first)
+            court: courtNameString || undefined, // Pass resolved name
+            caseType: caseTypeNameString || undefined, // Pass resolved name
           };
           navigation.navigate("CaseDetail", { caseDetails: navDetails });
         } else { console.error("Failed to add case."); }
