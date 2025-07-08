@@ -19,9 +19,8 @@ export type HomeStackParamList = {
   // For simplicity, AddCaseDetails might be a screen within this HomeStack too,
   // or AddCase itself is a stack. Let's keep AddCaseDetails here for now.
   AddCaseDetails: { update?: boolean; initialValues?: CaseDetails; uniqueId?: string };
-  // Documents and Fees routes might also be part of this stack if they are separate screens
-  Documents: { update?: boolean; uniqueId: string };
-  Fees: { update?: boolean; uniqueId: string };
+  // Documents: { update?: boolean; uniqueId: string }; // Documents route removed from this stack
+  // Fees: { update?: boolean; uniqueId: string }; // Fees route removed
 };
 
 // Stack for the "Search" Tab

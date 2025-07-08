@@ -1,11 +1,9 @@
-import { Fontisto } from "@expo/vector-icons";
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
-import { Picker } from "@react-native-picker/picker";
+import { Fontisto } from "@expo/vector-icons"; // Keep for now if DatePickerField doesn't fully replace its usage pattern with Formik
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker"; // Potentially remove if DatePickerField handles all
+import { Picker } from "@react-native-picker/picker"; // To be replaced by DropdownPicker
 import { RouteProp, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { Formik, FormikProps } from "formik";
+import { Formik, FormikProps, FieldProps as FormikFieldProps } from "formik"; // Added FormikFieldProps
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -29,11 +27,19 @@ import {
 } from "../../DataBase";
 import { RootStackParamList } from "../../Types/navigationtypes";
 import { formatDate } from "../../utils/commonFunctions";
-import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen";
-import SuggestionInput from "../CommonComponents/SuggestionsInput";
+import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen"; // This is a summary type
+import { CaseData, DropdownOption as AppDropdownOption, caseStatusOptions, priorityOptions } from "../../Types/appTypes"; // For more comprehensive data structure & dropdown options
+// import SuggestionInput from "../CommonComponents/SuggestionsInput"; // No longer used directly by FormField
+
+// Import new common components
+import FormInput from '../CommonComponents/FormInput';
+import DropdownPicker from '../CommonComponents/DropdownPicker';
+import DatePickerField from '../CommonComponents/DatePickerField';
+import ActionButton from "../CommonComponents/ActionButton"; // For the submit button
+import { EditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle"; // For consistent page layout styles
 
 interface Field {
-  name: string;
+  name: keyof CaseData; // Ensure name is a key of CaseData for type safety with Formik values
   type: string;
   placeholder?: string;
   label: string;
@@ -56,69 +62,469 @@ interface Props {
   navigation?: AddCaseScreenNavigationProp;
 }
 
-const suggestionsInputFields = [
+// const suggestionsInputFields = [ /* ... This array is no longer used ... */ ];
+
+// Dummy options for dropdowns, similar to EditCaseScreen
+const dummyCaseTypeOptionsForAdd: AppDropdownOption[] = [
+  { label: 'Select Case Type...', value: '' },
+  { label: 'Civil Suit', value: 1 }, // Assuming value is the ID
+  { label: 'Criminal Defense', value: 2 },
+  { label: 'Family Law', value: 3 },
+  { label: 'Corporate', value: 4 },
+  { label: 'Other', value: 99 },
+];
+const dummyCourtOptionsForAdd: AppDropdownOption[] = [
+    { label: 'Select Court...', value: '' },
+    { label: 'District Court - City Center', value: 1 }, // Assuming value is the ID
+    { label: 'High Court - State Capital', value: 2 },
+    { label: 'Supreme Court', value: 3 },
+];
+// TODO: These dropdowns (case types, courts, police stations, districts) should ideally be fetched from the database.
+
+const SamplefieldsData: Field[] = [ // Renamed to avoid conflict, ensure Field[] type is used
   {
-    name: "CourtName",
+    name: "CaseTitle",
     type: "text",
-    placeholder: "Enter Court Name",
-    label: "Court Name",
-    //manual add
+    placeholder: "Enter Case Title (e.g., State vs. John Doe)",
+    label: "Case Title*",
   },
   {
-    name: "OnBehalfOf",
+    name: "ClientName",
     type: "text",
-    placeholder: "On Behalf of",
-    label: "On Behalf of",
-    //this should contain the manual add
+    placeholder: "Enter Client's Full Name",
+    label: "Client Name",
   },
   {
-    name: "Undersection",
+    name: "case_number",
     type: "text",
-    placeholder: "UnderSection",
-    label: "UnderSection",
+    placeholder: "Enter Case Number (e.g., CS/123/2023)",
+    label: "Case Number / ST Number",
   },
   {
-    name: "PoliceStation",
-    type: "text",
-    placeholder: "Enter Police Station",
-    label: "Police Station",
+    name: "case_type_id",
+    type: "select",
+    label: "Case Type",
+    options: dummyCaseTypeOptionsForAdd,
+    placeholder: "Select Case Type...",
   },
   {
-    name: "CaseStatus",
+    name: "court_id",
+    type: "select",
+    label: "Court",
+    options: dummyCourtOptionsForAdd,
+    placeholder: "Select Court...",
+  },
+  {
+    name: "FiledDate",
+    type: "date",
+    label: "Date Filed",
+    placeholder: "Select date case was filed",
+  },
+  {
+    name: "JudgeName",
     type: "text",
+    placeholder: "Enter Judge's Name (if known)",
+    label: "Presiding Judge",
+  },
+  {
+    name: "OpposingCounsel",
+    type: "text",
+    placeholder: "Enter Opposing Counsel's Name",
+    label: "Opposing Counsel / Advocate",
+  },
+  {
+    name: "Status",
+    type: "select",
     label: "Case Status",
-    placeholder: " Case Status",
+    options: caseStatusOptions, // From appTypes
+    placeholder: "Select Status...",
+  },
+  {
+    name: "Priority",
+    type: "select",
+    label: "Priority Level",
+    options: priorityOptions, // From appTypes
+    placeholder: "Select Priority...",
+  },
+  {
+    name: "HearingDate",
+    type: "date",
+    label: "Next Hearing Date",
+    placeholder: "Select next hearing date",
+  },
+  {
+    name: "StatuteOfLimitations",
+    type: "date",
+    label: "Statute of Limitations",
+    placeholder: "Select SOL date (if applicable)",
+  },
+  { name: "FirstParty", type: "text", placeholder: "Enter First Party Name", label: "First Party" },
+  { name: "OppositeParty", type: "text", placeholder: "Enter Opposite Party Name", label: "Opposite Party" },
+  { name: "ClientContactNumber", type: "text", placeholder: "Enter Client's Contact Number", label: "Client Contact No." },
+  { name: "Accussed", type: "text", placeholder: "Enter Accused Name(s)", label: "Accused" },
+  { name: "Undersection", type: "text", placeholder: "e.g., Section 302 IPC", label: "Under Section(s)" },
+  {
+    name: "CaseDescription",
+    type: "multiline",
+    placeholder: "Provide a brief summary or description of the case...",
+    label: "Case Description",
+  },
+  {
+    name: "CaseNotes",
+    type: "multiline",
+    placeholder: "Add any private notes, strategic considerations, or reminders...",
+    label: "Internal Notes / Strategy",
   },
 ];
 
-const Samplefields = [
-  {
-    name: "CNRNumber",
-    type: "text",
-    placeholder: "Enter CNR Number",
-    label: " CNR Number",
+// Sample validation schema
+const validationSchema = Yup.object().shape({
+  CaseTitle: Yup.string().required("Case Title is required"),
+  // Define your validation rules here based on your fields
+});
+
+// Define a component to render different types of form inputs
+const FormField: React.FC<{
+  field: Field;
+  handleChange: (fieldName: string) => (value: any) => void;
+  handleBlur: (fieldName: string) => () => void;
+  values: Partial<CaseData>;
+  errors: { [key in keyof CaseData]?: string };
+  setFieldValue: (field: keyof CaseData, value: any, shouldValidate?: boolean) => void;
+}> = ({
+  field,
+  values,
+  errors,
+  setFieldValue,
+}) => {
+  const commonProps = {
+    label: field.label,
+    error: errors[field.name],
+  };
+
+  switch (field.type) {
+    case "text":
+      return (
+        <FormInput
+          {...commonProps}
+          value={values[field.name] as string || ''}
+          placeholder={field.placeholder}
+          onChangeText={(text) => setFieldValue(field.name, text)}
+        />
+      );
+    case "multiline":
+        return (
+          <FormInput
+            {...commonProps}
+            value={values[field.name] as string || ''}
+            placeholder={field.placeholder}
+            onChangeText={(text) => setFieldValue(field.name, text)}
+            multiline
+            numberOfLines={4}
+            style={{minHeight: 80}}
+          />
+        );
+    case "select":
+      return (
+        <DropdownPicker
+          {...commonProps}
+          selectedValue={values[field.name] as string | number | undefined}
+          onValueChange={(itemValue) => setFieldValue(field.name, itemValue)}
+          options={field.options as AppDropdownOption[] || []}
+          placeholder={field.placeholder || `Select ${field.label}...`}
+        />
+      );
+    case "date":
+      return (
+        <DatePickerField
+          {...commonProps}
+          value={values[field.name] ? new Date(values[field.name] as string) : null}
+          onChange={(date) => setFieldValue(field.name, date ? date.toISOString() : null)}
+          placeholder={field.placeholder || "Select date"}
+        />
+      );
+    default:
+      console.warn("Unsupported field type in FormField:", field.type);
+      return null;
+  }
+};
+
+const AddCase: React.FC<Props> = ({ fields = SamplefieldsData, route }) => { // Use SamplefieldsData
+  const { update = false, initialValues, uniqueId } = route?.params ?? {};
+  const navigation = useNavigation();
+
+  // The suggestions state and FetchSuggestion effect are no longer needed
+  // as SuggestionInput has been replaced by FormInput in the FormField component.
+  // const [suggestions, setSuggestions] = useState({});
+  // useEffect(() => {
+  //   async function FetchSuggestion() {
+  //     try {
+  //       console.log("Placeholder for FetchSuggestion with getSuggestionsForField");
+  //     } catch (error) {
+  //       console.log("error fetching the Suggestions", error);
+  //     }
+  //   }
+  //   FetchSuggestion();
+  // }, []);
+
+  const getChangedValues = (
+    initial: Partial<CaseData>,
+    current: Partial<CaseData>
+  ): Partial<CaseData> => {
+    const changed: Partial<CaseData> = {};
+    for (const key in current) {
+      if (Object.prototype.hasOwnProperty.call(current, key)) {
+        const currentKey = key as keyof CaseData;
+        if (current[currentKey] !== initial[currentKey]) {
+          changed[currentKey] = current[currentKey];
+        }
+      }
+    }
+    return changed;
+  };
+
+  const handleFinalSubmit = async (formValues: Partial<CaseData>) => {
+    console.log("Final form values:", formValues);
+
+    const currentUniqueId = uniqueId || `UID_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    if (update && initialValues?.id) {
+      const caseIdToUpdate = initialValues.id;
+      const mappedInitialValues: Partial<CaseData> = {
+        uniqueId: initialValues.uniqueId,
+        id: initialValues.id,
+        CaseTitle: initialValues.caseNumber,
+        court_name: initialValues.court,
+        FiledDate: initialValues.dateFiled?.toISOString(),
+        case_type_name: initialValues.caseType,
+      };
+      const changedValues = getChangedValues(mappedInitialValues, formValues);
+
+      const caseUpdatePayload: CaseUpdateData = {};
+      for (const key in changedValues) {
+        if (Object.prototype.hasOwnProperty.call(changedValues, key)) {
+          const typedKey = key as keyof CaseData;
+          const value = changedValues[typedKey];
+
+          if (typedKey === "CNRNumber" && typeof value === 'string') caseUpdatePayload.CNRNumber = value;
+          else if (typedKey === "FiledDate" && typeof value === 'string') caseUpdatePayload.dateFiled = value;
+          else if (typedKey === "case_number" && typeof value === 'string') caseUpdatePayload.case_number = value;
+          else if (typedKey === "case_type_id" && (typeof value === 'number' || value === null)) caseUpdatePayload.case_type_id = value;
+          else if (typedKey === "court_id" && (typeof value === 'number' || value === null)) caseUpdatePayload.court_id = value;
+          else if (typedKey === "OnBehalfOf" && typeof value === 'string') caseUpdatePayload.OnBehalfOf = value;
+          else if (typedKey === "ClientName" && typeof value === 'string') caseUpdatePayload.OnBehalfOf = value;
+          else if (typedKey === "FirstParty" && typeof value === 'string') caseUpdatePayload.FirstParty = value;
+          else if (typedKey === "OppositeParty" && typeof value === 'string') caseUpdatePayload.OppositeParty = value;
+          else if (typedKey === "ClientContactNumber" && typeof value === 'string') caseUpdatePayload.ClientContactNumber = value;
+          else if (typedKey === "Accussed" && typeof value === 'string') caseUpdatePayload.Accussed = value;
+          else if (typedKey === "Undersection" && typeof value === 'string') caseUpdatePayload.Undersection = value;
+          else if (typedKey === "OppositeAdvocate" && typeof value === 'string') caseUpdatePayload.OppositeAdvocate = value;
+          else if (typedKey === "OpposingCounsel" && typeof value === 'string') caseUpdatePayload.OppositeAdvocate = value;
+          else if (typedKey === "OppAdvocateContactNumber" && typeof value === 'string') caseUpdatePayload.OppAdvocateContactNumber = value;
+          else if ((typedKey === "Status" || typedKey === "CaseStatus")  && typeof value === 'string') caseUpdatePayload.CaseStatus = value;
+          else if (typedKey === "PreviousDate" && typeof value === 'string') caseUpdatePayload.PreviousDate = value;
+          else if ((typedKey === "NextDate" || typedKey === "HearingDate") && typeof value === 'string') caseUpdatePayload.NextDate = value;
+        }
+      }
+
+      if (Object.keys(caseUpdatePayload).length === 0) {
+        console.log("No changes detected to update.");
+        navigation.goBack();
+        return;
+      }
+
+      console.log("Attempting to update case ID:", caseIdToUpdate, "with payload:", caseUpdatePayload);
+      try {
+        const success = await updateCase(caseIdToUpdate, caseUpdatePayload);
+        if (success) {
+          console.log("Successfully updated case ID:", caseIdToUpdate);
+          const navDetails: CaseDetails = {
+            uniqueId: formValues.uniqueId || initialValues.uniqueId,
+            id: caseIdToUpdate,
+            caseNumber: formValues.CaseTitle || initialValues.caseNumber,
+            court: initialValues.court,
+            caseType: initialValues.caseType,
+            dateFiled: formValues.FiledDate ? new Date(formValues.FiledDate) : initialValues.dateFiled,
+          };
+          navigation.navigate("CaseDetail", { caseDetails: navDetails });
+        } else {
+          console.error("Update operation failed for case ID:", caseIdToUpdate);
+        }
+      } catch (error) {
+        console.error("Error submitting update form:", error);
+        return;
+      }
+
+    } else {
+      const caseDataPayload: CaseInsertData = {
+        uniqueId: currentUniqueId,
+        user_id: null,
+        CNRNumber: formValues.CNRNumber || null,
+        court_id: typeof formValues.court_id === 'number' ? formValues.court_id : null,
+        dateFiled: formValues.FiledDate || null,
+        case_type_id: typeof formValues.case_type_id === 'number' ? formValues.case_type_id : null,
+        case_number: formValues.case_number || null,
+        case_year: typeof formValues.case_year === 'number' ? formValues.case_year : (formValues.case_year ? parseInt(formValues.case_year as string,10) : null),
+        crime_number: formValues.crime_number || null,
+        crime_year: typeof formValues.crime_year === 'number' ? formValues.crime_year : (formValues.crime_year ? parseInt(formValues.crime_year as string,10) : null),
+        OnBehalfOf: formValues.ClientName || formValues.OnBehalfOf || null,
+        FirstParty: formValues.FirstParty || null,
+        OppositeParty: formValues.OppositeParty || null,
+        ClientContactNumber: formValues.ClientContactNumber || null,
+        Accussed: formValues.Accussed || null,
+        Undersection: formValues.Undersection || null,
+        police_station_id: typeof formValues.police_station_id === 'number' ? formValues.police_station_id : null,
+        OppositeAdvocate: formValues.OpposingCounsel || formValues.OppositeAdvocate || null,
+        OppAdvocateContactNumber: formValues.OppAdvocateContactNumber || null,
+        CaseStatus: formValues.Status || formValues.CaseStatus || null,
+        PreviousDate: formValues.PreviousDate || null,
+        NextDate: formValues.HearingDate || formValues.NextDate || null,
+      };
+
+      console.log("Attempting to insert with payload:", caseDataPayload);
+      try {
+        const newCaseId = await addCase(caseDataPayload);
+        if (newCaseId) {
+          console.log("Successfully inserted with ID:", newCaseId, "and uniqueId:", currentUniqueId);
+          const newCaseDetails: CaseDetails = {
+            id: newCaseId,
+            uniqueId: currentUniqueId,
+            caseNumber: formValues.CaseTitle || "N/A",
+            dateFiled: formValues.FiledDate ? new Date(formValues.FiledDate) : undefined,
+          };
+          navigation.navigate("CaseDetail", { caseDetails: newCaseDetails });
+        } else {
+          console.error("Insert operation did not return a new ID.");
+        }
+      } catch (error) {
+        console.error("Error submitting the form with addCase:", error);
+        return;
+      }
+    }
+  };
+
+  const formikInitialValuesLogic = () => {
+    const baseValues: Partial<CaseData> = {};
+    SamplefieldsData.forEach(field => { // Use SamplefieldsData
+        baseValues[field.name] = field.type === "date" ? null : (field.type === "select" ? (field.options?.[0]?.value !== undefined ? field.options[0].value : '') : '');
+    });
+
+    if (update && initialValues) {
+        const mapped: Partial<CaseData> = { ...baseValues };
+        // More explicit mapping from CaseDetails (summary) to CaseData form fields
+        if (initialValues.uniqueId) mapped.uniqueId = initialValues.uniqueId;
+        if (initialValues.id) mapped.id = initialValues.id;
+        if (initialValues.caseNumber) mapped.CaseTitle = initialValues.caseNumber; // Map caseNumber to CaseTitle
+        // For dropdowns (court_id, case_type_id), initialValues (CaseDetails) has names (court, caseType).
+        // We cannot directly map these to IDs without a lookup.
+        // So, for update, these dropdowns will show their placeholder or first option unless
+        // EditCaseScreen (which uses full CaseData) is used for updates.
+        // For now, they will default to placeholder/first option.
+        if (initialValues.dateFiled) mapped.FiledDate = initialValues.dateFiled.toISOString();
+
+        // Example: if initialValues had more fields that map directly to CaseData keys
+        // if (initialValues.SomeOtherField) mapped.SomeOtherField = initialValues.SomeOtherField;
+        return mapped;
+    }
+    return baseValues;
+  };
+
+
+  return (
+    <ScrollView
+        style={styles.scrollViewStyle}
+        contentContainerStyle={styles.scrollContentContainerStyle}
+        keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.formScreenContainer}>
+        <Text style={styles.screenTitle}>{update ? "Update Case Details" : "Add New Case"}</Text>
+
+        <Formik
+            initialValues={formikInitialValuesLogic()}
+            validationSchema={validationSchema}
+            onSubmit={handleFinalSubmit}
+            enableReinitialize
+        >
+          {({
+            handleChange,
+            handleBlur,
+            handleSubmit,
+            values,
+            setFieldValue,
+            errors,
+            touched,
+          }) => (
+            <View>
+              {SamplefieldsData.map((field, index) => ( // Use SamplefieldsData
+                <View key={index}>
+                  <FormField
+                    field={field}
+                    handleChange={(name) => (val) => setFieldValue(name, val)}
+                    handleBlur={(name) => () => handleBlur(name)}
+                    values={values}
+                    errors={ (touched[field.name] && errors[field.name]) ? { [field.name]: errors[field.name] as string } : {} } // Ensure error is string
+                    setFieldValue={setFieldValue}
+                  />
+                </View>
+              ))}
+              <View style={styles.actionButtonContainer}>
+                <ActionButton
+                    title={update ? "Save Changes" : "Save Case"}
+                    onPress={() => handleSubmit()}
+                    type="primary"
+                />
+                <ActionButton
+                    title="Cancel"
+                    onPress={() => navigation.goBack()}
+                    type="secondary"
+                />
+              </View>
+            </View>
+          )}
+        </Formik>
+      </View>
+    </ScrollView>
+  );
+};
+
+export default AddCase;
+
+const styles = StyleSheet.create({
+  scrollViewStyle: {
+    flex: 1,
+    backgroundColor: EditCaseScreenStyles.screen.backgroundColor,
   },
-  {
-    name: "CourtName",
-    type: "text",
-    placeholder: "Enter Court Name",
-    label: "Court Name",
-    //manual add
+  scrollContentContainerStyle: {
+    flexGrow: 1,
+    paddingBottom: 20,
   },
-  {
-    name: "caseType",
-    type: "select",
-    label: "Case Type",
-    options: [
-      { label: "Civil", value: "civil" },
-      { label: "Criminal", value: "criminal" },
-      { label: "Family", value: "family" },
-    ],
-    //options should be added manually
+  formScreenContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
   },
-  { name: "dateFiled", type: "date", label: "Date Filed" },
-  {
-    name: "CaseNo",
+  screenTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 24,
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  actionButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 30,
+    // The ActionButton components have their own internal padding and margins.
+    // If more specific layout is needed for the container of these two buttons:
+    // e.g., using buttonWrapper styles from EditCaseScreenStyles
+    // <View style={EditCaseScreenStyles.buttonWrapper}><ActionButton .../></View>
+    // <View style={EditCaseScreenStyles.buttonWrapper}><ActionButton .../></View>
+  },
+  // Old styles that are likely no longer needed due to common component usage:
+  // label: { ... },
+  // inputField: { ... },
+  // dropdownContainer: { ... },
+  // datePickerContainer: { ... },
+});
     type: "text",
     placeholder: "Enter Case Number",
     label: "CaseNumber/STNumber",
@@ -216,95 +622,74 @@ const validationSchema = Yup.object().shape({
 // Define a component to render different types of form inputs
 const FormField: React.FC<{
   field: Field;
-  handleChange: FormikProps<{ [key: string]: string }>["handleChange"];
-  handleBlur: FormikProps<{ [key: string]: string }>["handleBlur"];
-  values: CaseDetails | { [key: string]: string };
-  errors: { [key: string]: string | undefined };
-  openDatePicker: () => void;
-  suggestionArray: string[];
+  handleChange: (fieldName: string) => (value: any) => void; // Simplified for direct use
+  handleBlur: (fieldName: string) => () => void; // Simplified for direct use
+  values: Partial<CaseData>; // Use Partial<CaseData>
+  errors: { [key in keyof CaseData]?: string }; // Typed errors
+  setFieldValue: (field: keyof CaseData, value: any, shouldValidate?: boolean) => void;
+  // openDatePicker and suggestionArray might become obsolete or handled differently
 }> = ({
   field,
-  handleChange,
-  handleBlur,
+  handleChange, // Formik's handleChange can still be used if preferred
+  handleBlur,   // Formik's handleBlur
   values,
   errors,
-  openDatePicker,
-  suggestionArray,
+  setFieldValue, // Formik's setFieldValue is useful for custom components
 }) => {
+  const commonProps = {
+    label: field.label,
+    error: errors[field.name],
+    // onBlur: handleBlur(field.name), // If FormInput supported onBlur directly in a way Formik likes
+  };
+
   switch (field.type) {
     case "text":
+      // SuggestionInput is a custom component. If we want to use FormInput for plain text:
+      // For now, let's assume SuggestionInput will be styled or replaced by FormInput.
+      // If SuggestionInput is to be kept, it needs styling similar to FormInput.
+      // This example will use FormInput for simplicity of demonstrating the switch.
       return (
-        // <View>
-        //   <Text style={styles.label}>{field.label}</Text>
-        //   <TextInput
-        //     id={field.name}
-        //     style={styles.inputField}
-        //     onChangeText={handleChange(field.name)}
-        //     onBlur={() => handleBlur(field.name)}
-        //     value={values[field.name]}
-        //     placeholder={field.placeholder}
-        //     data-name={field.name}
-        //   />
-        //   {errors[field.name] && (
-        //     <Text style={{ color: "red" }}>{errors[field.name]}</Text>
-        //   )}
-        // </View>
-        <SuggestionInput
-          key={field.name}
-          label={field.label}
+        <FormInput
+          {...commonProps}
+          value={values[field.name] as string || ''}
           placeholder={field.placeholder}
-          value={values[field.name]}
-          suggestions={suggestionArray}
-          onChangeText={handleChange(field.name)}
-          onBlur={handleBlur(field.name)}
+          onChangeText={(text) => setFieldValue(field.name, text)} // Use setFieldValue for Formik
+          // keyboardType, secureTextEntry, multiline can be added to Field interface
         />
       );
+    case "multiline": // Added a specific type for multiline text areas
+        return (
+          <FormInput
+            {...commonProps}
+            value={values[field.name] as string || ''}
+            placeholder={field.placeholder}
+            onChangeText={(text) => setFieldValue(field.name, text)}
+            multiline
+            numberOfLines={4} // Default, can be made configurable via Field interface
+            style={{minHeight: 80}}
+          />
+        );
     case "select":
       return (
-        <View>
-          <Text style={styles.label}>{field.label}</Text>
-          <View style={styles.dropdownContainer}>
-            <Picker
-              id={field.name}
-              selectedValue={values[field.name]}
-              onValueChange={(itemValue: string) =>
-                handleChange(field.name)(itemValue)
-              }
-              style={styles.dropdownContainer}
-            >
-              {field.options!.map((option, index) => (
-                <Picker.Item
-                  style={styles.dropdown}
-                  key={index}
-                  label={option.label}
-                  value={option.value}
-                />
-              ))}
-            </Picker>
-          </View>
-          {errors[field.name] && (
-            <Text style={{ color: "red" }}>{errors[field.name]}</Text>
-          )}
-        </View>
+        <DropdownPicker
+          {...commonProps}
+          selectedValue={values[field.name] as string | number | undefined}
+          onValueChange={(itemValue) => setFieldValue(field.name, itemValue)}
+          options={field.options as AppDropdownOption[] || []} // Cast to ensure compatibility
+          placeholder={field.placeholder || `Select ${field.label}...`}
+        />
       );
     case "date":
       return (
-        <View>
-          <Text style={styles.label}>{field.label}</Text>
-          <View style={styles.datePickerContainer}>
-            <TouchableOpacity onPress={openDatePicker}>
-              <Fontisto name="date" size={24} color="black" />
-            </TouchableOpacity>
-            {values[field.name] && (
-              <Text>{new Date(values[field.name]).toDateString()}</Text>
-            )}
-            {errors[field.name] && (
-              <Text style={{ color: "red" }}>{errors[field.name]}</Text>
-            )}
-          </View>
-        </View>
+        <DatePickerField
+          {...commonProps}
+          value={values[field.name] ? new Date(values[field.name] as string) : null}
+          onChange={(date) => setFieldValue(field.name, date ? date.toISOString() : null)}
+          placeholder={field.placeholder || "Select date"}
+        />
       );
     default:
+      console.warn("Unsupported field type in FormField:", field.type);
       return null;
   }
 };

@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Text, Alert, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons'; // Using Ionicons for one icon
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker'; // Import DocumentPicker
 
 import { EditCaseScreenStyles } from './EditCaseScreenStyle';
 import FormInput from '../CommonComponents/FormInput';
@@ -90,7 +91,47 @@ const EditCaseScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  const handleAddDocument = () => { Alert.alert('Add New Document', 'Implement document picker functionality.'); };
+  const handleAddDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "*/*", // Allow all file types, or be more specific
+        copyToCacheDirectory: true, // Recommended for reliability
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        console.log('Document picking cancelled or no assets found');
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (!asset.uri) {
+        Alert.alert("Error", "Could not get document URI.");
+        return;
+      }
+
+      const newDocument: Document = {
+        // For a new, unsaved document, 'id' would typically be generated client-side temporarily
+        // or assigned after saving to DB. Using Date.now() for a temporary unique key for the list.
+        // The actual DB 'id' and 'case_id' will be set upon saving the case.
+        id: Date.now(), // Temporary ID for UI list key. This is NOT the DB ID.
+        case_id: caseData.id as number, // Assuming caseData.id is present when editing an existing case
+        fileName: asset.name || `document_${Date.now()}`,
+        uploadDate: new Date().toISOString(), // Set current date as upload date for this new item
+        fileType: asset.mimeType || asset.name?.split('.').pop() || 'unknown',
+        fileSize: asset.size,
+        uri: asset.uri, // Local cache URI of the picked file
+        // stored_filename will be determined when the file is actually saved persistently
+      };
+
+      setDocuments((prevDocs) => [...prevDocs, newDocument]);
+      Alert.alert("Document Added", `${newDocument.fileName} has been added to the list. Save the case to persist changes.`);
+
+    } catch (error) {
+      console.error("Error picking document:", error);
+      Alert.alert("Error", "An error occurred while picking the document.");
+    }
+  };
+
   const handleViewDocument = (doc: Document) => { Alert.alert('View Document', `Viewing: ${doc.fileName}`); };
   const handleEditDocument = (doc: Document) => { Alert.alert('Edit Document Metadata', `Editing metadata for: ${doc.fileName}`); };
   const handleDeleteDocument = (docToDelete: Document) => {
