@@ -66,7 +66,7 @@ const CaseDetail: React.FC<Props> = ({ route, navigation }) => {
               CaseTitle: caseDetails.caseNumber,
               // case_number: caseDetails.caseNumber, // Or if it's strictly a number/code
               court_name: caseDetails.court, // For display; EditCaseScreen uses court_id for dropdown
-              FiledDate: caseDetails.dateFiled?.toISOString(), // Convert Date to ISO string
+              FiledDate: caseDetails.dateFiled instanceof Date ? caseDetails.dateFiled.toISOString() : null, // Safely convert Date to ISO string
               case_type_name: caseDetails.caseType, // For display; EditCaseScreen uses case_type_id
               // Documents and TimelineEvents are not available in this simplified CaseDetails object
               // EditCaseScreen will use its defaults or fetch them if it's enhanced to do so.
