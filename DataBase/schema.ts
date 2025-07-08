@@ -57,34 +57,46 @@ export interface Case {
   user_id?: number | null; // FK to Users, who this case belongs to or who created it
 
   // Case Details
+  CaseTitle?: string | null; // New: For the main title of the case from form
   CNRNumber?: string | null;
-  court_id?: number | null; // FK to Courts
+  court_id?: number | null; // Will remain, but FK constraint removed. For future linking.
+  court_name?: string | null; // New: To store court name as text
   dateFiled?: string | null; // ISO8601 "YYYY-MM-DD"
-  case_type_id?: number | null; // FK to CaseTypes
+  case_type_id?: number | null; // Will remain, but FK constraint removed. For future linking.
+  case_type_name?: string | null; // New: To store case type name as text
   case_number?: string | null;
   case_year?: number | null;
   crime_number?: string | null;
   crime_year?: number | null;
+  JudgeName?: string | null; // New: From form
 
   // Parties & Representation
-  OnBehalfOf?: string | null; // Consider if this should be a link to a Clients table later
+  ClientName?: string | null; // New: Explicit client name from form
+  OnBehalfOf?: string | null; // Can be used if ClientName is not specific enough or for other contexts
   FirstParty?: string | null;
   OppositeParty?: string | null;
-  ClientContactNumber?: string | null; // Associated with FirstParty or OnBehalfOf?
-  Accussed?: string | null; // Could be multiple, consider a separate table in future if details needed per accused
+  ClientContactNumber?: string | null;
+  Accussed?: string | null;
 
   // Legal Details
   Undersection?: string | null;
-  police_station_id?: number | null; // FK to PoliceStations
+  police_station_id?: number | null; // FK to PoliceStations (constraint can remain if PoliceStations table is managed)
+  StatuteOfLimitations?: string | null; // New: From form
 
   // Opposition Details
+  OpposingCounsel?: string | null; // New: From form (can replace/supplement OppositeAdvocate)
   OppositeAdvocate?: string | null;
   OppAdvocateContactNumber?: string | null;
 
   // Status and Dates
-  CaseStatus?: string | null; // Consider a CaseStatuses lookup table if statuses are predefined
+  CaseStatus?: string | null; // Current field for status string
+  Priority?: string | null; // New: From form
   PreviousDate?: string | null; // ISO8601 "YYYY-MM-DD"
   NextDate?: string | null; // ISO8601 "YYYY-MM-DD"
+
+  // Notes & Description
+  CaseDescription?: string | null; // New: From form
+  CaseNotes?: string | null; // New: From form
 
   // Timestamps
   created_at: string; // ISO8601
@@ -174,16 +186,21 @@ CREATE TABLE IF NOT EXISTS Cases (
   user_id INTEGER, -- Case owner/creator
 
   -- Case Details
+  CaseTitle TEXT,
   CNRNumber TEXT,
-  court_id INTEGER,
+  court_id INTEGER, -- Retained for future linking, FK constraint removed below
+  court_name TEXT,  -- To store court name as string
   dateFiled TEXT,
-  case_type_id INTEGER,
+  case_type_id INTEGER, -- Retained for future linking, FK constraint removed below
+  case_type_name TEXT, -- To store case type name as string
   case_number TEXT,
   case_year INTEGER,
   crime_number TEXT,
   crime_year INTEGER,
+  JudgeName TEXT,
 
   -- Parties & Representation
+  ClientName TEXT,
   OnBehalfOf TEXT,
   FirstParty TEXT,
   OppositeParty TEXT,
@@ -193,24 +210,30 @@ CREATE TABLE IF NOT EXISTS Cases (
   -- Legal Details
   Undersection TEXT,
   police_station_id INTEGER,
+  StatuteOfLimitations TEXT,
 
   -- Opposition Details
+  OpposingCounsel TEXT,
   OppositeAdvocate TEXT,
   OppAdvocateContactNumber TEXT,
 
   -- Status and Dates
-  CaseStatus TEXT,
+  CaseStatus TEXT, -- This is the string status from the dropdown e.g. "In Progress"
+  Priority TEXT,   -- e.g. "High", "Medium", "Low"
   PreviousDate TEXT,
   NextDate TEXT,
+  -- CaseDescription and CaseNotes are large text, can also be here or in a related table if very large/many.
+  CaseDescription TEXT,
+  CaseNotes TEXT,
   -- caseHistory TEXT, -- Old JSON history, to be removed
 
   -- Timestamps
   created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
   updated_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
 
-  FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE, -- Or SET NULL if cases should remain if user deleted
-  FOREIGN KEY (court_id) REFERENCES Courts(id) ON DELETE SET NULL,
-  FOREIGN KEY (case_type_id) REFERENCES CaseTypes(id) ON DELETE SET NULL,
+  FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
+  -- FOREIGN KEY (court_id) REFERENCES Courts(id) ON DELETE SET NULL, -- FK constraint removed
+  -- FOREIGN KEY (case_type_id) REFERENCES CaseTypes(id) ON DELETE SET NULL, -- FK constraint removed
   FOREIGN KEY (police_station_id) REFERENCES PoliceStations(id) ON DELETE SET NULL
 );`;
 

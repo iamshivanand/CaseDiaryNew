@@ -1,14 +1,15 @@
 import { Formik, FormikProps } from "formik";
-import React, { useEffect, useMemo } from "react"; // Added useMemo
+import React, { useMemo } from "react";
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
+  Alert, // Added for user feedback
 } from "react-native";
 import * as Yup from "yup";
 import { RouteProp, useNavigation } from "@react-navigation/native";
-import { v4 as uuidv4 } from "uuid"; // For uniqueId generation
+import { v4 as uuidv4 } from "uuid";
 
 import {
   addCase,
@@ -34,7 +35,7 @@ interface FieldDefinition {
   options?: AppDropdownOption[];
 }
 
-type AddCaseScreenRouteProp = RouteProp<HomeStackParamList, "AddCaseDetails">; // Changed to AddCaseDetails as this is its context
+type AddCaseScreenRouteProp = RouteProp<HomeStackParamList, "AddCaseDetails">;
 
 interface AddCaseProps {
   route: AddCaseScreenRouteProp;
@@ -48,9 +49,10 @@ const dummyCourtOptionsForAdd: AppDropdownOption[] = [
 ];
 
 const formFieldsDefinition: FieldDefinition[] = [
-  { name: "CaseTitle", type: "text", placeholder: "Enter Case Title", label: "Case Title*" },
+  { name: "CaseTitle", type: "text", placeholder: "e.g., State vs. John Doe", label: "Case Title*" },
   { name: "ClientName", type: "text", placeholder: "Enter Client's Full Name", label: "Client Name" },
   { name: "case_number", type: "text", placeholder: "e.g., CS/123/2023", label: "Case Number" },
+  { name: "CNRNumber", type: "text", placeholder: "Enter CNR Number", label: "CNR Number"},
   { name: "case_type_id", type: "select", label: "Case Type", options: dummyCaseTypeOptionsForAdd, placeholder: "Select Case Type..." },
   { name: "court_id", type: "select", label: "Court", options: dummyCourtOptionsForAdd, placeholder: "Select Court..." },
   { name: "FiledDate", type: "date", label: "Date Filed", placeholder: "Select date case was filed" },
@@ -67,10 +69,18 @@ const formFieldsDefinition: FieldDefinition[] = [
   { name: "Undersection", type: "text", placeholder: "e.g., Section 302 IPC", label: "Under Section(s)" },
   { name: "CaseDescription", type: "multiline", placeholder: "Provide a brief summary...", label: "Case Description" },
   { name: "CaseNotes", type: "multiline", placeholder: "Add any private notes...", label: "Internal Notes" },
+  // Example for other ID based fields that might become text or have text counterparts
+  // { name: "police_station_id", type: "select", label: "Police Station", options: [], placeholder: "Select Police Station..." }, // Needs data
+  // { name: "case_year", type: "text", placeholder: "YYYY", label: "Case Year"},
+  // { name: "crime_number", type: "text", placeholder: "Enter Crime Number", label: "Crime Number"},
+  // { name: "crime_year", type: "text", placeholder: "YYYY", label: "Crime Year"},
+  // { name: "OppAdvocateContactNumber", type: "text", placeholder: "Opposing Counsel Contact", label: "Opp. Counsel Contact"},
+  // { name: "PreviousDate", type: "date", label: "Previous Hearing Date", placeholder: "Select previous hearing date"},
 ];
 
 const validationSchema = Yup.object().shape({
   CaseTitle: Yup.string().required("Case Title is required"),
+  // Add other validations as needed
 });
 
 const FormFieldRenderer: React.FC<{
@@ -100,7 +110,7 @@ const FormFieldRenderer: React.FC<{
 };
 
 const AddCase: React.FC<AddCaseProps> = ({ route }) => {
-  const params = route.params; // Route params for AddCaseDetails
+  const params = route.params;
   const { update = false, initialValues, uniqueId: routeUniqueId } = params ?? {};
 
   const navigation = useNavigation();
@@ -108,125 +118,187 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const uniqueIdToUse = routeUniqueId || initialValues?.uniqueId || generatedUniqueId;
 
   const prepareFormInitialValues = (): Partial<CaseData> => {
-    const defaults: Partial<CaseData> = {};
+    const defaults: Partial<CaseData> = { uniqueId: uniqueIdToUse }; // Ensure uniqueId is part of defaults
     formFieldsDefinition.forEach(field => {
-      defaults[field.name] = field.type === "date" ? null : (field.type === "select" ? (field.options?.[0]?.value ?? '') : '');
+      if (field.name !== 'uniqueId') { // uniqueId is already set
+        defaults[field.name] = field.type === "date" ? null : (field.type === "select" ? (field.options?.[0]?.value ?? '') : '');
+      }
     });
+
     if (update && initialValues) {
-      return {
-        ...defaults,
-        uniqueId: initialValues.uniqueId,
-        id: initialValues.id,
-        CaseTitle: initialValues.caseNumber || '',
-        FiledDate: initialValues.dateFiled ? initialValues.dateFiled.toISOString() : null,
-        // Note: initialValues (CaseDetails) doesn't have IDs for court/caseType.
-        // For update mode, EditCaseScreen is preferred as it handles full CaseData.
-        // This form will show placeholders for court/caseType if initialValues are from summary CaseDetails.
-      };
+      const mappedInitialValues: Partial<CaseData> = { ...defaults };
+      // Map from CaseDetails (summary) to CaseData form fields
+      if (initialValues.uniqueId) mappedInitialValues.uniqueId = initialValues.uniqueId;
+      if (initialValues.id) mappedInitialValues.id = initialValues.id;
+      if (initialValues.caseNumber) mappedInitialValues.CaseTitle = initialValues.caseNumber;
+      if (initialValues.dateFiled) mappedInitialValues.FiledDate = initialValues.dateFiled.toISOString();
+
+      // For court & caseType, initialValues has names. formFieldsDefinition uses _id for selection.
+      // If we want to pre-select based on names, we'd need to find the ID from dummyOptions.
+      // For simplicity now, if updating, these will show placeholder unless full CaseData is passed.
+      const initialCourt = dummyCourtOptionsForAdd.find(opt => opt.label === initialValues.court);
+      if (initialCourt) mappedInitialValues.court_id = initialCourt.value;
+
+      const initialCaseType = dummyCaseTypeOptionsForAdd.find(opt => opt.label === initialValues.caseType);
+      if (initialCaseType) mappedInitialValues.case_type_id = initialCaseType.value;
+
+      // TODO: Map other fields from initialValues (CaseDetails) to respective CaseData fields if they exist
+      // Example: if (initialValues.onBehalfOf) mappedInitialValues.OnBehalfOf = initialValues.onBehalfOf;
+      // This part needs to be robust based on what CaseDetails actually contains.
+      return mappedInitialValues;
     }
-    return { ...defaults, uniqueId: uniqueIdToUse };
+    return defaults;
   };
+
+  const getChangedValues = (
+    initial: Partial<CaseData>,
+    current: Partial<CaseData>
+  ): Partial<CaseData> => {
+    const changed: Partial<CaseData> = {};
+    for (const key in current) {
+      if (Object.prototype.hasOwnProperty.call(current, key)) {
+        const currentKey = key as keyof CaseData;
+        if (current[currentKey] !== initial[currentKey]) {
+          changed[currentKey] = current[currentKey];
+        }
+      }
+    }
+    return changed;
+  };
+
 
   const handleSubmitForm = async (formValues: Partial<CaseData>) => {
     console.log("Submitting form values:", formValues);
 
+    const selectedCourtOption = dummyCourtOptionsForAdd.find(opt => opt.value === formValues.court_id);
+    const courtNameString = selectedCourtOption && selectedCourtOption.value !== '' ? selectedCourtOption.label : null;
+    const selectedCaseTypeOption = dummyCaseTypeOptionsForAdd.find(opt => opt.value === formValues.case_type_id);
+    const caseTypeNameString = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : null;
+
     if (update && initialValues?.id) {
       const caseIdToUpdate = initialValues.id;
-      const updatePayload: CaseUpdateData = {};
-      // Map relevant formValues to CaseUpdateData, ensure correct types
-      if (formValues.CaseTitle !== undefined) updatePayload.OnBehalfOf = formValues.CaseTitle; // Example, align with your DB schema
-      if (formValues.FiledDate !== undefined) updatePayload.dateFiled = formValues.FiledDate;
-      if (formValues.case_number !== undefined) updatePayload.case_number = formValues.case_number;
 
-      // For court_id and case_type_id, send NULL as per user clarification for update too
-      updatePayload.court_id = null;
-      updatePayload.case_type_id = null;
-      // User needs to add text columns like 'court_name_text', 'case_type_name_text' to DB
-      // and update CaseUpdateData type and updateCase function accordingly.
-      const selectedCourtOption = dummyCourtOptionsForAdd.find(opt => opt.value === formValues.court_id);
-      const courtNameString = selectedCourtOption?.label;
-      const selectedCaseTypeOption = dummyCaseTypeOptionsForAdd.find(opt => opt.value === formValues.case_type_id);
-      const caseTypeNameString = selectedCaseTypeOption?.label;
-      console.log("INFO (Update): Intended Court Name:", courtNameString);
-      console.log("INFO (Update): Intended Case Type Name:", caseTypeNameString);
-      // Example: if schema had 'court_name_text': updatePayload.court_name_text = courtNameString;
+      // Create a representation of initial form state based on 'initialValues' (CaseDetails)
+      // to correctly determine what has changed.
+      const initialFormStateForCompare = prepareFormInitialValues(); // This will use initialValues if in update mode.
+      const changedFields = getChangedValues(initialFormStateForCompare, formValues);
 
-
-      if (formValues.Status !== undefined) updatePayload.CaseStatus = formValues.Status;
-      // ... map other updatable fields ...
-
-      if (Object.keys(updatePayload).length === 0 && (!courtNameString && !caseTypeNameString)) { // check if any actual data changed
-        console.log("No changes to update.");
+      if (Object.keys(changedFields).length === 0) {
+        console.log("No changes detected to update.");
         navigation.goBack();
         return;
       }
+
+      const updatePayload: CaseUpdateData = {
+        // Include only changed fields that are part of CaseUpdateData
+        ...(changedFields.CaseTitle && { CaseTitle: changedFields.CaseTitle }),
+        ...(changedFields.ClientName && { ClientName: changedFields.ClientName }),
+        ...(changedFields.CNRNumber && { CNRNumber: changedFields.CNRNumber }),
+        court_id: formValues.court_id || null, // Store the ID, FK constraint removed
+        court_name: courtNameString, // Store the name
+        dateFiled: changedFields.FiledDate,
+        case_type_id: formValues.case_type_id || null, // Store the ID, FK constraint removed
+        case_type_name: caseTypeNameString, // Store the name
+        ...(changedFields.case_number && { case_number: changedFields.case_number }),
+        ...(changedFields.case_year && { case_year: changedFields.case_year ? parseInt(changedFields.case_year as string, 10) : null }),
+        ...(changedFields.crime_number && { crime_number: changedFields.crime_number }),
+        ...(changedFields.crime_year && { crime_year: changedFields.crime_year ? parseInt(changedFields.crime_year as string, 10) : null }),
+        ...(changedFields.JudgeName && { JudgeName: changedFields.JudgeName }),
+        ...(changedFields.OnBehalfOf && { OnBehalfOf: changedFields.OnBehalfOf }),
+        ...(changedFields.FirstParty && { FirstParty: changedFields.FirstParty }),
+        ...(changedFields.OppositeParty && { OppositeParty: changedFields.OppositeParty }),
+        ...(changedFields.ClientContactNumber && { ClientContactNumber: changedFields.ClientContactNumber }),
+        ...(changedFields.Accussed && { Accussed: changedFields.Accussed }),
+        ...(changedFields.Undersection && { Undersection: changedFields.Undersection }),
+        ...(changedFields.police_station_id && { police_station_id: typeof changedFields.police_station_id === 'number' ? changedFields.police_station_id : null }),
+        ...(changedFields.StatuteOfLimitations && { StatuteOfLimitations: changedFields.StatuteOfLimitations }),
+        ...(changedFields.OpposingCounsel && { OpposingCounsel: changedFields.OpposingCounsel }),
+        ...(changedFields.OppositeAdvocate && { OppositeAdvocate: changedFields.OppositeAdvocate }),
+        ...(changedFields.OppAdvocateContactNumber && { OppAdvocateContactNumber: changedFields.OppAdvocateContactNumber }),
+        ...(changedFields.Status && { CaseStatus: changedFields.Status }), // Map form's Status to DB's CaseStatus
+        ...(changedFields.Priority && { Priority: changedFields.Priority }),
+        ...(changedFields.PreviousDate && { PreviousDate: changedFields.PreviousDate }),
+        ...(changedFields.HearingDate && { NextDate: changedFields.HearingDate }), // Map form's HearingDate to DB's NextDate
+        ...(changedFields.CaseDescription && { CaseDescription: changedFields.CaseDescription }),
+        ...(changedFields.CaseNotes && { CaseNotes: changedFields.CaseNotes }),
+      };
+       // Remove undefined properties from updatePayload
+       Object.keys(updatePayload).forEach(key => {
+        const K = key as keyof CaseUpdateData;
+        if (updatePayload[K] === undefined) {
+          delete updatePayload[K];
+        }
+      });
+
+
+      console.log("Attempting to update with payload:", JSON.stringify(updatePayload, null, 2));
       try {
         const success = await updateCase(caseIdToUpdate, updatePayload);
         if (success) {
-          console.log("Case updated successfully");
+          Alert.alert("Success", "Case updated successfully.");
           const navDetails: CaseDetails = {
-            uniqueId: formValues.uniqueId || initialValues.uniqueId,
+            uniqueId: formValues.uniqueId || initialValues.uniqueId, // Use updated uniqueId from form if available
             id: caseIdToUpdate,
             caseNumber: formValues.CaseTitle || initialValues.caseNumber,
             court: courtNameString || initialValues.court,
             caseType: caseTypeNameString || initialValues.caseType,
-            dateFiled: formValues.FiledDate ? new Date(formValues.FiledDate) : initialValues.dateFiled,
+            dateFiled: formValues.FiledDate || (initialValues.dateFiled ? initialValues.dateFiled.toISOString() : undefined),
           };
           navigation.navigate("CaseDetail", { caseDetails: navDetails });
-        } else { console.error("Failed to update case."); }
-      } catch (e) { console.error("Error updating case:", e); }
+        } else { Alert.alert("Error", "Failed to update case."); }
+      } catch (e) { console.error("Error updating case:", e); Alert.alert("Error", "An error occurred while updating.");}
     } else { // ADD LOGIC
-      const selectedCourtOption = dummyCourtOptionsForAdd.find(opt => opt.value === formValues.court_id);
-      const courtNameString = selectedCourtOption && selectedCourtOption.value !== '' ? selectedCourtOption.label : null;
-      const selectedCaseTypeOption = dummyCaseTypeOptionsForAdd.find(opt => opt.value === formValues.case_type_id);
-      const caseTypeNameString = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : null;
-
       const insertPayload: CaseInsertData = {
         uniqueId: formValues.uniqueId || uniqueIdToUse,
         user_id: null,
+        CaseTitle: formValues.CaseTitle || null,
+        ClientName: formValues.ClientName || null,
         CNRNumber: formValues.CNRNumber || null,
-        court_id: null, // Send NULL for FK ID
-        case_type_id: null, // Send NULL for FK ID
+        court_id: formValues.court_id || null, // Store ID, FK constraint removed
+        court_name: courtNameString, // Store name
         dateFiled: formValues.FiledDate || null,
+        case_type_id: formValues.case_type_id || null, // Store ID, FK constraint removed
+        case_type_name: caseTypeNameString, // Store name
         case_number: formValues.case_number || null,
         case_year: formValues.case_year ? parseInt(formValues.case_year as string, 10) : null,
         crime_number: formValues.crime_number || null,
         crime_year: formValues.crime_year ? parseInt(formValues.crime_year as string, 10) : null,
-        OnBehalfOf: formValues.ClientName || formValues.OnBehalfOf || null,
+        JudgeName: formValues.JudgeName || null,
+        OnBehalfOf: formValues.OnBehalfOf || null, // This is separate from ClientName now
         FirstParty: formValues.FirstParty || null,
         OppositeParty: formValues.OppositeParty || null,
         ClientContactNumber: formValues.ClientContactNumber || null,
         Accussed: formValues.Accussed || null,
         Undersection: formValues.Undersection || null,
         police_station_id: typeof formValues.police_station_id === 'number' ? formValues.police_station_id : null,
-        OppositeAdvocate: formValues.OpposingCounsel || formValues.OppositeAdvocate || null,
+        StatuteOfLimitations: formValues.StatuteOfLimitations || null,
+        OpposingCounsel: formValues.OpposingCounsel || null,
+        OppositeAdvocate: formValues.OppositeAdvocate || null, // Keep if distinct from OpposingCounsel
         OppAdvocateContactNumber: formValues.OppAdvocateContactNumber || null,
-        CaseStatus: formValues.Status || formValues.CaseStatus || null,
+        CaseStatus: formValues.Status || null,
+        Priority: formValues.Priority || null,
         PreviousDate: formValues.PreviousDate || null,
-        NextDate: formValues.HearingDate || formValues.NextDate || null,
-        // To store names, user needs to add TEXT columns to Cases table & CaseInsertData type:
-        // e.g., court_name_text: courtNameString, case_type_name_text: caseTypeNameString
+        NextDate: formValues.HearingDate || null,
+        CaseDescription: formValues.CaseDescription || null,
+        CaseNotes: formValues.CaseNotes || null,
       };
 
-      console.log("INFO (Add): Intended Court Name (for future TEXT column):", courtNameString);
-      console.log("INFO (Add): Intended Case Type Name (for future TEXT column):", caseTypeNameString);
-      console.log("Actual insertPayload (with court_id & case_type_id as NULL):", JSON.stringify(insertPayload, null, 2));
-
+      console.log("Attempting to insert with payload:", JSON.stringify(insertPayload, null, 2));
       try {
         const newCaseId = await addCase(insertPayload);
         if (newCaseId) {
-          console.log("Case added successfully with ID:", newCaseId);
+          Alert.alert("Success", "Case added successfully.");
           const navDetails: CaseDetails = {
             id: newCaseId,
             uniqueId: insertPayload.uniqueId,
-            caseNumber: formValues.CaseTitle || "N/A",
-            dateFiled: formValues.FiledDate ? new Date(formValues.FiledDate) : undefined,
+            caseNumber: insertPayload.CaseTitle || insertPayload.case_number || "N/A",
+            dateFiled: insertPayload.dateFiled || undefined, // Pass as ISO string
             court: courtNameString || undefined,
             caseType: caseTypeNameString || undefined,
           };
           navigation.navigate("CaseDetail", { caseDetails: navDetails });
-        } else { console.error("Failed to add case."); }
-      } catch (e) { console.error("Error adding case:", e); }
+        } else { Alert.alert("Error", "Failed to add case."); }
+      } catch (e) { console.error("Error adding case:", e); Alert.alert("Error", "An error occurred while adding case."); }
     }
   };
 

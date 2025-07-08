@@ -43,15 +43,32 @@ const EditCaseScreen: React.FC = () => {
   // Safely access initialCaseData, ensuring it's defined or falls back to undefined
   const initialCaseDataFromParams = route.params?.initialCaseData;
 
-  const [caseData, setCaseData] = useState<Partial<CaseData>>(
-    initialCaseDataFromParams || {
+  const [caseData, setCaseData] = useState<Partial<CaseData>>(() => {
+    const defaults: Partial<CaseData> = {
       CaseStatus: caseStatusOptions.find(opt => opt.label === "Open")?.value || caseStatusOptions[0].value,
       Priority: priorityOptions.find(opt => opt.label === "Medium")?.value || priorityOptions[0].value,
-    }
-  );
+    };
+    let initialData = initialCaseDataFromParams ? { ...defaults, ...initialCaseDataFromParams } : { ...defaults };
 
-  // DEBUGGING STEP: Forcing dummy data for documents to isolate the source of the rendering error.
-  const [documents, setDocuments] = useState<Document[]>([
+    // If initialData has names but not IDs for court/caseType, try to find IDs from dummy options
+    // This helps pre-select dropdowns if only names were passed via navigation params.
+    if (initialData.court_name && (initialData.court_id === undefined || initialData.court_id === null || initialData.court_id === '')) {
+      const foundCourt = dummyCourtOptions.find(opt => opt.label === initialData.court_name);
+      if (foundCourt && foundCourt.value !== '') { // Ensure we don't set an empty string as ID
+        initialData.court_id = foundCourt.value as number;
+      }
+    }
+    if (initialData.case_type_name && (initialData.case_type_id === undefined || initialData.case_type_id === null || initialData.case_type_id === '')) {
+      const foundCaseType = dummyCaseTypeOptions.find(opt => opt.label === initialData.case_type_name);
+      if (foundCaseType && foundCaseType.value !== '') { // Ensure we don't set an empty string as ID
+        initialData.case_type_id = foundCaseType.value as number;
+      }
+    }
+    return initialData;
+  });
+
+  // Reverted DEBUGGING STEP: Use initialCaseDataFromParams for documents or fallback to dummy.
+  const [documents, setDocuments] = useState<Document[]>(initialCaseDataFromParams?.documents || [
     { id: 1, case_id: 1, fileName: 'Merger Agreement Final.pdf', uploadDate: '2023-09-15T10:30:00.000Z', fileType: 'application/pdf', fileSize: 2048000, stored_filename: 'doc_1_1.pdf' },
     { id: 2, case_id: 1, fileName: 'Client Intake Form.docx', uploadDate: '2023-09-10T14:00:00.000Z', fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileSize: 512000, stored_filename: 'doc_1_2.docx' },
     { id: 3, case_id: 1, fileName: 'Evidence Photos (Set 1).zip', uploadDate: '2023-10-02T09:15:00.000Z', fileType: 'application/zip', fileSize: 15360000, stored_filename: 'doc_1_3.zip' },

@@ -360,57 +360,74 @@ export type CaseUpdateData = Partial<Omit<CaseRow, 'id' | 'uniqueId' | 'created_
 
 export const addCase = async (caseData: CaseInsertData): Promise<number | null> => {
     const db = await getDb();
-    // Ensure uniqueId is present
     if (!caseData.uniqueId) {
         throw new Error("uniqueId is required to add a case.");
     }
 
-    const fields = Object.keys(caseData).join(", ");
-    const placeholders = Object.keys(caseData).map(() => "?").join(", ");
-    const values = Object.values(caseData);
+    // Filter out undefined values, as SQL insert doesn't like 'undefined' for optional fields.
+    // Null is fine.
+    const validCaseData: { [key: string]: any } = {};
+    for (const key in caseData) {
+        if (Object.prototype.hasOwnProperty.call(caseData, key)) {
+            const typedKey = key as keyof CaseInsertData;
+            if (caseData[typedKey] !== undefined) {
+                validCaseData[typedKey] = caseData[typedKey];
+            }
+        }
+    }
+
+    const fields = Object.keys(validCaseData).join(", ");
+    const placeholders = Object.keys(validCaseData).map(() => "?").join(", ");
+    const values = Object.values(validCaseData);
+
+    // Ensure all values are either string, number, or null.
+    const sanitizedValues = values.map(val => (val === undefined ? null : val));
+
+    if (!fields || sanitizedValues.length === 0) {
+        throw new Error("No valid fields to insert for addCase.");
+    }
 
     try {
-        const result = await db.runAsync(
-            `INSERT INTO Cases (${fields}) VALUES (${placeholders})`,
-            values
-        );
+        const sql = `INSERT INTO Cases (${fields}) VALUES (${placeholders})`;
+        console.log("Executing SQL for addCase:", sql, sanitizedValues); // Log SQL and values
+        const result = await db.runAsync(sql, sanitizedValues);
         return result.lastInsertRowId;
     } catch (error) {
-        console.error("Error adding case:", error);
+        console.error("Error adding case with SQL:", `INSERT INTO Cases (${fields}) VALUES (${placeholders})`, "Values:", sanitizedValues, "Error:", error);
         throw error;
     }
 };
 
+// CaseWithDetails will now primarily use fields directly from Cases table
+// as court_name and case_type_name are now part of CaseRow (from schema.ts's Case interface)
 export interface CaseWithDetails extends CaseRow {
-  caseTypeName?: string;
-  courtName?: string;
-  districtName?: string; // From PoliceStation -> District
-  policeStationName?: string;
-  // Add other joined names as needed
+  // caseTypeName and courtName are now directly CaseRow.case_type_name and CaseRow.court_name
+  districtName?: string | null; // From PoliceStation -> District
+  policeStationName?: string | null;
 }
 
 export const getCases = async (userId?: number | null): Promise<CaseWithDetails[]> => {
     const db = await getDb();
-    // Basic query, can be expanded with more joins and filters
+    // Updated query to reflect that court_name and case_type_name are directly on Cases table (c)
+    // Retain JOIN for policeStationName and districtName if needed.
     let sql = `
         SELECT
             c.*,
-            ct.name as caseTypeName,
-            co.name as courtName,
             ps.name as policeStationName,
             d.name as districtName
         FROM Cases c
-        LEFT JOIN CaseTypes ct ON c.case_type_id = ct.id
-        LEFT JOIN Courts co ON c.court_id = co.id
         LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
         LEFT JOIN Districts d ON ps.district_id = d.id
     `;
+    // Removed JOINs for CaseTypes (ct) and Courts (co) as their names are now assumed to be on Cases table.
+    // c.case_type_name and c.court_name will be selected via c.*
+
     const params: (number | string)[] = [];
     if (userId !== undefined && userId !== null) {
-        sql += " WHERE c.user_id = ?"; // Assuming cases are filtered by user_id
+        sql += " WHERE c.user_id = ?";
         params.push(userId);
     }
-    sql += " ORDER BY c.updated_at DESC"; // Or NextDate, etc.
+    sql += " ORDER BY c.updated_at DESC";
 
     return db.getAllAsync<CaseWithDetails>(sql, params);
 };
@@ -420,17 +437,15 @@ export const getCaseById = async (id: number, userId?: number | null): Promise<C
      let sql = `
         SELECT
             c.*,
-            ct.name as caseTypeName,
-            co.name as courtName,
             ps.name as policeStationName,
             d.name as districtName
         FROM Cases c
-        LEFT JOIN CaseTypes ct ON c.case_type_id = ct.id
-        LEFT JOIN Courts co ON c.court_id = co.id
         LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
         LEFT JOIN Districts d ON ps.district_id = d.id
         WHERE c.id = ?
     `;
+    // Removed JOINs for CaseTypes (ct) and Courts (co)
+
     const params: (number | string)[] = [id];
 
     if (userId !== undefined && userId !== null) {
@@ -453,18 +468,29 @@ export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?:
         return false;
     }
 
-    const updatableData = { ...data };
-    const fieldsToUpdate = Object.keys(updatableData).map(key => `${key} = ?`).join(", ");
-    if (!fieldsToUpdate) {
-        console.warn("No fields provided for update.");
-        return false; // No actual fields to update
+    // Filter out undefined values from the input data for the update
+    const validUpdateData: { [key: string]: any } = {};
+    for (const key in data) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+            const typedKey = key as keyof CaseUpdateData;
+            if (data[typedKey] !== undefined) {
+                validUpdateData[typedKey] = data[typedKey];
+            }
+        }
     }
 
-    const valuesToUpdate = Object.values(updatableData);
+    if (Object.keys(validUpdateData).length === 0) {
+        console.warn("No valid fields provided for update after filtering undefined values.");
+        return false;
+    }
+
+    const fieldsToUpdate = Object.keys(validUpdateData).map(key => `${key} = ?`).join(", ");
+    const valuesToUpdate = Object.values(validUpdateData).map(val => (val === undefined ? null : val)); // Sanitize
+
     valuesToUpdate.push(id); // For the WHERE id = ?
 
     let sql = `UPDATE Cases SET ${fieldsToUpdate} WHERE id = ?`;
-    const queryParams: any[] = [...valuesToUpdate];
+    const queryParams: any[] = valuesToUpdate; // Already includes id
 
     // If you want to ensure the case being updated belongs to the actorUserId (if provided)
     // This is an additional check beyond what getCaseById might do if actorUserId is for general fetching permission
@@ -521,13 +547,18 @@ export const addCaseHistoryEntry = async (entry: CaseHistoryLogEntryData): Promi
 // Define which fields of the CaseRow should be tracked for history.
 // This helps in iterating and logging changes only for relevant fields.
 // Exclude 'id', 'uniqueId', 'created_at', 'updated_at' as they are metadata or immutable.
+// Add new fields from CaseRow interface here.
 const TRACKED_CASE_FIELDS: Array<keyof Omit<CaseRow, 'id' | 'uniqueId' | 'created_at' | 'updated_at'>> = [
-  'user_id', 'CNRNumber', 'court_id', 'dateFiled', 'case_type_id',
-  'case_number', 'case_year', 'crime_number', 'crime_year',
-  'OnBehalfOf', 'FirstParty', 'OppositeParty', 'ClientContactNumber', 'Accussed',
-  'Undersection', 'police_station_id',
-  'OppositeAdvocate', 'OppAdvocateContactNumber',
-  'CaseStatus', 'PreviousDate', 'NextDate'
+  'user_id', 'CaseTitle', 'CNRNumber',
+  'court_id', 'court_name', // court_name is new text field
+  'dateFiled',
+  'case_type_id', 'case_type_name', // case_type_name is new text field
+  'case_number', 'case_year', 'crime_number', 'crime_year', 'JudgeName',
+  'ClientName', 'OnBehalfOf', 'FirstParty', 'OppositeParty', 'ClientContactNumber', 'Accussed',
+  'Undersection', 'police_station_id', 'StatuteOfLimitations',
+  'OpposingCounsel', 'OppositeAdvocate', 'OppAdvocateContactNumber',
+  'CaseStatus', 'Priority', 'PreviousDate', 'NextDate',
+  'CaseDescription', 'CaseNotes'
 ];
 
 const logCaseChanges = async (
