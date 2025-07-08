@@ -495,9 +495,10 @@ const AddCase: React.FC<Props> = ({ fields = Samplefields, route }) => {
         // This will be addressed in a later step if requested.
         const newCaseId = await addCase(caseDataPayload);
         if (newCaseId) {
-          console.log("Successfully inserted with ID:", newCaseId);
-          // Navigate or give feedback. Passing newCaseId or full object might be useful.
-          navigation.navigate("Documents" as never); // Or to CaseList/CaseDetail
+          console.log("Successfully inserted with ID:", newCaseId, "and uniqueId:", currentUniqueId);
+          // Navigate to Documents tab, passing the new caseId and the uniqueId used.
+          // The DocumentUpload screen (Documents tab) should use caseId if available.
+          navigation.navigate("Documents", { caseId: newCaseId, uniqueId: currentUniqueId });
         } else {
           console.error("Insert operation did not return a new ID.");
           // Handle error: show message to user

@@ -95,8 +95,8 @@ const AddCaseDetails: React.FC<props> = ({ route }) => {
         component={AddCase}
         initialParams={
           initialValues
-            ? { update: true, initialValues, uniqueId: initialValues.uniqueId, caseId: initialValues.id, onCaseSaved: handleCaseSaved }
-            : { update: false, uniqueId, onCaseSaved: handleCaseSaved } // Pass uniqueId and the callback
+            ? { update: true, initialValues, uniqueId: initialValues.uniqueId, caseId: initialValues.id } // Removed onCaseSaved
+            : { update: false, uniqueId } // Removed onCaseSaved, pass uniqueId
         }
       />
       <Tab.Screen
