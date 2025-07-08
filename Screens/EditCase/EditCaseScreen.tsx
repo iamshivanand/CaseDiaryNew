@@ -13,8 +13,9 @@ import ActionButton from '../CommonComponents/ActionButton';
 import DocumentItem from './components/DocumentItem';
 import TimelineItem from './components/TimelineItem';
 
-import { CaseData, Document, TimelineEvent, DropdownOption, caseStatusOptions, priorityOptions } from '../../Types/appTypes';
-import { RootStackParamList } from '../../Types/navigationtypes'; // Adjust path as needed
+// Ensuring these paths are correct and explicit
+import { CaseData, Document, TimelineEvent, DropdownOption, caseStatusOptions, priorityOptions } from "../../Types/appTypes";
+import { RootStackParamList } from "../../Types/navigationtypes";
 
 // Dummy data for dropdowns - in a real app, these would come from DB or constants file
 const dummyCaseTypeOptions: DropdownOption[] = [
