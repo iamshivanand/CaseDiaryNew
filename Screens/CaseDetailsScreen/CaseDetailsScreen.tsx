@@ -83,15 +83,31 @@ const CaseDetail: React.FC<Props> = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
       <View style={styles.DetailsTextContainer}>
-        {Object.entries(caseDetails).map(
-          ([key, value]: [string, string], index) => (
+        {Object.entries(caseDetails).map(([key, value], index) => {
+          let displayValue: string;
+          if (value instanceof Date) {
+            displayValue = value.toLocaleDateString(); // Format date to string
+          } else if (value === null || value === undefined) {
+            displayValue = "N/A";
+          } else if (typeof value === 'object') {
+            displayValue = JSON.stringify(value); // Simple stringify for other objects
+          }
+           else {
+            displayValue = String(value); // Ensure everything else is a string
+          }
+
+          // Skip rendering for 'uniqueId' if it's not meant for user display, or format it if needed
+          // if (key === 'uniqueId') return null;
+
+          return (
             <View key={index} style={styles.detail}>
               <Text style={styles.DetailsText}>
-                {key}: {value}
+                <Text style={styles.detailKey}>{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: </Text>
+                {displayValue}
               </Text>
             </View>
-          )
-        )}
+          );
+        })}
       </View>
     </ScrollView>
   );

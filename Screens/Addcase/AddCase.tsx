@@ -1,5 +1,5 @@
-import { Formik, FormikProps } from "formik"; // Removed FormikFieldProps as it wasn't used
-import React, { useEffect } from "react"; // Removed useState as it's not directly used by AddCase anymore (Formik handles state)
+import { Formik, FormikProps } from "formik";
+import React, { useEffect, useMemo } from "react"; // Added useMemo
 import {
   StyleSheet,
   Text,
@@ -7,8 +7,8 @@ import {
   ScrollView,
 } from "react-native";
 import * as Yup from "yup";
-import { RouteProp, useNavigation } from "@react-navigation/native"; // useNavigation is used
-// Removed unused imports: Fontisto, DateTimePicker, Picker, TextInput, Button, TouchableOpacity, Autocomplete
+import { RouteProp, useNavigation } from "@react-navigation/native";
+import { v4 as uuidv4 } from "uuid"; // For uniqueId generation
 
 import {
   addCase,
@@ -16,18 +16,16 @@ import {
   CaseInsertData,
   CaseUpdateData,
 } from "../../DataBase";
-import { HomeStackParamList } from "../../Types/navigationtypes"; // Assuming AddCase is part of HomeStack
-import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen"; // Summary type for initialValues
+import { HomeStackParamList } from "../../Types/navigationtypes";
+import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen";
 import { CaseData, DropdownOption as AppDropdownOption, caseStatusOptions, priorityOptions } from "../../Types/appTypes";
 
-// Import new common components
 import FormInput from '../CommonComponents/FormInput';
 import DropdownPicker from '../CommonComponents/DropdownPicker';
 import DatePickerField from '../CommonComponents/DatePickerField';
 import ActionButton from "../CommonComponents/ActionButton";
-import { EditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle"; // For consistent page layout styles
+import { EditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle";
 
-// Interface for field definitions
 interface FieldDefinition {
   name: keyof CaseData;
   type: "text" | "select" | "date" | "multiline";
@@ -36,21 +34,12 @@ interface FieldDefinition {
   options?: AppDropdownOption[];
 }
 
-// Props for AddCase screen
-// The route params for "AddCase" come from HomeStackParamList
-type AddCaseScreenRouteProp = RouteProp<HomeStackParamList, "AddCase">;
-// If AddCase is also used for "AddCaseDetails" route, that needs to be handled if params differ
-// type AddCaseDetailsScreenRouteProp = RouteProp<HomeStackParamList, "AddCaseDetails">;
-
+type AddCaseScreenRouteProp = RouteProp<HomeStackParamList, "AddCaseDetails">; // Changed to AddCaseDetails as this is its context
 
 interface AddCaseProps {
-  // route prop is automatically provided by React Navigation
-  route: AddCaseScreenRouteProp; // | AddCaseDetailsScreenRouteProp; // Use specific route prop
-  // navigation prop is also automatically provided
+  route: AddCaseScreenRouteProp;
 }
 
-
-// --- Field Definitions ---
 const dummyCaseTypeOptionsForAdd: AppDropdownOption[] = [
   { label: 'Select Case Type...', value: '' }, { label: 'Civil Suit', value: 1 }, { label: 'Criminal Defense', value: 2 }, { label: 'Family Law', value: 3 }, { label: 'Corporate', value: 4 }, { label: 'Other', value: 99 },
 ];
@@ -80,21 +69,16 @@ const formFieldsDefinition: FieldDefinition[] = [
   { name: "CaseNotes", type: "multiline", placeholder: "Add any private notes...", label: "Internal Notes" },
 ];
 
-// --- Validation Schema ---
 const validationSchema = Yup.object().shape({
   CaseTitle: Yup.string().required("Case Title is required"),
-  // Add other validations as needed
 });
 
-// --- FormField Renderer Sub-component ---
 const FormFieldRenderer: React.FC<{
   fieldConfig: FieldDefinition;
-  // Formik props are passed implicitly or via context by <Field> or directly
-  formik: FormikProps<Partial<CaseData>>; // Pass all of Formik's props
+  formik: FormikProps<Partial<CaseData>>;
 }> = ({ fieldConfig, formik }) => {
   const { values, errors, touched, setFieldValue } = formik;
   const fieldName = fieldConfig.name;
-
   const commonInputProps = {
     label: fieldConfig.label,
     error: (touched[fieldName] && errors[fieldName]) ? errors[fieldName] : undefined,
@@ -102,102 +86,76 @@ const FormFieldRenderer: React.FC<{
 
   switch (fieldConfig.type) {
     case "text":
-      return (
-        <FormInput
-          {...commonInputProps}
-          value={values[fieldName] as string || ''}
-          placeholder={fieldConfig.placeholder}
-          onChangeText={(text) => setFieldValue(fieldName, text)}
-        />
-      );
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} />;
     case "multiline":
-      return (
-        <FormInput
-          {...commonInputProps}
-          value={values[fieldName] as string || ''}
-          placeholder={fieldConfig.placeholder}
-          onChangeText={(text) => setFieldValue(fieldName, text)}
-          multiline
-          numberOfLines={4}
-          style={{ minHeight: 80 }}
-        />
-      );
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} style={{ minHeight: 80 }} />;
     case "select":
-      return (
-        <DropdownPicker
-          {...commonInputProps}
-          selectedValue={values[fieldName] as string | number | undefined}
-          onValueChange={(itemValue) => setFieldValue(fieldName, itemValue)}
-          options={fieldConfig.options || []}
-          placeholder={fieldConfig.placeholder || `Select ${fieldConfig.label}...`}
-        />
-      );
+      return <DropdownPicker {...commonInputProps} selectedValue={values[fieldName] as string | number | undefined} onValueChange={(itemValue) => setFieldValue(fieldName, itemValue)} options={fieldConfig.options || []} placeholder={fieldConfig.placeholder || `Select ${fieldConfig.label}...`} />;
     case "date":
-      return (
-        <DatePickerField
-          {...commonInputProps}
-          value={values[fieldName] ? new Date(values[fieldName] as string) : null}
-          onChange={(date) => setFieldValue(fieldName, date ? date.toISOString() : null)}
-          placeholder={fieldConfig.placeholder || "Select date"}
-        />
-      );
+      return <DatePickerField {...commonInputProps} value={values[fieldName] ? new Date(values[fieldName] as string) : null} onChange={(date) => setFieldValue(fieldName, date ? date.toISOString() : null)} placeholder={fieldConfig.placeholder || "Select date"} />;
     default:
-      console.warn("Unsupported field type in FormFieldRenderer:", fieldConfig.type);
+      console.warn("Unsupported field type:", fieldConfig.type);
       return null;
   }
 };
 
-// --- Main AddCase Component ---
 const AddCase: React.FC<AddCaseProps> = ({ route }) => {
-  // Extract params. Note: AddCaseDetails route might pass different params than AddCase route.
-  // This component is now primarily for the 'AddCaseDetails' route context (from HomeStack).
-  // It can also be theoretically used for 'AddCase' route if params are aligned.
-  const params = route.params as HomeStackParamList['AddCaseDetails']; // Explicitly type params
+  const params = route.params; // Route params for AddCaseDetails
   const { update = false, initialValues, uniqueId: routeUniqueId } = params ?? {};
 
   const navigation = useNavigation();
-
-  const generatedUniqueId = React.useMemo(() => uuidv4(), []);
+  const generatedUniqueId = useMemo(() => uuidv4(), []);
   const uniqueIdToUse = routeUniqueId || initialValues?.uniqueId || generatedUniqueId;
-
 
   const prepareFormInitialValues = (): Partial<CaseData> => {
     const defaults: Partial<CaseData> = {};
     formFieldsDefinition.forEach(field => {
       defaults[field.name] = field.type === "date" ? null : (field.type === "select" ? (field.options?.[0]?.value ?? '') : '');
     });
-
-    if (update && initialValues) { // initialValues is CaseDetails (summary)
+    if (update && initialValues) {
       return {
         ...defaults,
         uniqueId: initialValues.uniqueId,
         id: initialValues.id,
-        CaseTitle: initialValues.caseNumber || '', // Map from summary
-        // Cannot map court_id/case_type_id from names in CaseDetails without lookups
+        CaseTitle: initialValues.caseNumber || '',
         FiledDate: initialValues.dateFiled ? initialValues.dateFiled.toISOString() : null,
-        // other fields from initialValues if they map directly to CaseData keys
+        // Note: initialValues (CaseDetails) doesn't have IDs for court/caseType.
+        // For update mode, EditCaseScreen is preferred as it handles full CaseData.
+        // This form will show placeholders for court/caseType if initialValues are from summary CaseDetails.
       };
     }
-    return { ...defaults, uniqueId: uniqueIdToUse }; // For new case
+    return { ...defaults, uniqueId: uniqueIdToUse };
   };
 
   const handleSubmitForm = async (formValues: Partial<CaseData>) => {
     console.log("Submitting form values:", formValues);
 
-    if (update && initialValues?.id) { // UPDATE LOGIC
+    if (update && initialValues?.id) {
       const caseIdToUpdate = initialValues.id;
-      const updatePayload: CaseUpdateData = { /* map formValues to CaseUpdateData */ };
-      // This mapping needs to be comprehensive, similar to what was in previous handleFinalSubmit
-      // Example:
-      if (formValues.CaseTitle !== undefined) updatePayload.OnBehalfOf = formValues.CaseTitle; // Or map to appropriate field
+      const updatePayload: CaseUpdateData = {};
+      // Map relevant formValues to CaseUpdateData, ensure correct types
+      if (formValues.CaseTitle !== undefined) updatePayload.OnBehalfOf = formValues.CaseTitle; // Example, align with your DB schema
       if (formValues.FiledDate !== undefined) updatePayload.dateFiled = formValues.FiledDate;
       if (formValues.case_number !== undefined) updatePayload.case_number = formValues.case_number;
-      if (formValues.court_id !== undefined) updatePayload.court_id = formValues.court_id;
-      if (formValues.case_type_id !== undefined) updatePayload.case_type_id = formValues.case_type_id;
-      if (formValues.Status !== undefined) updatePayload.CaseStatus = formValues.Status;
-      // ... etc. for all relevant fields ...
 
-      if (Object.keys(updatePayload).length === 0) {
+      // For court_id and case_type_id, send NULL as per user clarification for update too
+      updatePayload.court_id = null;
+      updatePayload.case_type_id = null;
+      // User needs to add text columns like 'court_name_text', 'case_type_name_text' to DB
+      // and update CaseUpdateData type and updateCase function accordingly.
+      const selectedCourtOption = dummyCourtOptionsForAdd.find(opt => opt.value === formValues.court_id);
+      const courtNameString = selectedCourtOption?.label;
+      const selectedCaseTypeOption = dummyCaseTypeOptionsForAdd.find(opt => opt.value === formValues.case_type_id);
+      const caseTypeNameString = selectedCaseTypeOption?.label;
+      console.log("INFO (Update): Intended Court Name:", courtNameString);
+      console.log("INFO (Update): Intended Case Type Name:", caseTypeNameString);
+      // Example: if schema had 'court_name_text': updatePayload.court_name_text = courtNameString;
+
+
+      if (formValues.Status !== undefined) updatePayload.CaseStatus = formValues.Status;
+      // ... map other updatable fields ...
+
+      if (Object.keys(updatePayload).length === 0 && (!courtNameString && !caseTypeNameString)) { // check if any actual data changed
         console.log("No changes to update.");
         navigation.goBack();
         return;
@@ -206,69 +164,53 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const success = await updateCase(caseIdToUpdate, updatePayload);
         if (success) {
           console.log("Case updated successfully");
-          // Navigate to CaseDetail with updated summary
           const navDetails: CaseDetails = {
             uniqueId: formValues.uniqueId || initialValues.uniqueId,
             id: caseIdToUpdate,
             caseNumber: formValues.CaseTitle || initialValues.caseNumber,
-            court: initialValues.court, // Old name, ideally fetch new name
-            caseType: initialValues.caseType, // Old name, ideally fetch new name
+            court: courtNameString || initialValues.court,
+            caseType: caseTypeNameString || initialValues.caseType,
             dateFiled: formValues.FiledDate ? new Date(formValues.FiledDate) : initialValues.dateFiled,
           };
           navigation.navigate("CaseDetail", { caseDetails: navDetails });
         } else { console.error("Failed to update case."); }
       } catch (e) { console.error("Error updating case:", e); }
     } else { // ADD LOGIC
-      // Resolve selected IDs to their string labels for potential storage
       const selectedCourtOption = dummyCourtOptionsForAdd.find(opt => opt.value === formValues.court_id);
       const courtNameString = selectedCourtOption && selectedCourtOption.value !== '' ? selectedCourtOption.label : null;
-
       const selectedCaseTypeOption = dummyCaseTypeOptionsForAdd.find(opt => opt.value === formValues.case_type_id);
       const caseTypeNameString = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : null;
 
       const insertPayload: CaseInsertData = {
-        uniqueId: formValues.uniqueId || uniqueIdToUse, // Ensure uniqueId
-        user_id: null, // Placeholder for user ID
+        uniqueId: formValues.uniqueId || uniqueIdToUse,
+        user_id: null,
         CNRNumber: formValues.CNRNumber || null,
-
-        // Send NULL to FK ID columns to prevent FOREIGN KEY constraint error
-        court_id: null,
-        case_type_id: null,
-
-        // The actual string names would be stored in new TEXT columns in the Cases table.
-        // Since CaseInsertData doesn't have these fields yet, this is a conceptual addition.
-        // The DB schema and CaseInsertData type need to be updated by the user.
-        // Example:
-        // court_name_text: courtNameString, // (requires 'court_name_text' in CaseInsertData & DB)
-        // case_type_name_text: caseTypeNameString, // (requires 'case_type_name_text' in CaseInsertData & DB)
-
+        court_id: null, // Send NULL for FK ID
+        case_type_id: null, // Send NULL for FK ID
         dateFiled: formValues.FiledDate || null,
         case_number: formValues.case_number || null,
-        // case_year, crime_number, crime_year need to be in formFieldsDefinition and CaseData to be captured
         case_year: formValues.case_year ? parseInt(formValues.case_year as string, 10) : null,
         crime_number: formValues.crime_number || null,
         crime_year: formValues.crime_year ? parseInt(formValues.crime_year as string, 10) : null,
-
-        OnBehalfOf: formValues.ClientName || formValues.OnBehalfOf || null, // Prioritize ClientName if available
+        OnBehalfOf: formValues.ClientName || formValues.OnBehalfOf || null,
         FirstParty: formValues.FirstParty || null,
         OppositeParty: formValues.OppositeParty || null,
         ClientContactNumber: formValues.ClientContactNumber || null,
         Accussed: formValues.Accussed || null,
         Undersection: formValues.Undersection || null,
-        // police_station_id also needs to be handled (is it an ID or name? FK exists)
-        police_station_id: typeof formValues.police_station_id === 'number' ? formValues.police_station_id : null, // Assuming it's an ID for now
-
-        OppositeAdvocate: formValues.OpposingCounsel || formValues.OppositeAdvocate || null, // Prioritize OpposingCounsel
+        police_station_id: typeof formValues.police_station_id === 'number' ? formValues.police_station_id : null,
+        OppositeAdvocate: formValues.OpposingCounsel || formValues.OppositeAdvocate || null,
         OppAdvocateContactNumber: formValues.OppAdvocateContactNumber || null,
-        CaseStatus: formValues.Status || formValues.CaseStatus || null, // Prioritize Status from dropdown
-        PreviousDate: formValues.PreviousDate || null, // Needs to be added to formFieldsDefinition if used
-        NextDate: formValues.HearingDate || formValues.NextDate || null, // Prioritize HearingDate
-        // CaseDescription and CaseNotes are not in CaseInsertData/Cases schema by default.
+        CaseStatus: formValues.Status || formValues.CaseStatus || null,
+        PreviousDate: formValues.PreviousDate || null,
+        NextDate: formValues.HearingDate || formValues.NextDate || null,
+        // To store names, user needs to add TEXT columns to Cases table & CaseInsertData type:
+        // e.g., court_name_text: courtNameString, case_type_name_text: caseTypeNameString
       };
 
-      console.log("INFO: Intended Court Name (requires DB schema change to store):", courtNameString);
-      console.log("INFO: Intended Case Type Name (requires DB schema change to store):", caseTypeNameString);
-      console.log("Attempting to insert with payload (court_id & case_type_id as NULL):", JSON.stringify(insertPayload, null, 2));
+      console.log("INFO (Add): Intended Court Name (for future TEXT column):", courtNameString);
+      console.log("INFO (Add): Intended Case Type Name (for future TEXT column):", caseTypeNameString);
+      console.log("Actual insertPayload (with court_id & case_type_id as NULL):", JSON.stringify(insertPayload, null, 2));
 
       try {
         const newCaseId = await addCase(insertPayload);
@@ -279,9 +221,8 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
             uniqueId: insertPayload.uniqueId,
             caseNumber: formValues.CaseTitle || "N/A",
             dateFiled: formValues.FiledDate ? new Date(formValues.FiledDate) : undefined,
-            // For display on CaseDetailsScreen, pass the names if possible (requires schema change to store them first)
-            court: courtNameString || undefined, // Pass resolved name
-            caseType: caseTypeNameString || undefined, // Pass resolved name
+            court: courtNameString || undefined,
+            caseType: caseTypeNameString || undefined,
           };
           navigation.navigate("CaseDetail", { caseDetails: navDetails });
         } else { console.error("Failed to add case."); }
