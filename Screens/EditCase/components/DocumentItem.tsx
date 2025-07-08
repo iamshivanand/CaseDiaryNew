@@ -16,7 +16,7 @@ interface DocumentItemProps {
 
 const DocumentItem: React.FC<DocumentItemProps> = ({ document, onView, onEdit, onDelete }) => {
   const getFileIconName = (fileType?: string | null): keyof typeof MaterialIcons.glyphMap => {
-    const type = fileType?.toLowerCase() || '';
+    const type = typeof fileType === 'string' ? fileType.toLowerCase() : '';
     if (type.includes('pdf')) return 'picture-as-pdf';
     if (type.includes('image') || type.includes('jpeg') || type.includes('jpg') || type.includes('png')) return 'image';
     if (type.includes('doc') || type.includes('word')) return 'description';
@@ -25,15 +25,22 @@ const DocumentItem: React.FC<DocumentItemProps> = ({ document, onView, onEdit, o
     return 'insert-drive-file'; // Default file icon
   };
 
-  const formattedUploadDate = () => {
+  const displayFileName = typeof document.fileName === 'string' ? document.fileName : "Unknown File";
+
+  const displayUploadDate = () => {
+    if (typeof document.uploadDate !== 'string' || !document.uploadDate) {
+      return 'Date N/A'; // Placeholder for missing or invalid date string
+    }
     try {
       // Assuming document.uploadDate is an ISO string like "2023-09-15T10:00:00.000Z"
       // or "YYYY-MM-DD HH:MM:SS" - needs to be parseable by parseISO or new Date()
       const date = parseISO(document.uploadDate);
       return format(date, "MMM dd, yyyy");
     } catch (error) {
-      // If date is already formatted or in an unexpected format, display as is
-      return document.uploadDate;
+      // If parseISO fails, it means document.uploadDate is not a valid ISO string that parseISO understands.
+      // Return the original string if it might be a pre-formatted date, otherwise a placeholder.
+      // Check if it's a non-empty string before returning it directly.
+      return document.uploadDate.trim() !== '' ? document.uploadDate : 'Invalid Date Format';
     }
   };
 
@@ -44,10 +51,10 @@ const DocumentItem: React.FC<DocumentItemProps> = ({ document, onView, onEdit, o
       </View>
       <View style={DocumentItemStyles.textContainer}>
         <Text style={DocumentItemStyles.fileName} numberOfLines={1} ellipsizeMode="middle">
-          {document.fileName}
+          {displayFileName}
         </Text>
         <Text style={DocumentItemStyles.uploadDate}>
-          Uploaded: {formattedUploadDate()}
+          Uploaded: {displayUploadDate()}
         </Text>
       </View>
       <View style={DocumentItemStyles.actionsContainer}>
