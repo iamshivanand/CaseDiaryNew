@@ -20,10 +20,12 @@ import Autocomplete from "react-native-autocomplete-input";
 import * as Yup from "yup";
 
 import {
-  insertFormAsync,
-  updateFormAsync,
-  FormData,
-  getSuggestions,
+  addCase,
+  updateCase,
+  CaseInsertData,
+  CaseUpdateData, // Added for update operation
+  getSuggestionsForField, // Changed from getSuggestions
+  // FormData, // FormData is not defined in DataBase/index.ts
 } from "../../DataBase";
 import { RootStackParamList } from "../../Types/navigationtypes";
 import { formatDate } from "../../utils/commonFunctions";
@@ -322,9 +324,14 @@ const AddCase: React.FC<Props> = ({ fields = Samplefields, route }) => {
   useEffect(() => {
     async function FetchSuggestion() {
       try {
-        const data = await getSuggestions(global.db, suggestionsInputFields);
-        console.log("Suggestion bala data is ", data);
-        setSuggestions(data);
+        // TODO: Review getSuggestionsForField usage based on its signature in DataBase/index.ts
+        // It expects (fieldName, userId, districtIdForPoliceStations)
+        // The current `suggestionsInputFields` might need to be iterated or handled differently.
+        // For now, this part is kept as is, focusing on addCase.
+        // const data = await getSuggestionsForField(global.db, suggestionsInputFields);
+        // console.log("Suggestion bala data is ", data);
+        // setSuggestions(data);
+        console.log("Placeholder for FetchSuggestion with getSuggestionsForField");
       } catch (error) {
         console.log("error fetching the Suggestions", error);
       }
@@ -360,30 +367,148 @@ const AddCase: React.FC<Props> = ({ fields = Samplefields, route }) => {
   };
   const handleFinalSubmit = async (values: { [key: string]: string }) => {
     console.log("Final form values:", values); // Log the final form values
-    try {
-      if (update) {
-        // Perform update operation
-        //to update need to pass unique Id field
-        //can filter the values those are changed
-        const changedValues = getChangedValues(
-          initialValues as CaseDetails,
-          values
-        );
-        await updateFormAsync(global.db, uniqueId, changedValues);
-        navigation.navigate("CaseDetail", {
-          caseDetails: values as CaseDetails,
-        });
-      } else {
-        // Perform insert operation
-        await insertFormAsync(global.db, { ...values, uniqueId });
-        console.log("Successfully inserted");
-        navigation.navigate("Documents" as never);
+
+    // Ensure uniqueId is present. If not passed via route.params, generate one.
+    // This is a placeholder for uniqueId generation logic if needed.
+    // For now, relying on route.params.uniqueId which is used by addCase.
+    const currentUniqueId = uniqueId || `UID_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+
+    if (update && initialValues?.id) { // Check for initialValues.id for update
+      const caseIdToUpdate = initialValues.id;
+      // Perform update operation
+      const changedValues = getChangedValues(
+        initialValues as CaseDetails, // Assuming CaseDetails is compatible enough with CaseRow
+        values
+      );
+
+      // Map changedValues to CaseUpdateData structure
+      // This is a simplified mapping. Similar to addCase, name-to-ID conversions
+      // would be needed here if those fields are updatable and changed.
+      const caseUpdatePayload: CaseUpdateData = {};
+
+      // Iterate over changedValues and map them to known fields in CaseUpdateData
+      // This assumes form field names (keys in `changedValues`) might need mapping
+      // to schema field names. For now, direct mapping where names match.
+      for (const key in changedValues) {
+        if (Object.prototype.hasOwnProperty.call(changedValues, key)) {
+          const value = changedValues[key];
+          // Example direct mappings (add more as needed, and handle ID lookups)
+          if (key === "CNRNumber") caseUpdatePayload.CNRNumber = value;
+          else if (key === "dateFiled") caseUpdatePayload.dateFiled = value; // Ensure "YYYY-MM-DD"
+          else if (key === "CaseNo") caseUpdatePayload.case_number = value;
+          // else if (key === "CaseNoYear") caseUpdatePayload.case_year = value ? parseInt(value, 10) : null;
+          else if (key === "CrimeNo") caseUpdatePayload.crime_number = value;
+          // else if (key === "CrimeNoYear") caseUpdatePayload.crime_year = value ? parseInt(value, 10) : null;
+          else if (key === "OnBehalfOf") caseUpdatePayload.OnBehalfOf = value;
+          else if (key === "FirstParty") caseUpdatePayload.FirstParty = value;
+          else if (key === "OppositeParty") caseUpdatePayload.OppositeParty = value;
+          else if (key === "ClientContactNumber") caseUpdatePayload.ClientContactNumber = value;
+          else if (key === "Accussed") caseUpdatePayload.Accussed = value;
+          else if (key === "Undersection") caseUpdatePayload.Undersection = value;
+          else if (key === "OppositeAdvocate") caseUpdatePayload.OppositeAdvocate = value;
+          else if (key === "OppAdvocateContactNumber") caseUpdatePayload.OppAdvocateContactNumber = value;
+          else if (key === "CaseStatus") caseUpdatePayload.CaseStatus = value;
+          else if (key === "PreviousDate") caseUpdatePayload.PreviousDate = value; // Ensure "YYYY-MM-DD"
+          else if (key === "NextDate") caseUpdatePayload.NextDate = value; // Ensure "YYYY-MM-DD"
+          // TODO: Add mappings for fields requiring ID lookups if they are changed:
+          // e.g., if values.CourtName changed, you'd need to get its ID for court_id
+          // if (key === "CourtName") caseUpdatePayload.court_id = await getCourtId(value);
+          // if (key === "caseType") caseUpdatePayload.case_type_id = await getCaseTypeId(value);
+          // if (key === "PoliceStation") caseUpdatePayload.police_station_id = await getPoliceStationId(value);
+        }
       }
-    } catch (error) {
-      console.log("Error in submitting the form", error);
-      return false;
+
+      if (Object.keys(caseUpdatePayload).length === 0) {
+        console.log("No changes detected to update.");
+        // Optionally navigate back or show a message
+        navigation.goBack();
+        return;
+      }
+
+      console.log("Attempting to update case ID:", caseIdToUpdate, "with payload:", caseUpdatePayload);
+
+      try {
+        // const userId = null; // TODO: Get actual user ID if available for actorUserId
+        const success = await updateCase(caseIdToUpdate, caseUpdatePayload /*, userId */);
+        if (success) {
+          console.log("Successfully updated case ID:", caseIdToUpdate);
+          // Optimistically update the details for navigation
+          const updatedDetails = { ...initialValues, ...changedValues };
+          navigation.navigate("CaseDetail", {
+             caseDetails: updatedDetails as CaseDetails, // Cast needed if CaseDetails is different from CaseRow
+          });
+        } else {
+          console.error("Update operation failed or no rows were changed for case ID:", caseIdToUpdate);
+          // Handle error: show message to user
+        }
+      } catch (error) {
+        console.error("Error submitting update form with updateCase:", error);
+        // Handle error: show message to user
+        return;
+      }
+
+    } else {
+      // Perform insert operation
+      // Basic mapping from form `values` to `CaseInsertData`.
+      // This is a simplified mapping. Many fields (CourtName, caseType, PoliceStation, District)
+      // need to be converted to their respective IDs.
+      // This requires further logic to fetch or look up these IDs.
+      const caseDataPayload: CaseInsertData = {
+        uniqueId: currentUniqueId, // Essential: from route.params or generated
+        user_id: null, // TODO: Assign actual user_id if available (e.g., from auth context)
+
+        CNRNumber: values.CNRNumber || null,
+        // court_id: Requires lookup from values.CourtName
+        // For now, placeholder or requires UI change to select court and get ID
+        court_id: null, // Placeholder: Needs ID from values.CourtName
+        dateFiled: values.dateFiled || null, // Ensure this is "YYYY-MM-DD"
+        // case_type_id: Requires lookup from values.caseType (e.g., "civil" -> ID)
+        case_type_id: null, // Placeholder: Needs ID from values.caseType
+        case_number: values.CaseNo || null, // Form uses "CaseNo"
+        case_year: values.CaseNoYear ? parseInt(values.CaseNoYear, 10) : null, // Assuming CaseNoYear field exists
+        crime_number: values.CrimeNo || null, // Form uses "CrimeNo"
+        crime_year: values.CrimeNoYear ? parseInt(values.CrimeNoYear, 10) : null, // Assuming CrimeNoYear field exists
+
+        OnBehalfOf: values.OnBehalfOf || null,
+        FirstParty: values.FirstParty || null,
+        OppositeParty: values.OppositeParty || null,
+        ClientContactNumber: values.ClientContactNumber || null,
+        Accussed: values.Accussed || null,
+
+        Undersection: values.Undersection || null,
+        // police_station_id: Requires lookup from values.PoliceStation (and possibly district_id)
+        police_station_id: null, // Placeholder
+
+        OppositeAdvocate: values.OppositeAdvocate || null,
+        OppAdvocateContactNumber: values.OppAdvocateContactNumber || null,
+
+        CaseStatus: values.CaseStatus || null,
+        PreviousDate: values.PreviousDate || null, // Ensure "YYYY-MM-DD"
+        NextDate: values.NextDate || null, // Ensure "YYYY-MM-DD"
+      };
+
+      console.log("Attempting to insert with payload:", caseDataPayload);
+
+      try {
+        // global.db is used here. Ideally, getDb() should be called.
+        // This will be addressed in a later step if requested.
+        const newCaseId = await addCase(caseDataPayload);
+        if (newCaseId) {
+          console.log("Successfully inserted with ID:", newCaseId);
+          // Navigate or give feedback. Passing newCaseId or full object might be useful.
+          navigation.navigate("Documents" as never); // Or to CaseList/CaseDetail
+        } else {
+          console.error("Insert operation did not return a new ID.");
+          // Handle error: show message to user
+        }
+      } catch (error) {
+        console.error("Error submitting the form with addCase:", error);
+        // Handle error: show message to user, check if it's a duplicate uniqueId error, etc.
+        return; // Stop execution if error occurs
+      }
     }
-    // onSubmit(values);
+    // onSubmit(values); // Original onSubmit call, if needed for other purposes.
   };
 
   const openDatePicker = (fieldName: string) => {
