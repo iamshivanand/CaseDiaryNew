@@ -1,590 +1,690 @@
-// database.ts
-import * as FileSystem from "expo-file-system";
-import * as SQLite from "expo-sqlite";
+// DataBase/index.ts
+import * as FileSystem from 'expo-file-system';
+import * as SQLite from 'expo-sqlite';
+import { initializeSchema, CaseType, Court, District, PoliceStation, CaseDocument, Case as CaseRow, User } from './schema'; // Assuming Case is renamed to CaseRow to avoid conflict
+
 const DATABASE_NAME = "CaseDiary.db";
+const DOCUMENTS_DIRECTORY = FileSystem.documentDirectory + "documents/";
 
-interface UploadOptions {
-  fileName: string;
-  fileType: string;
-  fileUri: string;
-  copyToFilesystem: boolean;
-  folderName?: string; // Optional parameter for specifying folder name
-  uniqueId: string;
-}
 
-const Samplefields = [
-  {
-    name: "uniqueId",
-    type: "string",
-    required: true,
-  },
-  {
-    name: "CNRNumber",
-    type: "text",
-    placeholder: "Enter CNR Number",
-    label: " CNR Number",
-  },
-  {
-    name: "CourtName",
-    type: "text",
-    placeholder: "Enter Court Name",
-    label: "Court Name",
-    //manual add
-  },
-  { name: "dateFiled", type: "date", label: "Date Filed" },
-  {
-    name: "caseType",
-    type: "select",
-    label: "Case Type",
-    options: [
-      { label: "Civil", value: "civil" },
-      { label: "Criminal", value: "criminal" },
-      { label: "Family", value: "family" },
-    ],
-    //options should be added manually
-  },
-  {
-    name: "CaseNo",
-    type: "text",
-    placeholder: "Enter Case Number",
-    label: "CaseNumber/STNumber",
-    //this must also have year field with dropdown and search
-  },
-  {
-    name: "CrimeNo",
-    type: "text",
-    placeholder: "Enter Crime Number",
-    label: "Crime Number",
-    //this must also have year field with dropdown and search
-  },
-  {
-    name: "OnBehalfOf",
-    type: "text",
-    placeholder: "On Behalf of",
-    label: "On Behalf of",
-    //this should contain the manual add
-  },
-  {
-    name: "FirstParty",
-    type: "text",
-    placeholder: "Enter First Party",
-    label: "Enter First Party",
-  },
-  {
-    name: "OppositeParty",
-    type: "text",
-    placeholder: "Enter Opposite Party",
-    label: "Enter Opposite Party",
-  },
-  {
-    name: "ClientContactNumber",
-    type: "text",
-    placeholder: "Enter Contact Number",
-    label: "Client Contact Number",
-  },
-  {
-    name: "Accussed",
-    type: "text",
-    placeholder: "Enter Accused Name",
-    label: "Accused",
-  },
-  {
-    name: "Undersection",
-    type: "text",
-    placeholder: "UnderSection",
-    label: "UnderSection",
-  },
-  {
-    name: "PoliceStation",
-    type: "text",
-    placeholder: "Enter Police Station",
-    label: "Police Station",
-  },
-  {
-    name: "District",
-    type: "select",
-    label: "District",
-    options: [
-      { label: "Bareilly", value: "Bareilly" },
-      { label: "Lucknow", value: "Lucknow" },
-    ],
-    //List all the Districts in india with search
-  },
-  {
-    name: "OppositeAdvocate",
-    type: "text",
-    label: "Opposite Advocate",
-    placeholder: "Opposite Advocate",
-  },
-  {
-    name: "OppAdvocateContactNumber",
-    type: "text",
-    label: "Opp. Advocate Contact No.",
-    placeholder: "Contact Number",
-  },
-  {
-    name: "CaseStatus",
-    type: "text",
-    label: "Case Status",
-    placeholder: " Case Status",
-  },
-  { name: "PreviousDate", type: "date", label: "Previous Date" },
-  { name: "NextDate", type: "date", label: "Next Date" },
-  {
-    name: "DocumentPath",
-    type: "text",
-    required: false,
-  },
-  {
-    name: "caseHistory",
-    type: "text",
-    required: false,
-  },
+let dbInstance: SQLite.SQLiteDatabase | null = null;
 
-  // Add more fields with different types as needed
+// --- Database Initialization and Connection Management ---
+
+/**
+ * ONLY FOR TEST ENVIRONMENTS. Clears the singleton dbInstance.
+ */
+export const __TEST_ONLY_resetDbInstance = () => {
+  console.log(`NODE_ENV in __TEST_ONLY_resetDbInstance: ${process.env.NODE_ENV}`); // Debugging line
+  if (process.env.NODE_ENV === 'test') {
+    dbInstance = null;
+  } else {
+    console.warn("__TEST_ONLY_resetDbInstance called outside of test environment. This is not allowed.");
+  }
+};
+
+export const getDb = async (): Promise<SQLite.SQLiteDatabase> => {
+  if (dbInstance === null) {
+    try {
+      // console.log("dbInstance is null, opening new DB connection."); // Debugging line
+      const instance = await SQLite.openDatabaseAsync(DATABASE_NAME);
+      console.log("Database opened successfully.");
+      dbInstance = instance;
+      await initializeSchema(dbInstance);
+      await seedInitialData(dbInstance);
+    } catch (error) {
+      console.error("Failed to open or initialize database:", error);
+      throw error;
+    }
+  }
+  if (!dbInstance) {
+    throw new Error("Database instance is null after attempting to open.");
+  }
+  return dbInstance;
+};
+
+// --- Seeding Initial Data ---
+const PREDEFINED_DISTRICTS: Array<Omit<District, 'id' | 'user_id'>> = [
+  { name: 'Bareilly', state: 'Uttar Pradesh' },
+  { name: 'Lucknow', state: 'Uttar Pradesh' },
+  { name: 'Mumbai City', state: 'Maharashtra' },
+  { name: 'South Delhi', state: 'Delhi' },
+  { name: 'North Goa', state: 'Goa' },
+  { name: 'Jaipur', state: 'Rajasthan' },
+  { name: 'Patna', state: 'Bihar' },
+  { name: 'Kolkata', state: 'West Bengal' },
+  { name: 'Chennai', state: 'Tamil Nadu' },
+  { name: 'Bangalore Urban', state: 'Karnataka' },
 ];
 
-export const openDatabaseAsync = async () => {
-  if (!global.hasOwnProperty("db")) {
-    global.db = SQLite.openDatabaseAsync(DATABASE_NAME);
-    await createTableAsync(global.db, Samplefields);
+const PREDEFINED_CASE_TYPES: Array<Omit<CaseType, 'id' | 'user_id'>> = [
+  { name: 'Civil' },
+  { name: 'Criminal' },
+  { name: 'Family' },
+  { name: 'Writ' },
+  { name: 'Corporate' },
+  { name: 'Revenue' },
+  { name: 'Consumer' },
+  { name: 'Labour' },
+  { name: 'Arbitration' },
+  { name: 'Service Matter' },
+];
+
+export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> => {
+  console.log("Attempting to seed initial data...");
+
+  // Seed Case Types
+  try {
+    for (const caseType of PREDEFINED_CASE_TYPES) {
+      const existing = await db.getFirstAsync<CaseType>(
+        "SELECT * FROM CaseTypes WHERE name = ? AND user_id IS NULL",
+        [caseType.name]
+      );
+      if (!existing) {
+        await db.runAsync("INSERT INTO CaseTypes (name, user_id) VALUES (?, NULL)", [caseType.name]);
+        console.log(`Seeded CaseType: ${caseType.name}`);
+      }
+    }
+  } catch (error) {
+    console.error("Error seeding case types:", error);
   }
-  return global.db;
+
+  // Seed Districts
+  try {
+    for (const district of PREDEFINED_DISTRICTS) {
+      const existing = await db.getFirstAsync<District>(
+        "SELECT * FROM Districts WHERE name = ? AND state = ? AND user_id IS NULL",
+        [district.name, district.state]
+      );
+      if (!existing) {
+        await db.runAsync("INSERT INTO Districts (name, state, user_id) VALUES (?, ?, NULL)", [
+          district.name,
+          district.state,
+        ]);
+        console.log(`Seeded District: ${district.name}, ${district.state}`);
+      }
+    }
+  } catch (error) {
+    console.error("Error seeding districts:", error);
+  }
+  console.log("Initial data seeding process complete.");
 };
 
-export interface FormData {
-  id?: number | string;
-  caseNumber?: string;
-  court?: string;
-  dateFiled?: Date;
-  caseType?: string;
-  // ... other fields as needed
-  DocumentPath?: string; // Optional PDF path placeholder
+
+// --- CRUD Operations for CaseTypes ---
+export const addCaseType = async (name: string, userId?: number | null): Promise<number | null> => {
+  const db = await getDb();
+  if (!name || name.trim() === "") {
+    throw new Error("Case type name cannot be empty.");
+  }
+  try {
+    const result = await db.runAsync(
+      "INSERT INTO CaseTypes (name, user_id) VALUES (?, ?)",
+      [name.trim(), userId ?? null]
+    );
+    return result.lastInsertRowId;
+  } catch (error) {
+    console.error(`Error adding case type "${name}":`, error);
+    throw error;
+  }
+};
+
+export const getCaseTypes = async (userId?: number | null): Promise<CaseType[]> => {
+  const db = await getDb();
+  let query = "SELECT * FROM CaseTypes WHERE user_id IS NULL";
+  const params: (number | string | null)[] = []; // Adjusted type for params
+
+  if (userId !== undefined && userId !== null) {
+    query += " OR user_id = ?";
+    params.push(userId);
+  }
+  query += " ORDER BY name ASC";
+
+  return db.getAllAsync<CaseType>(query, params);
+};
+
+export const updateCaseType = async (id: number, name: string, userId: number): Promise<boolean> => {
+  const db = await getDb();
+  if (!name || name.trim() === "") {
+    throw new Error("Case type name cannot be empty.");
+  }
+  try {
+    const result = await db.runAsync(
+      "UPDATE CaseTypes SET name = ? WHERE id = ? AND user_id = ?",
+      [name.trim(), id, userId]
+    );
+    return result.changes > 0;
+  } catch (error) {
+    console.error(`Error updating case type ID ${id}:`, error);
+    throw error;
+  }
+};
+
+export const deleteCaseType = async (id: number, userId: number): Promise<boolean> => {
+  const db = await getDb();
+  try {
+    const result = await db.runAsync(
+      "DELETE FROM CaseTypes WHERE id = ? AND user_id = ?",
+      [id, userId]
+    );
+    return result.changes > 0;
+  } catch (error) {
+    console.error(`Error deleting case type ID ${id}:`, error);
+    throw error;
+  }
+};
+
+// --- CRUD Operations for Courts ---
+export const addCourt = async (name: string, userId?: number | null): Promise<number | null> => {
+  const db = await getDb();
+  if (!name || name.trim() === "") throw new Error("Court name cannot be empty.");
+  try {
+    const result = await db.runAsync("INSERT INTO Courts (name, user_id) VALUES (?, ?)", [name.trim(), userId ?? null]);
+    return result.lastInsertRowId;
+  } catch (error) { console.error(`Error adding court "${name}":`, error); throw error; }
+};
+
+export const getCourts = async (userId?: number | null): Promise<Court[]> => {
+  const db = await getDb();
+  let query = "SELECT * FROM Courts WHERE user_id IS NULL";
+  const params: (number | string | null)[] = [];
+  if (userId !== undefined && userId !== null) { query += " OR user_id = ?"; params.push(userId); }
+  query += " ORDER BY name ASC";
+  return db.getAllAsync<Court>(query, params);
+};
+
+export const updateCourt = async (id: number, name: string, userId: number): Promise<boolean> => {
+  const db = await getDb();
+  if (!name || name.trim() === "") throw new Error("Court name cannot be empty.");
+  try {
+    const result = await db.runAsync("UPDATE Courts SET name = ? WHERE id = ? AND user_id = ?", [name.trim(), id, userId]);
+    return result.changes > 0;
+  } catch (error) { console.error(`Error updating court ID ${id}:`, error); throw error; }
+};
+
+export const deleteCourt = async (id: number, userId: number): Promise<boolean> => {
+  const db = await getDb();
+  try {
+    const result = await db.runAsync("DELETE FROM Courts WHERE id = ? AND user_id = ?", [id, userId]);
+    return result.changes > 0;
+  } catch (error) { console.error(`Error deleting court ID ${id}:`, error); throw error; }
+};
+
+
+// --- CRUD Operations for Districts ---
+export const addDistrict = async (name: string, state?: string | null, userId?: number | null): Promise<number | null> => {
+  const db = await getDb();
+  if (!name || name.trim() === "") throw new Error("District name cannot be empty.");
+  try {
+    const result = await db.runAsync(
+      "INSERT INTO Districts (name, state, user_id) VALUES (?, ?, ?)",
+      [name.trim(), state ?? null, userId ?? null]
+    );
+    return result.lastInsertRowId;
+  } catch (error) { console.error(`Error adding district "${name}":`, error); throw error; }
+};
+
+export const getDistricts = async (userId?: number | null): Promise<District[]> => {
+  const db = await getDb();
+  let query = "SELECT * FROM Districts WHERE user_id IS NULL";
+  const params: (number | string | null)[] = [];
+  if (userId !== undefined && userId !== null) { query += " OR user_id = ?"; params.push(userId); }
+  query += " ORDER BY state ASC, name ASC";
+  return db.getAllAsync<District>(query, params);
+};
+
+// Add update and delete for Districts if user-added districts should be manageable.
+
+// --- CRUD Operations for PoliceStations ---
+export const addPoliceStation = async (name: string, districtId?: number | null, userId?: number | null): Promise<number | null> => {
+  const db = await getDb();
+  if (!name || name.trim() === "") throw new Error("Police station name cannot be empty.");
+  try {
+    const result = await db.runAsync(
+      "INSERT INTO PoliceStations (name, district_id, user_id) VALUES (?, ?, ?)",
+      [name.trim(), districtId ?? null, userId ?? null]
+    );
+    return result.lastInsertRowId;
+  } catch (error) { console.error(`Error adding police station "${name}":`, error); throw error; }
+};
+
+export const getPoliceStations = async (districtId?: number | null, userId?: number | null): Promise<PoliceStation[]> => {
+  const db = await getDb();
+  let query = "SELECT * FROM PoliceStations WHERE 1=1"; // Start with a true condition
+  const params: (number | string | null)[] = [];
+
+  if (districtId !== undefined && districtId !== null) {
+    query += " AND district_id = ?";
+    params.push(districtId);
+  }
+  // Filter by global and user-specific
+  query += " AND (user_id IS NULL";
+  if (userId !== undefined && userId !== null) {
+    query += " OR user_id = ?";
+    params.push(userId);
+  }
+  query += ")";
+  query += " ORDER BY name ASC";
+  return db.getAllAsync<PoliceStation>(query, params);
+};
+// Add update and delete for PoliceStations if user-added stations should be manageable.
+
+
+// --- Document Management ---
+interface UploadOptions {
+  originalFileName: string;
+  fileType: string;
+  fileUri: string;
+  caseId: number;
+  userId?: number | null;
+  fileSize?: number | null;
 }
 
-export const createTableAsync = async (
-  db: SQLite.SQLiteDatabase,
-  samplefields: { name: string; type: string; required?: boolean }[]
-) => {
-  return new Promise<void>((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `
-          CREATE TABLE IF NOT EXISTS cases (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ${samplefields
-              .map(
-                (field) => `${field.name}${field.required ? " NOT NULL" : ""}`
-              )
-              .join(", ")}
-          );
-        `,
-          [],
-          (_, result) => {
-            resolve(); // Resolve the promise upon successful table creation
-          },
-          (_, error) => {
-            console.error("Error creating table:", error);
-            reject(error); // Reject the promise with the error
-            return true;
-          }
-        );
-      },
-      // Error callback
-      (error) => {
-        console.error("Transaction error:", error);
-        reject(error); // Reject the promise with the error
-        return true; // Return true to signify that the error is handled
-      }
-    );
-  });
-};
-export const getTableColumnsAsync = async (db: SQLite.Database) => {
-  return new Promise<string[]>((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `
-          PRAGMA table_info("cases");
-          `,
-          [],
-          (_, result) => {
-            const columns: string[] = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              const column = result.rows.item(i);
-              if (column) {
-                columns.push(column.name);
-              }
-            }
-            resolve(columns);
-            // console.log("columns are", columns);
-          },
-          (_, error) => {
-            console.error("Error getting table columns:", error);
-            reject(error);
-            return true;
-          }
-        );
-      },
-      (error) => {
-        console.error("Transaction error:", error);
-        reject(error);
-        return true;
-      }
-    );
-  });
-};
+export const uploadCaseDocument = async (options: UploadOptions): Promise<number | null> => {
+  const db = await getDb();
+  const { originalFileName, fileType, fileUri, caseId, userId, fileSize } = options;
 
-export const insertFormAsync = async (
-  db: SQLite.Database,
-  data: { [key: string]: any }
-) => {
-  return new Promise<void>((resolve, reject) => {
-    // console.log("hello values insetForm", data);
-    const fields = Object.keys(data);
-    const placeholders = fields.map(() => "?").join(", ");
-
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `
-          INSERT INTO cases (${fields.join(", ")})
-          VALUES (${placeholders})
-        `,
-          fields.map((field) => data[field]),
-          (_, result) => {
-            if (result.rowsAffected === 1) {
-              // console.log("Form inserted successfully!");
-              return resolve(); // Resolve the promise upon successful insertion
-            } else {
-              console.warn("Failed to insert form!");
-              reject(new Error("Failed to insert form")); // Reject the promise if insertion failed
-            }
-          },
-          (_, error) => {
-            console.error("Error inserting form:", error);
-            reject(error); // Reject the promise with the error
-            return true;
-          }
-        );
-      },
-      // Error callback
-      (error) => {
-        console.error("Transaction error:", error);
-        return reject(error); // Reject the promise with the error
-      }
-    );
-  });
-};
-
-export const getFormsAsync = async (db: SQLite.Database) => {
-  const results = await new Promise<any>((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        `
-        SELECT * FROM cases
-      `,
-        [],
-        (_, result) => {
-          // console.log("result is ", result);
-          resolve(result.rows); // Resolve the promise with the retrieved rows
-        },
-        (_, error) => {
-          console.error("Error fetching forms:", error);
-          reject(error); // Reject the promise with the error
-          return true;
-        }
-      );
-    });
-  });
-  // console.log("All cases", results); // Log the retrieved rows
-  return results;
-};
-
-export const searchFormsAsync = async (
-  db: SQLite.Database,
-  searchQuery: string
-) => {
-  // Filter the fields to include only those that have a "name" property
-  const searchableFields = Samplefields.filter((field) => field.name);
-
-  // Generate the WHERE clause based on the searchable fields
-  const whereClause = searchableFields
-    .map((field) => `${field.name} LIKE ?`)
-    .join(" OR ");
-
-  // Generate the placeholders and query parameters
-  const placeholders = Array(searchableFields.length).fill("?").join(",");
-  const queryParams = searchableFields.map(() => `%${searchQuery}%`);
-
-  const query = `
-    SELECT * FROM cases WHERE ${whereClause}
-  `;
-
-  const results = await new Promise<any>((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        query,
-        queryParams,
-        (_, result) => {
-          resolve(result.rows); // Resolve the promise with the retrieved rows
-        },
-        (_, error) => {
-          console.error("Error fetching forms:", error);
-          reject(error); // Reject the promise with the error
-          return true;
-        }
-      );
-    });
-  });
-  return results;
-};
-export const searchFormsAccordingToFieldsAsync = async (
-  db: SQLite.Database,
-  fieldName: string,
-  searchValue: string,
-  comparisonOperator: string = "=" 
-) => {
-  const query = `
-    SELECT * FROM cases WHERE ${fieldName} ${comparisonOperator} ?
-  `;
-
-  const results = await new Promise<any>((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        query,
-        [searchValue],
-        (_, result) => {
-          resolve(result.rows); // Resolve the promise with the retrieved rows
-        },
-        (_, error) => {
-          console.error("Error fetching forms:", error);
-          reject(error); // Reject the promise with the error
-          return true;
-        }
-      );
-    });
-  });
-  return results;
-};
-
-export const updateFormAsync = async (
-  db: SQLite.Database,
-  uniqueId: string | number,
-  data: any
-): Promise<boolean> => {
-  return new Promise<boolean>((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        console.log("Hello from update Database", data.NextDate);
-
-        // First, fetch the current data
-        tx.executeSql(
-          `SELECT * FROM cases WHERE uniqueId = ?`,
-          [uniqueId],
-          (_, result) => {
-            const currentData = result.rows.item(0);
-
-            if (data?.NextDate && currentData?.NextDate !== data?.NextDate) {
-              data.PreviousDate = currentData?.NextDate;
-
-              // Maintain case history
-              const history = JSON.parse(currentData?.caseHistory || "[]");
-              history.push({
-                date: new Date().toISOString(),
-                field: "NextDate",
-                oldValue: currentData?.NextDate,
-                newValue: data?.NextDate,
-              });
-              data.caseHistory = JSON.stringify(history);
-            }
-
-            const updateFields = Object.keys(data)
-              .filter((key) => key !== "uniqueId")
-              .map((key) => `${key} = ?`)
-              .join(", ");
-            const values: (string | number)[] = Object.values(data).filter(
-              (val): val is string | number => val !== undefined
-            );
-            console.log("Hello UpdateFields are", updateFields, values);
-
-            if (updateFields.length === 0) {
-              console.warn("No fields provided for update.");
-              resolve(false);
-              return;
-            }
-
-            values.push(uniqueId);
-
-            tx.executeSql(
-              `
-              UPDATE cases
-              SET ${updateFields}
-              WHERE uniqueId = ?
-            `,
-              values,
-              (_, result) => {
-                if (result.rowsAffected === 1) {
-                  resolve(true);
-                } else {
-                  console.warn("Failed to update form!", result);
-                  resolve(false);
-                }
-              },
-              (_, error) => {
-                console.error("Error updating form:", error);
-                reject(error);
-                return true;
-              }
-            );
-          },
-          (_, error) => {
-            console.error("Error fetching current data:", error);
-            reject(error);
-            return true;
-          }
-        );
-      },
-      (error) => {
-        console.error("Transaction error:", error);
-        reject(error);
-      }
-    );
-  });
-};
-export const deleteFormAsync = async (db: SQLite.Database, id: string) => {
-  db.transaction((tx) => {
-    tx.executeSql(
-      `
-      DELETE FROM cases WHERE id = ?
-    `,
-      [id]
-    );
-  });
-};
-
-//export const addPdfAttachmentAsync = async (formData: FormData, pdfUri: string) => {
-// Implement logic to store the PDF file (e.g., using expo-file-system or react-native-fs)
-// based on the pdfUri and update formData.pdfPath with the actual storage location
-// formData.pdfPath = /* path where the PDF is stored */
-// return formData;
-//};
-const uploadFile = async (options: UploadOptions) => {
-  const {
-    fileName,
-    fileType,
-    fileUri,
-    copyToFilesystem,
-    folderName,
-    uniqueId,
-  } = options;
+  const timestamp = Date.now();
+  const sanitizedOriginalFileName = originalFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const uniqueStoredFileName = `${caseId}_${timestamp}_${sanitizedOriginalFileName}.${fileType}`;
 
   try {
-    const appSandboxUri =
-      FileSystem.documentDirectory + `documents/${fileName}.${fileType}`;
-    await FileSystem.copyAsync({ from: fileUri, to: appSandboxUri });
-    await updateFormAsync(global.db, uniqueId, { DocumentPath: appSandboxUri });
+    const dirInfo = await FileSystem.getInfoAsync(DOCUMENTS_DIRECTORY);
+    if (!dirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(DOCUMENTS_DIRECTORY, { intermediates: true });
+    }
+
+    const destinationUri = DOCUMENTS_DIRECTORY + uniqueStoredFileName;
+    await FileSystem.copyAsync({ from: fileUri, to: destinationUri });
+
+    const result = await db.runAsync(
+      "INSERT INTO CaseDocuments (case_id, stored_filename, original_display_name, file_type, file_size, user_id) VALUES (?, ?, ?, ?, ?, ?)",
+      [caseId, uniqueStoredFileName, originalFileName, fileType, fileSize ?? null, userId ?? null]
+    );
+    return result.lastInsertRowId;
   } catch (error) {
-    console.log("Error aa gyaa bhaiya");
+    console.error("Error uploading file:", error);
+    return null;
   }
 };
 
-export default uploadFile;
+export const getCaseDocuments = async (caseId: number): Promise<CaseDocument[]> => {
+  const db = await getDb();
+  return db.getAllAsync<CaseDocument>("SELECT * FROM CaseDocuments WHERE case_id = ? ORDER BY created_at DESC", [caseId]);
+};
 
-export const checkFileExists = async (filePath: string) => {
+export const deleteCaseDocument = async (documentId: number): Promise<boolean> => {
+  const db = await getDb();
+  const doc = await db.getFirstAsync<CaseDocument>("SELECT stored_filename FROM CaseDocuments WHERE id = ?", [documentId]);
+  if (!doc) {
+    console.warn(`Document with ID ${documentId} not found for deletion.`);
+    return false;
+  }
+  const filePath = DOCUMENTS_DIRECTORY + doc.stored_filename;
+  try {
+    const result = await db.runAsync("DELETE FROM CaseDocuments WHERE id = ?", [documentId]);
+    if (result.changes > 0) {
+      const fileInfo = await FileSystem.getInfoAsync(filePath);
+      if (fileInfo.exists) {
+        await FileSystem.deleteAsync(filePath);
+      }
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error(`Error deleting document ID ${documentId}:`, error);
+    throw error;
+  }
+};
+
+export const getFullDocumentPath = (storedFileName: string | null | undefined): string | null => {
+  if (!storedFileName) return null;
+  return DOCUMENTS_DIRECTORY + storedFileName;
+};
+
+export const checkFileExists = async (filePath: string): Promise<boolean> => {
   try {
     const { exists } = await FileSystem.getInfoAsync(filePath);
     return exists;
   } catch (error) {
     console.error("Error checking file existence:", error);
+    return false;
+  }
+};
+
+// --- CRUD Operations for Cases ---
+// Using CaseRow from schema.ts to avoid conflict with React Case keyword
+export type CaseInsertData = Omit<CaseRow, 'id' | 'created_at' | 'updated_at'>;
+export type CaseUpdateData = Partial<Omit<CaseRow, 'id' | 'uniqueId' | 'created_at' | 'updated_at'>>;
+
+
+export const addCase = async (caseData: CaseInsertData): Promise<number | null> => {
+    const db = await getDb();
+    // Ensure uniqueId is present
+    if (!caseData.uniqueId) {
+        throw new Error("uniqueId is required to add a case.");
+    }
+
+    const fields = Object.keys(caseData).join(", ");
+    const placeholders = Object.keys(caseData).map(() => "?").join(", ");
+    const values = Object.values(caseData);
+
+    try {
+        const result = await db.runAsync(
+            `INSERT INTO Cases (${fields}) VALUES (${placeholders})`,
+            values
+        );
+        return result.lastInsertRowId;
+    } catch (error) {
+        console.error("Error adding case:", error);
+        throw error;
+    }
+};
+
+export interface CaseWithDetails extends CaseRow {
+  caseTypeName?: string;
+  courtName?: string;
+  districtName?: string; // From PoliceStation -> District
+  policeStationName?: string;
+  // Add other joined names as needed
+}
+
+export const getCases = async (userId?: number | null): Promise<CaseWithDetails[]> => {
+    const db = await getDb();
+    // Basic query, can be expanded with more joins and filters
+    let sql = `
+        SELECT
+            c.*,
+            ct.name as caseTypeName,
+            co.name as courtName,
+            ps.name as policeStationName,
+            d.name as districtName
+        FROM Cases c
+        LEFT JOIN CaseTypes ct ON c.case_type_id = ct.id
+        LEFT JOIN Courts co ON c.court_id = co.id
+        LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
+        LEFT JOIN Districts d ON ps.district_id = d.id
+    `;
+    const params: (number | string)[] = [];
+    if (userId !== undefined && userId !== null) {
+        sql += " WHERE c.user_id = ?"; // Assuming cases are filtered by user_id
+        params.push(userId);
+    }
+    sql += " ORDER BY c.updated_at DESC"; // Or NextDate, etc.
+
+    return db.getAllAsync<CaseWithDetails>(sql, params);
+};
+
+export const getCaseById = async (id: number, userId?: number | null): Promise<CaseWithDetails | null> => {
+    const db = await getDb();
+     let sql = `
+        SELECT
+            c.*,
+            ct.name as caseTypeName,
+            co.name as courtName,
+            ps.name as policeStationName,
+            d.name as districtName
+        FROM Cases c
+        LEFT JOIN CaseTypes ct ON c.case_type_id = ct.id
+        LEFT JOIN Courts co ON c.court_id = co.id
+        LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
+        LEFT JOIN Districts d ON ps.district_id = d.id
+        WHERE c.id = ?
+    `;
+    const params: (number | string)[] = [id];
+
+    if (userId !== undefined && userId !== null) {
+        sql += " AND c.user_id = ?";
+        params.push(userId);
+    }
+    const result = await db.getFirstAsync<CaseWithDetails>(sql, params);
+    return result ?? null;
+};
+
+
+export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?: number | null): Promise<boolean> => {
+    const db = await getDb();
+    // Fetch the current state of the case *before* the update
+    // Pass actorUserId to getCaseById if you want to enforce that the user initiating the update owns the case or has rights
+    const currentCaseData = await getCaseById(id, actorUserId);
+
+    if (!currentCaseData) {
+        console.warn(`Case with id ${id} not found or not accessible by user ${actorUserId}.`);
+        return false;
+    }
+
+    const updatableData = { ...data };
+    const fieldsToUpdate = Object.keys(updatableData).map(key => `${key} = ?`).join(", ");
+    if (!fieldsToUpdate) {
+        console.warn("No fields provided for update.");
+        return false; // No actual fields to update
+    }
+
+    const valuesToUpdate = Object.values(updatableData);
+    valuesToUpdate.push(id); // For the WHERE id = ?
+
+    let sql = `UPDATE Cases SET ${fieldsToUpdate} WHERE id = ?`;
+    const queryParams: any[] = [...valuesToUpdate];
+
+    // If you want to ensure the case being updated belongs to the actorUserId (if provided)
+    // This is an additional check beyond what getCaseById might do if actorUserId is for general fetching permission
+    if (actorUserId !== undefined && actorUserId !== null && currentCaseData.user_id === actorUserId) {
+        // This is fine, user is updating their own case.
+        // If cases can be updated by users other than the owner (e.g. an admin), this logic needs adjustment.
+    } else if (actorUserId !== undefined && actorUserId !== null && currentCaseData.user_id !== actorUserId) {
+        // console.warn(`User ${actorUserId} attempting to update case ${id} owned by ${currentCaseData.user_id}.`);
+        // Decide if this should be an error or if specific fields are allowed to be updated by others.
+        // For now, let's assume only owner or system (actorUserId=null) can update.
+        // If actorUserId is provided but doesn't match case owner, this might be an issue.
+        // For simplicity, the getCaseById check should handle most ownership concerns for now.
+    }
+
+    try {
+        const result = await db.runAsync(sql, queryParams);
+        if (result.changes > 0) {
+            // Log changes to CaseHistoryLog
+            // Important: 'data' contains the new values. 'currentCaseData' contains old values.
+            // Ensure currentCaseData and data are properly typed for key access.
+            await logCaseChanges(id, currentCaseData as CaseRow, data as CaseUpdateData, actorUserId);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error(`Error updating case ID ${id}:`, error);
+        throw error;
+    }
+};
+
+// --- Case History Log ---
+interface CaseHistoryLogEntryData {
+  case_id: number;
+  field_changed: string;
+  old_value: string | null;
+  new_value: string | null;
+  user_id?: number | null; // The user who performed the action
+}
+
+export const addCaseHistoryEntry = async (entry: CaseHistoryLogEntryData): Promise<number | null> => {
+  const db = await getDb();
+  try {
+    const result = await db.runAsync(
+      "INSERT INTO CaseHistoryLog (case_id, user_id, field_changed, old_value, new_value, timestamp) VALUES (?, ?, ?, ?, ?, STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))",
+      [entry.case_id, entry.user_id ?? null, entry.field_changed, entry.old_value, entry.new_value]
+    );
+    return result.lastInsertRowId;
+  } catch (error) {
+    console.error("Error adding case history entry:", error);
     throw error;
   }
 };
 
-export const getSuggestions = async (db: SQLite.Database, fields) => {
-  const suggestions = {};
-  const fieldsWithNames = fields?.filter((field) => field.name);
+// Define which fields of the CaseRow should be tracked for history.
+// This helps in iterating and logging changes only for relevant fields.
+// Exclude 'id', 'uniqueId', 'created_at', 'updated_at' as they are metadata or immutable.
+const TRACKED_CASE_FIELDS: Array<keyof Omit<CaseRow, 'id' | 'uniqueId' | 'created_at' | 'updated_at'>> = [
+  'user_id', 'CNRNumber', 'court_id', 'dateFiled', 'case_type_id',
+  'case_number', 'case_year', 'crime_number', 'crime_year',
+  'OnBehalfOf', 'FirstParty', 'OppositeParty', 'ClientContactNumber', 'Accussed',
+  'Undersection', 'police_station_id',
+  'OppositeAdvocate', 'OppAdvocateContactNumber',
+  'CaseStatus', 'PreviousDate', 'NextDate'
+];
 
-  await Promise.all(
-    fieldsWithNames.map(async (field) => {
-      try {
-        const results = await new Promise((resolve, reject) => {
-          db.transaction((tx) => {
-            tx.executeSql(
-              `SELECT DISTINCT ${field.name} FROM cases WHERE ${field.name} IS NOT NULL AND ${field.name} != ''`,
-              [],
-              (_, result) => {
-                const values = new Set();
-                for (let i = 0; i < result.rows.length; i++) {
-                  values.add(result.rows.item(i)[field.name]);
-                }
-                resolve(Array.from(values)); // Convert set back to array
-              },
-              (_, error) => {
-                console.error(
-                  `Error fetching suggestions for field ${field.name}:`,
-                  error
-                );
-                reject(error);
-                return true;
-              }
-            );
-          });
-        });
+const logCaseChanges = async (
+    caseId: number,
+    oldData: CaseRow, // Full old case data
+    newData: CaseUpdateData, // Partial new data
+    actorUserId?: number | null
+) => {
+    for (const key of TRACKED_CASE_FIELDS) {
+        // Check if the field is present in newData and has changed
+        if (newData.hasOwnProperty(key)) {
+            const oldValue = oldData[key] !== undefined && oldData[key] !== null ? String(oldData[key]) : null;
+            const newValue = newData[key] !== undefined && newData[key] !== null ? String(newData[key]) : null;
 
-        suggestions[field.name] = results;
-      } catch (error) {
-        console.error(
-          `Error fetching suggestions for field ${field.name}:`,
-          error
-        );
-      }
-    })
-  );
-
-  return suggestions;
+            if (oldValue !== newValue) {
+                await addCaseHistoryEntry({
+                    case_id: caseId,
+                    field_changed: key,
+                    old_value: oldValue,
+                    new_value: newValue,
+                    user_id: actorUserId
+                });
+            }
+        }
+    }
+    // Special handling for PreviousDate if NextDate is changed (as per original logic)
+    // This logic might be redundant if NextDate changes are already logged by the loop above,
+    // but kept if explicit PreviousDate update is desired.
+    if (newData.NextDate && newData.NextDate !== oldData.NextDate) {
+        // The updateCase function already handles setting PreviousDate = old NextDate in the DB.
+        // The change to NextDate itself is logged by the loop above.
+        // If PreviousDate is also a field in newData and changed independently, it's logged.
+        // If PreviousDate is ONLY changed implicitly when NextDate changes,
+        // and not part of `newData` from the client, then its change isn't logged by the loop.
+        // However, the `updateCase` in the plan was supposed to handle this.
+        // Let's assume the `updateCase` in the DB would have set `PreviousDate = oldData.NextDate`
+        // So, if `PreviousDate` is part of `TRACKED_CASE_FIELDS`, its change will be logged.
+        // The current `updateCase` does not explicitly set `PreviousDate`.
+        // This implies `PreviousDate` must be sent in the `data` payload if it needs to be updated.
+    }
 };
 
-export const fetchFieldsAsync = async (
-  db: SQLite.Database,
-  fields: string[]
-): Promise<any[]> => {
-  // Validate that the fields exist in the Samplefields array
-  const validFields = fields.filter((field) =>
-    Samplefields.some((sampleField) => sampleField.name === field)
-  );
 
-  if (validFields.length === 0) {
-    throw new Error("No valid fields specified.");
-  }
-
-  // Generate the SELECT clause
-  const selectClause = validFields.join(", ");
-
-  const query = `SELECT ${selectClause} FROM cases`;
-
-  // Execute the query and fetch the data
-  const results = await new Promise<any[]>((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        query,
-        [],
-        (_, result) => {
-          const rows = [];
-          for (let i = 0; i < result.rows.length; i++) {
-            rows.push(result.rows.item(i));
-          }
-          resolve(rows); // Resolve the promise with the retrieved rows
-        },
-        (_, error) => {
-          console.error("Error fetching fields:", error);
-          reject(error); // Reject the promise with the error
-          return true;
+export const deleteCase = async (id: number, userId?: number | null): Promise<boolean> => {
+    const db = await getDb();
+    // Also delete associated documents from filesystem
+    const documents = await getCaseDocuments(id);
+    for (const doc of documents) {
+        const filePath = getFullDocumentPath(doc.stored_filename);
+        if (filePath) {
+            try {
+                const fileInfo = await FileSystem.getInfoAsync(filePath);
+                if (fileInfo.exists) {
+                    await FileSystem.deleteAsync(filePath);
+                }
+            } catch (e) { console.error("Error deleting file for case:", e); }
         }
-      );
-    });
-  });
+    }
+    // Deleting from Cases table will cascade to CaseDocuments and CaseHistoryLog due to FK constraints
+    let sql = "DELETE FROM Cases WHERE id = ?";
+    const params: (number|string)[] = [id];
+    if (userId !== undefined && userId !== null) {
+        sql += " AND user_id = ?";
+        params.push(userId);
+    }
+    try {
+        const result = await db.runAsync(sql, params);
+        return result.changes > 0;
+    } catch (error) {
+        console.error(`Error deleting case ID ${id}:`, error);
+        throw error;
+    }
+};
 
-  return results;
+
+// --- Suggestions --- (Refactored from old getSuggestions)
+export const getSuggestionsForField = async (
+    fieldName: 'CaseTypes' | 'Courts' | 'Districts' | 'PoliceStations', // Add more as needed
+    userId?: number | null,
+    districtIdForPoliceStations?: number | null // Only for PoliceStations
+): Promise<Array<{id: number, name: string}>> => {
+    // This is a simplified version. In a real app, you might want more specific suggestion functions.
+    const db = await getDb();
+    let results: Array<{id: number, name: string}> = [];
+
+    switch (fieldName) {
+        case 'CaseTypes':
+            results = await getCaseTypes(userId);
+            break;
+        case 'Courts':
+            results = await getCourts(userId);
+            break;
+        case 'Districts':
+            results = await getDistricts(userId);
+            break;
+        case 'PoliceStations':
+            results = await getPoliceStations(districtIdForPoliceStations, userId);
+            break;
+        default:
+            console.warn(`Suggestions not implemented for field: ${fieldName}`);
+            return [];
+    }
+    return results.map(item => ({ id: item.id, name: item.name }));
+};
+
+
+// The old Samplefields constant is no longer needed for DB structure
+// Old functions like createTableAsync, insertFormAsync, getFormsAsync, etc. are now replaced or will be.
+// The default export 'uploadFile' is replaced by 'uploadCaseDocument'.
+// Old 'FormData' interface is replaced by specific interfaces from schema.ts.
+// getTableColumnsAsync and fetchFieldsAsync can be removed for now.
+// searchFormsAsync and searchFormsAccordingToFieldsAsync need to be refactored to searchCasesAsync with proper joins.
+// This will be a more complex function depending on which fields are searchable.
+// For now, a basic search function placeholder:
+
+export const searchCases = async (query: string, userId?: number | null): Promise<CaseWithDetails[]> => {
+    const db = await getDb();
+    const searchQuery = `%${query}%`;
+    // This is a very basic search. A more comprehensive search would involve
+    // searching across multiple relevant fields and JOINed tables.
+    let sql = `
+        SELECT
+            c.*,
+            ct.name as caseTypeName,
+            co.name as courtName,
+            ps.name as policeStationName,
+            d.name as districtName
+        FROM Cases c
+        LEFT JOIN CaseTypes ct ON c.case_type_id = ct.id
+        LEFT JOIN Courts co ON c.court_id = co.id
+        LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
+        LEFT JOIN Districts d ON ps.district_id = d.id
+        WHERE (
+            c.uniqueId LIKE ? OR
+            c.CNRNumber LIKE ? OR
+            c.case_number LIKE ? OR
+            c.FirstParty LIKE ? OR
+            c.OppositeParty LIKE ? OR
+            c.Accussed LIKE ? OR
+            c.Undersection LIKE ? OR
+            ct.name LIKE ? OR
+            co.name LIKE ? OR
+            ps.name LIKE ? OR
+            d.name LIKE ?
+        )
+    `;
+    const params: any[] = [
+        searchQuery, searchQuery, searchQuery, searchQuery,
+        searchQuery, searchQuery, searchQuery, searchQuery,
+        searchQuery, searchQuery, searchQuery
+    ];
+
+    if (userId !== undefined && userId !== null) {
+        sql += " AND c.user_id = ?";
+        params.push(userId);
+    }
+    sql += " ORDER BY c.updated_at DESC";
+
+    return db.getAllAsync<CaseWithDetails>(sql, params);
 };
