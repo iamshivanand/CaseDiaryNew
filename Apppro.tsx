@@ -38,14 +38,14 @@ const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
 // Define Stack Navigators for each tab
 
 const HomeStack = () => (
-  <HomeStackNav.Navigator screenOptions={{ headerShown: false }}> {/* Default to no headers in stack, screens can override */}
+  <HomeStackNav.Navigator screenOptions={{ headerShown: false }}>
     <HomeStackNav.Screen name="HomeScreen" component={HomeScreen} />
-    <HomeStackNav.Screen name="AllCases" component={CasesList} options={{ headerShown: true, title: "All Cases" }}/>
-    <HomeStackNav.Screen name="CaseDetail" component={CaseDetail} options={{ headerShown: true, title: "Case Details" }}/>
-    <HomeStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ headerShown: true, title: "Edit Case" }}/>
-    <HomeStackNav.Screen name="AddCase" component={AddCase} options={{ headerShown: true, title: "Add New Case" }}/>
-    <HomeStackNav.Screen name="AddCaseDetails" component={AddCaseDetails} options={{ headerShown: true, title: "Add Case Details" }}/>
-    {/* Add Documents, Fees screens here if they are part of HomeStack */}
+    <HomeStackNav.Screen name="AllCases" component={CasesList} options={{ headerShown: true, title: "All Cases" }} />
+    <HomeStackNav.Screen name="CaseDetail" component={CaseDetail} options={{ headerShown: true, title: "Case Details" }} />
+    <HomeStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ headerShown: true, title: "Edit Case" }} />
+    <HomeStackNav.Screen name="AddCase" component={AddCase} options={{ headerShown: true, title: "Add New Case" }} />
+    <HomeStackNav.Screen name="AddCaseDetails" component={AddCaseDetails} options={{ headerShown: true, title: "Add Case Details" }} />
+    {/* Documents and Fees screens can be added here as needed */}
   </HomeStackNav.Navigator>
 );
 
