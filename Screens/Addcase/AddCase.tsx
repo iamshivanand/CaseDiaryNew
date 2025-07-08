@@ -1,4 +1,5 @@
 import { Formik, FormikProps } from "formik"; // Removed FormikFieldProps as it wasn't used
+import { v4 as uuidv4 } from "uuid"; // Import uuidv4 for generating unique IDs
 import React, { useEffect } from "react"; // Removed useState as it's not directly used by AddCase anymore (Formik handles state)
 import {
   StyleSheet,
