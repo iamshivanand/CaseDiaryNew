@@ -9,6 +9,7 @@ export const mockLawyerProfileData: LawyerProfileData = {
     totalCases: 125,
     upcomingHearings: 8,
     yearsOfPractice: 10,
+    yearsOfPracticeLastUpdated: new Date().toISOString().split('T')[0], // Set to today for calculation base
   },
   aboutMe:
     "Dedicated and results-oriented Senior Legal Counsel with 10 years of experience in providing expert legal advice and representation. Proven ability to manage complex legal matters and achieve favorable outcomes for clients. Strong background in corporate law, litigation, and intellectual property rights.",
