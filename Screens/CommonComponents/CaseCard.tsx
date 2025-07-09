@@ -25,20 +25,30 @@ interface CaseDetails {
   dateFiled: string;
   // Add more properties if needed
 }
-type RootStackParamList = {
-  CaseDetail: { caseDetails: CaseDetails };
-};
+import { HomeStackParamList } from "../../Types/navigationtypes"; // Import HomeStackParamList
 
-type CaseDetailScreenNavigationProp = StackNavigationProp<
-  RootStackParamList,
-  "CaseDetail"
+// CaseDetails interface remains the same for this component's props
+export interface CaseDetails { // Renamed to avoid conflict if CaseDetails is imported from elsewhere for other purposes
+  uniqueId: string;
+  id: number;
+  caseNumber: string; // This is usually the title or main display number
+  caseType?: string;  // Optional: case_type_name
+  court?: string;     // Optional: court_name
+  dateFiled?: string; // Optional: dateFiled (ISO string)
+  // Add more properties if needed by the card display itself
+}
+
+// Use HomeStackParamList for navigation prop, assuming CaseCard navigates within HomeStack
+type CaseCardNavigationProp = StackNavigationProp<
+  HomeStackParamList,
+  "CaseDetailsV2" // Or any other screen in HomeStack it might navigate to (e.g. EditCase directly)
 >;
 
 const CaseCard: React.FC<{
-  caseDetails: CaseDetails;
+  caseDetails: CaseDetails; // This is the prop type
   onDelete?: () => void;
 }> = ({ caseDetails, onDelete }) => {
-  const navigation = useNavigation<CaseDetailScreenNavigationProp>();
+  const navigation = useNavigation<CaseCardNavigationProp>();
 
   const [isConfirmationVisible, setIsConfirmationVisible] = useState(false);
   const [showUpdateField, setShowUpdateField] = useState(false);
@@ -59,8 +69,11 @@ const CaseCard: React.FC<{
     onDelete();
   };
   const handleEdit = () => {
-    console.log("Edit button pressed");
-    navigation.navigate("CaseDetail", { caseDetails });
+    console.log("Edit button pressed, navigating to CaseDetailsV2 with id:", caseDetails.id);
+    navigation.navigate("CaseDetailsV2", {
+      caseId: caseDetails.id,
+      caseTitleHeader: caseDetails.caseNumber // Pass caseNumber as a fallback header title
+    });
   };
   const handleUpdateDate = (values: { [key: string]: any }) => {
     console.log("Next Date value:", values.NextDate);

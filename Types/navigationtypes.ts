@@ -4,23 +4,18 @@ import { CaseData, Document, TimelineEvent } from "./appTypes"; // Comprehensive
 
 // Stack for the "Home" or "Cases" Tab
 export type HomeStackParamList = {
-  HomeScreen: undefined; // Main screen for this tab
-  AllCases: undefined;   // List of all cases
-  CaseDetail: { caseDetails: CaseDetails }; // Shows details of a single case
-  EditCase: { // Screen to edit an existing case
+  HomeScreen: undefined;
+  AllCases: undefined;
+  CaseDetail: { caseDetails: CaseDetails }; // Old one, to be replaced gradually
+  CaseDetailsV2: { caseId: number; caseTitleHeader?: string }; // New details screen
+  EditCase: {
     initialCaseData?: Partial<CaseData> & {
       documents?: Document[],
       timelineEvents?: TimelineEvent[]
     }
   };
-  // Assuming AddCase.tsx is the main entry for adding a new case flow
-  AddCase: { uniqueId?: string }; // uniqueId might be generated before starting
-  // AddCaseDetails, Documents, Fees would be part of the AddCase stack if it's multi-step
-  // For simplicity, AddCaseDetails might be a screen within this HomeStack too,
-  // or AddCase itself is a stack. Let's keep AddCaseDetails here for now.
+  AddCase: { uniqueId?: string };
   AddCaseDetails: { update?: boolean; initialValues?: CaseDetails; uniqueId?: string };
-  // Documents: { update?: boolean; uniqueId: string }; // Documents route removed from this stack
-  // Fees: { update?: boolean; uniqueId: string }; // Fees route removed
 };
 
 // Stack for the "Search" Tab
