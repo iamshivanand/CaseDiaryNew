@@ -686,11 +686,9 @@ export const getSuggestionsForField = async (
 export const searchCases = async (query: string, userId?: number | null): Promise<CaseWithDetails[]> => {
     const db = await getDb();
     const searchQuery = `%${query}%`;
-    // This is a very basic search. A more comprehensive search would involve
-    // searching across multiple relevant fields and JOINed tables.
-    const db = await getDb();
-    const searchQuery = `%${query}%`;
-    // Updated SQL to search new direct text columns and remove old JOINs for case type/court names
+    // Corrected SQL: Removed duplicate db/searchQuery declaration.
+    // Search direct columns c.court_name, c.case_type_name.
+    // Removed old ct.name, co.name from WHERE and associated JOINs.
     let sql = `
         SELECT
             c.*,
@@ -705,8 +703,8 @@ export const searchCases = async (query: string, userId?: number | null): Promis
             c.ClientName LIKE ? OR
             c.CNRNumber LIKE ? OR
             c.case_number LIKE ? OR
-            c.court_name LIKE ? OR      机场
-            c.case_type_name LIKE ? OR
+            c.court_name LIKE ? OR      -- Search direct column
+            c.case_type_name LIKE ? OR  -- Search direct column
             c.JudgeName LIKE ? OR
             c.OnBehalfOf LIKE ? OR
             c.FirstParty LIKE ? OR
@@ -718,12 +716,12 @@ export const searchCases = async (query: string, userId?: number | null): Promis
             c.Priority LIKE ? OR
             c.CaseDescription LIKE ? OR
             c.CaseNotes LIKE ? OR
-            ps.name LIKE ? OR
-            d.name LIKE ?
+            ps.name LIKE ? OR           -- Police Station Name (from JOIN)
+            d.name LIKE ?               -- District Name (from JOIN)
         )
     `;
-    // Update params array to match the number of LIKE clauses
-    const params: any[] = Array(19).fill(searchQuery); // 19 LIKE clauses above
+    // Count '?' : 1 (uniqueId) + 18 (Case fields) + 2 (ps.name, d.name) = 21
+    const params: any[] = Array(21).fill(searchQuery);
 
     if (userId !== undefined && userId !== null) {
         sql += " AND c.user_id = ?";

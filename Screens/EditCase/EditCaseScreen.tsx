@@ -4,7 +4,7 @@ import { ScrollView, View, Text, Alert, KeyboardAvoidingView, Platform, StyleShe
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import * as db from '../../DataBase'; // MOVED TO TOP LEVEL
+import * as db from '../../DataBase';
 
 import { EditCaseScreenStyles } from './EditCaseScreenStyle';
 import FormInput from '../CommonComponents/FormInput';
@@ -50,14 +50,8 @@ const EditCaseScreen: React.FC = () => {
     return initialData;
   });
 
-  const [documents, setDocuments] = useState<Document[]>(initialCaseDataFromParams?.documents || [
-    // Dummy documents if needed, or leave empty: []
-    { id: 1, case_id: 1, fileName: 'Merger Agreement Final.pdf', uploadDate: '2023-09-15T10:30:00.000Z', fileType: 'application/pdf', fileSize: 2048000, stored_filename: 'doc_1_1.pdf' },
-  ]);
-  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>(initialCaseDataFromParams?.timelineEvents || [
-    // Dummy timeline events
-    { id: 'tl1', date: '2023-10-20T00:00:00.000Z', description: 'Initial consultation.' },
-  ]);
+  const [documents, setDocuments] = useState<Document[]>(initialCaseDataFromParams?.documents || []);
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>(initialCaseDataFromParams?.timelineEvents || []);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
 
   const loadDocuments = async (currentCaseId: number | string | undefined) => {
@@ -84,11 +78,19 @@ const EditCaseScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    navigation.setOptions({ title: initialCaseDataFromParams ? 'Edit Case Details' : 'Add New Case' });
+    navigation.setOptions({ title: initialCaseDataFromParams ? 'Edit Case Details' : 'Add New Case (Error state - EditScreen should have ID)' });
     if (initialCaseDataFromParams?.id) {
       loadDocuments(initialCaseDataFromParams.id);
     } else {
-      setDocuments(initialCaseDataFromParams?.documents || []);
+       // This screen is for EDITING, so an ID should always be present.
+       // If no ID, it implies a new case, which should use AddCaseScreen.
+       // Or, if initialCaseDataFromParams is truly for a new case being "edited" before first save:
+       setDocuments(initialCaseDataFromParams?.documents || []);
+       if (!initialCaseDataFromParams?.uniqueId && !initialCaseDataFromParams?.id) {
+         // If it's truly a new case without even a uniqueId, this screen might not be appropriate.
+         // For now, we assume `initialCaseDataFromParams` implies an existing case if `id` is present.
+         console.warn("EditCaseScreen loaded without case ID or uniqueId in initialCaseDataFromParams.");
+       }
     }
   }, [navigation, initialCaseDataFromParams]);
 
@@ -97,8 +99,8 @@ const EditCaseScreen: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!caseData.id) {
-      Alert.alert("Error", "Case ID is missing. Cannot update.");
+    if (!caseData.id || typeof caseData.id !== 'number') { // Ensure ID is a number for DB operations
+      Alert.alert("Error", "Case ID is missing or invalid. Cannot update.");
       return;
     }
     if (!caseData.CaseTitle?.trim()) {
@@ -113,23 +115,41 @@ const EditCaseScreen: React.FC = () => {
       const selectedCaseTypeOption = dummyCaseTypeOptions.find(opt => opt.value === caseData.case_type_id);
       const caseTypeNameForDb = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : caseData.case_type_name || null;
 
+      // Construct payload based on CaseUpdateData (derived from CaseRow schema)
       const updatePayload: db.CaseUpdateData = {
-        CaseTitle: caseData.CaseTitle, ClientName: caseData.ClientName, CNRNumber: caseData.CNRNumber,
-        court_id: caseData.court_id || null, court_name: courtNameForDb,
-        dateFiled: caseData.FiledDate || caseData.dateFiled,
-        case_type_id: caseData.case_type_id || null, case_type_name: caseTypeNameForDb,
-        case_number: caseData.case_number, case_year: caseData.case_year ? Number(caseData.case_year) : null,
-        crime_number: caseData.crime_number, crime_year: caseData.crime_year ? Number(caseData.crime_year) : null,
-        JudgeName: caseData.JudgeName, OnBehalfOf: caseData.OnBehalfOf, FirstParty: caseData.FirstParty,
-        OppositeParty: caseData.OppositeParty, ClientContactNumber: caseData.ClientContactNumber,
-        Accussed: caseData.Accussed, Undersection: caseData.Undersection,
-        police_station_id: caseData.police_station_id || null, StatuteOfLimitations: caseData.StatuteOfLimitations,
-        OpposingCounsel: caseData.OpposingCounsel, OppositeAdvocate: caseData.OppositeAdvocate,
-        OppAdvocateContactNumber: caseData.OppAdvocateContactNumber, CaseStatus: caseData.Status || caseData.CaseStatus,
-        Priority: caseData.Priority, PreviousDate: caseData.PreviousDate,
-        NextDate: caseData.HearingDate || caseData.NextDate,
-        CaseDescription: caseData.CaseDescription, CaseNotes: caseData.CaseNotes,
+        CaseTitle: caseData.CaseTitle,
+        ClientName: caseData.ClientName,
+        CNRNumber: caseData.CNRNumber,
+        court_id: caseData.court_id || null,
+        court_name: courtNameForDb,
+        dateFiled: caseData.FiledDate || caseData.dateFiled, // Use form's FiledDate first
+        case_type_id: caseData.case_type_id || null,
+        case_type_name: caseTypeNameForDb,
+        case_number: caseData.case_number,
+        case_year: caseData.case_year ? Number(caseData.case_year) : null,
+        crime_number: caseData.crime_number,
+        crime_year: caseData.crime_year ? Number(caseData.crime_year) : null,
+        JudgeName: caseData.JudgeName,
+        OnBehalfOf: caseData.OnBehalfOf, // If form has ClientName, ensure mapping is correct for DB
+        FirstParty: caseData.FirstParty,
+        OppositeParty: caseData.OppositeParty,
+        ClientContactNumber: caseData.ClientContactNumber,
+        Accussed: caseData.Accussed,
+        Undersection: caseData.Undersection,
+        police_station_id: caseData.police_station_id || null,
+        StatuteOfLimitations: caseData.StatuteOfLimitations,
+        OpposingCounsel: caseData.OpposingCounsel, // From form
+        OppositeAdvocate: caseData.OppositeAdvocate, // From loaded data if not on form
+        OppAdvocateContactNumber: caseData.OppAdvocateContactNumber,
+        CaseStatus: caseData.Status || caseData.CaseStatus, // Form 'Status' maps to DB 'CaseStatus'
+        Priority: caseData.Priority,
+        PreviousDate: caseData.PreviousDate,
+        NextDate: caseData.HearingDate || caseData.NextDate, // Form 'HearingDate' maps to DB 'NextDate'
+        CaseDescription: caseData.CaseDescription,
+        CaseNotes: caseData.CaseNotes,
       };
+
+      // Remove undefined properties from updatePayload to prevent errors with some DB drivers
       Object.keys(updatePayload).forEach(key => {
         const K = key as keyof db.CaseUpdateData;
         if (updatePayload[K] === undefined) { delete updatePayload[K]; }
@@ -140,14 +160,16 @@ const EditCaseScreen: React.FC = () => {
 
       if (caseUpdateSuccess) {
         console.log('Case data updated successfully.');
-        const newDocsToUpload = documents.filter(doc => doc.uri && typeof doc.id === 'number' && doc.id > 1000000);
+        const newDocsToUpload = documents.filter(doc => doc.uri && typeof doc.id === 'number' && doc.id > 1000000); // Heuristic for temp ID
         if (newDocsToUpload.length > 0) {
-          // Alert.alert("Uploading Documents", `Attempting to upload ${newDocsToUpload.length} new document(s)...`);
+          // Consider a more user-friendly feedback for multiple uploads
         }
         for (const newDoc of newDocsToUpload) {
           try {
+            // Ensure caseData.id is valid before using it
+            if (typeof caseData.id !== 'number') throw new Error("Invalid case ID for document upload.");
             const uploadedDocId = await db.uploadCaseDocument({
-              caseId: caseData.id as number, originalFileName: newDoc.fileName,
+              caseId: caseData.id, originalFileName: newDoc.fileName,
               fileType: newDoc.fileType || 'application/octet-stream', fileUri: newDoc.uri as string,
               fileSize: newDoc.fileSize, userId: null, // TODO: User ID
             });
@@ -155,24 +177,30 @@ const EditCaseScreen: React.FC = () => {
             else { console.log(`Document ${newDoc.fileName} uploaded with ID ${uploadedDocId}`);}
           } catch (uploadError) { overallSuccess = false; console.error(`Error during upload of ${newDoc.fileName}:`, uploadError); }
         }
-        if (caseData.id) await loadDocuments(caseData.id as number);
+
+        if (typeof caseData.id === 'number') await loadDocuments(caseData.id);
+
         if (overallSuccess) { Alert.alert('Success', 'Case details and documents saved successfully.'); navigation.goBack(); }
-        else { Alert.alert('Partial Success', 'Case details saved, but some document operations may have failed.'); }
+        else { Alert.alert('Partial Success', 'Case details saved, but some document operations may have failed. Please review.'); }
       } else { overallSuccess = false; Alert.alert('Error', 'Failed to update case details. Documents were not processed.'); }
-    } catch (error) { overallSuccess = false; console.error("Error saving case details:", error); Alert.alert('Error', 'An error occurred.'); }
+    } catch (error) { overallSuccess = false; console.error("Error saving case details:", error); Alert.alert('Error', 'An error occurred while saving.'); }
     finally { setIsSaving(false); }
   };
 
   const handleCancel = () => { navigation.goBack(); };
 
   const handleAddDocument = async () => {
+    if (typeof caseData.id !== 'number') {
+        Alert.alert("Error", "Cannot add document: Case ID is not available. Save the case first.");
+        return;
+    }
     try {
       const result = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true });
       if (result.canceled || !result.assets || result.assets.length === 0) return;
       const asset = result.assets[0];
       if (!asset.uri) { Alert.alert("Error", "Could not get document URI."); return; }
       const newDocument: Document = {
-        id: Date.now(), case_id: caseData.id as number, fileName: asset.name || `document_${Date.now()}`,
+        id: Date.now(), case_id: caseData.id, fileName: asset.name || `document_${Date.now()}`,
         uploadDate: new Date().toISOString(), fileType: asset.mimeType || asset.name?.split('.').pop() || 'unknown',
         fileSize: asset.size, uri: asset.uri,
       };
@@ -191,12 +219,16 @@ const EditCaseScreen: React.FC = () => {
       Alert.alert("Document Removed", `${docToDelete.fileName} removed from list.`);
       return;
     }
+    if (typeof docToDelete.id !== 'number') {
+        Alert.alert("Error", "Document ID is invalid for deletion.");
+        return;
+    }
     Alert.alert("Confirm Deletion", `Delete "${docToDelete.fileName}"? This cannot be undone.`,
       [{ text: "Cancel", style: "cancel" },
        { text: "Delete Permanently", style: "destructive", onPress: async () => {
            try {
              setIsLoadingDocuments(true);
-             const success = await db.deleteCaseDocument(docToDelete.id as number);
+             const success = await db.deleteCaseDocument(docToDelete.id);
              if (success) { setDocuments(docs => docs.filter(d => d.id !== docToDelete.id)); Alert.alert("Deleted", `"${docToDelete.fileName}" deleted.`); }
              else { Alert.alert("Error", `Failed to delete "${docToDelete.fileName}" from DB.`); }
            } catch (error) { console.error("Error deleting document from DB:", error); Alert.alert("Error", "Error deleting document."); }
@@ -215,25 +247,42 @@ const EditCaseScreen: React.FC = () => {
     ]);
   };
 
+  // Render logic using all the state and handlers...
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={EditCaseScreenStyles.screen} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContentContainer} keyboardShouldPersistTaps="handled">
         <View style={EditCaseScreenStyles.formContainer}>
           <FormInput label="Case Title*" value={caseData.CaseTitle || ''} onChangeText={(text) => handleInputChange('CaseTitle', text)} placeholder="e.g., Acme Corp vs. Beta Inc." />
-          <FormInput label="Client Name" value={caseData.ClientName || caseData.OnBehalfOf || ''} onChangeText={(text) => handleInputChange('ClientName', text)} placeholder="Enter client's full name" />
-          <FormInput label="Case Number / CNR Number" value={caseData.case_number || caseData.CNRNumber ||''} onChangeText={(text) => handleInputChange('case_number', text)} placeholder="e.g., CS/123/2023 or UCN..." />
+          <FormInput label="Client Name" value={caseData.ClientName || ''} onChangeText={(text) => handleInputChange('ClientName', text)} placeholder="Enter client's full name" />
+          <FormInput label="On Behalf Of" value={caseData.OnBehalfOf || ''} onChangeText={(text) => handleInputChange('OnBehalfOf', text)} placeholder="Representing whom?" />
+          <FormInput label="Case Number" value={caseData.case_number || ''} onChangeText={(text) => handleInputChange('case_number', text)} placeholder="e.g., CS/123/2023" />
+          <FormInput label="CNR Number" value={caseData.CNRNumber || ''} onChangeText={(text) => handleInputChange('CNRNumber', text)} placeholder="Enter CNR Number" />
+
           <DropdownPicker label="Case Type" selectedValue={caseData.case_type_id || ""} onValueChange={(val) => handleInputChange('case_type_id', val as number)} options={dummyCaseTypeOptions} placeholder="Select Case Type..." />
           <DropdownPicker label="Court" selectedValue={caseData.court_id || ""} onValueChange={(val) => handleInputChange('court_id', val as number)} options={dummyCourtOptions} placeholder="Select Court..." />
-          <FormInput label="Presiding Judge" value={caseData.JudgeName || ''} onChangeText={(text) => handleInputChange('JudgeName', text)} placeholder="Enter judge's name (if known)" />
-          <FormInput label="Opposing Counsel / Advocate" value={caseData.OpposingCounsel || caseData.OppositeAdvocate || ''} onChangeText={(text) => handleInputChange('OpposingCounsel', text)} placeholder="Enter opposing counsel's name" />
-          <DropdownPicker label="Case Status" selectedValue={caseData.Status || caseData.CaseStatus || ""} onValueChange={(val) => handleInputChange('Status', val as string)} options={caseStatusOptions} placeholder="Select Status..." />
+
+          <FormInput label="Presiding Judge" value={caseData.JudgeName || ''} onChangeText={(text) => handleInputChange('JudgeName', text)} placeholder="Enter judge's name" />
+          <FormInput label="Opposing Counsel" value={caseData.OpposingCounsel || ''} onChangeText={(text) => handleInputChange('OpposingCounsel', text)} placeholder="Enter opposing counsel's name" />
+          {/* <FormInput label="Opposite Advocate" value={caseData.OppositeAdvocate || ''} onChangeText={(text) => handleInputChange('OppositeAdvocate', text)} placeholder="Enter opposite advocate (if different)" /> */}
+
+
+          <DropdownPicker label="Case Status" selectedValue={caseData.Status || ""} onValueChange={(val) => handleInputChange('Status', val as string)} options={caseStatusOptions} placeholder="Select Status..." />
           <DropdownPicker label="Priority Level" selectedValue={caseData.Priority || ""} onValueChange={(val) => handleInputChange('Priority', val as string)} options={priorityOptions} placeholder="Select Priority..." />
-          <DatePickerField label="Date Filed" value={caseData.FiledDate || caseData.dateFiled ? new Date(caseData.FiledDate || caseData.dateFiled!) : null} onChange={(date) => handleInputChange('FiledDate', date ? date.toISOString() : null)} placeholder="Select date case was filed" />
-          <DatePickerField label="Next Hearing Date" value={caseData.HearingDate || caseData.NextDate ? new Date(caseData.HearingDate || caseData.NextDate!) : null} onChange={(date) => handleInputChange('HearingDate', date ? date.toISOString() : null)} placeholder="Select next hearing date" />
-          <DatePickerField label="Statute of Limitations" value={caseData.StatuteOfLimitations ? new Date(caseData.StatuteOfLimitations) : null} onChange={(date) => handleInputChange('StatuteOfLimitations', date ? date.toISOString() : null)} placeholder="Select SOL date (if applicable)" />
-          {(caseData.Status === 'Closed' || caseData.CaseStatus === 'Closed') && (
+
+          <DatePickerField label="Date Filed" value={caseData.FiledDate ? new Date(caseData.FiledDate) : null} onChange={(date) => handleInputChange('FiledDate', date ? date.toISOString() : null)} placeholder="Select date case was filed" />
+          <DatePickerField label="Next Hearing Date" value={caseData.HearingDate ? new Date(caseData.HearingDate) : null} onChange={(date) => handleInputChange('HearingDate', date ? date.toISOString() : null)} placeholder="Select next hearing date" />
+          <DatePickerField label="Statute of Limitations" value={caseData.StatuteOfLimitations ? new Date(caseData.StatuteOfLimitations) : null} onChange={(date) => handleInputChange('StatuteOfLimitations', date ? date.toISOString() : null)} placeholder="Select SOL date" />
+
+          {(caseData.Status === 'Closed') && (
             <DatePickerField label="Date Closed" value={caseData.ClosedDate ? new Date(caseData.ClosedDate) : null} onChange={(date) => handleInputChange('ClosedDate', date ? date.toISOString() : null)} placeholder="Select date case was closed" />
           )}
+
+          <FormInput label="First Party" value={caseData.FirstParty || ''} onChangeText={(text) => handleInputChange('FirstParty', text)} placeholder="Enter First Party Name" />
+          <FormInput label="Opposite Party" value={caseData.OppositeParty || ''} onChangeText={(text) => handleInputChange('OppositeParty', text)} placeholder="Enter Opposite Party Name" />
+          <FormInput label="Client Contact No." value={caseData.ClientContactNumber || ''} onChangeText={(text) => handleInputChange('ClientContactNumber', text)} placeholder="Enter Client's Contact Number" keyboardType="phone-pad" />
+          <FormInput label="Accused" value={caseData.Accussed || ''} onChangeText={(text) => handleInputChange('Accussed', text)} placeholder="Enter Accused Name(s)" />
+          <FormInput label="Under Section(s)" value={caseData.Undersection || ''} onChangeText={(text) => handleInputChange('Undersection', text)} placeholder="e.g., Section 302 IPC" />
+
           <FormInput label="Case Description" value={caseData.CaseDescription || ''} onChangeText={(text) => handleInputChange('CaseDescription', text)} placeholder="Provide a brief summary..." multiline numberOfLines={4} style={{minHeight: 80}} />
           <FormInput label="Internal Notes / Strategy" value={caseData.CaseNotes || ''} onChangeText={(text) => handleInputChange('CaseNotes', text)} placeholder="Add any private notes..." multiline numberOfLines={4} style={{minHeight: 80}}/>
 
