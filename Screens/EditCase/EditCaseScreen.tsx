@@ -1,6 +1,6 @@
 // Screens/EditCase/EditCaseScreen.tsx
-import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, Alert, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ScrollView, View, Text, Alert, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -17,6 +17,8 @@ import TimelineItem from './components/TimelineItem';
 
 import { CaseData, Document, TimelineEvent, DropdownOption, caseStatusOptions, priorityOptions } from "../../Types/appTypes";
 import { RootStackParamList } from "../../Types/navigationtypes";
+import { CaseWithDetails } from '../../DataBase';
+
 
 const dummyCaseTypeOptions: DropdownOption[] = [
   { label: 'Select Case Type...', value: '' }, { label: 'Civil Suit', value: 1 }, { label: 'Criminal Defense', value: 2 }, { label: 'Family Law', value: 3 }, { label: 'Corporate', value: 4 }, { label: 'Other', value: 99 },
@@ -30,38 +32,21 @@ type EditCaseScreenRouteProp = RouteProp<RootStackParamList, 'EditCase'>;
 const EditCaseScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<EditCaseScreenRouteProp>();
+
   const [isSaving, setIsSaving] = useState(false);
-  const initialCaseDataFromParams = route.params?.initialCaseData;
+  const [isLoadingCaseDetails, setIsLoadingCaseDetails] = useState(true);
+  const initialCaseId = route.params?.initialCaseData?.id; // Get ID from initial summary data
 
-  const [caseData, setCaseData] = useState<Partial<CaseData>>(() => {
-    const defaults: Partial<CaseData> = {
-      Status: caseStatusOptions.find(opt => opt.label === "Open")?.value || caseStatusOptions[0].value,
-      Priority: priorityOptions.find(opt => opt.label === "Medium")?.value || priorityOptions[0].value,
-    };
-    let initialData = initialCaseDataFromParams ? { ...defaults, ...initialCaseDataFromParams } : { ...defaults };
-    if (initialData.court_name && (initialData.court_id === undefined || initialData.court_id === null || initialData.court_id === '')) {
-      const foundCourt = dummyCourtOptions.find(opt => opt.label === initialData.court_name);
-      if (foundCourt && foundCourt.value !== '') { initialData.court_id = foundCourt.value as number; }
-    }
-    if (initialData.case_type_name && (initialData.case_type_id === undefined || initialData.case_type_id === null || initialData.case_type_id === '')) {
-      const foundCaseType = dummyCaseTypeOptions.find(opt => opt.label === initialData.case_type_name);
-      if (foundCaseType && foundCaseType.value !== '') { initialData.case_type_id = foundCaseType.value as number; }
-    }
-    return initialData;
-  });
-
-  const [documents, setDocuments] = useState<Document[]>(initialCaseDataFromParams?.documents || []);
-  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>(initialCaseDataFromParams?.timelineEvents || []);
+  const [caseData, setCaseData] = useState<Partial<CaseData>>({});
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]); // Assuming timeline might also be fetched or part of CaseData
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
 
-  const loadDocuments = async (currentCaseId: number | string | undefined) => {
-    if (!currentCaseId || typeof currentCaseId !== 'number') {
-      setDocuments(initialCaseDataFromParams?.documents || []);
-      return;
-    }
+  const loadDocuments = useCallback(async (currentCaseId: number) => {
+    if (!currentCaseId) return;
     setIsLoadingDocuments(true);
     try {
-      const fetchedDocs = await db.getCaseDocuments(currentCaseId as number);
+      const fetchedDocs = await db.getCaseDocuments(currentCaseId);
       const uiDocs: Document[] = fetchedDocs.map(dbDoc => ({
         id: dbDoc.id, case_id: dbDoc.case_id, fileName: dbDoc.original_display_name,
         uploadDate: dbDoc.created_at, fileType: dbDoc.file_type, fileSize: dbDoc.file_size,
@@ -71,35 +56,90 @@ const EditCaseScreen: React.FC = () => {
     } catch (error) {
       console.error("Error loading documents for case:", error);
       Alert.alert("Error", "Could not load documents.");
-      setDocuments(initialCaseDataFromParams?.documents || []);
     } finally {
       setIsLoadingDocuments(false);
     }
-  };
+  }, []);
+
 
   useEffect(() => {
-    navigation.setOptions({ title: initialCaseDataFromParams ? 'Edit Case Details' : 'Add New Case (Error state - EditScreen should have ID)' });
-    if (initialCaseDataFromParams?.id) {
-      loadDocuments(initialCaseDataFromParams.id);
-    } else {
-       // This screen is for EDITING, so an ID should always be present.
-       // If no ID, it implies a new case, which should use AddCaseScreen.
-       // Or, if initialCaseDataFromParams is truly for a new case being "edited" before first save:
-       setDocuments(initialCaseDataFromParams?.documents || []);
-       if (!initialCaseDataFromParams?.uniqueId && !initialCaseDataFromParams?.id) {
-         // If it's truly a new case without even a uniqueId, this screen might not be appropriate.
-         // For now, we assume `initialCaseDataFromParams` implies an existing case if `id` is present.
-         console.warn("EditCaseScreen loaded without case ID or uniqueId in initialCaseDataFromParams.");
-       }
-    }
-  }, [navigation, initialCaseDataFromParams]);
+    const caseIdToLoad = initialCaseId; // Use the ID passed in navigation params
+
+    const fetchCaseDetailsAndDocuments = async () => {
+      if (!caseIdToLoad || typeof caseIdToLoad !== 'number') {
+        Alert.alert("Error", "No valid Case ID provided to edit.");
+        setIsLoadingCaseDetails(false);
+        navigation.goBack();
+        return;
+      }
+
+      setIsLoadingCaseDetails(true);
+      try {
+        const fetchedCase = await db.getCaseById(caseIdToLoad);
+        if (fetchedCase) {
+          // Map CaseWithDetails (from DB) to CaseData (for form state)
+          const formState: Partial<CaseData> = {
+            id: fetchedCase.id,
+            uniqueId: fetchedCase.uniqueId,
+            CaseTitle: fetchedCase.CaseTitle,
+            ClientName: fetchedCase.ClientName,
+            OnBehalfOf: fetchedCase.OnBehalfOf,
+            CNRNumber: fetchedCase.CNRNumber,
+            case_number: fetchedCase.case_number,
+            court_id: fetchedCase.court_id,
+            court_name: fetchedCase.court_name, // From DB
+            case_type_id: fetchedCase.case_type_id,
+            case_type_name: fetchedCase.case_type_name, // From DB
+            FiledDate: fetchedCase.dateFiled, // DB stores as dateFiled, form uses FiledDate
+            dateFiled: fetchedCase.dateFiled, // Keep original for comparison if needed
+            JudgeName: fetchedCase.JudgeName,
+            OpposingCounsel: fetchedCase.OpposingCounsel,
+            OppositeAdvocate: fetchedCase.OppositeAdvocate,
+            Status: fetchedCase.CaseStatus, // DB stores as CaseStatus, form uses Status
+            CaseStatus: fetchedCase.CaseStatus, // Keep original
+            Priority: fetchedCase.Priority,
+            HearingDate: fetchedCase.NextDate, // DB stores as NextDate, form uses HearingDate
+            NextDate: fetchedCase.NextDate, // Keep original
+            StatuteOfLimitations: fetchedCase.StatuteOfLimitations,
+            ClosedDate: null, // Assuming ClosedDate is not directly in CaseRow yet, or needs specific logic
+            FirstParty: fetchedCase.FirstParty,
+            OppositeParty: fetchedCase.OppositeParty,
+            ClientContactNumber: fetchedCase.ClientContactNumber,
+            Accussed: fetchedCase.Accussed,
+            Undersection: fetchedCase.Undersection,
+            police_station_id: fetchedCase.police_station_id,
+            OppAdvocateContactNumber: fetchedCase.OppAdvocateContactNumber,
+            PreviousDate: fetchedCase.PreviousDate,
+            CaseDescription: fetchedCase.CaseDescription,
+            CaseNotes: fetchedCase.CaseNotes,
+            // documents and timelineEvents are handled separately or if part of CaseData from DB
+          };
+          setCaseData(formState);
+          navigation.setOptions({ title: `Edit: ${fetchedCase.CaseTitle || 'Case'}` });
+          await loadDocuments(caseIdToLoad);
+          // TODO: Load timeline events if they are separate
+        } else {
+          Alert.alert("Error", "Case not found.");
+          navigation.goBack();
+        }
+      } catch (error) {
+        console.error("Error fetching case details:", error);
+        Alert.alert("Error", "Could not load case details.");
+        navigation.goBack();
+      } finally {
+        setIsLoadingCaseDetails(false);
+      }
+    };
+
+    fetchCaseDetailsAndDocuments();
+  }, [navigation, initialCaseId, loadDocuments]);
 
   const handleInputChange = (field: keyof CaseData, value: string | number | Date | null | undefined) => {
     setCaseData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
-    if (!caseData.id || typeof caseData.id !== 'number') { // Ensure ID is a number for DB operations
+    if (!caseData.id || typeof caseData.id !== 'number') {
       Alert.alert("Error", "Case ID is missing or invalid. Cannot update.");
       return;
     }
@@ -115,63 +155,40 @@ const EditCaseScreen: React.FC = () => {
       const selectedCaseTypeOption = dummyCaseTypeOptions.find(opt => opt.value === caseData.case_type_id);
       const caseTypeNameForDb = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : caseData.case_type_name || null;
 
-      // Construct payload based on CaseUpdateData (derived from CaseRow schema)
       const updatePayload: db.CaseUpdateData = {
-        CaseTitle: caseData.CaseTitle,
-        ClientName: caseData.ClientName,
-        CNRNumber: caseData.CNRNumber,
-        court_id: caseData.court_id || null,
-        court_name: courtNameForDb,
-        dateFiled: caseData.FiledDate || caseData.dateFiled, // Use form's FiledDate first
-        case_type_id: caseData.case_type_id || null,
-        case_type_name: caseTypeNameForDb,
-        case_number: caseData.case_number,
-        case_year: caseData.case_year ? Number(caseData.case_year) : null,
-        crime_number: caseData.crime_number,
-        crime_year: caseData.crime_year ? Number(caseData.crime_year) : null,
-        JudgeName: caseData.JudgeName,
-        OnBehalfOf: caseData.OnBehalfOf, // If form has ClientName, ensure mapping is correct for DB
-        FirstParty: caseData.FirstParty,
-        OppositeParty: caseData.OppositeParty,
-        ClientContactNumber: caseData.ClientContactNumber,
-        Accussed: caseData.Accussed,
-        Undersection: caseData.Undersection,
-        police_station_id: caseData.police_station_id || null,
-        StatuteOfLimitations: caseData.StatuteOfLimitations,
-        OpposingCounsel: caseData.OpposingCounsel, // From form
-        OppositeAdvocate: caseData.OppositeAdvocate, // From loaded data if not on form
-        OppAdvocateContactNumber: caseData.OppAdvocateContactNumber,
-        CaseStatus: caseData.Status || caseData.CaseStatus, // Form 'Status' maps to DB 'CaseStatus'
-        Priority: caseData.Priority,
-        PreviousDate: caseData.PreviousDate,
-        NextDate: caseData.HearingDate || caseData.NextDate, // Form 'HearingDate' maps to DB 'NextDate'
-        CaseDescription: caseData.CaseDescription,
-        CaseNotes: caseData.CaseNotes,
+        CaseTitle: caseData.CaseTitle, ClientName: caseData.ClientName, CNRNumber: caseData.CNRNumber,
+        court_id: caseData.court_id || null, court_name: courtNameForDb,
+        dateFiled: caseData.FiledDate || caseData.dateFiled,
+        case_type_id: caseData.case_type_id || null, case_type_name: caseTypeNameForDb,
+        case_number: caseData.case_number, case_year: caseData.case_year ? Number(caseData.case_year) : null,
+        crime_number: caseData.crime_number, crime_year: caseData.crime_year ? Number(caseData.crime_year) : null,
+        JudgeName: caseData.JudgeName, OnBehalfOf: caseData.OnBehalfOf, FirstParty: caseData.FirstParty,
+        OppositeParty: caseData.OppositeParty, ClientContactNumber: caseData.ClientContactNumber,
+        Accussed: caseData.Accussed, Undersection: caseData.Undersection,
+        police_station_id: caseData.police_station_id || null, StatuteOfLimitations: caseData.StatuteOfLimitations,
+        OpposingCounsel: caseData.OpposingCounsel, OppositeAdvocate: caseData.OppositeAdvocate,
+        OppAdvocateContactNumber: caseData.OppAdvocateContactNumber, CaseStatus: caseData.Status || caseData.CaseStatus,
+        Priority: caseData.Priority, PreviousDate: caseData.PreviousDate,
+        NextDate: caseData.HearingDate || caseData.NextDate,
+        CaseDescription: caseData.CaseDescription, CaseNotes: caseData.CaseNotes,
       };
-
-      // Remove undefined properties from updatePayload to prevent errors with some DB drivers
       Object.keys(updatePayload).forEach(key => {
         const K = key as keyof db.CaseUpdateData;
         if (updatePayload[K] === undefined) { delete updatePayload[K]; }
       });
 
-      console.log('Updating Case Data with payload:', JSON.stringify(updatePayload, null, 2));
       const caseUpdateSuccess = await db.updateCase(caseData.id as number, updatePayload);
 
       if (caseUpdateSuccess) {
         console.log('Case data updated successfully.');
-        const newDocsToUpload = documents.filter(doc => doc.uri && typeof doc.id === 'number' && doc.id > 1000000); // Heuristic for temp ID
-        if (newDocsToUpload.length > 0) {
-          // Consider a more user-friendly feedback for multiple uploads
-        }
+        const newDocsToUpload = documents.filter(doc => doc.uri && typeof doc.id === 'number' && doc.id > 1000000);
         for (const newDoc of newDocsToUpload) {
           try {
-            // Ensure caseData.id is valid before using it
             if (typeof caseData.id !== 'number') throw new Error("Invalid case ID for document upload.");
             const uploadedDocId = await db.uploadCaseDocument({
               caseId: caseData.id, originalFileName: newDoc.fileName,
               fileType: newDoc.fileType || 'application/octet-stream', fileUri: newDoc.uri as string,
-              fileSize: newDoc.fileSize, userId: null, // TODO: User ID
+              fileSize: newDoc.fileSize, userId: null,
             });
             if (!uploadedDocId) { overallSuccess = false; console.error(`Failed to upload document: ${newDoc.fileName}`);}
             else { console.log(`Document ${newDoc.fileName} uploaded with ID ${uploadedDocId}`);}
@@ -191,7 +208,7 @@ const EditCaseScreen: React.FC = () => {
 
   const handleAddDocument = async () => {
     if (typeof caseData.id !== 'number') {
-        Alert.alert("Error", "Cannot add document: Case ID is not available. Save the case first.");
+        Alert.alert("Error", "Cannot add document: Case ID is not available. Save the case first if this is a new record being edited (unusual flow).");
         return;
     }
     try {
@@ -247,7 +264,15 @@ const EditCaseScreen: React.FC = () => {
     ]);
   };
 
-  // Render logic using all the state and handlers...
+  if (isLoadingCaseDetails) {
+    return (
+      <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+        <ActivityIndicator size="large" color={EditCaseScreenStyles.screen.backgroundColor === '#F3F4F6' ? "#1D4ED8" : undefined} />
+        <Text>Loading case details...</Text>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={EditCaseScreenStyles.screen} keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContentContainer} keyboardShouldPersistTaps="handled">
@@ -264,7 +289,6 @@ const EditCaseScreen: React.FC = () => {
           <FormInput label="Presiding Judge" value={caseData.JudgeName || ''} onChangeText={(text) => handleInputChange('JudgeName', text)} placeholder="Enter judge's name" />
           <FormInput label="Opposing Counsel" value={caseData.OpposingCounsel || ''} onChangeText={(text) => handleInputChange('OpposingCounsel', text)} placeholder="Enter opposing counsel's name" />
           {/* <FormInput label="Opposite Advocate" value={caseData.OppositeAdvocate || ''} onChangeText={(text) => handleInputChange('OppositeAdvocate', text)} placeholder="Enter opposite advocate (if different)" /> */}
-
 
           <DropdownPicker label="Case Status" selectedValue={caseData.Status || ""} onValueChange={(val) => handleInputChange('Status', val as string)} options={caseStatusOptions} placeholder="Select Status..." />
           <DropdownPicker label="Priority Level" selectedValue={caseData.Priority || ""} onValueChange={(val) => handleInputChange('Priority', val as string)} options={priorityOptions} placeholder="Select Priority..." />
