@@ -285,8 +285,17 @@ export const uploadCaseDocument = async (options: UploadOptions): Promise<number
   const { originalFileName, fileType, fileUri, caseId, userId, fileSize } = options;
 
   const timestamp = Date.now();
-  const sanitizedOriginalFileName = originalFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const uniqueStoredFileName = `${caseId}_${timestamp}_${sanitizedOriginalFileName}.${fileType}`;
+  // Extract file extension from originalFileName
+  const nameParts = originalFileName.split('.');
+  const extension = nameParts.length > 1 ? nameParts.pop() : 'dat'; // Default extension if none found
+  const baseName = nameParts.join('.');
+  const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, '_'); // Sanitize base name only
+
+  // Construct unique filename using the extracted extension
+  const uniqueStoredFileName = `${caseId}_${timestamp}_${sanitizedBaseName}.${extension}`;
+
+  // The 'fileType' parameter should be the MIME type for DB storage
+  const mimeTypeForDb = fileType;
 
   try {
     const dirInfo = await FileSystem.getInfoAsync(DOCUMENTS_DIRECTORY);
@@ -299,7 +308,7 @@ export const uploadCaseDocument = async (options: UploadOptions): Promise<number
 
     const result = await db.runAsync(
       "INSERT INTO CaseDocuments (case_id, stored_filename, original_display_name, file_type, file_size, user_id) VALUES (?, ?, ?, ?, ?, ?)",
-      [caseId, uniqueStoredFileName, originalFileName, fileType, fileSize ?? null, userId ?? null]
+      [caseId, uniqueStoredFileName, originalFileName, mimeTypeForDb, fileSize ?? null, userId ?? null]
     );
     return result.lastInsertRowId;
   } catch (error) {
