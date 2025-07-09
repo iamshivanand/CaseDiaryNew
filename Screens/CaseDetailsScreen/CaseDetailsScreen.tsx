@@ -18,7 +18,7 @@ export interface CaseDetails { // This is the type this screen currently receive
   id?: number | string;
   caseNumber?: string; // Often used as a title or primary identifier
   court?: string;
-  dateFiled?: Date; // Note: This is a Date object
+  dateFiled?: string; // Changed to string (ISO format expected)
   caseType?: string;
   // Potentially other summary fields
 }
@@ -64,10 +64,9 @@ const CaseDetail: React.FC<Props> = ({ route, navigation }) => {
               id: caseDetails.id,
               // Assuming caseDetails.caseNumber is the main identifiable string/title
               CaseTitle: caseDetails.caseNumber,
-              // case_number: caseDetails.caseNumber, // Or if it's strictly a number/code
-              court_name: caseDetails.court, // For display; EditCaseScreen uses court_id for dropdown
-              FiledDate: caseDetails.dateFiled instanceof Date ? caseDetails.dateFiled.toISOString() : null, // Safely convert Date to ISO string
-              case_type_name: caseDetails.caseType, // For display; EditCaseScreen uses case_type_id
+              court_name: caseDetails.court,
+              FiledDate: caseDetails.dateFiled, // Pass as string (already should be an ISO string)
+              case_type_name: caseDetails.caseType,
               // Documents and TimelineEvents are not available in this simplified CaseDetails object
               // EditCaseScreen will use its defaults or fetch them if it's enhanced to do so.
             };
@@ -85,15 +84,20 @@ const CaseDetail: React.FC<Props> = ({ route, navigation }) => {
       <View style={styles.DetailsTextContainer}>
         {Object.entries(caseDetails).map(([key, value], index) => {
           let displayValue: string;
-          if (value instanceof Date) {
-            displayValue = value.toLocaleDateString(); // Format date to string
+          if (key === 'dateFiled' && typeof value === 'string' && value) {
+            try {
+              displayValue = new Date(value).toLocaleDateString(); // Format ISO string to locale date
+            } catch (e) {
+              displayValue = value; // Fallback to raw string if parsing fails
+            }
+          } else if (value instanceof Date) { // Should not happen if dateFiled is string, but good fallback
+            displayValue = value.toLocaleDateString();
           } else if (value === null || value === undefined) {
             displayValue = "N/A";
           } else if (typeof value === 'object') {
-            displayValue = JSON.stringify(value); // Simple stringify for other objects
-          }
-           else {
-            displayValue = String(value); // Ensure everything else is a string
+            displayValue = JSON.stringify(value);
+          } else {
+            displayValue = String(value);
           }
 
           // Skip rendering for 'uniqueId' if it's not meant for user display, or format it if needed

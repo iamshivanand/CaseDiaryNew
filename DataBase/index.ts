@@ -688,37 +688,42 @@ export const searchCases = async (query: string, userId?: number | null): Promis
     const searchQuery = `%${query}%`;
     // This is a very basic search. A more comprehensive search would involve
     // searching across multiple relevant fields and JOINed tables.
+    const db = await getDb();
+    const searchQuery = `%${query}%`;
+    // Updated SQL to search new direct text columns and remove old JOINs for case type/court names
     let sql = `
         SELECT
             c.*,
-            ct.name as caseTypeName,
-            co.name as courtName,
             ps.name as policeStationName,
             d.name as districtName
         FROM Cases c
-        LEFT JOIN CaseTypes ct ON c.case_type_id = ct.id
-        LEFT JOIN Courts co ON c.court_id = co.id
         LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
         LEFT JOIN Districts d ON ps.district_id = d.id
         WHERE (
             c.uniqueId LIKE ? OR
+            c.CaseTitle LIKE ? OR
+            c.ClientName LIKE ? OR
             c.CNRNumber LIKE ? OR
             c.case_number LIKE ? OR
+            c.court_name LIKE ? OR      机场
+            c.case_type_name LIKE ? OR
+            c.JudgeName LIKE ? OR
+            c.OnBehalfOf LIKE ? OR
             c.FirstParty LIKE ? OR
             c.OppositeParty LIKE ? OR
+            c.OpposingCounsel LIKE ? OR
             c.Accussed LIKE ? OR
             c.Undersection LIKE ? OR
-            ct.name LIKE ? OR
-            co.name LIKE ? OR
+            c.CaseStatus LIKE ? OR
+            c.Priority LIKE ? OR
+            c.CaseDescription LIKE ? OR
+            c.CaseNotes LIKE ? OR
             ps.name LIKE ? OR
             d.name LIKE ?
         )
     `;
-    const params: any[] = [
-        searchQuery, searchQuery, searchQuery, searchQuery,
-        searchQuery, searchQuery, searchQuery, searchQuery,
-        searchQuery, searchQuery, searchQuery
-    ];
+    // Update params array to match the number of LIKE clauses
+    const params: any[] = Array(19).fill(searchQuery); // 19 LIKE clauses above
 
     if (userId !== undefined && userId !== null) {
         sql += " AND c.user_id = ?";
