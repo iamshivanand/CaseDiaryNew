@@ -126,14 +126,15 @@ export interface ActivityItem {
 }
 
 export interface LawyerProfileData {
-  avatarUrl?: string;
+  avatarUrl?: string | null; // Can be a web URL or a local file URI
   name: string;
   designation: string;
   practiceAreas: string[];
   stats: {
-    totalCases: number;
-    upcomingHearings: number;
-    yearsOfPractice: number;
+    totalCases: number; // Remains non-editable for now
+    upcomingHearings: number; // Remains non-editable for now
+    yearsOfPractice: number; // Editable
+    yearsOfPracticeLastUpdated?: string; // ISO Date string, e.g., "2023-10-27"
   };
   aboutMe: string;
   contactInfo: {
@@ -142,5 +143,5 @@ export interface LawyerProfileData {
     address: string;
   };
   languages: string[];
-  recentActivity: ActivityItem[];
+  recentActivity: ActivityItem[]; // Remains non-editable for now
 }
