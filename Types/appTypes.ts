@@ -117,3 +117,30 @@ export const priorityOptions: DropdownOption[] = [
 // Lookup type options (examples, assuming these would be populated from the database)
 export interface CaseTypeOption extends DropdownOption { value: number; }
 export interface CourtOption extends DropdownOption { value: number; }
+
+// Profile Screen Types
+export interface ActivityItem {
+  id: string;
+  date: string;
+  description: string;
+}
+
+export interface LawyerProfileData {
+  avatarUrl?: string;
+  name: string;
+  designation: string;
+  practiceAreas: string[];
+  stats: {
+    totalCases: number;
+    upcomingHearings: number;
+    yearsOfPractice: number;
+  };
+  aboutMe: string;
+  contactInfo: {
+    email: string;
+    phone: string;
+    address: string;
+  };
+  languages: string[];
+  recentActivity: ActivityItem[];
+}
