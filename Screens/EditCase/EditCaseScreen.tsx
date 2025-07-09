@@ -39,18 +39,24 @@ type EditCaseScreenRouteProp = RouteProp<RootStackParamList, 'EditCase'>;
 const EditCaseScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<EditCaseScreenRouteProp>();
+  const [isSaving, setIsSaving] = useState(false); // For loading state on save button
 
   // Safely access initialCaseData, ensuring it's defined or falls back to undefined
   const initialCaseDataFromParams = route.params?.initialCaseData;
 
   const [caseData, setCaseData] = useState<Partial<CaseData>>(() => {
     const defaults: Partial<CaseData> = {
-      CaseStatus: caseStatusOptions.find(opt => opt.label === "Open")?.value || caseStatusOptions[0].value,
+      // Default status and priority from imported options
+      Status: caseStatusOptions.find(opt => opt.label === "Open")?.value || caseStatusOptions[0].value,
       Priority: priorityOptions.find(opt => opt.label === "Medium")?.value || priorityOptions[0].value,
     };
-    let initialData = initialCaseDataFromParams ? { ...defaults, ...initialCaseDataFromParams } : { ...defaults };
+    // Merge defaults with params, giving precedence to params
+    let initialData = initialCaseDataFromParams
+      ? { ...defaults, ...initialCaseDataFromParams }
+      : { ...defaults };
 
     // If initialData has names but not IDs for court/caseType, try to find IDs from dummy options
+    // This helps pre-select dropdowns if only names were passed via navigation params.
     // This helps pre-select dropdowns if only names were passed via navigation params.
     if (initialData.court_name && (initialData.court_id === undefined || initialData.court_id === null || initialData.court_id === '')) {
       const foundCourt = dummyCourtOptions.find(opt => opt.label === initialData.court_name);
@@ -82,26 +88,195 @@ const EditCaseScreen: React.FC = () => {
     { id: 'tl2', date: '2023-10-25T00:00:00.000Z', description: 'Case filed with the District Court. Filing fee paid and receipt obtained.' },
     { id: 'tl3', date: '2023-11-05T00:00:00.000Z', description: 'First hearing scheduled by the court for Nov 20, 2023. Sent notification to client.' },
   ]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+
+  const loadDocuments = async (currentCaseId: number | string | undefined) => {
+    if (!currentCaseId || typeof currentCaseId !== 'number') { // Ensure currentCaseId is a valid number
+        setDocuments(initialCaseDataFromParams?.documents || []); // Fallback to initial or empty
+        return;
+    }
+    setIsLoadingDocuments(true);
+    try {
+        const fetchedDocs = await db.getCaseDocuments(currentCaseId as number);
+        // Map CaseDocument (from DB) to Document (for UI state)
+        const uiDocs: Document[] = fetchedDocs.map(dbDoc => ({
+            id: dbDoc.id,
+            case_id: dbDoc.case_id,
+            fileName: dbDoc.original_display_name,
+            uploadDate: dbDoc.created_at, // This is ISO string from DB
+            fileType: dbDoc.file_type,
+            fileSize: dbDoc.file_size,
+            stored_filename: dbDoc.stored_filename,
+            // uri is not present for documents fetched from DB
+        }));
+        setDocuments(uiDocs);
+    } catch (error) {
+        console.error("Error loading documents for case:", error);
+        Alert.alert("Error", "Could not load documents.");
+        // Potentially set documents to initial or empty on error
+        setDocuments(initialCaseDataFromParams?.documents || []);
+    } finally {
+        setIsLoadingDocuments(false);
+    }
+  };
 
   useEffect(() => {
     navigation.setOptions({ title: initialCaseDataFromParams ? 'Edit Case Details' : 'Add New Case' });
+    if (initialCaseDataFromParams?.id) {
+        loadDocuments(initialCaseDataFromParams.id);
+    } else {
+        // If it's a new case (no id), or initialCaseDataFromParams.documents is preferred source for new screen
+        setDocuments(initialCaseDataFromParams?.documents || []);
+    }
   }, [navigation, initialCaseDataFromParams]);
+
+  const handleInputChange = (field: keyof CaseData, value: string | number | Date | null | undefined) => {
+import * as db from '../../DataBase'; // Import database functions
+// ... other imports ...
+
+// ... (dummy data and component definition) ...
+
+const EditCaseScreen: React.FC = () => {
+  // ... (navigation, route, state initializations including isSaving) ...
 
   const handleInputChange = (field: keyof CaseData, value: string | number | Date | null | undefined) => {
     setCaseData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!caseData.id) {
+      Alert.alert("Error", "Case ID is missing. Cannot update.");
+      return;
+    }
     if (!caseData.CaseTitle?.trim()) {
       Alert.alert('Validation Error', 'Case Title is required.');
       return;
     }
-    // Add more validations as needed
-    console.log('Saving Case Data:', JSON.stringify(caseData, null, 2));
-    console.log('Saving Documents:', JSON.stringify(documents, null, 2));
-    console.log('Saving Timeline Events:', JSON.stringify(timelineEvents, null, 2));
-    Alert.alert('Case Saved', 'Case details have been successfully saved (simulated).');
-    // navigation.goBack(); // Or navigate to a relevant screen
+
+    setIsSaving(true);
+    try {
+      // Resolve names for court and case type
+      const selectedCourtOption = dummyCourtOptions.find(opt => opt.value === caseData.court_id);
+      const courtNameForDb = selectedCourtOption && selectedCourtOption.value !== '' ? selectedCourtOption.label : caseData.court_name || null;
+
+      const selectedCaseTypeOption = dummyCaseTypeOptions.find(opt => opt.value === caseData.case_type_id);
+      const caseTypeNameForDb = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : caseData.case_type_name || null;
+
+      const updatePayload: db.CaseUpdateData = {
+        // Map all fields from caseData (Partial<CaseData>) to CaseUpdateData
+        // CaseUpdateData is Partial<Omit<CaseRow, 'id' | 'uniqueId' | 'created_at' | 'updated_at'>>
+        // CaseRow now includes all the new text fields.
+        CaseTitle: caseData.CaseTitle,
+        ClientName: caseData.ClientName,
+        CNRNumber: caseData.CNRNumber,
+        court_id: caseData.court_id || null, // Keep the ID
+        court_name: courtNameForDb,          // Save the name
+        dateFiled: caseData.FiledDate || caseData.dateFiled, // Prefer FiledDate from form
+        case_type_id: caseData.case_type_id || null, // Keep the ID
+        case_type_name: caseTypeNameForDb,       // Save the name
+        case_number: caseData.case_number,
+        case_year: caseData.case_year ? Number(caseData.case_year) : null,
+        crime_number: caseData.crime_number,
+        crime_year: caseData.crime_year ? Number(caseData.crime_year) : null,
+        JudgeName: caseData.JudgeName,
+        OnBehalfOf: caseData.OnBehalfOf, // If ClientName is primary, this might be different or derived
+        FirstParty: caseData.FirstParty,
+        OppositeParty: caseData.OppositeParty,
+        ClientContactNumber: caseData.ClientContactNumber,
+        Accussed: caseData.Accussed,
+        Undersection: caseData.Undersection,
+        police_station_id: caseData.police_station_id || null,
+        StatuteOfLimitations: caseData.StatuteOfLimitations,
+        OpposingCounsel: caseData.OpposingCounsel, // This is the form field
+        OppositeAdvocate: caseData.OppositeAdvocate, // This is also in CaseData, ensure mapping is clear
+        OppAdvocateContactNumber: caseData.OppAdvocateContactNumber,
+        CaseStatus: caseData.Status || caseData.CaseStatus, // Status from dropdown
+        Priority: caseData.Priority,
+        PreviousDate: caseData.PreviousDate,
+        NextDate: caseData.HearingDate || caseData.NextDate, // HearingDate from form
+        CaseDescription: caseData.CaseDescription,
+        CaseNotes: caseData.CaseNotes,
+      };
+
+      // Remove undefined properties from updatePayload to avoid sending them in SQL
+      Object.keys(updatePayload).forEach(key => {
+        const K = key as keyof db.CaseUpdateData;
+        if (updatePayload[K] === undefined) {
+          delete updatePayload[K];
+        }
+      });
+
+      console.log('Updating Case Data with payload:', JSON.stringify(updatePayload, null, 2));
+      const success = await db.updateCase(caseData.id as number, updatePayload);
+
+      if (success) {
+        console.log('Case data updated successfully.');
+        // Now handle document uploads for new documents
+        // New documents are identified by having a local 'uri' and a temporary ID (timestamp)
+        const newDocsToUpload = documents.filter(doc => doc.uri && typeof doc.id === 'number' && doc.id > 1000000);
+        let allDocUploadsSuccessful = true;
+        if (newDocsToUpload.length > 0) {
+          Alert.alert("Uploading Documents", `Attempting to upload ${newDocsToUpload.length} new document(s)...`);
+        }
+
+        for (const newDoc of newDocsToUpload) {
+          try {
+            const uploadedDocId = await db.uploadCaseDocument({
+              caseId: caseData.id as number,
+              originalFileName: newDoc.fileName,
+              fileType: newDoc.fileType || 'application/octet-stream', // Default MIME type
+              fileUri: newDoc.uri as string, // newDoc.uri is guaranteed by filter
+              fileSize: newDoc.fileSize,
+              userId: null, // TODO: Pass actual user ID when available
+            });
+            if (!uploadedDocId) {
+              allDocUploadsSuccessful = false;
+              console.error(`Failed to upload document: ${newDoc.fileName}`);
+              Alert.alert("Upload Error", `Failed to upload document: ${newDoc.fileName}`);
+              // Decide if you want to stop or continue with other uploads
+            } else {
+              console.log(`Document ${newDoc.fileName} uploaded with ID ${uploadedDocId}`);
+            }
+          } catch (uploadError) {
+            allDocUploadsSuccessful = false;
+            console.error(`Error during upload of ${newDoc.fileName}:`, uploadError);
+            Alert.alert("Upload Exception", `Error uploading ${newDoc.fileName}.`);
+          }
+        }
+
+        let overallSuccess = true; // Track overall success of all operations
+
+        if (allDocUploadsSuccessful) {
+          console.log('All new documents (if any) uploaded successfully.');
+        } else {
+          overallSuccess = false; // Mark overall success as false if any doc upload failed
+          console.log('Some document uploads failed.');
+          // Individual alerts for failed uploads are already shown.
+          // A summary alert for partial success could be added here if desired.
+        }
+
+        // Refresh document list from DB to get proper IDs and stored_filenames
+        // This ensures UI shows the latest state, including newly uploaded docs with DB IDs.
+        if (caseData.id) await loadDocuments(caseData.id as number);
+
+        if (overallSuccess) {
+           Alert.alert('Success', 'Case details and documents saved successfully.');
+           navigation.goBack(); // Navigate back on full success
+        } else {
+           Alert.alert('Partial Success', 'Case details saved, but some document operations may have failed. Please review.');
+           // Optionally, still navigate back or stay on screen for user to review
+           // navigation.goBack();
+        }
+
+      } else { // Case data update failed
+        Alert.alert('Error', 'Failed to update case details. Documents were not processed.');
+      }
+    } catch (error) {
+      console.error("Error saving case details:", error);
+      Alert.alert('Error', 'An error occurred while saving case details.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -151,11 +326,49 @@ const EditCaseScreen: React.FC = () => {
 
   const handleViewDocument = (doc: Document) => { Alert.alert('View Document', `Viewing: ${doc.fileName}`); };
   const handleEditDocument = (doc: Document) => { Alert.alert('Edit Document Metadata', `Editing metadata for: ${doc.fileName}`); };
-  const handleDeleteDocument = (docToDelete: Document) => {
-    Alert.alert('Confirm Deletion', `Are you sure you want to delete "${docToDelete.fileName}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', onPress: () => setDocuments(docs => docs.filter(d => d.id !== docToDelete.id)), style: 'destructive' }
-    ]);
+
+  const handleDeleteDocument = async (docToDelete: Document) => {
+    // If the document has a URI, it's a newly added client-side file not yet in DB.
+    // If it has a numeric ID and no URI, assume it's a DB record.
+    // Temporary IDs (Date.now()) are numbers, so check for URI presence to differentiate.
+    const isNewUnsavedDoc = !!docToDelete.uri && typeof docToDelete.id === 'number' && docToDelete.id > 1000000; // Heuristic for Date.now() IDs
+
+    if (isNewUnsavedDoc) {
+      // Just remove from local state
+      setDocuments(docs => docs.filter(d => d.id !== docToDelete.id));
+      Alert.alert("Document Removed", `${docToDelete.fileName} has been removed from the list.`);
+      return;
+    }
+
+    // For existing documents, confirm and delete from DB
+    Alert.alert(
+      "Confirm Deletion",
+      `Are you sure you want to permanently delete "${docToDelete.fileName}"? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Permanently",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsLoadingDocuments(true); // Use general loader or a specific one
+              const success = await db.deleteCaseDocument(docToDelete.id as number);
+              if (success) {
+                setDocuments(docs => docs.filter(d => d.id !== docToDelete.id));
+                Alert.alert("Deleted", `"${docToDelete.fileName}" has been deleted.`);
+              } else {
+                Alert.alert("Error", `Failed to delete "${docToDelete.fileName}" from the database.`);
+              }
+            } catch (error) {
+              console.error("Error deleting document from DB:", error);
+              Alert.alert("Error", "An error occurred while deleting the document.");
+            } finally {
+              setIsLoadingDocuments(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleAddTimelineEvent = () => { Alert.alert('Add New Timeline Event', 'Implement form to add a new timeline event.'); };
@@ -337,10 +550,10 @@ const EditCaseScreen: React.FC = () => {
 
       <View style={EditCaseScreenStyles.bottomButtonContainer}>
         <View style={EditCaseScreenStyles.buttonWrapper}>
-          <ActionButton title="Cancel" onPress={handleCancel} type="secondary" />
+          <ActionButton title="Cancel" onPress={handleCancel} type="secondary" disabled={isSaving} />
         </View>
         <View style={EditCaseScreenStyles.buttonWrapper}>
-          <ActionButton title="Save Changes" onPress={handleSave} type="primary" loading={false} />
+          <ActionButton title="Save Changes" onPress={handleSave} type="primary" loading={isSaving} disabled={isSaving} />
         </View>
       </View>
     </KeyboardAvoidingView>
