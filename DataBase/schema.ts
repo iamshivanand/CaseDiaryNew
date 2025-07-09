@@ -53,54 +53,58 @@ export interface CaseDocument {
 
 export interface Case {
   id: number;
-  uniqueId: string; // Keep for now if it's used as an external stable ID
-  user_id?: number | null; // FK to Users, who this case belongs to or who created it
+  uniqueId: string;
+  user_id?: number | null;
 
-  // Case Details
-  CaseTitle?: string | null; // New: For the main title of the case from form
-  CNRNumber?: string | null;
-  court_id?: number | null; // Will remain, but FK constraint removed. For future linking.
-  court_name?: string | null; // New: To store court name as text
-  dateFiled?: string | null; // ISO8601 "YYYY-MM-DD"
-  case_type_id?: number | null; // Will remain, but FK constraint removed. For future linking.
-  case_type_name?: string | null; // New: To store case type name as text
-  case_number?: string | null;
-  case_year?: number | null;
-  crime_number?: string | null;
-  crime_year?: number | null;
-  JudgeName?: string | null; // New: From form
+  // Case Identification & Core Details
+  CaseTitle?: string | null;        // Primary title for the case
+  ClientName?: string | null;       // Primary client associated with the case
+  OnBehalfOf?: string | null;       // E.g., "Self", "Minor child", "Company XYZ" (if different from ClientName)
+  CNRNumber?: string | null;        // CNR Number
+  case_number?: string | null;      // Case number (e.g., O.S No. 123/2023)
+  case_year?: number | null;        // Year of the case, if part of case_number or separate
 
-  // Parties & Representation
-  ClientName?: string | null; // New: Explicit client name from form
-  OnBehalfOf?: string | null; // Can be used if ClientName is not specific enough or for other contexts
-  FirstParty?: string | null;
-  OppositeParty?: string | null;
-  ClientContactNumber?: string | null;
-  Accussed?: string | null;
+  // Court and Type (Name stored directly, ID for future linking)
+  court_id?: number | null;         // Optional ID for future linking to a managed Courts table
+  court_name?: string | null;       // Actual name of the court (e.g., "District Court, Cityville")
+  case_type_id?: number | null;     // Optional ID for future linking to a managed CaseTypes table
+  case_type_name?: string | null;   // Actual name of the case type (e.g., "Civil Suit", "Criminal Appeal")
 
-  // Legal Details
-  Undersection?: string | null;
-  police_station_id?: number | null; // FK to PoliceStations (constraint can remain if PoliceStations table is managed)
-  StatuteOfLimitations?: string | null; // New: From form
+  // Dates
+  dateFiled?: string | null;        // Date case was filed (ISO8601 "YYYY-MM-DD")
+  NextDate?: string | null;         // Next hearing date (ISO8601 "YYYY-MM-DD")
+  PreviousDate?: string | null;     // Previous hearing date (ISO8601 "YYYY-MM-DD")
+  StatuteOfLimitations?: string | null; // Statute of limitations date
 
-  // Opposition Details
-  OpposingCounsel?: string | null; // New: From form (can replace/supplement OppositeAdvocate)
-  OppositeAdvocate?: string | null;
-  OppAdvocateContactNumber?: string | null;
+  // Legal Specifics
+  crime_number?: string | null;     // FIR/Crime number, if applicable
+  crime_year?: number | null;       // Year of the crime/FIR
+  police_station_id?: number | null;// FK to PoliceStations table (if this table is managed)
+  Undersection?: string | null;     // Relevant sections of law (e.g., "Sec 302 IPC, Sec 120B IPC")
 
-  // Status and Dates
-  CaseStatus?: string | null; // Current field for status string
-  Priority?: string | null; // New: From form
-  PreviousDate?: string | null; // ISO8601 "YYYY-MM-DD"
-  NextDate?: string | null; // ISO8601 "YYYY-MM-DD"
+  // Parties
+  FirstParty?: string | null;       // Name of the first party (e.g., Plaintiff/Petitioner)
+  OppositeParty?: string | null;    // Name of the opposite party (e.g., Defendant/Respondent)
+  Accussed?: string | null;         // Name(s) of accused, if applicable
+  ClientContactNumber?: string | null; // Contact number for the primary client
 
-  // Notes & Description
-  CaseDescription?: string | null; // New: From form
-  CaseNotes?: string | null; // New: From form
+  // Counsel Details
+  JudgeName?: string | null;        // Name of the presiding judge
+  OpposingCounsel?: string | null;  // Name of the opposing counsel
+  OppositeAdvocate?: string | null; // Often same as OpposingCounsel, or specific advocate name
+  OppAdvocateContactNumber?: string | null; // Contact for opposing counsel
+
+  // Case Status & Management
+  CaseStatus?: string | null;       // Current status (e.g., "Open", "In Progress", "Closed", "Appealed")
+  Priority?: string | null;         // Priority (e.g., "High", "Medium", "Low")
+
+  // Descriptions & Notes
+  CaseDescription?: string | null;  // Detailed description of the case
+  CaseNotes?: string | null;        // Internal notes, strategy, etc.
 
   // Timestamps
-  created_at: string; // ISO8601
-  updated_at: string; // ISO8601
+  created_at: string;
+  updated_at: string;
 }
 
 
@@ -183,57 +187,61 @@ export const CREATE_CASES_TABLE = `
 CREATE TABLE IF NOT EXISTS Cases (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   uniqueId TEXT UNIQUE NOT NULL, -- Consider if this is still needed or if 'id' is sufficient
-  user_id INTEGER, -- Case owner/creator
+  user_id INTEGER,
 
-  -- Case Details
+  -- Case Identification & Core Details
   CaseTitle TEXT,
-  CNRNumber TEXT,
-  court_id INTEGER, -- Retained for future linking, FK constraint removed below
-  court_name TEXT,  -- To store court name as string
-  dateFiled TEXT,
-  case_type_id INTEGER, -- Retained for future linking, FK constraint removed below
-  case_type_name TEXT, -- To store case type name as string
-  case_number TEXT,
-  case_year INTEGER,
-  crime_number TEXT,
-  crime_year INTEGER,
-  JudgeName TEXT,
-
-  -- Parties & Representation
   ClientName TEXT,
   OnBehalfOf TEXT,
-  FirstParty TEXT,
-  OppositeParty TEXT,
-  ClientContactNumber TEXT,
-  Accussed TEXT,
+  CNRNumber TEXT,
+  case_number TEXT,
+  case_year INTEGER,
 
-  -- Legal Details
-  Undersection TEXT,
-  police_station_id INTEGER,
+  -- Court and Type (Name stored directly, ID for future linking)
+  court_id INTEGER,         -- Retained for future linking, FK constraint removed
+  court_name TEXT,          -- Actual name of the court
+  case_type_id INTEGER,     -- Retained for future linking, FK constraint removed
+  case_type_name TEXT,      -- Actual name of the case type
+
+  -- Dates
+  dateFiled TEXT,
+  NextDate TEXT,
+  PreviousDate TEXT,
   StatuteOfLimitations TEXT,
 
-  -- Opposition Details
+  -- Legal Specifics
+  crime_number TEXT,
+  crime_year INTEGER,
+  police_station_id INTEGER,
+  Undersection TEXT,
+
+  -- Parties
+  FirstParty TEXT,
+  OppositeParty TEXT,
+  Accussed TEXT,
+  ClientContactNumber TEXT,
+
+  -- Counsel Details
+  JudgeName TEXT,
   OpposingCounsel TEXT,
   OppositeAdvocate TEXT,
   OppAdvocateContactNumber TEXT,
 
-  -- Status and Dates
-  CaseStatus TEXT, -- This is the string status from the dropdown e.g. "In Progress"
-  Priority TEXT,   -- e.g. "High", "Medium", "Low"
-  PreviousDate TEXT,
-  NextDate TEXT,
-  -- CaseDescription and CaseNotes are large text, can also be here or in a related table if very large/many.
+  -- Case Status & Management
+  CaseStatus TEXT,
+  Priority TEXT,
+
+  -- Descriptions & Notes
   CaseDescription TEXT,
   CaseNotes TEXT,
-  -- caseHistory TEXT, -- Old JSON history, to be removed
 
   -- Timestamps
   created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
   updated_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
 
   FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
-  -- FOREIGN KEY (court_id) REFERENCES Courts(id) ON DELETE SET NULL, -- FK constraint removed
-  -- FOREIGN KEY (case_type_id) REFERENCES CaseTypes(id) ON DELETE SET NULL, -- FK constraint removed
+  -- FOREIGN KEY (court_id) REFERENCES Courts(id) ON DELETE SET NULL, -- FK constraint explicitly removed
+  -- FOREIGN KEY (case_type_id) REFERENCES CaseTypes(id) ON DELETE SET NULL, -- FK constraint explicitly removed
   FOREIGN KEY (police_station_id) REFERENCES PoliceStations(id) ON DELETE SET NULL
 );`;
 
