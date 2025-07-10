@@ -1,6 +1,6 @@
 // Screens/CaseDetailsScreen/CaseDetailsScreen.tsx
 import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, FlatList, Alert, StyleSheet as RNStyleSheet, Platform } from 'react-native'; // Added Platform
+import { View, Text, ScrollView, ActivityIndicator, FlatList, Alert, Platform } from 'react-native'; // Removed StyleSheet as RNStyleSheet
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as FileSystem from 'expo-file-system';

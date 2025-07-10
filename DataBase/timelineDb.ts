@@ -1,5 +1,5 @@
 // DataBase/timelineDb.ts
-import { getDb } from './index'; // Adjust if getDb is in a different location relative to this new file
+import { getDb } from './connection'; // Changed import path for getDb
 import { TimelineEventRow } from './schema';
 
 export type TimelineEventInsertData = Omit<TimelineEventRow, 'id' | 'created_at' | 'updated_at'>;

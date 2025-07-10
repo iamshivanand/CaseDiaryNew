@@ -2,6 +2,37 @@
 
 import * as SQLite from 'expo-sqlite';
 
+// --- Seeding Initial Data Constants ---
+// Moved here from DataBase/index.ts to be co-located with seedInitialData function
+const PREDEFINED_DISTRICTS: Array<Omit<District, 'id' | 'user_id'>> = [
+  { name: 'Bareilly', state: 'Uttar Pradesh' },
+  { name: 'Lucknow', state: 'Uttar Pradesh' },
+  { name: 'Mumbai City', state: 'Maharashtra' },
+  { name: 'South Delhi', state: 'Delhi' },
+  { name: 'North Goa', state: 'Goa' },
+  { name: 'Jaipur', state: 'Rajasthan' },
+  { name: 'Patna', state: 'Bihar' },
+  { name: 'Kolkata', state: 'West Bengal' },
+  { name: 'Chennai', state: 'Tamil Nadu' },
+  { name: 'Bangalore Urban', state: 'Karnataka' },
+  // Add more as needed
+];
+
+const PREDEFINED_CASE_TYPES: Array<Omit<CaseType, 'id' | 'user_id'>> = [
+  { name: 'Civil' },
+  { name: 'Criminal' },
+  { name: 'Family' },
+  { name: 'Writ' },
+  { name: 'Corporate' },
+  { name: 'Revenue' },
+  { name: 'Consumer' },
+  { name: 'Labour' },
+  { name: 'Arbitration' },
+  { name: 'Service Matter' },
+  // Add more as needed
+];
+
+
 // ---------------
 // TYPE INTERFACES
 // ---------------
