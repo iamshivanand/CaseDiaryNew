@@ -23,10 +23,12 @@ export const ThemeContext = createContext<ThemeContextType>({
       text: "#000",
     },
   },
-  updateTheme: () => {},
+  updateTheme: () => {}, // Function to update the theme
 });
 
 const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // const colorScheme = Appearance.getColorScheme();
+  // const isDarkMode = useColorScheme() === "dark";
   const [theme, setTheme] = useState<Theme>(() => {
     const defaultTheme: Theme = {
       colors: {
@@ -40,7 +42,7 @@ const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   });
 
   const updateTheme = (newTheme: Partial<Theme>) => {
-    setTheme({ ...theme, ...newTheme });
+    setTheme({ ...theme, ...newTheme }); // Update specific theme properties
   };
 
   const value = { theme, updateTheme };

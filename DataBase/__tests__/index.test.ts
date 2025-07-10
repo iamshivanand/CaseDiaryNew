@@ -1,8 +1,9 @@
 import * as SQLite from 'expo-sqlite'; // This will be the mock
-import * as dbFunctions from '../index';
+import * as dbFunctions from '../index'; // Import your database functions
+// Import the specific function directly for clarity and to ensure it's resolved
 import { __TEST_ONLY_resetDbInstance, getDb, getCaseTypes, addCaseType, updateCaseType, deleteCaseType, addCase, getCaseById, updateCase, deleteCase, uploadCaseDocument, getCaseDocuments, deleteCaseDocument } from '../index';
-import { CaseInsertData, CaseUpdateData } from '../index';
-import { CaseType, CaseDocument, Case as CaseRow } from '../schema';
+import { CaseInsertData, CaseUpdateData } from '../index'; // Import types
+import { CaseType, CaseDocument, Case as CaseRow } from '../schema'; // Import schema types
 
 
 // Helper to access the mock's internal state if needed for assertions or reset
@@ -34,17 +35,18 @@ beforeEach(async () => {
 describe('Database Module Tests', () => {
   describe('Schema Initialization and Seeding', () => {
     it('should initialize schema and seed initial data without errors', async () => {
-      const databaseMock = await getDb();
+      const databaseMock = await getDb(); // This is our mock SQLiteDatabase object
       expect(databaseMock).toBeDefined();
 
+      // Directly call the mock's getAllAsync to bypass our getCaseTypes wrapper for this specific debug
       const caseTypes = await databaseMock.getAllAsync("SELECT * FROM CaseTypes WHERE user_id IS NULL ORDER BY name ASC", []);
-      // console.log('Test received caseTypes:', JSON.stringify(caseTypes)); // Intentionally kept for debugging if needed
+      console.log('Test received caseTypes:', JSON.stringify(caseTypes)); // Log what the test sees
 
       expect(caseTypes.length).toBeGreaterThan(0);
       const civilType = caseTypes.find(ct => ct.name === 'Civil');
       expect(civilType).toBeDefined();
 
-      const districts = await dbFunctions.getDistricts();
+      const districts = await dbFunctions.getDistricts(); // Use dbFunctions alias or specific import for other functions
       expect(districts.length).toBeGreaterThan(0);
       const bareilly = districts.find(d => d.name === 'Bareilly');
       expect(bareilly).toBeDefined();
