@@ -41,7 +41,7 @@ export interface CaseDetails { // Renamed to avoid conflict if CaseDetails is im
 // Use HomeStackParamList for navigation prop, assuming CaseCard navigates within HomeStack
 type CaseCardNavigationProp = StackNavigationProp<
   HomeStackParamList,
-  "CaseDetailsV2" // Or any other screen in HomeStack it might navigate to (e.g. EditCase directly)
+  "CaseDetail" // Changed from CaseDetailsV2 to CaseDetail
 >;
 
 const CaseCard: React.FC<{
@@ -69,10 +69,10 @@ const CaseCard: React.FC<{
     onDelete();
   };
   const handleEdit = () => {
-    console.log("Edit button pressed, navigating to CaseDetailsV2 with id:", caseDetails.id);
-    navigation.navigate("CaseDetailsV2", {
+    console.log("Edit button pressed, navigating to CaseDetail with id:", caseDetails.id);
+    navigation.navigate("CaseDetail", { // Changed from CaseDetailsV2
       caseId: caseDetails.id,
-      caseTitleHeader: caseDetails.caseNumber // Pass caseNumber as a fallback header title
+      caseTitleHeader: caseDetails.caseNumber
     });
   };
   const handleUpdateDate = (values: { [key: string]: any }) => {

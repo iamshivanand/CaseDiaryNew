@@ -1,14 +1,18 @@
-// Screens/CaseDetailsScreenV2/components/StatusBadgeV2.tsx
-import React from 'react';
+// Screens/CaseDetailsScreen/components/StatusBadge.tsx
+import React, { useContext } from 'react'; // Added useContext
 import { View, Text } from 'react-native';
-import { StatusBadgeV2Styles as styles } from './StatusBadgeV2Style';
+import { getStatusBadgeStyles } from './StatusBadgeStyle'; // Import function
+import { ThemeContext } from '../../../Providers/ThemeProvider'; // Adjust path
 
-interface StatusBadgeV2Props {
+interface StatusBadgeProps {
   status: string | null | undefined;
 }
 
-const StatusBadgeV2: React.FC<StatusBadgeV2Props> = ({ status }) => {
-  const normalizedStatus = (status || 'unknown').toLowerCase().replace(/\s+/g, ''); // e.g. "inprogress"
+const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+  const { theme } = useContext(ThemeContext); // Get theme
+  const styles = getStatusBadgeStyles(theme); // Generate styles
+
+  const normalizedStatus = (status || 'unknown').toLowerCase().replace(/\s+/g, '');
 
   let badgeStyle = styles.defaultStatus;
   let textStyle = styles.defaultStatusText;
@@ -37,4 +41,4 @@ const StatusBadgeV2: React.FC<StatusBadgeV2Props> = ({ status }) => {
   );
 };
 
-export default StatusBadgeV2;
+export default StatusBadge;

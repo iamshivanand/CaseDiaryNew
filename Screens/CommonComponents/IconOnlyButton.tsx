@@ -1,15 +1,16 @@
 // Screens/CommonComponents/IconOnlyButton.tsx
-import React from "react";
+import React, { useContext } from "react"; // Added useContext
 import { TouchableOpacity, ViewStyle } from "react-native";
-import { IconOnlyButtonStyle } from "./IconOnlyButtonStyle";
+import { getIconOnlyButtonStyles } from "./IconOnlyButtonStyle"; // Import function
+import { ThemeContext } from "../../Providers/ThemeProvider"; // Adjust path
 
 interface IconOnlyButtonProps {
   onPress: () => void;
-  icon: React.ReactNode; // Expects a fully formed icon component, e.g., <MaterialIcons name="edit" size={24} color="blue" />
+  icon: React.ReactNode;
   style?: ViewStyle;
   disabled?: boolean;
   accessibilityLabel: string;
-  hitSlop?: { top?: number; bottom?: number; left?: number; right?: number }; // For larger touch target
+  hitSlop?: { top?: number; bottom?: number; left?: number; right?: number };
 }
 
 const IconOnlyButton: React.FC<IconOnlyButtonProps> = ({
@@ -18,14 +19,17 @@ const IconOnlyButton: React.FC<IconOnlyButtonProps> = ({
   style,
   disabled = false,
   accessibilityLabel,
-  hitSlop = { top: 5, bottom: 5, left: 5, right: 5 }, // Default hitSlop
+  hitSlop = { top: 5, bottom: 5, left: 5, right: 5 },
 }) => {
+  const { theme } = useContext(ThemeContext);
+  const styles = getIconOnlyButtonStyles(theme); // Generate styles
+
   return (
     <TouchableOpacity
       style={[
-        IconOnlyButtonStyle.button,
+        styles.button, // Use themed base style
         style,
-        disabled && IconOnlyButtonStyle.disabled,
+        disabled && styles.disabled, // Use themed disabled style
       ]}
       onPress={onPress}
       disabled={disabled}

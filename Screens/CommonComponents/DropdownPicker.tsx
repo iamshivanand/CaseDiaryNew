@@ -1,8 +1,9 @@
 // Screens/CommonComponents/DropdownPicker.tsx
-import React from "react";
+import React, { useContext } from "react"; // Added useContext
 import { View, Text, Platform } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { DropdownPickerStyles } from "./DropdownPickerStyle";
+import { getDropdownPickerStyles } from "./DropdownPickerStyle"; // Import function
+import { ThemeContext } from "../../Providers/ThemeProvider"; // Adjust path
 import { DropdownOption } from "../../Types/appTypes";
 
 interface DropdownPickerProps {
@@ -24,37 +25,40 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
   error,
   placeholder,
 }) => {
+  const { theme } = useContext(ThemeContext);
+  const styles = getDropdownPickerStyles(theme);
+
   const pickerOptions = placeholder
     ? [{ label: placeholder, value: "" } as DropdownOption, ...options]
     : options;
 
   return (
-    <View style={DropdownPickerStyles.inputContainer}>
-      <Text style={DropdownPickerStyles.label}>{label}</Text>
+    <View style={styles.inputContainer}>
+      <Text style={styles.label}>{label}</Text>
       <View style={[
-        DropdownPickerStyles.pickerContainer,
-        error ? { borderColor: 'red' } : {},
-        !enabled ? { backgroundColor: '#E5E7EB' } : {} // Disabled style
+        styles.pickerContainer,
+        error ? { borderColor: theme.colors.errorBorder || 'red' } : {},
+        !enabled ? styles.disabledPickerContainer : {}
       ]}>
         <Picker
           selectedValue={selectedValue}
           onValueChange={onValueChange}
           enabled={enabled}
-          style={DropdownPickerStyles.picker}
-          dropdownIconColor={Platform.OS === 'ios' ? "#D1D5DB" : "#1D4ED8"} // iOS uses a chevron, Android an arrow
-          mode="dropdown" // Explicitly set mode, 'dialog' is other option for Android
+          style={styles.picker}
+          dropdownIconColor={Platform.OS === 'ios' ? (theme.colors.textSecondary || "#D1D5DB") : (theme.colors.primary || "#1D4ED8")}
+          mode="dropdown"
         >
           {pickerOptions.map((option, index) => (
             <Picker.Item
-              key={index.toString()} // Using index for key if values might not be unique before selection
+              key={option.value?.toString() || index.toString()} // Prefer option.value for key
               label={option.label}
               value={option.value}
-              color={option.value === "" && placeholder ? "#9CA3AF" : undefined} // Style placeholder differently
+              color={(option.value === "" && placeholder) ? (theme.colors.placeholderText || "#9CA3AF") : styles.picker.color}
             />
           ))}
         </Picker>
       </View>
-      {error && <Text style={DropdownPickerStyles.errorText}>{error}</Text>}
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 };

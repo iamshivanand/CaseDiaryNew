@@ -248,3 +248,6 @@ export const searchCases = async (query: string, userId?: number | null): Promis
     console.log("Search SQL:", sql); // Log search SQL
     return db.getAllAsync<CaseWithDetails>(sql, params);
 };
+
+// Export timeline CRUD functions
+export * from './timelineDb';

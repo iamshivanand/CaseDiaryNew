@@ -1,18 +1,23 @@
 // Screens/CommonComponents/SectionHeaderStyle.ts
 import { StyleSheet } from "react-native";
+import { Theme } from "../../Providers/ThemeProvider"; // Adjust path as needed
 
-export const SectionHeaderStyles = StyleSheet.create({
+export const getSectionHeaderStyles = (theme: Theme) => StyleSheet.create({
   container: {
-    marginTop: 24, // Space above the section header
-    marginBottom: 16, // Space below the header, before the content
-    paddingHorizontal: 4, // Slight horizontal padding if needed, adjust based on screen layout
-    // borderBottomWidth: 1, // Optional: add a line under the header
-    // borderBottomColor: "#E5E7EB",
+    marginTop: 24,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+    // Optional border, can use theme.colors.border
+    // borderBottomWidth: 1,
+    // borderBottomColor: theme.colors.border || "#E5E7EB",
     // paddingBottom: 8,
   },
   title: {
-    fontSize: 20, // Larger font for section titles
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#1F2937", // A slightly softer black
+    color: theme.colors.sectionHeaderText || theme.colors.text, // Use specific or fallback
   },
 });
+
+// Suggested new theme color:
+// sectionHeaderText?: string;

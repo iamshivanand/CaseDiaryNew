@@ -107,6 +107,16 @@ export interface Case {
   updated_at: string;
 }
 
+export interface TimelineEventRow {
+  id: number;
+  case_id: number; // Foreign Key to Cases table
+  event_date: string; // ISO8601 "YYYY-MM-DD" or full timestamp
+  description: string;
+  created_at: string; // ISO8601
+  updated_at: string; // ISO8601
+  user_id?: number | null; // Optional: if events are user-specific or for audit
+}
+
 
 // ---------------
 // DDL STATEMENTS
@@ -271,6 +281,33 @@ export const CREATE_CASE_HISTORY_LOG_CASE_ID_INDEX = `
 CREATE INDEX IF NOT EXISTS idx_casehistorylog_case_id ON CaseHistoryLog(case_id);
 `;
 
+export const CREATE_TIMELINE_EVENTS_TABLE = `
+CREATE TABLE IF NOT EXISTS TimelineEvents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  case_id INTEGER NOT NULL,
+  event_date TEXT NOT NULL, -- Store as ISO8601 string
+  description TEXT NOT NULL,
+  user_id INTEGER, -- Optional: who created this event
+  created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+  updated_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+  FOREIGN KEY (case_id) REFERENCES Cases(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE SET NULL
+);`;
+
+// Index for faster timeline event lookups per case
+export const CREATE_TIMELINE_EVENTS_CASE_ID_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_timelineevents_case_id ON TimelineEvents(case_id);
+`;
+
+// Trigger to update 'updated_at' timestamp on TimelineEvents table
+export const CREATE_TIMELINE_EVENTS_UPDATED_AT_TRIGGER = `
+CREATE TRIGGER IF NOT EXISTS trigger_timelineevents_updated_at
+AFTER UPDATE ON TimelineEvents
+FOR EACH ROW
+BEGIN
+  UPDATE TimelineEvents SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = OLD.id;
+END;`;
+
 // Function to execute all DDL statements
 export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void> => {
   // Enable foreign keys - this is important for SQLite to enforce constraints
@@ -298,6 +335,9 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   await db.execAsync(CREATE_CASE_DOCUMENTS_CASE_ID_INDEX);
   await db.execAsync(CREATE_CASE_HISTORY_LOG_TABLE);
   await db.execAsync(CREATE_CASE_HISTORY_LOG_CASE_ID_INDEX);
+  await db.execAsync(CREATE_TIMELINE_EVENTS_TABLE);
+  await db.execAsync(CREATE_TIMELINE_EVENTS_CASE_ID_INDEX);
+  await db.execAsync(CREATE_TIMELINE_EVENTS_UPDATED_AT_TRIGGER);
 
   console.log("Database schema initialized.");
 };

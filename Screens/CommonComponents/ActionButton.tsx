@@ -1,7 +1,8 @@
 // Screens/CommonComponents/ActionButton.tsx
-import React from "react";
+import React, { useContext } from "react";
 import { TouchableOpacity, Text, ActivityIndicator, View, ViewStyle, TextStyle } from "react-native";
-import { ActionButtonStyle } from "./ActionButtonStyle";
+import { getActionButtonStyles } from "./ActionButtonStyle";
+import { ThemeContext, Theme } from "../../Providers/ThemeProvider"; // Adjust path
 
 interface ActionButtonProps {
   title: string;
@@ -24,45 +25,42 @@ const ActionButton: React.FC<ActionButtonProps> = ({
   textStyle,
   leftIcon,
 }) => {
+  const { theme } = useContext(ThemeContext);
+  const styles = getActionButtonStyles(theme); // Generate styles with theme
+
   let buttonStyleConfig;
   let textStyleConfig;
   let finalActivityIndicatorColor;
 
   switch (type) {
     case "primary":
-      buttonStyleConfig = ActionButtonStyle.primaryButton;
-      textStyleConfig = ActionButtonStyle.primaryButtonText;
-      finalActivityIndicatorColor = ActionButtonStyle.primaryButtonText.color || "#FFFFFF";
+      buttonStyleConfig = styles.primaryButton;
+      textStyleConfig = styles.primaryButtonText;
+      finalActivityIndicatorColor = textStyleConfig.color || theme.colors.background;
       break;
     case "secondary":
-      buttonStyleConfig = ActionButtonStyle.secondaryButton;
-      textStyleConfig = ActionButtonStyle.secondaryButtonText;
-      // For secondary (ghost/text buttons), use the text color for the indicator, or a default if not specified
-      finalActivityIndicatorColor = ActionButtonStyle.secondaryButtonText.color || "#1D4ED8";
+      buttonStyleConfig = styles.secondaryButton;
+      textStyleConfig = styles.secondaryButtonText;
+      finalActivityIndicatorColor = textStyleConfig.color || theme.colors.primary;
       break;
     case "dashed":
-      buttonStyleConfig = ActionButtonStyle.dashedButton;
-      textStyleConfig = ActionButtonStyle.dashedButtonText;
-      // Dashed buttons are often similar to primary in terms of text on transparent/light bg, but icon might be primary color
-      finalActivityIndicatorColor = ActionButtonStyle.dashedButtonText.color || "#1D4ED8";
+      buttonStyleConfig = styles.dashedButton;
+      textStyleConfig = styles.dashedButtonText;
+      finalActivityIndicatorColor = textStyleConfig.color || theme.colors.primary;
       break;
     default:
-      buttonStyleConfig = ActionButtonStyle.primaryButton;
-      textStyleConfig = ActionButtonStyle.primaryButtonText;
-      finalActivityIndicatorColor = ActionButtonStyle.primaryButtonText.color || "#FFFFFF";
+      buttonStyleConfig = styles.primaryButton;
+      textStyleConfig = styles.primaryButtonText;
+      finalActivityIndicatorColor = textStyleConfig.color || theme.colors.background;
   }
-
-  // If the button text color for primary is not white (e.g. dark theme with light primary button), this ensures contrast.
-  // However, usually primary buttons have light text on dark bg or vice-versa.
-  // The logic above tries to infer from textStyleConfig.color.
 
   return (
     <TouchableOpacity
       style={[
-        ActionButtonStyle.button,
+        styles.button,
         buttonStyleConfig,
-        (disabled || loading) && ActionButtonStyle.disabledButton,
-        style, // Allow custom style overrides
+        (disabled || loading) && styles.disabledButton,
+        style,
       ]}
       onPress={onPress}
       disabled={disabled || loading}
@@ -72,8 +70,8 @@ const ActionButton: React.FC<ActionButtonProps> = ({
         <ActivityIndicator color={finalActivityIndicatorColor} />
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {leftIcon && <View style={ActionButtonStyle.iconWrapper}>{leftIcon}</View>}
-          <Text style={[ActionButtonStyle.buttonText, textStyleConfig, textStyle]}>
+          {leftIcon && <View style={styles.iconWrapper}>{leftIcon}</View>}
+          <Text style={[styles.buttonText, textStyleConfig, textStyle]}>
             {title}
           </Text>
         </View>

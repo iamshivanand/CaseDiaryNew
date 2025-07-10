@@ -86,9 +86,16 @@ export interface Document {
 }
 
 export interface TimelineEvent {
-  id: string; // Could be number if from DB, or string for local generation (e.g., UUID)
-  date: string; // ISO8601 "YYYY-MM-DD" or full timestamp
+  id: number | string; // number from DB, string for temporary _clientSideId if 'new'
+  case_id?: number;    // Will be set when saving new events to DB
+  date: string;        // ISO8601 "YYYY-MM-DD" or full timestamp
   description: string;
+  user_id?: number | null; // From TimelineEventRow
+
+  // Client-side flags for managing state before saving
+  _clientSideId?: string; // For 'new' items before they have a DB id (e.g., uuidv4())
+  _status?: 'new' | 'modified' | 'deleted' | 'synced';
+  // 'synced' can be used after successful save to clear _status, or item is just re-fetched
 }
 
 // For dropdowns

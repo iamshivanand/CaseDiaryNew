@@ -1,19 +1,22 @@
-// Screens/CaseDetailsScreenV2/components/DocumentCardV2.tsx
-import React from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native'; // Added Alert
+// Screens/CaseDetailsScreen/components/DocumentCard.tsx
+import React, { useContext } from 'react'; // Added useContext
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { DocumentCardV2Styles as styles } from './DocumentCardV2Style';
+import { getDocumentCardStyles } from './DocumentCardStyle'; // Import function
+import { ThemeContext } from '../../../Providers/ThemeProvider'; // Adjust path
 import { Document } from '../../../Types/appTypes';
 import { format, parseISO, isValid } from 'date-fns';
 import IconOnlyButton from '../../CommonComponents/IconOnlyButton';
 
-interface DocumentCardV2Props {
+interface DocumentCardProps {
   document: Document;
   onPress?: (document: Document) => void;
   onDownloadPress?: (document: Document) => void;
 }
 
-const DocumentCardV2: React.FC<DocumentCardV2Props> = ({ document, onPress, onDownloadPress }) => {
+const DocumentCard: React.FC<DocumentCardProps> = ({ document, onPress, onDownloadPress }) => {
+  const { theme } = useContext(ThemeContext); // Get theme
+  const styles = getDocumentCardStyles(theme); // Generate styles
 
   const getFileIconName = (fileType?: string | null): keyof typeof Icon.glyphMap => {
     const type = typeof fileType === 'string' ? fileType.toLowerCase() : '';
@@ -40,16 +43,15 @@ const DocumentCardV2: React.FC<DocumentCardV2Props> = ({ document, onPress, onDo
   const handleCardPress = () => {
     if (onPress) {
       onPress(document);
-    } else if (onDownloadPress) { // Fallback to download if no general onPress
+    } else if (onDownloadPress) {
       onDownloadPress(document);
     } else {
-      // Default action if neither is provided, e.g., view details or download
       Alert.alert("Document Action", `Selected: ${document.fileName}`);
     }
   };
 
   const handleDownload = (e: any) => {
-    e.stopPropagation(); // Prevent card press if icon is tapped
+    e.stopPropagation();
     if (onDownloadPress) {
       onDownloadPress(document);
     } else {
@@ -59,7 +61,6 @@ const DocumentCardV2: React.FC<DocumentCardV2Props> = ({ document, onPress, onDo
 
   return (
     <TouchableOpacity onPress={handleCardPress} activeOpacity={0.8} style={styles.card}>
-      {/* Removed outer View, TouchableOpacity is now the card root */}
         <View style={styles.documentIconContainer}>
           <Icon name={getFileIconName(document.fileType)} size={22} style={styles.documentIcon} />
         </View>
@@ -72,14 +73,14 @@ const DocumentCardV2: React.FC<DocumentCardV2Props> = ({ document, onPress, onDo
           </Text>
         </View>
         <IconOnlyButton
-            icon={<Icon name="file-download" size={24} color={styles.documentIcon.color} />} // Use consistent color
+            icon={<Icon name="file-download" size={24} color={styles.documentIcon.color} />}
             onPress={handleDownload}
             accessibilityLabel="Download document"
-            style={styles.downloadIconContainer} // Apply specific style if needed for positioning/margin
-            hitSlop={{top:10, bottom:10, left:10, right:10}} // Make it easier to tap
+            style={styles.downloadIconContainer}
+            hitSlop={{top:10, bottom:10, left:10, right:10}}
         />
     </TouchableOpacity>
   );
 };
 
-export default DocumentCardV2;
+export default DocumentCard; // Renamed export

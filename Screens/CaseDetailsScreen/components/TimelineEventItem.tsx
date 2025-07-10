@@ -1,26 +1,28 @@
-// Screens/CaseDetailsScreenV2/components/TimelineEventItemV2.tsx
-import React from 'react';
+// Screens/CaseDetailsScreen/components/TimelineEventItem.tsx
+import React, { useContext } from 'react'; // Added useContext
 import { View, Text } from 'react-native';
-import { TimelineEventItemV2Styles as styles } from './TimelineEventItemV2Style';
+import { getTimelineEventItemStyles } from './TimelineEventItemStyle'; // Import function
+import { ThemeContext } from '../../../Providers/ThemeProvider'; // Adjust path
 import { TimelineEvent } from '../../../Types/appTypes';
 import { format, parseISO, isValid } from 'date-fns';
 
-interface TimelineEventItemV2Props {
+interface TimelineEventItemProps {
   event: TimelineEvent;
   isLastItem?: boolean;
 }
 
-const TimelineEventItemV2: React.FC<TimelineEventItemV2Props> = ({ event, isLastItem = false }) => {
+const TimelineEventItem: React.FC<TimelineEventItemProps> = ({ event, isLastItem = false }) => {
+  const { theme } = useContext(ThemeContext); // Get theme
+  const styles = getTimelineEventItemStyles(theme); // Generate styles
   const formattedDate = () => {
     if (typeof event.date !== 'string' || !event.date) {
       return 'Date N/A';
     }
     try {
       const dateObj = parseISO(event.date);
-      // Example format: "October 20, 2023"
       return isValid(dateObj) ? format(dateObj, "MMMM dd, yyyy") : event.date;
     } catch (e) {
-      return event.date; // Fallback if not ISO or parseISO fails for other reasons
+      return event.date;
     }
   };
 
@@ -38,4 +40,4 @@ const TimelineEventItemV2: React.FC<TimelineEventItemV2Props> = ({ event, isLast
   );
 };
 
-export default TimelineEventItemV2;
+export default TimelineEventItem; // Renamed export

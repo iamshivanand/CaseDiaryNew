@@ -14,6 +14,9 @@ const windowWidth = Dimensions.get("window").width;
 
 const SearchScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
+  // Generate styles with theme
+  const styles = getSearchScreenStyles(theme);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<CaseWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -118,56 +121,63 @@ const SearchScreen: React.FC = () => {
 
 export default SearchScreen;
 
-const styles = StyleSheet.create({
+const getSearchScreenStyles = (theme: Theme) => StyleSheet.create({
   screenContainer: {
     flex: 1,
-    paddingTop: 10, // Remove default padding, use per-section padding
+    paddingTop: 10,
+    backgroundColor: theme.colors.background, // Added theme background
   },
   searchSection: {
     paddingHorizontal: 15,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0', // Light separator line
-    backgroundColor: 'transparent', // Or theme.colors.background
+    borderBottomColor: theme.colors.border || '#e0e0e0',
+    backgroundColor: theme.colors.background, // Ensure section bg matches screen if needed
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: '#f0f0f0', // Lighter background for input field itself
+    backgroundColor: theme.colors.inputBackground || '#f0f0f0', // Themeable input bg
     borderRadius: 8,
     paddingHorizontal: 10,
-    height: 48, // Increased height
-    marginBottom: 10, // Space before search button
+    height: 48,
+    marginBottom: 10,
   },
-  input: {
+  input: { // Text color already applied dynamically in component
     flex: 1,
-    height: '100%', // Take full height of container
+    height: '100%',
     fontSize: 16,
   },
-  icon: {
+  icon: { // Icon color already applied dynamically in component
     marginRight: 10,
   },
-  searchButton: {
-    minHeight: 48, // Match input height
-    marginVertical: 0, // Remove default vertical margin if any from ActionButton
+  searchButton: { // ActionButton will use its own themed styles, this is for layout
+    minHeight: 48,
+    marginVertical: 0,
   },
-  searchButtonText: {
+  searchButtonText: { // ActionButton will use its own themed styles
     fontSize: 16,
   },
-  loader: {
-    flex: 1, // Center loader if it's the only thing
+  loader: { // ActivityIndicator color applied dynamically in component
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   listContentContainer: {
     paddingHorizontal: 15,
-    paddingBottom: 20, // Space at the bottom of the list
-    flexGrow: 1, // Important for ListEmptyComponent to work correctly
+    paddingBottom: 20,
+    flexGrow: 1,
   },
-  emptyText: {
+  emptyText: { // Text color already applied dynamically in component
     textAlign: 'center',
     marginTop: 50,
     fontSize: 16,
-    color: '#666', // Default color, will be overridden by theme
   },
 });
+
+// Add to Theme interface in ThemeProvider.tsx if these are new:
+// inputBackground?: string;
+// shadow?: string;
+// primaryLight?: string; // For icon backgrounds like in DocumentCard
+// cardBackground?: string; // For cards
+// status...Bg/Text colors for StatusBadge

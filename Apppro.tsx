@@ -9,8 +9,8 @@ import { ThemeContext } from "./Providers/ThemeProvider";
 // Import Screens for Stacks
 import HomeScreen from "./Screens/HomeScreen/HomeScreen";
 import CasesList from "./Screens/CasesList/CasesList";
-import CaseDetail from "./Screens/CaseDetailsScreen/CaseDetailsScreen"; // Old one
-import CaseDetailsScreenV2 from "./Screens/CaseDetailsScreenV2/CaseDetailsScreenV2"; // New one
+import CaseDetailsScreen from "./Screens/CaseDetailsScreen/CaseDetailsScreen"; // This is now the new, refactored screen
+// import CaseDetailsScreenV2 from "./Screens/CaseDetailsScreenV2/CaseDetailsScreenV2"; // V2 Import removed
 import EditCaseScreen from "./Screens/EditCase/EditCaseScreen";
 import AddCase from "./Screens/Addcase/AddCase";
 import AddCaseDetails from "./Screens/Addcase/AddCaseDetails";
@@ -42,17 +42,15 @@ const HomeStack = () => (
   <HomeStackNav.Navigator screenOptions={{ headerShown: true }}> {/* Default to true for this stack */}
     <HomeStackNav.Screen name="HomeScreen" component={HomeScreen} options={{ headerShown: false }} /> {/* HomeScreen has custom header */}
     <HomeStackNav.Screen name="AllCases" component={CasesList} options={{ title: "All Cases" }} />
-    <HomeStackNav.Screen name="CaseDetail" component={CaseDetail} options={{ title: "Case Details (Old)" }} />
+    {/* CaseDetail now points to the new CaseDetailsScreen (which was CaseDetailsScreenV2) */}
     <HomeStackNav.Screen
-      name="CaseDetailsV2"
-      component={CaseDetailsScreenV2}
-      // Title is set dynamically within CaseDetailsScreenV2 using navigation.setOptions
-      // but we can set a default/fallback here if needed.
-      options={{ title: "Case Details" }}
+      name="CaseDetail"
+      component={CaseDetailsScreen} // This should be the new one, as CaseDetailsScreenV2 was renamed to this.
+      options={{ title: "Case Details" }} // Title is set dynamically within the screen
     />
+    {/* CaseDetailsV2 screen entry removed */}
     <HomeStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
     <HomeStackNav.Screen name="AddCase" component={AddCase} options={{ title: "Add New Case" }} />
-    {/* AddCase route might be presented differently, or AddCaseDetails is the main entry for form */}
     <HomeStackNav.Screen name="AddCaseDetails" component={AddCaseDetails} options={{ title: "Case Form" }} />
   </HomeStackNav.Navigator>
 );

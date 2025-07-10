@@ -25,7 +25,9 @@ import FormInput from '../CommonComponents/FormInput';
 import DropdownPicker from '../CommonComponents/DropdownPicker';
 import DatePickerField from '../CommonComponents/DatePickerField';
 import ActionButton from "../CommonComponents/ActionButton";
-import { EditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle";
+// import { EditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle"; // Will use its own themed styles
+import { ThemeContext, Theme } from "../../Providers/ThemeProvider"; // Import ThemeContext and Theme
+import { getEditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle"; // For base screen style
 
 interface FieldDefinition {
   name: keyof CaseData;
@@ -112,6 +114,8 @@ const FormFieldRenderer: React.FC<{
 const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const params = route.params;
   const { update = false, initialValues, uniqueId: routeUniqueId } = params ?? {};
+  const { theme } = React.useContext(ThemeContext); // Get theme
+  const styles = getAddCaseStyles(theme); // Generate styles with theme
 
   const navigation = useNavigation();
   const generatedUniqueId = useMemo(() => uuidv4(), []);
@@ -242,12 +246,11 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
             caseNumber: formValues.CaseTitle || initialValues.caseNumber,
             court: courtNameString || initialValues.court,
             caseType: caseTypeNameString || initialValues.caseType,
-            dateFiled: formValues.FiledDate || (initialValues.dateFiled ? initialValues.dateFiled.toISOString() : undefined), // This is string
+            dateFiled: formValues.FiledDate || (initialValues.dateFiled ? initialValues.dateFiled.toISOString() : undefined),
           };
-          // Navigate to the new V2 screen
-          navigation.navigate("CaseDetailsV2", {
+          navigation.navigate("CaseDetail", { // Changed from CaseDetailsV2
             caseId: caseIdToUpdate,
-            caseTitleHeader: navDetails.caseNumber // Pass caseNumber as a fallback header title
+            caseTitleHeader: navDetails.caseNumber
           });
         } else { Alert.alert("Error", "Failed to update case."); }
       } catch (e) { console.error("Error updating case:", e); Alert.alert("Error", "An error occurred while updating.");}
@@ -292,8 +295,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const newCaseId = await addCase(insertPayload);
         if (newCaseId) {
           Alert.alert("Success", "Case added successfully.");
-          // Navigate to the new V2 screen
-          navigation.navigate("CaseDetailsV2", {
+          navigation.navigate("CaseDetail", { // Changed from CaseDetailsV2
             caseId: newCaseId,
             caseTitleHeader: insertPayload.CaseTitle || insertPayload.case_number || "New Case"
           });
@@ -343,10 +345,10 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
 
 export default AddCase;
 
-const styles = StyleSheet.create({
+const getAddCaseStyles = (theme: Theme) => StyleSheet.create({
   scrollViewStyle: {
     flex: 1,
-    backgroundColor: EditCaseScreenStyles.screen.backgroundColor,
+    backgroundColor: theme.colors.screenBackground || theme.colors.background,
   },
   scrollContentContainerStyle: {
     flexGrow: 1,
@@ -360,7 +362,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 24,
-    color: '#1F2937',
+    color: theme.colors.text,
     textAlign: 'center',
   },
   actionButtonContainer: {

@@ -1,34 +1,41 @@
 // Screens/CommonComponents/FormInputStyle.ts
 import { StyleSheet } from "react-native";
+import { Theme } from "../../Providers/ThemeProvider"; // Adjust path as needed
 
-export const FormInputStyles = StyleSheet.create({
+export const getFormInputStyles = (theme: Theme) => StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 8,
-    color: "#333", // Darker text for labels
+    color: theme.colors.labelText || theme.colors.text, // Assuming labelText or fallback to text
   },
   textInput: {
-    height: 48, // Slightly taller for better touch target
+    height: 48,
     borderWidth: 1,
-    borderColor: "#D1D5DB", // Softer gray border
-    borderRadius: 8, // Softer rounding
+    borderColor: theme.colors.border || "#D1D5DB",
+    borderRadius: 8,
     paddingHorizontal: 12,
-    backgroundColor: "#FFF",
+    backgroundColor: theme.colors.inputBackground || theme.colors.background, // Assuming inputBackground or background
     fontSize: 16,
-    color: "#111827", // Input text color
+    color: theme.colors.inputText || theme.colors.text, // Assuming inputText or text
   },
   textInputMultiline: {
-    minHeight: 100, // Min height for multiline, can grow
-    textAlignVertical: "top", // Align text to the top for multiline
-    paddingTop: 12, // Match paddingHorizontal for consistency
+    minHeight: 100,
+    textAlignVertical: "top",
+    paddingTop: 12,
   },
   inputContainer: {
-    marginBottom: 20, // Space below each input field
+    marginBottom: 20,
   },
   errorText: {
-    color: 'red',
+    color: theme.colors.errorText || 'red', // Assuming errorText color in theme
     fontSize: 12,
     marginTop: 4,
   }
 });
+
+// Add to Theme interface if new specific colors are used:
+// labelText?: string;
+// inputBackground?: string;
+// inputText?: string;
+// errorText?: string;
