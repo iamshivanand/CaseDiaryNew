@@ -25,30 +25,20 @@ interface CaseDetails {
   dateFiled: string;
   // Add more properties if needed
 }
-import { HomeStackParamList } from "../../Types/navigationtypes"; // Import HomeStackParamList
+type RootStackParamList = {
+  CaseDetail: { caseDetails: CaseDetails };
+};
 
-// CaseDetails interface remains the same for this component's props
-export interface CaseDetails { // Renamed to avoid conflict if CaseDetails is imported from elsewhere for other purposes
-  uniqueId: string;
-  id: number;
-  caseNumber: string; // This is usually the title or main display number
-  caseType?: string;  // Optional: case_type_name
-  court?: string;     // Optional: court_name
-  dateFiled?: string; // Optional: dateFiled (ISO string)
-  // Add more properties if needed by the card display itself
-}
-
-// Use HomeStackParamList for navigation prop, assuming CaseCard navigates within HomeStack
-type CaseCardNavigationProp = StackNavigationProp<
-  HomeStackParamList,
-  "CaseDetail" // Changed from CaseDetailsV2 to CaseDetail
+type CaseDetailScreenNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  "CaseDetail"
 >;
 
 const CaseCard: React.FC<{
-  caseDetails: CaseDetails; // This is the prop type
+  caseDetails: CaseDetails;
   onDelete?: () => void;
 }> = ({ caseDetails, onDelete }) => {
-  const navigation = useNavigation<CaseCardNavigationProp>();
+  const navigation = useNavigation<CaseDetailScreenNavigationProp>();
 
   const [isConfirmationVisible, setIsConfirmationVisible] = useState(false);
   const [showUpdateField, setShowUpdateField] = useState(false);
@@ -69,11 +59,8 @@ const CaseCard: React.FC<{
     onDelete();
   };
   const handleEdit = () => {
-    console.log("Edit button pressed, navigating to CaseDetail with id:", caseDetails.id);
-    navigation.navigate("CaseDetail", { // Changed from CaseDetailsV2
-      caseId: caseDetails.id,
-      caseTitleHeader: caseDetails.caseNumber
-    });
+    console.log("Edit button pressed");
+    navigation.navigate("CaseDetail", { caseDetails });
   };
   const handleUpdateDate = (values: { [key: string]: any }) => {
     console.log("Next Date value:", values.NextDate);

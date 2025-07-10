@@ -2,36 +2,51 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import { StyleSheet } from "react-native";
 
-import Appro from "../Apppro"; // Appro is now the TabNavigator with nested Stacks
+import Appro from "../Apppro";
+import AddCase from "../Screens/Addcase/AddCase";
+import AddCaseDetails from "../Screens/Addcase/AddCaseDetails";
+import CaseDetail from "../Screens/CaseDetailsScreen/CaseDetailsScreen";
+import CasesList from "../Screens/CasesList/CasesList";
 import withResponsiveDimensions from "../Screens/CommonComponents/WithScreenDimenions";
+import SettingsScreen from "../Screens/Settings/SettingsScreen";
+import ManageLookupCategoryScreen from "../Screens/Settings/ManageLookupCategoryScreen";
 import { RootStackParamList } from "../Types/navigationtypes";
-// Screens like AddCaseDetails, CaseDetail, CasesList, SettingsScreen, ManageLookupCategoryScreen
-// are now part of stacks defined in Appro.tsx (via HomeStack, ProfileStack, etc.)
-// So they should not be defined here at the root level if they are intended to be within tabs.
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const MainAppWithScreenDimensions = withResponsiveDimensions(Appro);
-
+const MainAppWithScreenDimensions = withResponsiveDimensions(Appro); // Assuming Appro is a component
 const Routes = () => {
   return (
-    // This Root Stack Navigator now primarily manages the MainApp (Tab Navigator)
-    // and any screens that should appear OVER the tabs (e.g., global modals).
-    // For now, we only have MainApp.
     <Stack.Navigator initialRouteName="MainApp">
       <Stack.Screen
         name="MainApp"
         component={MainAppWithScreenDimensions}
-        options={{ headerShown: false }} // The TabNavigator (Appro) and its internal stacks manage their own headers.
+        options={{ headerShown: false }}
       />
-      {/*
-        If you had global modal screens that should appear on top of everything,
-        you would define them here, outside of 'MainApp'. For example:
-        <Stack.Screen
-          name="GlobalModalScreen"
-          component={GlobalModalScreenComponent}
-          options={{ presentation: 'modal', headerShown: false }}
-        />
-      */}
+      <Stack.Screen
+        name="AddCaseDetails"
+        component={AddCaseDetails}
+        options={{ title: "Add/Edit Case Details" }}
+      />
+      <Stack.Screen
+        name="AllCases"
+        component={CasesList}
+        options={{ title: "All Cases" }}
+      />
+      <Stack.Screen
+        name="CaseDetail"
+        component={CaseDetail}
+        options={{ title: "Case Details" }}
+      />
+      <Stack.Screen
+        name="SettingsScreen"
+        component={SettingsScreen}
+        options={{ title: "Settings" }}
+      />
+      <Stack.Screen
+        name="ManageLookupCategoryScreen"
+        component={ManageLookupCategoryScreen}
+        options={({ route }) => ({ title: route.params.title || "Manage Category" })}
+      />
     </Stack.Navigator>
   );
 };
