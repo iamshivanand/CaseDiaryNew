@@ -1,20 +1,19 @@
 // Screens/CaseDetailsScreen/CaseDetailsScreen.tsx
-import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, FlatList, Alert, Platform } from 'react-native'; // Removed StyleSheet as RNStyleSheet
+import React, { useState, useEffect, useLayoutEffect, useCallback, useContext } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, FlatList, Alert, Platform, StyleSheet as ReactNativeStyleSheet } from 'react-native'; // Use ReactNativeStyleSheet alias for local styles if needed
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as FileSystem from 'expo-file-system';
-import * as IntentLauncher from 'expo-intent-launcher'; // For Android
-import * as Sharing from 'expo-sharing'; // For iOS or cross-platform sharing
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as Sharing from 'expo-sharing';
 
 import { HomeStackParamList } from '../../Types/navigationtypes';
 import { CaseData, Document, TimelineEvent } from '../../Types/appTypes';
 import * as db from '../../DataBase';
 import { CaseWithDetails } from '../../DataBase';
-import { ThemeContext, Theme } from '../../Providers/ThemeProvider'; // Import ThemeContext and Theme type
+import { ThemeContext, Theme } from '../../Providers/ThemeProvider';
 
-import { getCaseDetailsScreenStyles } from './CaseDetailsScreenStyle'; // Import the function
-// Import sub-components - these will be created in ./components/ with new names
+import { getCaseDetailsScreenStyles } from './CaseDetailsScreenStyle';
 import StatusBadge from './components/StatusBadge';
 import DateRow from './components/DateRow';
 import DocumentCard from './components/DocumentCard';
@@ -24,22 +23,21 @@ import ActionButton from '../CommonComponents/ActionButton';
 
 type CaseDetailsScreenRouteProp = RouteProp<HomeStackParamList, 'CaseDetail'>;
 
-// Define PRIMARY_BLUE_COLOR_FOR_LOADER or import from theme if available
-const PRIMARY_BLUE_COLOR_FOR_LOADER = '#3B82F6';
+const PRIMARY_BLUE_COLOR_FOR_LOADER = '#3B82F6'; // Fallback if theme not providing it
 
 const CaseDetailsScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<CaseDetailsScreenRouteProp>();
-  const { theme } = useContext(ThemeContext); // Get theme from context
-  const styles = getCaseDetailsScreenStyles(theme); // Generate styles with theme
+  const { theme } = useContext(ThemeContext);
+  const styles = getCaseDetailsScreenStyles(theme); // Generate themed styles
 
   const caseId = route.params?.caseId;
 
   const [caseDetailsData, setCaseDetailsData] = useState<CaseWithDetails | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Overall loading for the screen
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false); // Specific for document list
 
   useLayoutEffect(() => {
     if (caseDetailsData?.CaseTitle) {
@@ -53,7 +51,7 @@ const CaseDetailsScreen: React.FC = () => {
 
   const loadDocumentsAndTimeline = useCallback(async (currentCaseId: number) => {
     if (!currentCaseId) return;
-    setIsLoadingDocuments(true);
+    setIsLoadingDocuments(true); // This can be true while main details are also loading or after
     try {
       const fetchedDocs = await db.getCaseDocuments(currentCaseId);
       const uiDocs: Document[] = fetchedDocs.map(dbDoc => ({
@@ -63,13 +61,14 @@ const CaseDetailsScreen: React.FC = () => {
       }));
       setDocuments(uiDocs);
 
-      setTimelineEvents([ // Dummy Timeline Data
-        { id: 'tl1', date: '2023-10-20T00:00:00.000Z', description: 'Initial consultation with client. Case details discussed extensively.' },
-        { id: 'tl2', date: '2023-10-25T00:00:00.000Z', description: 'Case filed with the District Court of Cityville. All necessary paperwork submitted.' },
-        { id: 'tl3', date: '2023-11-05T00:00:00.000Z', description: 'First hearing scheduled. Client and legal team prepared initial arguments.' },
+      // Dummy Timeline Data (Replace with actual fetch: await db.getTimelineEventsByCaseId(currentCaseId))
+      setTimelineEvents([
+        { id: 'tl1', date: '2023-10-20T00:00:00.000Z', description: 'Initial consultation with client. Case details discussed extensively.', _status: 'synced' },
+        { id: 'tl2', date: '2023-10-25T00:00:00.000Z', description: 'Case filed with the District Court of Cityville. All necessary paperwork submitted.', _status: 'synced' },
+        { id: 'tl3', date: '2023-11-05T00:00:00.000Z', description: 'First hearing scheduled. Client and legal team prepared initial arguments.', _status: 'synced' },
       ]);
     } catch (error) {
-      console.error("Error loading associated data for case:", error);
+      console.error("Error loading associated data (documents/timeline) for case:", error);
       Alert.alert("Error", "Could not load associated case data.");
     } finally {
       setIsLoadingDocuments(false);
@@ -78,7 +77,7 @@ const CaseDetailsScreen: React.FC = () => {
 
   useEffect(() => {
     const caseIdToLoad = route.params?.caseId;
-    const fetchData = async () => {
+    const fetchAllData = async () => {
       if (!caseIdToLoad || typeof caseIdToLoad !== 'number') {
         Alert.alert("Error", "No valid Case ID provided.");
         setIsLoading(false);
@@ -103,7 +102,7 @@ const CaseDetailsScreen: React.FC = () => {
         setIsLoading(false);
       }
     };
-    fetchData();
+    fetchAllData();
   }, [route.params?.caseId, navigation, loadDocumentsAndTimeline]);
 
   const handleEditCase = () => {
@@ -131,55 +130,40 @@ const CaseDetailsScreen: React.FC = () => {
 
   const handleDocumentInteraction = async (doc: Document) => {
     if (!doc.stored_filename) {
-      Alert.alert("Not Available", "This document is not stored locally or its path is missing.");
-      return;
+      Alert.alert("Not Available", "Document path not found."); return;
     }
-
     const localDocumentPath = db.getFullDocumentPath(doc.stored_filename);
     if (!localDocumentPath) {
-      Alert.alert("Error", "Could not construct document path.");
-      return;
+      Alert.alert("Error", "Could not construct document path."); return;
     }
-
     try {
       const fileInfo = await FileSystem.getInfoAsync(localDocumentPath);
       if (!fileInfo.exists) {
-        Alert.alert("Error", "File not found. It might have been deleted or is not accessible.");
-        return;
+        Alert.alert("Error", "File not found."); return;
       }
-
       if (Platform.OS === 'android') {
         const contentUri = await FileSystem.getContentUriAsync(localDocumentPath);
         await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-          data: contentUri,
-          flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-          type: doc.fileType || '*/*', // Use stored MIME type
+          data: contentUri, flags: 1, type: doc.fileType || '*/*',
         });
       } else if (Platform.OS === 'ios') {
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(localDocumentPath, {
-            mimeType: doc.fileType || undefined, // Use stored MIME type
-            dialogTitle: `Open or Share ${doc.fileName}`,
-            UTI: doc.fileType || undefined, // Provide UTI if known, helps iOS pick apps
+            mimeType: doc.fileType || undefined, dialogTitle: `Open ${doc.fileName}`, UTI: doc.fileType || undefined,
           });
-        } else {
-          Alert.alert("Unavailable", "Sharing is not available on this device.");
-        }
-      } else {
-        // For other platforms or as a generic fallback
-        Alert.alert("Open Document", `File saved at: ${localDocumentPath}. Please open manually.`);
-      }
+        } else { Alert.alert("Unavailable", "Sharing is not available."); }
+      } else { Alert.alert("Open Document", `File at: ${localDocumentPath}. Open manually.`); }
     } catch (error: any) {
       console.error("Error opening document:", error);
-      Alert.alert("Error Opening File", error.message || "Could not open document. Please ensure you have a compatible app installed.");
+      Alert.alert("Error Opening File", error.message || "Could not open document.");
     }
   };
 
   if (isLoading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={PRIMARY_BLUE_COLOR_FOR_LOADER} />
-        <Text>Loading Case Details...</Text>
+        <ActivityIndicator size="large" color={theme.colors.primary || PRIMARY_BLUE_COLOR_FOR_LOADER} />
+        <Text style={styles.centeredText}>Loading Case Details...</Text>
       </View>
     );
   }
@@ -187,7 +171,7 @@ const CaseDetailsScreen: React.FC = () => {
   if (!caseDetailsData) {
     return (
       <View style={styles.centered}>
-        <Text>No case data found or error loading.</Text>
+        <Text style={styles.centeredText}>No case data found or error loading.</Text>
       </View>
     );
   }
@@ -214,7 +198,7 @@ const CaseDetailsScreen: React.FC = () => {
 
         <View style={styles.documentsSection}>
             <SectionHeader title="Documents" />
-            {isLoadingDocuments ? <ActivityIndicator /> : documents.length > 0 ? (
+            {isLoadingDocuments ? <ActivityIndicator color={theme.colors.primary || PRIMARY_BLUE_COLOR_FOR_LOADER} /> : documents.length > 0 ? (
                 <FlatList
                     data={documents}
                     renderItem={({item}) => (
@@ -237,7 +221,7 @@ const CaseDetailsScreen: React.FC = () => {
                 <FlatList
                     data={timelineEvents}
                     renderItem={({item, index}) => <TimelineEventItem event={item} isLast={index === timelineEvents.length -1} />}
-                    keyExtractor={(item) => item.id.toString()}
+                    keyExtractor={(item) => item._clientSideId || item.id.toString()} // Use clientSideId for new items
                 />
             ) : (
                 <Text style={styles.noItemsText}>No timeline events available.</Text>
