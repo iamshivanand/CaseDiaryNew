@@ -39,8 +39,8 @@ const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
 // Define Stack Navigators for each tab
 
 const HomeStack = () => (
-  <HomeStackNav.Navigator screenOptions={{ headerShown: true }}> {/* Default to true for this stack */}
-    <HomeStackNav.Screen name="HomeScreen" component={HomeScreen} options={{ headerShown: false }} /> {/* HomeScreen has custom header */}
+  <HomeStackNav.Navigator screenOptions={{ headerShown: true }}>{/* Default to true for this stack */}
+    <HomeStackNav.Screen name="HomeScreen" component={HomeScreen} options={{ headerShown: false }} />{/* HomeScreen has custom header */}
     <HomeStackNav.Screen name="AllCases" component={CasesList} options={{ title: "All Cases" }} />
     {/* CaseDetail now points to the new CaseDetailsScreen (which was CaseDetailsScreenV2) */}
     <HomeStackNav.Screen
