@@ -83,6 +83,7 @@ export interface Document {
   fileSize?: number | null; // from CaseDocument file_size
   uri?: string; // Local URI for new/cached files
   stored_filename?: string; // from CaseDocument stored_filename
+  template_type?: string | null; // from CaseDocument template_type
 }
 
 export interface TimelineEvent {

@@ -1,8 +1,9 @@
 // Screens/CaseDetailsScreenV2/CaseDetailsScreenV2.tsx
 import React, { useState, useEffect, useLayoutEffect } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, StyleSheet, Alert, FlatList } from 'react-native'; // Added FlatList
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons'; // Example, choose your icon set
+import * as Sharing from 'expo-sharing'; // Import expo-sharing
 
 import { HomeStackParamList } from '../../Types/navigationtypes'; // Assuming it's in HomeStack
 import { CaseData, Document, TimelineEvent } from '../../Types/appTypes'; // Main data types
@@ -64,9 +65,14 @@ const CaseDetailsScreenV2: React.FC = () => {
           // Fetch documents separately
           const fetchedDocs = await db.getCaseDocuments(caseId);
           const uiDocs: Document[] = fetchedDocs.map(dbDoc => ({
-            id: dbDoc.id, case_id: dbDoc.case_id, fileName: dbDoc.original_display_name,
-            uploadDate: dbDoc.created_at, fileType: dbDoc.file_type, fileSize: dbDoc.file_size,
+            id: dbDoc.id,
+            case_id: dbDoc.case_id,
+            fileName: dbDoc.original_display_name,
+            uploadDate: dbDoc.created_at,
+            fileType: dbDoc.file_type,
+            fileSize: dbDoc.file_size,
             stored_filename: dbDoc.stored_filename,
+            template_type: dbDoc.template_type, // Added template_type
           }));
           setDocuments(uiDocs);
 
@@ -137,10 +143,31 @@ const CaseDetailsScreenV2: React.FC = () => {
     );
   }
 
-  // Placeholder for document download/view action
-  const handleDocumentInteraction = (doc: Document) => {
-    Alert.alert("Document Action", `Interacting with: ${doc.fileName}`);
-    // Here you would implement actual view/download logic using doc.stored_filename or doc.uri
+  const handleDocumentInteraction = async (doc: Document) => {
+    if (!doc.stored_filename) {
+      Alert.alert("Error", "Document path is not available.");
+      return;
+    }
+    const filePath = db.getFullDocumentPath(doc.stored_filename);
+    if (!filePath) {
+        Alert.alert("Error", "Could not construct document path.");
+        return;
+    }
+
+    try {
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert("Sharing not available", "Sharing is not available on this device.");
+        return;
+      }
+      await Sharing.shareAsync(filePath, {
+        mimeType: doc.fileType || 'application/octet-stream', // Provide a default MIME type
+        dialogTitle: `Share ${doc.fileName}`, // Optional
+        UTI: doc.fileType === 'application/pdf' ? 'com.adobe.pdf' : undefined, // Optional: for iOS
+      });
+    } catch (error) {
+      console.error("Error sharing document:", error);
+      Alert.alert("Error", `Could not share document: ${doc.fileName}`);
+    }
   };
 
   return (
@@ -183,7 +210,7 @@ const CaseDetailsScreenV2: React.FC = () => {
                     keyExtractor={(item) => item.id.toString()}
                 />
             ) : (
-                <Text style={styles.noItemsText}>{isLoadingDocuments ? "Loading documents..." : "No documents available."}</Text>
+                <Text style={styles.noItemsText}>No documents available.</Text>
             )}
         </View>
 

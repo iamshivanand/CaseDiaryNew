@@ -49,6 +49,7 @@ export interface CaseDocument {
   file_size?: number | null; // In bytes
   created_at: string; // ISO8601, when document was added
   user_id?: number | null; // Who uploaded this document, if relevant
+  template_type?: string | null; // E.g., "agreement_draft", "legal_notice"
 }
 
 export interface Case {
@@ -172,6 +173,7 @@ CREATE TABLE IF NOT EXISTS CaseDocuments (
   original_display_name TEXT NOT NULL,
   file_type TEXT,
   file_size INTEGER,
+  template_type TEXT, -- Added template_type column
   created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
   user_id INTEGER, -- Optional: if document privacy is per user, not just per case
   FOREIGN KEY (case_id) REFERENCES Cases(id) ON DELETE CASCADE,

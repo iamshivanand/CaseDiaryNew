@@ -48,6 +48,12 @@ export const DocumentCardV2Styles = StyleSheet.create({
   documentDate: {
     fontSize: 13, // Slightly larger date
     color: SOFT_GRAY_TEXT,
+    marginBottom: 2, // Add some space if template type is below
+  },
+  documentMeta: { // Style for template_type or other metadata
+    fontSize: 12,
+    color: SOFT_GRAY_TEXT, // Same as date for consistency
+    fontStyle: 'italic', // Differentiate it a bit
   },
   downloadIconContainer: { // For the IconOnlyButton wrapper of download icon
     // IconOnlyButton already has padding. Add margin if needed.

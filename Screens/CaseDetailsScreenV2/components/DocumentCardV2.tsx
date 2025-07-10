@@ -70,6 +70,11 @@ const DocumentCardV2: React.FC<DocumentCardV2Props> = ({ document, onPress, onDo
           <Text style={styles.documentDate}>
             Uploaded: {formattedUploadDate()}
           </Text>
+          {document.template_type && (
+            <Text style={styles.documentMeta}>
+              Template: {document.template_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </Text>
+          )}
         </View>
         <IconOnlyButton
             icon={<Icon name="file-download" size={24} color={styles.documentIcon.color} />} // Use consistent color

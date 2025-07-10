@@ -14,6 +14,7 @@ import CaseDetailsScreenV2 from "./Screens/CaseDetailsScreenV2/CaseDetailsScreen
 import EditCaseScreen from "./Screens/EditCase/EditCaseScreen";
 import AddCase from "./Screens/Addcase/AddCase";
 import AddCaseDetails from "./Screens/Addcase/AddCaseDetails";
+import PDFGeneratorScreen from "./Screens/PDFGeneratorScreen/PDFGeneratorScreen"; // Import the new screen
 
 import SearchScreen from "./Screens/SearchScreen/SearchScreen";
 import CalendarScreen from "./Screens/Calendar/Calendar";
@@ -54,6 +55,7 @@ const HomeStack = () => (
     <HomeStackNav.Screen name="AddCase" component={AddCase} options={{ title: "Add New Case" }} />
     {/* AddCase route might be presented differently, or AddCaseDetails is the main entry for form */}
     <HomeStackNav.Screen name="AddCaseDetails" component={AddCaseDetails} options={{ title: "Case Form" }} />
+    <HomeStackNav.Screen name="PDFGeneratorScreen" component={PDFGeneratorScreen} options={{ title: "Generate Document" }} />
   </HomeStackNav.Navigator>
 );
 

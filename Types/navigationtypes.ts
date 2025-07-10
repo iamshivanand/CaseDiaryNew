@@ -16,6 +16,7 @@ export type HomeStackParamList = {
   };
   AddCase: { uniqueId?: string };
   AddCaseDetails: { update?: boolean; initialValues?: CaseDetails; uniqueId?: string };
+  PDFGeneratorScreen: undefined; // Added PDFGeneratorScreen here
 };
 
 // Stack for the "Search" Tab

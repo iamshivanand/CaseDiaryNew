@@ -90,12 +90,20 @@ export const getCourts = async (userId?: number | null): Promise<Court[]> => {
 
 // --- Document Management ---
 interface UploadOptions {
-  originalFileName: string; fileType: string; fileUri: string; caseId: number; userId?: number | null; fileSize?: number | null;
+  originalFileName: string;
+  fileType: string; // Mime type or simple extension like 'pdf'
+  fileUri: string; // Path to the source file (e.g., generated PDF path)
+  caseId: number;
+  userId?: number | null;
+  fileSize?: number | null;
+  templateType?: string | null; // Added for the PDF template type
 }
 export const uploadCaseDocument = async (options: UploadOptions): Promise<number | null> => {
-  const db = await getDb(); const { originalFileName, fileType, fileUri, caseId, userId, fileSize } = options;
+  const db = await getDb();
+  const { originalFileName, fileType, fileUri, caseId, userId, fileSize, templateType } = options;
   const timestamp = Date.now(); const nameParts = originalFileName.split('.');
-  const extension = nameParts.length > 1 ? nameParts.pop() : 'dat'; const baseName = nameParts.join('.');
+  const extension = nameParts.length > 1 ? nameParts.pop() || 'tmp' : 'tmp'; // Ensure extension is not undefined
+  const baseName = nameParts.join('.');
   const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, '_');
   const uniqueStoredFileName = `${caseId}_${timestamp}_${sanitizedBaseName}.${extension}`;
   const mimeTypeForDb = fileType;
@@ -105,13 +113,15 @@ export const uploadCaseDocument = async (options: UploadOptions): Promise<number
     const destinationUri = DOCUMENTS_DIRECTORY + uniqueStoredFileName;
     await FileSystem.copyAsync({ from: fileUri, to: destinationUri });
     const result = await db.runAsync(
-      "INSERT INTO CaseDocuments (case_id, stored_filename, original_display_name, file_type, file_size, user_id) VALUES (?, ?, ?, ?, ?, ?)",
-      [caseId, uniqueStoredFileName, originalFileName, mimeTypeForDb, fileSize ?? null, userId ?? null]
+      "INSERT INTO CaseDocuments (case_id, stored_filename, original_display_name, file_type, file_size, user_id, template_type) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [caseId, uniqueStoredFileName, originalFileName, mimeTypeForDb, fileSize ?? null, userId ?? null, templateType ?? null]
     ); return result.lastInsertRowId;
   } catch (error) { console.error("Error uploading file:", error); return null; }
 };
 export const getCaseDocuments = async (caseId: number): Promise<CaseDocument[]> => {
-  const db = await getDb(); return db.getAllAsync<CaseDocument>("SELECT * FROM CaseDocuments WHERE case_id = ? ORDER BY created_at DESC", [caseId]);
+  const db = await getDb();
+  // Ensure the query selects all necessary fields, including the new template_type
+  return db.getAllAsync<CaseDocument>("SELECT * FROM CaseDocuments WHERE case_id = ? ORDER BY created_at DESC", [caseId]);
 };
 export const deleteCaseDocument = async (documentId: number): Promise<boolean> => {
   const db = await getDb(); const doc = await db.getFirstAsync<CaseDocument>("SELECT stored_filename FROM CaseDocuments WHERE id = ?", [documentId]);

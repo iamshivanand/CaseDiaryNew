@@ -11,9 +11,10 @@ import {
 
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import NumberCard from "../CommonComponents/NumberCard";
+import { RootStackParamList } from "../../Types/navigationtypes"; // Ensure this is the correct path
 
 type Props = {
-  navigation: StackNavigationProp<any, "Home">;
+  navigation: StackNavigationProp<RootStackParamList, "Home">; // Use RootStackParamList
 };
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
@@ -31,8 +32,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.carouselContainer}>
           <Text>Banner carousel </Text>
         </View>
-        <View style={styles.buttonContainer}>
+        <View style={styles.buttonRow}>
           <TouchableOpacity
+            style={styles.buttonWrapper}
             onPress={() =>
               navigation.navigate("AddCaseDetails", { update: false })
             }
@@ -41,14 +43,30 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.buttonText}>Add Case</Text>
             </View>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate("AllCases")}>
+          <TouchableOpacity
+            style={styles.buttonWrapper}
+            onPress={() => navigation.navigate("AllCases")}
+          >
             <View style={styles.primarybuttons}>
-              <Text style={styles.buttonText}>View All</Text>
+              <Text style={styles.buttonText}>View All Cases</Text>
             </View>
           </TouchableOpacity>
         </View>
+        <View style={styles.buttonRow}>
+          {/* Add Generate PDF Button */}
+          <TouchableOpacity
+            style={styles.buttonWrapper}
+            onPress={() => navigation.navigate("PDFGeneratorScreen")}
+          >
+            <View style={[styles.primarybuttons, styles.generatePdfButton]}>
+              <Text style={styles.buttonText}>Generate PDF</Text>
+            </View>
+          </TouchableOpacity>
+           {/* You can add another button here if needed, or leave it to keep Generate PDF full-width in its row if buttonWrapper is flex:1 */}
+          <View style={styles.buttonWrapper} />
+        </View>
         {/* built a corosol for add and some other banner information */}
-        <Text>Cases List</Text>
+        <Text style={{color: theme.colors.text, fontSize: 16, fontWeight: 'bold', marginVertical: 10}}>Cases Overview</Text>
         <View
           style={{
             padding: 10,
@@ -126,33 +144,42 @@ const styles = StyleSheet.create({
   carouselContainer: {
     height: 200,
     width: "100%",
-    backgroundColor: "pink",
+    backgroundColor: "pink", // Replace with theme color if needed
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  buttonContainer: {
-    height: 80,
+  buttonRow: { // Changed from buttonContainer to buttonRow for clarity
     flexDirection: "row",
+    justifyContent: "space-between", // Distribute space between buttons
     alignItems: "center",
-    justifyContent: "space-evenly",
-    marginVertical: 10,
-    borderRadius: 10,
-    backgroundColor: "#f7f4f4",
+    marginVertical: 5, // Reduced margin for tighter layout
+    // backgroundColor: "#f7f4f4", // Consider removing or using theme.colors.surface
+    // borderRadius: 10, // Optional, if you want rounded rows
+  },
+  buttonWrapper: {
+    flex: 1, // Each button wrapper takes equal space
+    marginHorizontal: 5, // Add some space between buttons
   },
   primarybuttons: {
-    height: 40,
-    width: (windowWidth - 60) / 2,
+    height: 50, // Increased height for better touchability
+    // width: (windowWidth - 60) / 2, // Width will be managed by flex on buttonWrapper
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#37d6c1",
-    borderRadius: 5,
-    color: "white",
-    elevation: 5,
-    shadowColor: "#7a7474",
-    shadowOffset: { width: 5, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 5,
+    backgroundColor: "#37d6c1", // Replace with theme.colors.primary or accent
+    borderRadius: 8, // Slightly more rounded
+    paddingHorizontal: 10, // Add some padding
+    elevation: 3, // Reduced elevation for a flatter look if desired
+    shadowColor: "#555", // Darker shadow
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  generatePdfButton: {
+    backgroundColor: "#007bff", // Blue accent as requested (or use theme.colors.accent)
   },
   buttonText: {
-    fontSize: 20,
+    fontSize: 16, // Adjusted for potentially longer text and better fit
     fontWeight: "bold",
     color: "white",
   },
