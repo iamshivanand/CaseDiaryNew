@@ -13,6 +13,7 @@ import CaseDetail from "./Screens/CaseDetailsScreen/CaseDetailsScreen";
 import EditCaseScreen from "./Screens/EditCase/EditCaseScreen"; // Import your new screen
 import AddCase from "./Screens/Addcase/AddCase"; // Assuming this is the main AddCase screen
 import AddCaseDetails from "./Screens/Addcase/AddCaseDetails"; // If used within a stack
+import DocumentCaptureScreen from "./Screens/DocumentCapture/DocumentCaptureScreen"; // Import the new screen
 
 import SearchScreen from "./Screens/SearchScreen/SearchScreen";
 import CalendarScreen from "./Screens/Calendar/Calendar";
@@ -45,6 +46,7 @@ const HomeStack = () => (
     <HomeStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ headerShown: true, title: "Edit Case" }} />
     <HomeStackNav.Screen name="AddCase" component={AddCase} options={{ headerShown: true, title: "Add New Case" }} />
     <HomeStackNav.Screen name="AddCaseDetails" component={AddCaseDetails} options={{ headerShown: true, title: "Add Case Details" }} />
+    <HomeStackNav.Screen name="DocumentCaptureScreen" component={DocumentCaptureScreen} options={{ headerShown: true, title: "Import Document" }} />
     {/* Documents and Fees screens can be added here as needed */}
   </HomeStackNav.Navigator>
 );

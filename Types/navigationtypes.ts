@@ -18,7 +18,23 @@ export type HomeStackParamList = {
   // AddCaseDetails, Documents, Fees would be part of the AddCase stack if it's multi-step
   // For simplicity, AddCaseDetails might be a screen within this HomeStack too,
   // or AddCase itself is a stack. Let's keep AddCaseDetails here for now.
-  AddCaseDetails: { update?: boolean; initialValues?: CaseDetails; uniqueId?: string };
+  AddCaseDetails: {
+    update?: boolean;
+    initialValues?: CaseDetails;
+    uniqueId?: string;
+    recognizedText?: string; // For returning OCR text
+    fieldName?: keyof CaseData; // For returning OCR text field target
+  };
+  AddCase: { // Also needs to accept these params if DocumentCaptureScreen returns to it
+    uniqueId?: string;
+    recognizedText?: string;
+    fieldName?: keyof CaseData;
+  };
+  DocumentCaptureScreen: {
+    fieldName: keyof CaseData;
+    currentText: string;
+    returnScreen: keyof HomeStackParamList; // e.g., 'AddCase' or 'AddCaseDetails'
+  };
   // Documents: { update?: boolean; uniqueId: string }; // Documents route removed from this stack
   // Fees: { update?: boolean; uniqueId: string }; // Fees route removed
 };

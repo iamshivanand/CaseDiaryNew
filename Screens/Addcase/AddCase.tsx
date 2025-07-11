@@ -1,15 +1,17 @@
 import { Formik, FormikProps } from "formik";
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useRef } from "react"; // Added useEffect, useRef
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
-  Alert, // Added for user feedback
+  Alert,
+  TouchableOpacity, // Added TouchableOpacity
 } from "react-native";
 import * as Yup from "yup";
-import { RouteProp, useNavigation } from "@react-navigation/native";
+import { RouteProp, useNavigation, useIsFocused } from "@react-navigation/native"; // Added useIsFocused
 import { v4 as uuidv4 } from "uuid";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons"; // Added MaterialIcons
 
 import {
   addCase,
@@ -22,6 +24,7 @@ import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen";
 import { CaseData, DropdownOption as AppDropdownOption, caseStatusOptions, priorityOptions } from "../../Types/appTypes";
 
 import FormInput from '../CommonComponents/FormInput';
+import FormInputWithScan from '../CommonComponents/FormInputWithScan'; // Import the new component
 import DropdownPicker from '../CommonComponents/DropdownPicker';
 import DatePickerField from '../CommonComponents/DatePickerField';
 import ActionButton from "../CommonComponents/ActionButton";
@@ -89,16 +92,30 @@ const FormFieldRenderer: React.FC<{
 }> = ({ fieldConfig, formik }) => {
   const { values, errors, touched, setFieldValue } = formik;
   const fieldName = fieldConfig.name;
+  // Navigation logic is now within FormInputWithScan
+
   const commonInputProps = {
     label: fieldConfig.label,
     error: (touched[fieldName] && errors[fieldName]) ? errors[fieldName] : undefined,
+    placeholder: fieldConfig.placeholder,
   };
 
   switch (fieldConfig.type) {
     case "text":
-      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} />;
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} onChangeText={(text) => setFieldValue(fieldName, text)} />;
     case "multiline":
-      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} style={{ minHeight: 80 }} />;
+      return (
+        <FormInputWithScan
+          {...commonInputProps}
+          value={values[fieldName] as string || ''}
+          onChangeText={(text) => setFieldValue(fieldName, text)}
+          multiline
+          numberOfLines={4}
+          inputStyle={{ minHeight: 80 }} // Apply minHeight to the TextInput inside FormInput
+          fieldName={fieldName}
+          // returnScreen can be passed if needed, defaults to 'AddCase' in component
+        />
+      );
     case "select":
       return <DropdownPicker {...commonInputProps} selectedValue={values[fieldName] as string | number | undefined} onValueChange={(itemValue) => setFieldValue(fieldName, itemValue)} options={fieldConfig.options || []} placeholder={fieldConfig.placeholder || `Select ${fieldConfig.label}...`} />;
     case "date":
@@ -111,11 +128,23 @@ const FormFieldRenderer: React.FC<{
 
 const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const params = route.params;
-  const { update = false, initialValues, uniqueId: routeUniqueId } = params ?? {};
+  // Listen for recognizedText and fieldName from DocumentCaptureScreen
+  const { update = false, initialValues, uniqueId: routeUniqueId, recognizedText, fieldName: returnedFieldName } = params ?? {};
 
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
+  const formikRef = useRef<FormikProps<Partial<CaseData>>>(null);
+
   const generatedUniqueId = useMemo(() => uuidv4(), []);
   const uniqueIdToUse = routeUniqueId || initialValues?.uniqueId || generatedUniqueId;
+
+  useEffect(() => {
+    if (isFocused && returnedFieldName && recognizedText !== undefined && formikRef.current) {
+      formikRef.current.setFieldValue(returnedFieldName as keyof CaseData, recognizedText);
+      // @ts-ignore
+      navigation.setParams({ recognizedText: undefined, fieldName: undefined }); // Clear params
+    }
+  }, [isFocused, recognizedText, returnedFieldName, navigation]);
 
   const prepareFormInitialValues = (): Partial<CaseData> => {
     const defaults: Partial<CaseData> = { uniqueId: uniqueIdToUse }; // Ensure uniqueId is part of defaults
@@ -311,6 +340,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       <View style={styles.formScreenContainer}>
         <Text style={styles.screenTitle}>{update ? "Update Case Details" : "Add New Case"}</Text>
         <Formik
+          innerRef={formikRef} // Pass the ref here
           initialValues={prepareFormInitialValues()}
           validationSchema={validationSchema}
           onSubmit={handleSubmitForm}
@@ -368,4 +398,5 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     marginTop: 30,
   },
+  // Styles for fieldContainer, scanButton, scanButtonText removed as they are in FormInputWithScan.tsx
 });
