@@ -7,6 +7,9 @@ import { CaseType, Court, District, PoliceStation, CaseDocument, Case as CaseRow
 // getDb is now imported from connection.ts
 import { getDb, __TEST_ONLY_resetDbInstance_connection as __TEST_ONLY_resetDbInstance } from './connection';
 
+// Re-export getDb so it's available when importing from './DataBase'
+export { getDb };
+
 const DOCUMENTS_DIRECTORY = FileSystem.documentDirectory + "documents/";
 
 // --- Seeding Initial Data constants are moved to schema.ts with seedInitialData function ---
