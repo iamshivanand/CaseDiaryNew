@@ -14,7 +14,7 @@ import { getCases, addTimelineEvent, updateCase } from "../../DataBase";
 import { Case } from "../../DataBase/schema";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { CaseDataScreen } from "../../Types/appTypes"; // Import the new data type
-import { formatDate } from "../../utils/commonFunctions";
+import { formatDate, getCurrentUserId } from "../../utils/commonFunctions";
 import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 
@@ -105,7 +105,7 @@ const CasesList = (/*{ navigation, routes }*/) => {
     setPopupVisible(true);
   };
 
-  const handleSaveHearing = async (notes: string, nextHearingDate: Date) => {
+  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number) => {
     if (!selectedCase) return;
 
     try {
@@ -114,13 +114,13 @@ const CasesList = (/*{ navigation, routes }*/) => {
         case_id: parseInt(selectedCase.id, 10),
         event_date: new Date().toISOString(),
         description: notes,
-        user_id: 1, // Replace with actual user ID
+        user_id: userId,
       });
 
       // 2. Update case's next hearing date
       await updateCase(parseInt(selectedCase.id, 10), {
         NextDate: nextHearingDate.toISOString(),
-      });
+      }, userId);
 
       // 3. Refresh the list
       fetchData();
@@ -208,7 +208,9 @@ const CasesList = (/*{ navigation, routes }*/) => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
-          onSave={handleSaveHearing}
+          onSave={(notes, nextHearingDate) =>
+            handleSaveHearing(notes, nextHearingDate, getCurrentUserId())
+          }
         />
       )}
     </SafeAreaView>
