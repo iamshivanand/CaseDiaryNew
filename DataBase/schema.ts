@@ -381,3 +381,37 @@ export const tableExists = async (db: SQLite.SQLiteDatabase, tableName: string):
   );
   return (result?.count ?? 0) > 0;
 };
+
+export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> => {
+  try {
+    await db.withTransactionAsync(async () => {
+      // Seed Districts
+      const districtCountResult = await db.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM Districts WHERE user_id IS NULL;"
+      );
+      if ((districtCountResult?.count ?? 0) === 0) {
+        console.log("Seeding initial districts...");
+        for (const district of PREDEFINED_DISTRICTS) {
+          await db.runAsync("INSERT INTO Districts (name, state) VALUES (?, ?);", [district.name, district.state]);
+        }
+      }
+
+      // Seed Case Types
+      const caseTypeCountResult = await db.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM CaseTypes WHERE user_id IS NULL;"
+      );
+      if ((caseTypeCountResult?.count ?? 0) === 0) {
+        console.log("Seeding initial case types...");
+        for (const caseType of PREDEFINED_CASE_TYPES) {
+          await db.runAsync("INSERT INTO CaseTypes (name) VALUES (?);", [caseType.name]);
+        }
+      }
+    });
+    console.log("Initial data seeding check complete.");
+  } catch (error) {
+    console.error("Error during initial data seeding:", error);
+    // Depending on the desired behavior, you might want to re-throw the error
+    // to halt the application's startup if seeding is critical.
+    throw error;
+  }
+};
