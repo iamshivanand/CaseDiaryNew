@@ -295,12 +295,26 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const newCaseId = await addCase(insertPayload);
         if (newCaseId) {
           Alert.alert("Success", "Case added successfully.");
-          navigation.navigate("CaseDetail", { // Changed from CaseDetailsV2
-            caseId: newCaseId,
-            caseTitleHeader: insertPayload.CaseTitle || insertPayload.case_number || "New Case"
+          const navDetails: CaseDetails = {
+            id: newCaseId,
+            title: insertPayload.CaseTitle || "No Title",
+            clientName: insertPayload.ClientName || "N/A",
+            caseNumber: insertPayload.case_number || "N/A",
+            courtName: insertPayload.court_name || "N/A",
+            caseType: insertPayload.case_type_name || "N/A",
+            dateFiled: insertPayload.dateFiled,
+            status: insertPayload.CaseStatus || "N/A",
+          };
+          navigation.navigate("CaseDetails", {
+            caseDetails: navDetails,
           });
-        } else { Alert.alert("Error", "Failed to add case."); }
-      } catch (e) { console.error("Error adding case:", e); Alert.alert("Error", "An error occurred while adding case."); }
+        } else {
+          Alert.alert("Error", "Failed to add case.");
+        }
+      } catch (e) {
+        console.error("Error adding case:", e);
+        Alert.alert("Error", "An error occurred while adding case.");
+      }
     }
   };
 

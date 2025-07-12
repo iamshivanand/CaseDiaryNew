@@ -38,17 +38,11 @@ export interface CaseDetails { // Renamed to avoid conflict if CaseDetails is im
   // Add more properties if needed by the card display itself
 }
 
-// Use HomeStackParamList for navigation prop, assuming CaseCard navigates within HomeStack
-type CaseCardNavigationProp = StackNavigationProp<
-  HomeStackParamList,
-  "CaseDetail" // Changed from CaseDetailsV2 to CaseDetail
->;
-
 const CaseCard: React.FC<{
   caseDetails: CaseDetails; // This is the prop type
   onDelete?: () => void;
 }> = ({ caseDetails, onDelete }) => {
-  const navigation = useNavigation<CaseCardNavigationProp>();
+  const navigation = useNavigation();
 
   const [isConfirmationVisible, setIsConfirmationVisible] = useState(false);
   const [showUpdateField, setShowUpdateField] = useState(false);
@@ -69,10 +63,9 @@ const CaseCard: React.FC<{
     onDelete();
   };
   const handleEdit = () => {
-    console.log("Edit button pressed, navigating to CaseDetail with id:", caseDetails.id);
-    navigation.navigate("CaseDetail", { // Changed from CaseDetailsV2
-      caseId: caseDetails.id,
-      caseTitleHeader: caseDetails.caseNumber
+    console.log("Edit button pressed, navigating to CaseDetails with id:", caseDetails.id);
+    navigation.navigate("CaseDetails", {
+      caseDetails: caseDetails,
     });
   };
   const handleUpdateDate = (values: { [key: string]: any }) => {
