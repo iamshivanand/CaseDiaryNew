@@ -74,9 +74,11 @@ const CasesList = (/*{ navigation, routes }*/) => {
 
     // Filter by status
     if (activeFilter === "Active") {
-      tempCases = tempCases.filter(c => c.status === "Active" || c.status === "Pending");
+      tempCases = tempCases.filter(
+        (c) => c.status === "Active" || c.status === "Pending" || c.status === "Open"
+      );
     } else if (activeFilter === "Closed") {
-      tempCases = tempCases.filter(c => c.status === "Closed");
+      tempCases = tempCases.filter((c) => c.status === "Closed");
     }
 
     // Filter by search text (searches title and client)

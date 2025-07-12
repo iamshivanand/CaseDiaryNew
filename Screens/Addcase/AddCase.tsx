@@ -18,6 +18,8 @@ import {
   CaseUpdateData,
 } from "../../DataBase";
 import { HomeStackParamList } from "../../Types/navigationtypes";
+import { CaseDataScreen } from "../../Types/appTypes";
+import { formatDate } from "../../utils/commonFunctions";
 import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen";
 import { CaseData, DropdownOption as AppDropdownOption, caseStatusOptions, priorityOptions } from "../../Types/appTypes";
 
@@ -240,17 +242,21 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const success = await updateCase(caseIdToUpdate, updatePayload);
         if (success) {
           Alert.alert("Success", "Case updated successfully.");
-          const navDetails: CaseDetails = {
-            uniqueId: formValues.uniqueId || initialValues.uniqueId, // Use updated uniqueId from form if available
-            id: caseIdToUpdate,
-            caseNumber: formValues.CaseTitle || initialValues.caseNumber,
-            court: courtNameString || initialValues.court,
-            caseType: caseTypeNameString || initialValues.caseType,
-            dateFiled: formValues.FiledDate || (initialValues.dateFiled ? initialValues.dateFiled.toISOString() : undefined),
+          const navDetails: CaseDataScreen = {
+            id: caseIdToUpdate.toString(),
+            title: formValues.CaseTitle || "No Title",
+            client: formValues.ClientName || "N/A",
+            status: formValues.Status || "N/A",
+            nextHearing: formValues.HearingDate
+              ? formatDate(formValues.HearingDate)
+              : "N/A",
+            lastUpdate: new Date().toISOString(),
+            previousHearing: formValues.PreviousDate
+              ? formatDate(formValues.PreviousDate)
+              : "N/A",
           };
-          navigation.navigate("CaseDetail", { // Changed from CaseDetailsV2
-            caseId: caseIdToUpdate,
-            caseTitleHeader: navDetails.caseNumber
+          navigation.navigate("CaseDetails", {
+            caseDetails: navDetails,
           });
         } else { Alert.alert("Error", "Failed to update case."); }
       } catch (e) { console.error("Error updating case:", e); Alert.alert("Error", "An error occurred while updating.");}
@@ -295,15 +301,20 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const newCaseId = await addCase(insertPayload);
         if (newCaseId) {
           Alert.alert("Success", "Case added successfully.");
-          const navDetails: CaseDetails = {
-            id: newCaseId,
+          const navDetails: CaseDataScreen = {
+            id: newCaseId.toString(),
             title: insertPayload.CaseTitle || "No Title",
-            clientName: insertPayload.ClientName || "N/A",
-            caseNumber: insertPayload.case_number || "N/A",
-            courtName: insertPayload.court_name || "N/A",
-            caseType: insertPayload.case_type_name || "N/A",
-            dateFiled: insertPayload.dateFiled,
+            client: insertPayload.ClientName || "N/A",
             status: insertPayload.CaseStatus || "N/A",
+            nextHearing: insertPayload.NextDate
+              ? formatDate(insertPayload.NextDate)
+              : "N/A",
+            lastUpdate: insertPayload.updated_at
+              ? formatDate(insertPayload.updated_at)
+              : "N/A",
+            previousHearing: insertPayload.PreviousDate
+              ? formatDate(insertPayload.PreviousDate)
+              : "N/A",
           };
           navigation.navigate("CaseDetails", {
             caseDetails: navDetails,

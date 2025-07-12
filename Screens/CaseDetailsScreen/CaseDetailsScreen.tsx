@@ -31,7 +31,7 @@ const CaseDetailsScreen: React.FC = () => {
   const handleEditCase = () => {
     // Navigate to an EditCase screen, passing the case details
     // @ts-ignore
-    navigation.navigate("EditCase", { caseDetails });
+    navigation.navigate("EditCase", { caseId: caseDetails.id });
   };
 
   const handleAddNewDocument = () => {
