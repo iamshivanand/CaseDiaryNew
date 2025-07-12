@@ -24,7 +24,7 @@ import ActionButton from '../CommonComponents/ActionButton';
 
 type CaseDetailsScreenRouteProp = RouteProp<HomeStackParamList, 'CaseDetail'>;
 
-const PRIMARY_BLUE_COLOR_FOR_LOADER = '#3B82F6';
+export const PRIMARY_BLUE_COLOR_FOR_LOADER = '#3B82F6';
 
 // Define item types for the main FlatList
 type ListItemType =
