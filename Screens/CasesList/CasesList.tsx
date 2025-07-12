@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"; // Removed Dimensions, ScrollView
-import { getCases, addCaseTimelineEvent, updateCase } from "../../DataBase";
+import { getCases, addCaseTimelineEvent, updateCase, getCaseById } from "../../DataBase";
 import { Case } from "../../DataBase/schema";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { CaseDataScreen } from "../../Types/appTypes"; // Import the new data type
@@ -111,6 +111,11 @@ const CasesList = (/*{ navigation, routes }*/) => {
     if(isNaN(caseId)) return;
 
     try {
+      const caseExists = await getCaseById(caseId);
+      if(!caseExists) {
+        console.error("Case not found");
+        return;
+      }
       // 1. Add timeline event
       await addCaseTimelineEvent({
         case_id: caseId,
