@@ -1,6 +1,6 @@
 // Screens/EditCase/EditCaseScreen.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, View, Text, Alert, KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
+import { ScrollView, View, Text, Alert, KeyboardAvoidingView, Platform, StyleSheet as RNStyleSheet, ActivityIndicator } from 'react-native'; // Changed StyleSheet to RNStyleSheet
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
