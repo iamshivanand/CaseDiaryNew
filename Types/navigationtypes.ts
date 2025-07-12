@@ -17,6 +17,7 @@ export type HomeStackParamList = {
   };
   AddCase: { uniqueId?: string };
   AddCaseDetails: { update?: boolean; initialValues?: CaseDetails; uniqueId?: string };
+  AddDocument: { caseId: string | number };
 };
 
 // Stack for the "Search" Tab
