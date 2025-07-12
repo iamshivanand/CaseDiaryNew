@@ -5,7 +5,7 @@ import * as FileSystem from 'expo-file-system';
 import { CaseType, Court, District, PoliceStation, CaseDocument, Case as CaseRow, User } from './schema';
 
 // getDb is now imported from connection.ts
-import { getDb, __TEST_ONLY_resetDbInstance_connection as __TEST_ONLY_resetDbInstance } from './connection';
+import { getDb, __TEST_ONLY_resetDbInstance } from './connection';
 
 // Re-export getDb so it's available when importing from './DataBase'
 export { getDb };

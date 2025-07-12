@@ -30,6 +30,7 @@ import TimelineEventItem from "./components/TimelineEventItem";
 import * as FileSystem from "expo-file-system";
 import * as IntentLauncher from "expo-intent-launcher";
 import * as Sharing from "expo-sharing";
+import DocumentUpload from "../Addcase/DocumentUpload";
 
 type CaseDetailsScreenRouteProp = RouteProp<HomeStackParamList, "CaseDetails">;
 
@@ -177,12 +178,8 @@ const CaseDetailsScreen: React.FC = () => {
   listData.push({ type: "documentsHeader" });
   if (isLoadingDocuments) {
     listData.push({ type: "loadingDocuments" });
-  } else if (documents.length > 0) {
-    documents.forEach((doc) =>
-      listData.push({ type: "document", data: doc, id: `doc-${doc.id}` })
-    );
   } else {
-    listData.push({ type: "noDocuments" });
+    // We will render the DocumentUpload component directly, so we don't need to push documents here.
   }
 
   listData.push({ type: "timelineHeader" });
@@ -222,34 +219,18 @@ const CaseDetailsScreen: React.FC = () => {
               dateString={item.data.lastUpdate}
               iconName="update"
             />
+            <ActionButton
+              title="Edit Case"
+              onPress={handleEditCase}
+              type="primary"
+            />
           </View>
         );
       case "documentsHeader":
         return (
           <View style={styles.documentsSection}>
             <SectionHeader title="Documents" />
-          </View>
-        );
-      case "loadingDocuments":
-        return (
-          <View style={styles.centered}>
-            <ActivityIndicator
-              color={theme.colors.primary || PRIMARY_BLUE_COLOR_FOR_LOADER}
-            />
-          </View>
-        );
-      case "document":
-        return (
-          <DocumentCard
-            document={item.data}
-            onPress={() => handleDocumentInteraction(item.data)}
-            onDownloadPress={() => handleDocumentInteraction(item.data)} // Assuming press and download do same for now
-          />
-        );
-      case "noDocuments":
-        return (
-          <View style={styles.documentsSection}>
-            <Text style={styles.noItemsText}>No documents available.</Text>
+            <DocumentUpload caseId={parseInt(caseDetails.id, 10)} />
           </View>
         );
       case "timelineHeader":
@@ -280,20 +261,6 @@ const CaseDetailsScreen: React.FC = () => {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
       />
-      <View style={styles.bottomActionsContainer}>
-        <ActionButton
-          title="Edit Case"
-          onPress={handleEditCase}
-          type="primary"
-          style={styles.bottomActionPrimary}
-        />
-        <ActionButton
-          title="Add New Document"
-          onPress={handleAddNewDocument}
-          type="secondary"
-          style={styles.bottomActionSecondary}
-        />
-      </View>
     </View>
   );
 };
@@ -319,26 +286,6 @@ const styles = StyleSheet.create({
   clientName: {
     fontSize: 16,
     marginBottom: 12,
-  },
-  bottomActionsContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    padding: 16,
-    backgroundColor: "white",
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
-  },
-  bottomActionPrimary: {
-    flex: 1,
-    marginRight: 8,
-  },
-  bottomActionSecondary: {
-    flex: 1,
-    marginLeft: 8,
   },
 });
 

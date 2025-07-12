@@ -1,6 +1,6 @@
 import { AntDesign, Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native"; // Removed useRoute, RouteProp
-import React, { useCallback, useContext, useState } from "react";
+import React, { useCallback, useContext, useState, useEffect } from "react";
 import {
   FlatList,
   SafeAreaView,
@@ -10,12 +10,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"; // Removed Dimensions, ScrollView
-import { getCases } from "../../DataBase";
+import { getCases, addTimelineEvent, updateCase } from "../../DataBase";
 import { Case } from "../../DataBase/schema";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { CaseDataScreen } from "../../Types/appTypes"; // Import the new data type
-import { formatDate }s from "../../utils/commonFunctions";
+import { formatDate } from "../../utils/commonFunctions";
 import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
+import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 
 const transformApiCaseToCaseDataScreen = (apiCase: Case): CaseDataScreen => {
   return {
@@ -43,6 +44,8 @@ const CasesList = (/*{ navigation, routes }*/) => {
   const [filteredCases, setFilteredCases] = useState<CaseDataScreen[]>([]);
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterStatus>("Active");
+  const [isPopupVisible, setPopupVisible] = useState(false);
+  const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
 
   // Initial data load and filtering
   useFocusEffect(
@@ -97,9 +100,33 @@ const CasesList = (/*{ navigation, routes }*/) => {
     setSearchText(text);
   };
 
-  const handleUpdateHearing = (caseId: string | number | undefined) => {
-    console.log("Update Hearing pressed for case ID from list:", caseId);
-    // Navigate to update hearing screen or show modal
+  const handleUpdateHearing = (caseDetails: CaseDataScreen) => {
+    setSelectedCase(caseDetails);
+    setPopupVisible(true);
+  };
+
+  const handleSaveHearing = async (notes: string, nextHearingDate: Date) => {
+    if (!selectedCase) return;
+
+    try {
+      // 1. Add timeline event
+      await addTimelineEvent({
+        case_id: parseInt(selectedCase.id, 10),
+        event_date: new Date().toISOString(),
+        description: notes,
+        user_id: 1, // Replace with actual user ID
+      });
+
+      // 2. Update case's next hearing date
+      await updateCase(parseInt(selectedCase.id, 10), {
+        NextDate: nextHearingDate.toISOString(),
+      });
+
+      // 3. Refresh the list
+      fetchData();
+    } catch (error) {
+      console.error("Error updating hearing:", error);
+    }
   };
 
   const navigateToAddCase = () => {
@@ -166,7 +193,7 @@ const CasesList = (/*{ navigation, routes }*/) => {
         renderItem={({ item }) => (
           <NewCaseCard
             caseDetails={item}
-            onUpdateHearingPress={handleUpdateHearing}
+            onUpdateHearingPress={() => handleUpdateHearing(item)}
           />
         )}
         keyExtractor={(item) => item.id?.toString() || Math.random().toString()} // Ensure key is a string
@@ -177,6 +204,13 @@ const CasesList = (/*{ navigation, routes }*/) => {
         }
         contentContainerStyle={styles.listContentContainer}
       />
+      {selectedCase && (
+        <UpdateHearingPopup
+          visible={isPopupVisible}
+          onClose={() => setPopupVisible(false)}
+          onSave={handleSaveHearing}
+        />
+      )}
     </SafeAreaView>
   );
 };
