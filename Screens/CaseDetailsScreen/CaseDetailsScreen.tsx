@@ -18,6 +18,7 @@ import {
   View,
 } from "react-native"; // Removed ScrollView
 import * as db from "../../DataBase";
+import { getCaseTimelineEventsByCaseId } from "../../DataBase";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { CaseDataScreen, Document, TimelineEvent } from "../../Types/appTypes";
 import { HomeStackParamList } from "../../Types/navigationtypes";
@@ -78,11 +79,15 @@ const CaseDetailsScreen: React.FC = () => {
       }));
       setDocuments(uiDocs);
 
-      const fetchedTimelineEvents = await db.getTimelineEventsByCaseId(
+      const fetchedTimelineEvents = await getCaseTimelineEventsByCaseId(
         currentCaseId
       );
       setTimelineEvents(
-        fetchedTimelineEvents.map((tle) => ({ ...tle, id: tle.id.toString() }))
+        fetchedTimelineEvents.map((tle) => ({
+          id: tle.id.toString(),
+          date: tle.hearing_date,
+          description: tle.notes,
+        }))
       );
     } catch (error) {
       console.error(

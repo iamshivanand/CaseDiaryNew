@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"; // Removed Dimensions, ScrollView
-import { getCases, addTimelineEvent, updateCase } from "../../DataBase";
+import { getCases, addCaseTimelineEvent, updateCase } from "../../DataBase";
 import { Case } from "../../DataBase/schema";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { CaseDataScreen } from "../../Types/appTypes"; // Import the new data type
@@ -110,11 +110,10 @@ const CasesList = (/*{ navigation, routes }*/) => {
 
     try {
       // 1. Add timeline event
-      await addTimelineEvent({
+      await addCaseTimelineEvent({
         case_id: parseInt(selectedCase.id, 10),
-        event_date: new Date().toISOString(),
-        description: notes,
-        user_id: userId,
+        hearing_date: new Date().toISOString(),
+        notes: notes,
       });
 
       // 2. Update case's next hearing date

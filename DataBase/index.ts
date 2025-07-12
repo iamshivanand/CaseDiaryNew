@@ -245,7 +245,7 @@ export const searchCases = async (query: string, userId?: number | null): Promis
 };
 
 // Export timeline CRUD functions
-export * from './timelineDb';
+export * from './caseTimelineDb';
 // Export Suggestion an other lookup functions if they are still in use and correct
 // For example:
 // export const getSuggestionsForField = async (...) => { ... } // This was present before
