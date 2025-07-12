@@ -241,6 +241,28 @@ export const searchCases = async (query: string, userId?: number | null): Promis
     return db.getAllAsync<CaseWithDetails>(sql, params);
 };
 
+export const getCasesByDate = async (
+  date: string,
+  comparison: "=" | "<" | ">" | "<=" | ">=",
+  userId?: number | null
+): Promise<CaseWithDetails[]> => {
+  const db = await getDb();
+  let sql = `
+    SELECT c.*, ps.name as policeStationName, d.name as districtName
+    FROM Cases c
+    LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
+    LEFT JOIN Districts d ON ps.district_id = d.id
+    WHERE date(c.NextDate) ${comparison} date(?)
+  `;
+  const params: any[] = [date];
+  if (userId !== undefined && userId !== null) {
+    sql += " AND c.user_id = ?";
+    params.push(userId);
+  }
+  sql += " ORDER BY c.updated_at DESC";
+  return db.getAllAsync<CaseWithDetails>(sql, params);
+};
+
 // Export timeline CRUD functions
 export * from './timelineDb';
 // Export Suggestion an other lookup functions if they are still in use and correct

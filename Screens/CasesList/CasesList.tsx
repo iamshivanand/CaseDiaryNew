@@ -12,7 +12,7 @@ import {
 
 import {
   getCases,
-  // searchFormsAccordingToFieldsAsync, // To be replaced or refactored
+  getCasesByDate,
   searchCases, // Replaces searchFormsAsync
 } from "../../DataBase";
 import { ThemeContext } from "../../Providers/ThemeProvider";
@@ -35,41 +35,35 @@ const CasesList = ({ navigation, routes }) => {
 
   const handleSearch = async (text) => {
     setSearchText(text);
-    try {
-      // Assuming MOCK_CURRENT_USER_ID or actual user ID logic will be added here if needed by searchCases
-      // const userId = null; // Placeholder for actual user ID
-      const results = await searchCases(text /*, userId */);
-      setTotalCases(results || []); // searchCases returns CaseWithDetails[] directly
-    } catch (error) {
-      console.error("Error searching cases:", error);
-      setTotalCases([]); // Clear cases on error or show a message
+    if (text.length > 2) {
+      try {
+        // Assuming MOCK_CURRENT_USER_ID or actual user ID logic will be added here if needed by searchCases
+        // const userId = null; // Placeholder for actual user ID
+        const results = await searchCases(text /*, userId */);
+        setTotalCases(results || []); // searchCases returns CaseWithDetails[] directly
+      } catch (error) {
+        console.error("Error searching cases:", error);
+        setTotalCases([]); // Clear cases on error or show a message
+      }
+    } else if (text.length === 0) {
+      fetchData();
     }
   };
 
-  // Temporarily commenting out handleSearchForFilters and its usage
-  // as searchFormsAccordingToFieldsAsync needs a proper replacement strategy.
   const handleSearchForFilters = async (
     FieldName: string,
     searchValue: string,
-    comparisonOperator: string = "="
+    comparisonOperator: "=" | "<" | ">" | "<=" | ">=" = "="
   ) => {
-    console.warn(
-      "handleSearchForFilters is not implemented with current searchCases. Field:",
-      FieldName, "Value:", searchValue
-    );
-    // try {
-    //   // This function (searchFormsAccordingToFieldsAsync) needs to be refactored or replaced.
-    //   // const result = await searchFormsAccordingToFieldsAsync(
-    //   //   global.db,
-    //   //   FieldName,
-    //   //   searchValue,
-    //   //   comparisonOperator
-    //   // );
-    //   // console.log("result from this is ", result._array);
-    //   // setTotalCases(result._array);
-    // } catch (error) {
-    //   console.error("Error fetching forms with filters:", error);
-    // }
+    try {
+      const results = await getCasesByDate(
+        searchValue,
+        comparisonOperator
+      );
+      setTotalCases(results || []);
+    } catch (error) {
+      console.error("Error fetching forms with filters:", error);
+    }
   };
 
   useEffect(() => {
@@ -79,47 +73,37 @@ const CasesList = ({ navigation, routes }) => {
     let yesterdayDate;
     let tomorrowDate;
 
-    // Temporarily disable filter logic that uses handleSearchForFilters
-    const filter = params?.Filter;
-    if (filter === "todaysCases" || filter === "tomorrowCases" || filter === "yesterdayCases" || filter === "undatedCases") {
-        console.warn(`Filter '${filter}' is temporarily disabled as handleSearchForFilters is not fully implemented.`);
-        // Default to fetching all data if specific filter logic is disabled
-        fetchData();
-    } else {
+    switch (params?.Filter) {
+      case "todaysCases":
+        currentDate = formatDate(new Date());
+        console.log("current date is ", currentDate);
+        handleSearchForFilters("NextDate", currentDate);
+        break;
+      case "tomorrowCases":
+        currentDate = new Date();
+        tomorrow = new Date(currentDate);
+        tomorrow.setDate(currentDate.getDate() + 1);
+        tomorrowDate = formatDate(tomorrow);
+        handleSearchForFilters("NextDate", tomorrowDate);
+        break;
+      case "yesterdayCases":
+        currentDate = new Date();
+        yesterday = new Date(currentDate);
+        yesterday.setDate(currentDate.getDate() - 1);
+        yesterdayDate = formatDate(yesterday);
+        console.log("yesterdays date", yesterdayDate);
+        handleSearchForFilters("NextDate", yesterdayDate);
+        break;
+      case "undatedCases":
+        currentDate = new Date();
+        yesterday = new Date(currentDate);
+        yesterday.setDate(currentDate.getDate() - 1);
+        yesterdayDate = formatDate(yesterday);
+        handleSearchForFilters("NextDate", yesterdayDate, "<");
+        break;
+      default:
         fetchData();
     }
-
-    // switch (params?.Filter) {
-    //   case "todaysCases":
-    //     currentDate = formatDate(new Date());
-    //     console.log("current date is ", currentDate);
-    //     // handleSearchForFilters("NextDate", currentDate); // Disabled
-    //     break;
-    //   case "tomorrowCases":
-    //     currentDate = new Date();
-    //     tomorrow = new Date(currentDate);
-    //     tomorrow.setDate(currentDate.getDate() + 1);
-    //     tomorrowDate = formatDate(tomorrow);
-    //     // handleSearchForFilters("NextDate", tomorrowDate); // Disabled
-    //     break;
-    //   case "yesterdayCases":
-    //     currentDate = new Date();
-    //     yesterday = new Date(currentDate);
-    //     yesterday.setDate(currentDate.getDate() - 1);
-    //     yesterdayDate = formatDate(yesterday);
-    //     // console.log("yesterdays date", yesterdayDate);
-    //     // handleSearchForFilters("NextDate", yesterdayDate); // Disabled
-    //     break;
-    //   case "undatedCases":
-    //     currentDate = new Date();
-    //     yesterday = new Date(currentDate);
-    //     yesterday.setDate(currentDate.getDate() - 1);
-    //     yesterdayDate = formatDate(yesterday);
-    //     // handleSearchForFilters("NextDate", yesterdayDate, "<"); // Disabled
-    //     break;
-    //   default:
-    //     fetchData();
-    // }
   }, [params?.Filter]); // Added params?.Filter to dependency array
 
   const handleDelete = () => {
