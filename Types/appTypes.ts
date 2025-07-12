@@ -125,6 +125,33 @@ export const priorityOptions: DropdownOption[] = [
 export interface CaseTypeOption extends DropdownOption { value: number; }
 export interface CourtOption extends DropdownOption { value: number; }
 
+// Profile Screen Types
+export interface ActivityItem {
+  id: string;
+  date: string;
+  description: string;
+}
+
+export interface LawyerProfileData {
+  avatarUrl?: string | null; // Can be a web URL or a local file URI
+  name: string;
+  designation: string;
+  practiceAreas: string[];
+  stats: {
+    totalCases: number; // Remains non-editable for now
+    upcomingHearings: number; // Remains non-editable for now
+    yearsOfPractice: number; // Editable
+    yearsOfPracticeLastUpdated?: string; // ISO Date string, e.g., "2023-10-27"
+  };
+  aboutMe: string;
+  contactInfo: {
+    email: string;
+    phone: string;
+    address: string;
+  };
+  languages: string[];
+  recentActivity: ActivityItem[]; // Remains non-editable for now
+}
 // New CaseData interface for the Cases screen
 export interface CaseDataScreen {
   id?: string | number; // Optional: for keys or navigation
