@@ -18,9 +18,9 @@ import {
   View,
 } from "react-native"; // Removed ScrollView
 import * as db from "../../DataBase";
-import { getCaseTimelineEventsByCaseId } from "../../DataBase";
+import { getCaseTimelineEventsByCaseId, getCaseById } from "../../DataBase";
 import { ThemeContext } from "../../Providers/ThemeProvider";
-import { CaseDataScreen, Document, TimelineEvent } from "../../Types/appTypes";
+import { CaseData, CaseDataScreen, Document, TimelineEvent } from "../../Types/appTypes";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import ActionButton from "../CommonComponents/ActionButton";
 import SectionHeader from "../CommonComponents/SectionHeader";
@@ -52,16 +52,23 @@ const CaseDetailsScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<CaseDetailsScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
-  const { caseDetails } = route.params;
-
+  const { caseId } = route.params;
+  const [caseDetails, setCaseDetails] = useState<CaseData | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: caseDetails.title });
+    navigation.setOptions({ title: caseDetails?.CaseTitle || "Case Details" });
   }, [navigation, caseDetails]);
+
+  const loadCaseDetails = useCallback(async (caseId: number) => {
+    const details = await getCaseById(caseId);
+    if (details) {
+      setCaseDetails(details);
+    }
+  }, []);
 
   const loadDocumentsAndTimeline = useCallback(async (currentCaseId: number) => {
     if (!currentCaseId) return;
@@ -101,7 +108,7 @@ const CaseDetailsScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const caseIdToLoad = parseInt(caseDetails.id, 10);
+    const caseIdToLoad = parseInt(caseId.toString(), 10);
     const fetchAllData = async () => {
       if (!caseIdToLoad || isNaN(caseIdToLoad)) {
         Alert.alert("Error", "No valid Case ID provided.");
@@ -111,6 +118,7 @@ const CaseDetailsScreen: React.FC = () => {
       }
       setIsLoading(true);
       try {
+        await loadCaseDetails(caseIdToLoad);
         await loadDocumentsAndTimeline(caseIdToLoad);
       } catch (error) {
         console.error("Error fetching case details:", error);
@@ -121,7 +129,7 @@ const CaseDetailsScreen: React.FC = () => {
       }
     };
     fetchAllData();
-  }, [caseDetails.id, navigation, loadDocumentsAndTimeline]);
+  }, [caseId, navigation, loadDocumentsAndTimeline, loadCaseDetails]);
 
   const handleEditCase = () => {
     // Navigate to an EditCase screen, passing the case details
@@ -177,6 +185,14 @@ const CaseDetailsScreen: React.FC = () => {
     }
   };
 
+  if (!caseDetails) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   const listData: ListItemType[] = [];
   listData.push({ type: "summary", data: caseDetails });
 
@@ -206,70 +222,70 @@ const CaseDetailsScreen: React.FC = () => {
       case "summary":
         return (
           <View style={styles.summarySection}>
-            <Text style={styles.mainCaseTitle}>{item.data.title}</Text>
-            <Text style={styles.clientName}>Client: {item.data.client}</Text>
-            <StatusBadge status={item.data.status} />
+            <Text style={styles.mainCaseTitle}>{caseDetails.CaseTitle}</Text>
+            <Text style={styles.clientName}>Client: {caseDetails.ClientName}</Text>
+            <StatusBadge status={caseDetails.CaseStatus} />
             <DateRow
               label="Next Hearing"
-              dateString={item.data.nextHearing}
+              dateString={caseDetails.NextDate}
               iconName="gavel"
             />
             <DateRow
               label="Previous Hearing"
-              dateString={item.data.previousHearing}
+              dateString={caseDetails.PreviousDate}
               iconName="history"
             />
             <DateRow
               label="Last Update"
-              dateString={item.data.lastUpdate}
+              dateString={caseDetails.updated_at}
               iconName="update"
             />
             <View style={styles.detailsContainer}>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Case Number:</Text>
-                <Text style={styles.detailValue}>{item.data.case_number || 'N/A'}</Text>
+                <Text style={styles.detailValue}>{caseDetails.case_number || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Case Year:</Text>
-                <Text style={styles.detailValue}>{item.data.case_year || 'N/A'}</Text>
+                <Text style={styles.detailValue}>{caseDetails.case_year || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Court Name:</Text>
-                <Text style={styles.detailValue}>{item.data.court_name || 'N/A'}</Text>
+                <Text style={styles.detailValue}>{caseDetails.court_name || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Case Type:</Text>
-                <Text style={styles.detailValue}>{item.data.case_type_name || 'N/A'}</Text>
+                <Text style={styles.detailValue}>{caseDetails.case_type_name || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>On Behalf Of:</Text>
-                <Text style={styles.detailValue}>{item.data.OnBehalfOf || 'N/A'}</Text>
+                <Text style={styles.detailValue}>{caseDetails.OnBehalfOf || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>First Party:</Text>
-                <Text style={styles.detailValue}>{item.data.FirstParty || 'N/A'}</Text>
+                <Text style={styles.detailValue}>{caseDetails.FirstParty || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Opposite Party:</Text>
-                <Text style={styles.detailValue}>{item.data.OppositeParty || 'N/A'}</Text>
+                <Text style={styles.detailValue}>{caseDetails.OppositeParty || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Accused:</Text>
-                <Text style={styles.detailValue}>{item.data.Accussed || 'N/A'}</Text>
+                <Text style={styles.detailValue}>{caseDetails.Accussed || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Under Section:</Text>
-                <Text style={styles.detailValue}>{item.data.Undersection || 'N/A'}</Text>
+                <Text style={styles.detailValue}>{caseDetails.Undersection || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Priority:</Text>
-                <Text style={styles.detailValue}>{item.data.Priority || 'N/A'}</Text>
+                <Text style={styles.detailValue}>{caseDetails.Priority || 'N/A'}</Text>
               </View>
             </View>
             <Text style={styles.detailLabel}>Case Description:</Text>
-            <Text style={styles.detailValue}>{item.data.CaseDescription || 'N/A'}</Text>
+            <Text style={styles.detailValue}>{caseDetails.CaseDescription || 'N/A'}</Text>
             <Text style={styles.detailLabel}>Case Notes:</Text>
-            <Text style={styles.detailValue}>{item.data.CaseNotes || 'N/A'}</Text>
+            <Text style={styles.detailValue}>{caseDetails.CaseNotes || 'N/A'}</Text>
             <ActionButton
               title="Edit Case"
               onPress={handleEditCase}
@@ -281,7 +297,7 @@ const CaseDetailsScreen: React.FC = () => {
         return (
           <View style={styles.documentsSection}>
             <SectionHeader title="Documents" />
-            <DocumentUpload caseId={parseInt(caseDetails.id, 10)} />
+            <DocumentUpload caseId={caseId} />
           </View>
         );
       case "timelineHeader":
