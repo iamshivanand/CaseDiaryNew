@@ -137,13 +137,22 @@ export const getCaseById = async (id: number, userId?: number | null): Promise<C
              LEFT JOIN Districts d ON ps.district_id = d.id
              WHERE c.id = ?`;
   const params: any[] = [id];
-  if (userId != null) { sql += " AND c.user_id = ?"; params.push(userId); }
-  const result = await db.getFirstAsync<CaseWithDetails>(sql, params); return result ?? null;
+  if (userId != null) {
+    sql += " AND c.user_id = ?";
+    params.push(userId);
+  }
+  const result = await db.getFirstAsync<CaseWithDetails>(sql, params);
+  return result ?? null;
 };
 
 export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?: number | null): Promise<boolean> => {
-  const db = await getDb(); const currentCaseData = await getCaseById(id, actorUserId);
-  if (!currentCaseData) { console.warn(`Case ${id} not found or not accessible.`); return false; }
+  const db = await getDb();
+  console.log("Updating case with ID:", id, "and data:", data);
+  const currentCaseData = await getCaseById(id);
+  if (!currentCaseData) {
+    console.warn(`Case ${id} not found.`);
+    return false;
+  }
   const validUpdateData: { [key: string]: any } = {};
   for (const key in data) {
     if (Object.prototype.hasOwnProperty.call(data, key)) {
@@ -151,18 +160,37 @@ export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?:
       if (data[typedKey] !== undefined) validUpdateData[typedKey] = data[typedKey];
     }
   }
-  if (Object.keys(validUpdateData).length === 0) { console.warn("No fields for update."); return false; }
-  const fieldsToUpdate = Object.keys(validUpdateData).map(key => `${key} = ?`).join(", ");
-  const valuesToUpdate = Object.values(validUpdateData).map(val => (val === undefined ? null : val));
+  if (Object.keys(validUpdateData).length === 0) {
+    console.warn("No fields for update.");
+    return false;
+  }
+  const fieldsToUpdate = Object.keys(validUpdateData)
+    .map((key) => `${key} = ?`)
+    .join(", ");
+  const valuesToUpdate = Object.values(validUpdateData).map((val) =>
+    val === undefined ? null : val
+  );
   valuesToUpdate.push(id);
   let sql = `UPDATE Cases SET ${fieldsToUpdate} WHERE id = ?`;
   console.log("Executing SQL for updateCase:", sql, valuesToUpdate);
   try {
     const result = await db.runAsync(sql, valuesToUpdate);
     if (result.changes > 0) {
-      await logCaseChanges(id, currentCaseData, data, actorUserId); return true;
-    } return false;
-  } catch (error) { console.error(`Error updating case ID ${id}:`, error, "SQL:", sql, "Values:", valuesToUpdate); throw error; }
+      await logCaseChanges(id, currentCaseData, data, actorUserId);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error(
+      `Error updating case ID ${id}:`,
+      error,
+      "SQL:",
+      sql,
+      "Values:",
+      valuesToUpdate
+    );
+    throw error;
+  }
 };
 
 const TRACKED_CASE_FIELDS: Array<keyof Omit<CaseRow, 'id' | 'uniqueId' | 'created_at' | 'updated_at'>> = [

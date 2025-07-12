@@ -127,7 +127,17 @@ describe('Database Module Tests', () => {
   describe('CaseHistoryLog', () => {
     const testUserId = 1; // Case owner
     const actorUserId = 2; // Different user making the change
-    let caseId: number | null = 1;
+    let caseId: number | null;
+
+    beforeEach(async () => {
+      const initialCaseData: CaseInsertData = {
+        uniqueId: `case-hist-test-${Date.now()}`,
+        user_id: actorUserId,
+        CaseStatus: 'New',
+        NextDate: '2024-01-01',
+      };
+      caseId = await addCase(initialCaseData);
+    });
 
     it('should add a history entry when a tracked case field is updated', async () => {
       const updateCaseSpy = jest.spyOn(dbFunctions, 'updateCase');
