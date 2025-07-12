@@ -6,6 +6,7 @@ import { CaseData, Document, TimelineEvent } from "./appTypes"; // Comprehensive
 export type HomeStackParamList = {
   HomeScreen: undefined;
   AllCases: undefined;
+  CaseDetails: { caseDetails: CaseDataScreen };
   CaseDetail: { caseId: number; caseTitleHeader?: string }; // Updated params for the now-new CaseDetail screen
   // CaseDetailsV2 route removed
   EditCase: {

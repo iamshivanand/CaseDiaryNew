@@ -39,19 +39,41 @@ const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
 // Define Stack Navigators for each tab
 
 const HomeStack = () => (
-  <HomeStackNav.Navigator screenOptions={{ headerShown: true }}>{/* Default to true for this stack */}
-    <HomeStackNav.Screen name="HomeScreen" component={HomeScreen} options={{ headerShown: false }} />{/* HomeScreen has custom header */}
-    <HomeStackNav.Screen name="AllCases" component={CasesList} options={{ title: "All Cases" }} />
+  <HomeStackNav.Navigator screenOptions={{ headerShown: true }}>
+    {/* Default to true for this stack */}
+    <HomeStackNav.Screen
+      name="HomeScreen"
+      component={HomeScreen}
+      options={{ headerShown: false }}
+    />
+    {/* HomeScreen has custom header */}
+    <HomeStackNav.Screen
+      name="AllCases"
+      component={CasesList}
+      options={{ title: "All Cases" }}
+    />
     {/* CaseDetail now points to the new CaseDetailsScreen (which was CaseDetailsScreenV2) */}
     <HomeStackNav.Screen
-      name="CaseDetail"
+      name="CaseDetails"
       component={CaseDetailsScreen} // This should be the new one, as CaseDetailsScreenV2 was renamed to this.
       options={{ title: "Case Details" }} // Title is set dynamically within the screen
     />
     {/* CaseDetailsV2 screen entry removed */}
-    <HomeStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
-    <HomeStackNav.Screen name="AddCase" component={AddCase} options={{ title: "Add New Case" }} />
-    <HomeStackNav.Screen name="AddCaseDetails" component={AddCaseDetails} options={{ title: "Case Form" }} />
+    <HomeStackNav.Screen
+      name="EditCase"
+      component={EditCaseScreen}
+      options={{ title: "Edit Case" }}
+    />
+    <HomeStackNav.Screen
+      name="AddCase"
+      component={AddCase}
+      options={{ title: "Add New Case" }}
+    />
+    <HomeStackNav.Screen
+      name="AddCaseDetails"
+      component={AddCaseDetails}
+      options={{ title: "Case Form" }}
+    />
   </HomeStackNav.Navigator>
 );
 

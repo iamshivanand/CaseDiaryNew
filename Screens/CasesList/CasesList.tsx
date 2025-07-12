@@ -1,124 +1,73 @@
 import { AntDesign, Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native"; // Removed useRoute, RouteProp
-import React, { useContext, useEffect, useState } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native"; // Removed useRoute, RouteProp
+import React, { useCallback, useContext, useState } from "react";
 import {
+  FlatList,
+  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
-  View,
   TouchableOpacity,
-  SafeAreaView,
-  FlatList,
+  View,
 } from "react-native"; // Removed Dimensions, ScrollView
-
-// import {
-//   getCases,
-//   searchCases,
-// } from "../../DataBase"; // DB functions will be adapted or replaced by sample data initially
+import { getCases } from "../../DataBase";
+import { Case } from "../../DataBase/schema";
 import { ThemeContext } from "../../Providers/ThemeProvider";
-// import { formatDate } from "../../utils/commonFunctions"; // May not be needed with new data structure
-import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
 import { CaseDataScreen } from "../../Types/appTypes"; // Import the new data type
+import { formatDate }s from "../../utils/commonFunctions";
+import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
 
-// const windowWidth = Dimensions.get("window").width; // Removed as not used in current styles
-
-// Sample Data based on requirements
-const sampleCases: CaseDataScreen[] = [
-  {
-    id: "1",
-    title: "Estate of Johnson",
-    client: "Sarah Johnson",
-    status: "Active",
-    nextHearing: "Dec 15, 2023",
-    lastUpdate: "Nov 20, 2023",
-    previousHearing: "Oct 25, 2023",
-  },
-  {
-    id: "2",
-    title: "Smith vs. Jones",
-    client: "Michael Smith",
-    status: "Pending",
-    nextHearing: "Jan 10, 2024",
-    lastUpdate: "Nov 18, 2023",
-    previousHearing: "Sep 30, 2023",
-  },
-  {
-    id: "3",
-    title: "Alpha Corp Litigation",
-    client: "Alpha Corp",
-    status: "Active",
-    nextHearing: "Feb 22, 2024",
-    lastUpdate: "Jan 05, 2024",
-    previousHearing: "Dec 01, 2023",
-  },
-  {
-    id: "4",
-    title: "Property Dispute - Williams",
-    client: "Robert Williams",
-    status: "Closed",
-    nextHearing: "N/A",
-    lastUpdate: "Oct 10, 2023",
-    previousHearing: "Sep 15, 2023",
-  },
-  {
-    id: "5",
-    title: "Commercial Contract - Davis",
-    client: "Linda Davis",
-    status: "Pending",
-    nextHearing: "Mar 05, 2024",
-    lastUpdate: "Jan 15, 2024",
-    previousHearing: "Nov 25, 2023",
-  },
-   {
-    id: "6",
-    title: "Another Active Case",
-    client: "Active Client",
-    status: "Active",
-    nextHearing: "Mar 01, 2024",
-    lastUpdate: "Jan 20, 2024",
-    previousHearing: "Dec 10, 2023",
-  },
-  {
-    id: "7",
-    title: "A Closed Case",
-    client: "Closed Client Inc.",
-    status: "Closed",
-    nextHearing: "N/A",
-    lastUpdate: "Sep 01, 2023",
-    previousHearing: "Aug 01, 2023",
-  },
-];
-
+const transformApiCaseToCaseDataScreen = (apiCase: Case): CaseDataScreen => {
+  return {
+    id: apiCase.id.toString(),
+    title: apiCase.CaseTitle || "No Title",
+    client: apiCase.ClientName || "N/A",
+    status: apiCase.CaseStatus || "N/A",
+    nextHearing: apiCase.NextDate ? formatDate(apiCase.NextDate) : "N/A",
+    lastUpdate: apiCase.updated_at ? formatDate(apiCase.updated_at) : "N/A",
+    previousHearing: apiCase.PreviousDate
+      ? formatDate(apiCase.PreviousDate)
+      : "N/A",
+  };
+};
 type FilterStatus = "Active" | "Closed";
 
-const CasesList = (/*{ navigation, routes }*/) => { // Removed navigation, routes from props as useNavigation is used
+const CasesList = (/*{ navigation, routes }*/) => {
+  // Removed navigation, routes from props as useNavigation is used
   // const route = useRoute<CasesListRouteProp>(); // Not using route params for now
   // const { params } = route;
   const navigation = useNavigation();
   const { theme } = useContext(ThemeContext); // Keep theme for styling
 
-  const [allCases, setAllCases] = useState<CaseDataScreen[]>(sampleCases); // Initialize with sample data
+  const [allCases, setAllCases] = useState<CaseDataScreen[]>([]); // Initialize with sample data
   const [filteredCases, setFilteredCases] = useState<CaseDataScreen[]>([]);
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterStatus>("Active");
 
   // Initial data load and filtering
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
+
   useEffect(() => {
-    // fetchData(); // Replace with actual data fetching if needed
     filterAndSearchCases();
   }, [activeFilter, searchText, allCases]); // Re-filter when filter, search text, or allCases change
 
-  // const fetchData = async () => {
-  //   try {
-  //     // Replace with actual DB call if using getCases
-  //     // const results = await getCases(/* userId */);
-  //     // setAllCases(results ? results.map(transformApiCaseToCaseDataScreen) : []); // Transform if necessary
-  //     setAllCases(sampleCases); // Using sample data
-  //   } catch (error) {
-  //     console.error("Error fetching cases:", error);
-  //     setAllCases([]);
-  //   }
-  // };
+  const fetchData = async () => {
+    try {
+      // Replace with actual DB call if using getCases
+      const results = await getCases(/* userId */);
+      setAllCases(
+        results ? results.map(transformApiCaseToCaseDataScreen) : []
+      ); // Transform if necessary
+      // setAllCases(sampleCases); // Using sample data
+    } catch (error) {
+      console.error("Error fetching cases:", error);
+      setAllCases([]);
+    }
+  };
 
   const filterAndSearchCases = () => {
     let tempCases = allCases;
