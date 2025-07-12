@@ -63,7 +63,7 @@ const EditCaseScreen: React.FC = () => {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingCaseDetails, setIsLoadingCaseDetails] = useState(true);
-  const initialCaseIdFromRoute = route.params?.initialCaseData?.id;
+  const initialCaseIdFromRoute = route.params?.caseId;
 
   const [caseData, setCaseData] = useState<Partial<CaseData>>({});
   const [documents, setDocuments] = useState<Document[]>([]);
