@@ -1,9 +1,10 @@
 // Screens/CommonComponents/DatePickerField.tsx
-import React, { useState } from "react";
+import React, { useState, useContext } from "react"; // Added useContext
 import { View, Text, TouchableOpacity, Platform, Modal, Button, StyleSheet } from "react-native";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { DatePickerFieldStyles } from "./DatePickerFieldStyle";
-import { format } from 'date-fns'; // Using date-fns for formatting
+import { getDatePickerFieldStyles } from "./DatePickerFieldStyle"; // Import function
+import { ThemeContext } from "../../Providers/ThemeProvider"; // Adjust path
+import { format } from 'date-fns';
 
 interface DatePickerFieldProps {
   label: string;
@@ -26,23 +27,22 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
   minimumDate,
   maximumDate,
 }) => {
+  const { theme } = useContext(ThemeContext);
+  const styles = getDatePickerFieldStyles(theme); // Generate themed styles
+  // Note: iosPickerStyles are defined locally below, they could also be part of getDatePickerFieldStyles
+
   const [showPicker, setShowPicker] = useState(false);
-  // Temporary date state for iOS modal behavior
   const [iosDate, setIosDate] = useState<Date>(value || new Date());
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
-      setShowPicker(false); // Close picker on Android after selection/dismiss
+      setShowPicker(false);
       if (event.type === "set" && selectedDate) {
         onChange(selectedDate);
-      } else if (event.type === "dismissed") {
-        // User cancelled, do nothing or handle as needed
       }
     } else if (Platform.OS === 'ios') {
-      // For iOS, the picker is typically part of a modal
-      // The onChange event fires continuously as the user spins the wheel
       if (selectedDate) {
-        setIosDate(selectedDate); // Update temporary date
+        setIosDate(selectedDate);
       }
     }
   };
@@ -53,8 +53,7 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
   };
 
   const cancelIosDate = () => {
-    // Reset iosDate to original value if needed, or just close
-    setIosDate(value || new Date()); // Reset to current value or default
+    setIosDate(value || new Date());
     setShowPicker(false);
   };
 
@@ -62,23 +61,44 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
 
   const openPicker = () => {
     if (Platform.OS === 'ios') {
-        setIosDate(value || new Date()); // Initialize iOS date before showing picker
+        setIosDate(value || new Date());
     }
     setShowPicker(true);
   }
 
+  // Local styles for iOS modal, using theme where appropriate
+  const localIosPickerStyles = StyleSheet.create({
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: theme.colors.modalOverlayBg || 'rgba(0,0,0,0.4)',
+    },
+    modalContainer: {
+        backgroundColor: theme.colors.modalBackground || theme.colors.background,
+        borderTopRightRadius: 20,
+        borderTopLeftRadius: 20,
+        padding: 20,
+    },
+    buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 20,
+    }
+  });
+
+
   return (
-    <View style={DatePickerFieldStyles.inputContainer}>
-      <Text style={DatePickerFieldStyles.label}>{label}</Text>
+    <View style={styles.inputContainer}>
+      <Text style={styles.label}>{label}</Text>
       <TouchableOpacity
         style={[
-            DatePickerFieldStyles.dateTouchable,
-            error ? { borderColor: 'red' } : {}
+            styles.dateTouchable,
+            error ? { borderColor: theme.colors.errorBorder || 'red' } : {}
         ]}
         onPress={openPicker}
         activeOpacity={0.7}
       >
-        <Text style={value ? DatePickerFieldStyles.dateText : DatePickerFieldStyles.placeholderText}>
+        <Text style={value ? styles.dateText : styles.placeholderText}>
           {displayDate}
         </Text>
       </TouchableOpacity>
@@ -87,10 +107,11 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
         <DateTimePicker
           value={value || new Date()}
           mode="date"
-          display="default" // "spinner" or "calendar" also available
+          display="default"
           onChange={handleDateChange}
           minimumDate={minimumDate}
           maximumDate={maximumDate}
+          // accentColor={theme.colors.primary} // For Android spinner/calendar color
         />
       )}
 
@@ -101,48 +122,29 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
             visible={showPicker}
             onRequestClose={cancelIosDate}
         >
-            <View style={iosPickerStyles.modalOverlay}>
-                <View style={iosPickerStyles.modalContainer}>
+            <View style={localIosPickerStyles.modalOverlay}>
+                <View style={localIosPickerStyles.modalContainer}>
                     <DateTimePicker
                         value={iosDate}
                         mode="date"
-                        display="spinner" // "inline" or "compact" also possible
+                        display="spinner"
                         onChange={handleDateChange}
                         minimumDate={minimumDate}
                         maximumDate={maximumDate}
-                        textColor="#000" // Example: ensure text is visible in dark mode
+                        textColor={theme.colors.text} // iOS picker text color
+                        // themeVariant={theme.isDarkMode ? "dark" : "light"} // If theme has isDarkMode
                     />
-                    <View style={iosPickerStyles.buttonContainer}>
-                        <Button title="Cancel" onPress={cancelIosDate} color="#FF3B30" />
-                        <Button title="Done" onPress={confirmIosDate} color="#007AFF" />
+                    <View style={localIosPickerStyles.buttonContainer}>
+                        <Button title="Cancel" onPress={cancelIosDate} color={theme.colors.errorText || "#FF3B30"} />
+                        <Button title="Done" onPress={confirmIosDate} color={theme.colors.primary} />
                     </View>
                 </View>
             </View>
         </Modal>
       )}
-      {error && <Text style={DatePickerFieldStyles.errorText}>{error}</Text>}
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 };
-
-// Styles for iOS Picker Modal
-const iosPickerStyles = StyleSheet.create({
-    modalOverlay: {
-        flex: 1,
-        justifyContent: 'flex-end',
-        backgroundColor: 'rgba(0,0,0,0.4)',
-    },
-    modalContainer: {
-        backgroundColor: '#FFF', // Or use a theme-based color
-        borderTopRightRadius: 20,
-        borderTopLeftRadius: 20,
-        padding: 20,
-    },
-    buttonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 20,
-    }
-});
 
 export default DatePickerField;

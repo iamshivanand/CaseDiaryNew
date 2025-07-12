@@ -25,7 +25,9 @@ import FormInput from '../CommonComponents/FormInput';
 import DropdownPicker from '../CommonComponents/DropdownPicker';
 import DatePickerField from '../CommonComponents/DatePickerField';
 import ActionButton from "../CommonComponents/ActionButton";
-import { EditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle";
+// import { EditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle"; // Will use its own themed styles
+import { ThemeContext, Theme } from "../../Providers/ThemeProvider"; // Import ThemeContext and Theme
+import { getEditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle"; // For base screen style
 
 interface FieldDefinition {
   name: keyof CaseData;
@@ -112,6 +114,8 @@ const FormFieldRenderer: React.FC<{
 const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const params = route.params;
   const { update = false, initialValues, uniqueId: routeUniqueId } = params ?? {};
+  const { theme } = React.useContext(ThemeContext); // Get theme
+  const styles = getAddCaseStyles(theme); // Generate styles with theme
 
   const navigation = useNavigation();
   const generatedUniqueId = useMemo(() => uuidv4(), []);
@@ -244,7 +248,10 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
             caseType: caseTypeNameString || initialValues.caseType,
             dateFiled: formValues.FiledDate || (initialValues.dateFiled ? initialValues.dateFiled.toISOString() : undefined),
           };
-          navigation.navigate("CaseDetail", { caseDetails: navDetails });
+          navigation.navigate("CaseDetail", { // Changed from CaseDetailsV2
+            caseId: caseIdToUpdate,
+            caseTitleHeader: navDetails.caseNumber
+          });
         } else { Alert.alert("Error", "Failed to update case."); }
       } catch (e) { console.error("Error updating case:", e); Alert.alert("Error", "An error occurred while updating.");}
     } else { // ADD LOGIC
@@ -254,17 +261,17 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         CaseTitle: formValues.CaseTitle || null,
         ClientName: formValues.ClientName || null,
         CNRNumber: formValues.CNRNumber || null,
-        court_id: formValues.court_id || null, // Store ID, FK constraint removed
-        court_name: courtNameString, // Store name
+        court_id: formValues.court_id || null,
+        court_name: courtNameString,
         dateFiled: formValues.FiledDate || null,
-        case_type_id: formValues.case_type_id || null, // Store ID, FK constraint removed
-        case_type_name: caseTypeNameString, // Store name
+        case_type_id: formValues.case_type_id || null,
+        case_type_name: caseTypeNameString,
         case_number: formValues.case_number || null,
         case_year: formValues.case_year ? parseInt(formValues.case_year as string, 10) : null,
         crime_number: formValues.crime_number || null,
         crime_year: formValues.crime_year ? parseInt(formValues.crime_year as string, 10) : null,
         JudgeName: formValues.JudgeName || null,
-        OnBehalfOf: formValues.OnBehalfOf || null, // This is separate from ClientName now
+        OnBehalfOf: formValues.OnBehalfOf || null,
         FirstParty: formValues.FirstParty || null,
         OppositeParty: formValues.OppositeParty || null,
         ClientContactNumber: formValues.ClientContactNumber || null,
@@ -273,7 +280,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         police_station_id: typeof formValues.police_station_id === 'number' ? formValues.police_station_id : null,
         StatuteOfLimitations: formValues.StatuteOfLimitations || null,
         OpposingCounsel: formValues.OpposingCounsel || null,
-        OppositeAdvocate: formValues.OppositeAdvocate || null, // Keep if distinct from OpposingCounsel
+        OppositeAdvocate: formValues.OppositeAdvocate || null,
         OppAdvocateContactNumber: formValues.OppAdvocateContactNumber || null,
         CaseStatus: formValues.Status || null,
         Priority: formValues.Priority || null,
@@ -288,15 +295,10 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const newCaseId = await addCase(insertPayload);
         if (newCaseId) {
           Alert.alert("Success", "Case added successfully.");
-          const navDetails: CaseDetails = {
-            id: newCaseId,
-            uniqueId: insertPayload.uniqueId,
-            caseNumber: insertPayload.CaseTitle || insertPayload.case_number || "N/A",
-            dateFiled: insertPayload.dateFiled || undefined, // Pass as ISO string
-            court: courtNameString || undefined,
-            caseType: caseTypeNameString || undefined,
-          };
-          navigation.navigate("CaseDetail", { caseDetails: navDetails });
+          navigation.navigate("CaseDetail", { // Changed from CaseDetailsV2
+            caseId: newCaseId,
+            caseTitleHeader: insertPayload.CaseTitle || insertPayload.case_number || "New Case"
+          });
         } else { Alert.alert("Error", "Failed to add case."); }
       } catch (e) { console.error("Error adding case:", e); Alert.alert("Error", "An error occurred while adding case."); }
     }
@@ -343,10 +345,10 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
 
 export default AddCase;
 
-const styles = StyleSheet.create({
+const getAddCaseStyles = (theme: Theme) => StyleSheet.create({
   scrollViewStyle: {
     flex: 1,
-    backgroundColor: EditCaseScreenStyles.screen.backgroundColor,
+    backgroundColor: theme.colors.screenBackground || theme.colors.background,
   },
   scrollContentContainerStyle: {
     flexGrow: 1,
@@ -360,7 +362,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 24,
-    color: '#1F2937',
+    color: theme.colors.text,
     textAlign: 'center',
   },
   actionButtonContainer: {

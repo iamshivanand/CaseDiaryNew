@@ -1,7 +1,8 @@
 // Screens/CommonComponents/FormInput.tsx
-import React from "react";
+import React, { useContext } from "react"; // Added useContext
 import { View, Text, TextInput, KeyboardTypeOptions, TextInputProps } from "react-native";
-import { FormInputStyles } from "./FormInputStyle";
+import { getFormInputStyles } from "./FormInputStyle"; // Import function
+import { ThemeContext } from "../../Providers/ThemeProvider"; // Adjust path
 
 interface FormInputProps extends Omit<TextInputProps, 'onChangeText' | 'value'> {
   label: string;
@@ -25,18 +26,21 @@ const FormInput: React.FC<FormInputProps> = ({
   multiline = false,
   numberOfLines,
   error,
-  style, // Allow overriding or extending styles
+  style,
   ...rest
 }) => {
+  const { theme } = useContext(ThemeContext);
+  const styles = getFormInputStyles(theme); // Generate styles
+
   return (
-    <View style={FormInputStyles.inputContainer}>
-      <Text style={FormInputStyles.label}>{label}</Text>
+    <View style={styles.inputContainer}>
+      <Text style={styles.label}>{label}</Text>
       <TextInput
         style={[
-          FormInputStyles.textInput,
-          multiline && FormInputStyles.textInputMultiline,
-          error ? { borderColor: 'red' } : {},
-          style // Apply custom styles passed via props
+          styles.textInput,
+          multiline && styles.textInputMultiline,
+          error ? { borderColor: theme.colors.errorBorder || 'red' } : {}, // Use theme error border color
+          style
         ]}
         value={value}
         onChangeText={onChangeText}
@@ -45,10 +49,10 @@ const FormInput: React.FC<FormInputProps> = ({
         secureTextEntry={secureTextEntry}
         multiline={multiline}
         numberOfLines={multiline ? numberOfLines || 4 : 1}
-        placeholderTextColor="#9CA3AF"
+        placeholderTextColor={theme.colors.placeholderText || "#9CA3AF"} // Use theme placeholder color
         {...rest}
       />
-      {error && <Text style={FormInputStyles.errorText}>{error}</Text>}
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 };

@@ -9,10 +9,11 @@ import { ThemeContext } from "./Providers/ThemeProvider";
 // Import Screens for Stacks
 import HomeScreen from "./Screens/HomeScreen/HomeScreen";
 import CasesList from "./Screens/CasesList/CasesList";
-import CaseDetail from "./Screens/CaseDetailsScreen/CaseDetailsScreen";
-import EditCaseScreen from "./Screens/EditCase/EditCaseScreen"; // Import your new screen
-import AddCase from "./Screens/Addcase/AddCase"; // Assuming this is the main AddCase screen
-import AddCaseDetails from "./Screens/Addcase/AddCaseDetails"; // If used within a stack
+import CaseDetailsScreen from "./Screens/CaseDetailsScreen/CaseDetailsScreen"; // This is now the new, refactored screen
+// import CaseDetailsScreenV2 from "./Screens/CaseDetailsScreenV2/CaseDetailsScreenV2"; // V2 Import removed
+import EditCaseScreen from "./Screens/EditCase/EditCaseScreen";
+import AddCase from "./Screens/Addcase/AddCase";
+import AddCaseDetails from "./Screens/Addcase/AddCaseDetails";
 
 import SearchScreen from "./Screens/SearchScreen/SearchScreen";
 import CalendarScreen from "./Screens/Calendar/Calendar";
@@ -38,14 +39,19 @@ const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
 // Define Stack Navigators for each tab
 
 const HomeStack = () => (
-  <HomeStackNav.Navigator screenOptions={{ headerShown: false }}>
-    <HomeStackNav.Screen name="HomeScreen" component={HomeScreen} />
-    <HomeStackNav.Screen name="AllCases" component={CasesList} options={{ headerShown: true, title: "All Cases" }} />
-    <HomeStackNav.Screen name="CaseDetail" component={CaseDetail} options={{ headerShown: true, title: "Case Details" }} />
-    <HomeStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ headerShown: true, title: "Edit Case" }} />
-    <HomeStackNav.Screen name="AddCase" component={AddCase} options={{ headerShown: true, title: "Add New Case" }} />
-    <HomeStackNav.Screen name="AddCaseDetails" component={AddCaseDetails} options={{ headerShown: true, title: "Add Case Details" }} />
-    {/* Documents and Fees screens can be added here as needed */}
+  <HomeStackNav.Navigator screenOptions={{ headerShown: true }}>{/* Default to true for this stack */}
+    <HomeStackNav.Screen name="HomeScreen" component={HomeScreen} options={{ headerShown: false }} />{/* HomeScreen has custom header */}
+    <HomeStackNav.Screen name="AllCases" component={CasesList} options={{ title: "All Cases" }} />
+    {/* CaseDetail now points to the new CaseDetailsScreen (which was CaseDetailsScreenV2) */}
+    <HomeStackNav.Screen
+      name="CaseDetail"
+      component={CaseDetailsScreen} // This should be the new one, as CaseDetailsScreenV2 was renamed to this.
+      options={{ title: "Case Details" }} // Title is set dynamically within the screen
+    />
+    {/* CaseDetailsV2 screen entry removed */}
+    <HomeStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
+    <HomeStackNav.Screen name="AddCase" component={AddCase} options={{ title: "Add New Case" }} />
+    <HomeStackNav.Screen name="AddCaseDetails" component={AddCaseDetails} options={{ title: "Case Form" }} />
   </HomeStackNav.Navigator>
 );
 

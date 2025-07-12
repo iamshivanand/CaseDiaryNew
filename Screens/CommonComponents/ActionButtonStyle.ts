@@ -1,21 +1,17 @@
 // Screens/CommonComponents/ActionButtonStyle.ts
 import { StyleSheet } from "react-native";
+import { Theme } from "../../Providers/ThemeProvider"; // Adjust path as needed
 
-const PRIMARY_COLOR = "#1D4ED8"; // Blue
-const SECONDARY_COLOR = "#6B7280"; // Gray
-const WHITE_COLOR = "#FFFFFF";
-const LIGHT_GRAY_BORDER = "#D1D5DB";
-
-export const ActionButtonStyle = StyleSheet.create({
+export const getActionButtonStyles = (theme: Theme) => StyleSheet.create({
   button: {
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: 'row', // To accommodate icon + text
+    flexDirection: 'row',
     minHeight: 50,
-    marginVertical: 8, // Margin between buttons if stacked
+    marginVertical: 8,
   },
   buttonText: {
     fontSize: 16,
@@ -23,35 +19,34 @@ export const ActionButtonStyle = StyleSheet.create({
     textAlign: 'center',
   },
   iconWrapper: {
-    marginRight: 8, // Space between icon and text
+    marginRight: 8,
   },
-  // Primary Button (Solid)
   primaryButton: {
-    backgroundColor: PRIMARY_COLOR,
+    backgroundColor: theme.colors.primary,
   },
   primaryButtonText: {
-    color: WHITE_COLOR,
+    // Assuming primary button text is light/white on a dark primary color
+    color: theme.colors.primaryButtonText || theme.colors.background,
   },
-  // Secondary Button (Ghost/Outlined) - Cancel button style
   secondaryButton: {
-    backgroundColor: "transparent", // Ghost style
-    // borderWidth: 1, // Uncomment for outlined style
-    // borderColor: SECONDARY_COLOR, // Uncomment for outlined style
+    backgroundColor: "transparent",
+    // For outlined secondary:
+    // borderWidth: 1,
+    // borderColor: theme.colors.textSecondary || '#6B7280',
   },
   secondaryButtonText: {
-    color: SECONDARY_COLOR, // Default gray for secondary actions
+    color: theme.colors.textSecondary || theme.colors.primary, // Fallback to primary for secondary text if textSecondary not defined
   },
-  // Dashed Button (for "Add New...")
   dashedButton: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: PRIMARY_COLOR, // Use primary color for border
+    borderColor: theme.colors.primary,
     borderStyle: "dashed",
-    paddingVertical: 12, // Slightly less padding for dashed
+    paddingVertical: 12,
   },
   dashedButtonText: {
-    color: PRIMARY_COLOR,
-    fontWeight: "600", // Slightly less bold than primary/secondary
+    color: theme.colors.primary,
+    fontWeight: "600",
   },
   disabledButton: {
     opacity: 0.6,

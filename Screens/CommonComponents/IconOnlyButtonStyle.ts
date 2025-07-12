@@ -1,17 +1,20 @@
 // Screens/CommonComponents/IconOnlyButtonStyle.ts
 import { StyleSheet } from "react-native";
+import { Theme } from "../../Providers/ThemeProvider"; // Adjust path as needed
 
-export const IconOnlyButtonStyle = StyleSheet.create({
+export const getIconOnlyButtonStyles = (theme: Theme) => StyleSheet.create({
   button: {
-    padding: 8, // Adequate touch area
-    borderRadius: 20, // Circular or rounded square, adjust as needed
+    padding: 8,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    // Example: specify a min width/height if icons vary a lot in size
-    // minWidth: 36,
-    // minHeight: 36,
+    // Example: if you want a themed background on hover/press (more complex for TouchableOpacity)
+    // backgroundColor: theme.colors.iconButtonBackground || 'transparent',
   },
   disabled: {
-    opacity: 0.5,
+    opacity: 0.5, // Standard way to show disabled for icon buttons
   }
 });
+
+// Suggested new theme colors (if background is desired):
+// iconButtonBackground?: string;
