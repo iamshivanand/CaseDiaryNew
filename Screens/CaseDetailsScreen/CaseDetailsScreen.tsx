@@ -1,8 +1,9 @@
 // Screens/CaseDetailsScreen/CaseDetailsScreen.tsx
 import React, { useState, useEffect, useLayoutEffect, useCallback, useContext } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, FlatList, Alert, Platform, StyleSheet as ReactNativeStyleSheet } from 'react-native'; // Use ReactNativeStyleSheet alias for local styles if needed
+import { View, Text, ActivityIndicator, FlatList, Alert, Platform, StyleSheet as ReactNativeStyleSheet } from 'react-native'; // Removed ScrollView
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+// Icon import seems unused, can be removed if not needed for other parts not shown or future use.
+// import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as FileSystem from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
@@ -11,7 +12,7 @@ import { HomeStackParamList } from '../../Types/navigationtypes';
 import { CaseData, Document, TimelineEvent } from '../../Types/appTypes';
 import * as db from '../../DataBase';
 import { CaseWithDetails } from '../../DataBase';
-import { ThemeContext, Theme } from '../../Providers/ThemeProvider';
+import { ThemeContext } from '../../Providers/ThemeProvider';
 
 import { getCaseDetailsScreenStyles } from './CaseDetailsScreenStyle';
 import StatusBadge from './components/StatusBadge';
@@ -23,21 +24,34 @@ import ActionButton from '../CommonComponents/ActionButton';
 
 type CaseDetailsScreenRouteProp = RouteProp<HomeStackParamList, 'CaseDetail'>;
 
-const PRIMARY_BLUE_COLOR_FOR_LOADER = '#3B82F6'; // Fallback if theme not providing it
+const PRIMARY_BLUE_COLOR_FOR_LOADER = '#3B82F6';
+
+// Define item types for the main FlatList
+type ListItemType =
+  | { type: 'summary'; data: CaseWithDetails }
+  | { type: 'description'; text: string }
+  | { type: 'documentsHeader' }
+  | { type: 'document'; data: Document; id: string }
+  | { type: 'noDocuments' }
+  | { type: 'timelineHeader' }
+  | { type: 'timelineEvent'; data: TimelineEvent; isLast: boolean; id: string }
+  | { type: 'noTimelineEvents' }
+  | { type: 'loadingDocuments' };
+
 
 const CaseDetailsScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<CaseDetailsScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
-  const styles = getCaseDetailsScreenStyles(theme); // Generate themed styles
+  const styles = getCaseDetailsScreenStyles(theme);
 
-  const caseId = route.params?.caseId;
+  // const caseId = route.params?.caseId; // Already available via route.params.caseId
 
   const [caseDetailsData, setCaseDetailsData] = useState<CaseWithDetails | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // Overall loading for the screen
-  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false); // Specific for document list
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
 
   useLayoutEffect(() => {
     if (caseDetailsData?.CaseTitle) {
@@ -51,7 +65,7 @@ const CaseDetailsScreen: React.FC = () => {
 
   const loadDocumentsAndTimeline = useCallback(async (currentCaseId: number) => {
     if (!currentCaseId) return;
-    setIsLoadingDocuments(true); // This can be true while main details are also loading or after
+    setIsLoadingDocuments(true);
     try {
       const fetchedDocs = await db.getCaseDocuments(currentCaseId);
       const uiDocs: Document[] = fetchedDocs.map(dbDoc => ({
@@ -61,12 +75,10 @@ const CaseDetailsScreen: React.FC = () => {
       }));
       setDocuments(uiDocs);
 
-      // Dummy Timeline Data (Replace with actual fetch: await db.getTimelineEventsByCaseId(currentCaseId))
-      setTimelineEvents([
-        { id: 'tl1', date: '2023-10-20T00:00:00.000Z', description: 'Initial consultation with client. Case details discussed extensively.', _status: 'synced' },
-        { id: 'tl2', date: '2023-10-25T00:00:00.000Z', description: 'Case filed with the District Court of Cityville. All necessary paperwork submitted.', _status: 'synced' },
-        { id: 'tl3', date: '2023-11-05T00:00:00.000Z', description: 'First hearing scheduled. Client and legal team prepared initial arguments.', _status: 'synced' },
-      ]);
+      // Replace with actual fetch: await db.getTimelineEventsByCaseId(currentCaseId)
+      const fetchedTimelineEvents = await db.getTimelineEventsByCaseId(currentCaseId);
+      setTimelineEvents(fetchedTimelineEvents.map(tle => ({...tle, id: tle.id.toString() })));
+
     } catch (error) {
       console.error("Error loading associated data (documents/timeline) for case:", error);
       Alert.alert("Error", "Could not load associated case data.");
@@ -105,6 +117,7 @@ const CaseDetailsScreen: React.FC = () => {
     fetchAllData();
   }, [route.params?.caseId, navigation, loadDocumentsAndTimeline]);
 
+
   const handleEditCase = () => {
     if (caseDetailsData) {
       const caseDataForEdit: Partial<CaseData> = {
@@ -113,20 +126,21 @@ const CaseDetailsScreen: React.FC = () => {
         FiledDate: caseDetailsData.dateFiled,
         HearingDate: caseDetailsData.NextDate,
         documents: documents,
-        timelineEvents: timelineEvents
+        timelineEvents: timelineEvents // Ensure timeline events are also passed if needed
       };
       navigation.navigate('EditCase', { initialCaseData: caseDataForEdit });
     }
   };
 
   const handleAddNewDocument = () => {
-    if (caseDetailsData) {
-       const caseDataForEdit: Partial<CaseData> = {
+     if (caseDetailsData) { // Navigating to EditCase, which now handles document additions
+      const caseDataForEdit: Partial<CaseData> = {
         ...caseDetailsData, Status: caseDetailsData.CaseStatus, FiledDate: caseDetailsData.dateFiled, HearingDate: caseDetailsData.NextDate, documents: documents, timelineEvents: timelineEvents
       };
-      navigation.navigate('EditCase', { initialCaseData: caseDataForEdit });
+      navigation.navigate('EditCase', { initialCaseData: caseDataForEdit, focusOn: 'documents' });
     }
   };
+
 
   const handleDocumentInteraction = async (doc: Document) => {
     if (!doc.stored_filename) {
@@ -139,7 +153,7 @@ const CaseDetailsScreen: React.FC = () => {
     try {
       const fileInfo = await FileSystem.getInfoAsync(localDocumentPath);
       if (!fileInfo.exists) {
-        Alert.alert("Error", "File not found."); return;
+        Alert.alert("Error", "File not found at: " + localDocumentPath); return;
       }
       if (Platform.OS === 'android') {
         const contentUri = await FileSystem.getContentUriAsync(localDocumentPath);
@@ -159,7 +173,80 @@ const CaseDetailsScreen: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+
+  const listData: ListItemType[] = [];
+  if (caseDetailsData) {
+    listData.push({ type: 'summary', data: caseDetailsData });
+    if (caseDetailsData.CaseDescription) {
+      listData.push({ type: 'description', text: caseDetailsData.CaseDescription });
+    }
+
+    listData.push({ type: 'documentsHeader' });
+    if (isLoadingDocuments) {
+        listData.push({ type: 'loadingDocuments'});
+    } else if (documents.length > 0) {
+      documents.forEach(doc => listData.push({ type: 'document', data: doc, id: `doc-${doc.id}` }));
+    } else {
+      listData.push({ type: 'noDocuments' });
+    }
+
+    listData.push({ type: 'timelineHeader' });
+    if (timelineEvents.length > 0) {
+      timelineEvents.forEach((event, index) => listData.push({ type: 'timelineEvent', data: event, isLast: index === timelineEvents.length - 1, id: `tl-${event.id}` }));
+    } else {
+      listData.push({ type: 'noTimelineEvents' });
+    }
+  }
+
+
+  const renderListItem = ({ item }: { item: ListItemType }) => {
+    switch (item.type) {
+      case 'summary':
+        return (
+          <View style={styles.summarySection}>
+            <Text style={styles.mainCaseTitle}>{item.data.CaseTitle || 'N/A'}</Text>
+            <Text style={styles.clientName}>Client: {item.data.ClientName || item.data.OnBehalfOf || 'N/A'}</Text>
+            <StatusBadge status={item.data.CaseStatus} />
+            <DateRow label="Filed" dateString={item.data.dateFiled} iconName="gavel" />
+            {item.data.CaseStatus === 'Closed' && (
+              <DateRow label="Closed" dateString={item.data.ClosedDate || item.data.updated_at} iconName="event-busy" />
+            )}
+          </View>
+        );
+      case 'description':
+        return (
+          <View style={styles.descriptionSection}>
+            <SectionHeader title="Case Description" />
+            <Text style={styles.descriptionText}>{item.text}</Text>
+          </View>
+        );
+      case 'documentsHeader':
+        return <View style={styles.documentsSection}><SectionHeader title="Documents" /></View>;
+      case 'loadingDocuments':
+        return <View style={styles.centered}><ActivityIndicator color={theme.colors.primary || PRIMARY_BLUE_COLOR_FOR_LOADER} /></View>;
+      case 'document':
+        return (
+          <DocumentCard
+            document={item.data}
+            onPress={() => handleDocumentInteraction(item.data)}
+            onDownloadPress={() => handleDocumentInteraction(item.data)} // Assuming press and download do same for now
+          />
+        );
+      case 'noDocuments':
+        return <View style={styles.documentsSection}><Text style={styles.noItemsText}>No documents available.</Text></View>;
+      case 'timelineHeader':
+        return <View style={styles.timelineSection}><SectionHeader title="Case Timeline" /></View>;
+      case 'timelineEvent':
+        return <TimelineEventItem event={item.data} isLast={item.isLast} />;
+      case 'noTimelineEvents':
+        return <View style={styles.timelineSection}><Text style={styles.noItemsText}>No timeline events available.</Text></View>;
+      default:
+        return null;
+    }
+  };
+
+
+  if (isLoading && !caseDetailsData) { // Show full screen loader only if no data at all yet
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={theme.colors.primary || PRIMARY_BLUE_COLOR_FOR_LOADER} />
@@ -168,7 +255,7 @@ const CaseDetailsScreen: React.FC = () => {
     );
   }
 
-  if (!caseDetailsData) {
+  if (!caseDetailsData && !isLoading) { // No data and not loading -> error or empty state
     return (
       <View style={styles.centered}>
         <Text style={styles.centeredText}>No case data found or error loading.</Text>
@@ -176,59 +263,23 @@ const CaseDetailsScreen: React.FC = () => {
     );
   }
 
+
   return (
-    <View style={{flex: 1}}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.summarySection}>
-          <Text style={styles.mainCaseTitle}>{caseDetailsData.CaseTitle || 'N/A'}</Text>
-          <Text style={styles.clientName}>Client: {caseDetailsData.ClientName || caseDetailsData.OnBehalfOf || 'N/A'}</Text>
-          <StatusBadge status={caseDetailsData.CaseStatus} />
-          <DateRow label="Filed" dateString={caseDetailsData.dateFiled} iconName="gavel" />
-          {caseDetailsData.CaseStatus === 'Closed' && (
-             <DateRow label="Closed" dateString={caseDetailsData.ClosedDate || caseDetailsData.updated_at} iconName="event-busy" />
-          )}
-        </View>
-
-        {caseDetailsData.CaseDescription && (
-            <View style={styles.descriptionSection}>
-                <SectionHeader title="Case Description" />
-                <Text style={styles.descriptionText}>{caseDetailsData.CaseDescription}</Text>
-            </View>
-        )}
-
-        <View style={styles.documentsSection}>
-            <SectionHeader title="Documents" />
-            {isLoadingDocuments ? <ActivityIndicator color={theme.colors.primary || PRIMARY_BLUE_COLOR_FOR_LOADER} /> : documents.length > 0 ? (
-                <FlatList
-                    data={documents}
-                    renderItem={({item}) => (
-                        <DocumentCard
-                            document={item}
-                            onPress={() => handleDocumentInteraction(item)}
-                            onDownloadPress={() => handleDocumentInteraction(item)}
-                        />
-                    )}
-                    keyExtractor={(item) => item.id.toString()}
-                />
-            ) : (
-                <Text style={styles.noItemsText}>No documents available.</Text>
-            )}
-        </View>
-
-        <View style={styles.timelineSection}>
-            <SectionHeader title="Case Timeline" />
-             {timelineEvents.length > 0 ? (
-                <FlatList
-                    data={timelineEvents}
-                    renderItem={({item, index}) => <TimelineEventItem event={item} isLast={index === timelineEvents.length -1} />}
-                    keyExtractor={(item) => item._clientSideId || item.id.toString()} // Use clientSideId for new items
-                />
-            ) : (
-                <Text style={styles.noItemsText}>No timeline events available.</Text>
-            )}
-        </View>
-      </ScrollView>
-
+    <View style={{flex: 1, backgroundColor: theme.colors.background }}>
+      <FlatList
+        data={listData}
+        renderItem={renderListItem}
+        keyExtractor={(item, index) => {
+            // Ensure unique keys based on type and content
+            if ('id' in item && item.id) return item.id.toString();
+            if ('type' in item) return `${item.type}-${index}`;
+            return `item-${index}`;
+        }}
+        style={styles.container} // Use the old ScrollView's container style
+        contentContainerStyle={styles.contentContainer} // Use the old ScrollView's contentContainerStyle
+        // ListHeaderComponent could be used if there's content that should always be at the top
+        // and not part of the itemized listData, but here everything is an item.
+      />
       <View style={styles.bottomActionsContainer}>
         <ActionButton
           title="Edit Case"
