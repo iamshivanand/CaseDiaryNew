@@ -106,18 +106,20 @@ const CasesList = (/*{ navigation, routes }*/) => {
   };
 
   const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number) => {
-    if (!selectedCase) return;
+    if (!selectedCase || !selectedCase.id) return;
+    const caseId = parseInt(selectedCase.id.toString(), 10);
+    if(isNaN(caseId)) return;
 
     try {
       // 1. Add timeline event
       await addCaseTimelineEvent({
-        case_id: parseInt(selectedCase.id, 10),
+        case_id: caseId,
         hearing_date: new Date().toISOString(),
         notes: notes,
       });
 
       // 2. Update case's next hearing date
-      await updateCase(parseInt(selectedCase.id, 10), {
+      await updateCase(caseId, {
         NextDate: nextHearingDate.toISOString(),
       }, userId);
 
