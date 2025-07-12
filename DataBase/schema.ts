@@ -381,3 +381,44 @@ export const tableExists = async (db: SQLite.SQLiteDatabase, tableName: string):
   );
   return (result?.count ?? 0) > 0;
 };
+
+// Function to seed initial data
+export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> => {
+  console.log("Seeding initial data...");
+
+  // Seed Districts
+  try {
+    for (const district of PREDEFINED_DISTRICTS) {
+      // Using INSERT OR IGNORE to avoid errors if data already exists.
+      // Adjust unique constraints in table DDL if simple name uniqueness is desired for global items.
+      // Current DDL has UNIQUE (name, state, user_id), so user_id NULL means unique by name+state.
+      await db.runAsync(
+        "INSERT OR IGNORE INTO Districts (name, state, user_id) VALUES (?, ?, NULL)",
+        [district.name, district.state]
+      );
+    }
+    console.log("Predefined districts seeded or already exist.");
+  } catch (error) {
+    console.error("Error seeding predefined districts:", error);
+    // Decide if you want to throw, or just log and continue
+  }
+
+  // Seed Case Types
+  try {
+    for (const caseType of PREDEFINED_CASE_TYPES) {
+      // Current DDL has UNIQUE (name, user_id), so user_id NULL means unique by name.
+      await db.runAsync(
+        "INSERT OR IGNORE INTO CaseTypes (name, user_id) VALUES (?, NULL)",
+        [caseType.name]
+      );
+    }
+    console.log("Predefined case types seeded or already exist.");
+  } catch (error) {
+    console.error("Error seeding predefined case types:", error);
+    // Decide if you want to throw, or just log and continue
+  }
+
+  // Add other predefined data seeding here if necessary (e.g., Courts, PoliceStations if they have global entries)
+
+  console.log("Initial data seeding process complete.");
+};
