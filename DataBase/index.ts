@@ -176,7 +176,6 @@ export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?:
   try {
     const result = await db.runAsync(sql, valuesToUpdate);
     if (result.changes > 0) {
-      await logCaseChanges(id, currentCaseData, data, actorUserId);
       return true;
     }
     return false;
@@ -191,42 +190,6 @@ export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?:
     );
     throw error;
   }
-};
-
-const TRACKED_CASE_FIELDS: Array<keyof Omit<CaseRow, 'id' | 'uniqueId' | 'created_at' | 'updated_at'>> = [
-  'user_id', 'CaseTitle', 'ClientName', 'OnBehalfOf', 'CNRNumber', 'case_number', 'case_year',
-  'court_id', 'court_name', 'case_type_id', 'case_type_name',
-  'dateFiled', 'NextDate', 'PreviousDate', 'StatuteOfLimitations', 'ClosedDate', // Added ClosedDate
-  'crime_number', 'crime_year', 'police_station_id', 'Undersection',
-  'FirstParty', 'OppositeParty', 'Accussed', 'ClientContactNumber',
-  'JudgeName', 'OpposingCounsel', 'OppositeAdvocate', 'OppAdvocateContactNumber',
-  'CaseStatus', 'Priority', 'CaseDescription', 'CaseNotes'
-];
-interface CaseHistoryLogEntryData { case_id: number; field_changed: string; old_value: string | null; new_value: string | null; user_id?: number | null; }
-
-export const addCaseHistoryEntry = async (entry: CaseHistoryLogEntryData): Promise<number | null> => {
-    const db = await getDb();
-    try {
-        const result = await db.runAsync(
-        "INSERT INTO CaseHistoryLog (case_id, user_id, field_changed, old_value, new_value, timestamp) VALUES (?, ?, ?, ?, ?, STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))",
-        [entry.case_id, entry.user_id ?? null, entry.field_changed, entry.old_value, entry.new_value]
-        );
-        return result.lastInsertRowId;
-    } catch (error) { console.error("Error adding case history entry:", error); throw error; }
-};
-
-const logCaseChanges = async ( caseId: number, oldData: CaseRow, newData: CaseUpdateData, actorUserId?: number | null) => {
-    for (const key of TRACKED_CASE_FIELDS) {
-        if (newData.hasOwnProperty(key)) {
-            const oldValue = oldData[key] !== undefined && oldData[key] !== null ? String(oldData[key]) : null;
-            const newValue = newData[key as keyof CaseUpdateData] !== undefined && newData[key as keyof CaseUpdateData] !== null ? String(newData[key as keyof CaseUpdateData]) : null;
-            if (oldValue !== newValue) {
-                await addCaseHistoryEntry({
-                    case_id: caseId, field_changed: key, old_value: oldValue, new_value: newValue, user_id: actorUserId
-                });
-            }
-        }
-    }
 };
 
 export const deleteCase = async (id: number, userId?: number | null): Promise<boolean> => {

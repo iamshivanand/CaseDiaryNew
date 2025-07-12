@@ -294,23 +294,6 @@ BEGIN
   UPDATE Cases SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = OLD.id;
 END;`;
 
-// Future table for CaseHistoryLog (defined here for completeness of schema design)
-export const CREATE_CASE_HISTORY_LOG_TABLE = `
-CREATE TABLE IF NOT EXISTS CaseHistoryLog (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  case_id INTEGER NOT NULL,
-  timestamp TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-  user_id INTEGER, -- Who made the change (if available)
-  field_changed TEXT NOT NULL,
-  old_value TEXT,
-  new_value TEXT,
-  FOREIGN KEY (case_id) REFERENCES Cases(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE SET NULL
-);`;
-export const CREATE_CASE_HISTORY_LOG_CASE_ID_INDEX = `
-CREATE INDEX IF NOT EXISTS idx_casehistorylog_case_id ON CaseHistoryLog(case_id);
-`;
-
 export const CREATE_CASE_TIMELINE_TABLE = `
 CREATE TABLE IF NOT EXISTS CaseTimeline (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -362,8 +345,6 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   await db.execAsync(CREATE_CASES_UPDATED_AT_TRIGGER); // Trigger for Cases
   await db.execAsync(CREATE_CASE_DOCUMENTS_TABLE);
   await db.execAsync(CREATE_CASE_DOCUMENTS_CASE_ID_INDEX);
-  await db.execAsync(CREATE_CASE_HISTORY_LOG_TABLE);
-  await db.execAsync(CREATE_CASE_HISTORY_LOG_CASE_ID_INDEX);
   await db.execAsync(CREATE_CASE_TIMELINE_TABLE);
   await db.execAsync(CREATE_CASE_TIMELINE_CASE_ID_INDEX);
   await db.execAsync(CREATE_CASE_TIMELINE_UPDATED_AT_TRIGGER);

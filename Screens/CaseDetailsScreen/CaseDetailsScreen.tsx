@@ -224,6 +224,18 @@ const CaseDetailsScreen: React.FC = () => {
               dateString={item.data.lastUpdate}
               iconName="update"
             />
+            <Text style={styles.detailText}>Case Number: {item.data.case_number}</Text>
+            <Text style={styles.detailText}>Case Year: {item.data.case_year}</Text>
+            <Text style={styles.detailText}>Court Name: {item.data.court_name}</Text>
+            <Text style={styles.detailText}>Case Type: {item.data.case_type_name}</Text>
+            <Text style={styles.detailText}>On Behalf Of: {item.data.OnBehalfOf}</Text>
+            <Text style={styles.detailText}>First Party: {item.data.FirstParty}</Text>
+            <Text style={styles.detailText}>Opposite Party: {item.data.OppositeParty}</Text>
+            <Text style={styles.detailText}>Accused: {item.data.Accussed}</Text>
+            <Text style={styles.detailText}>Under Section: {item.data.Undersection}</Text>
+            <Text style={styles.detailText}>Priority: {item.data.Priority}</Text>
+            <Text style={styles.detailText}>Case Description: {item.data.CaseDescription}</Text>
+            <Text style={styles.detailText}>Case Notes: {item.data.CaseNotes}</Text>
             <ActionButton
               title="Edit Case"
               onPress={handleEditCase}
@@ -291,6 +303,10 @@ const styles = StyleSheet.create({
   clientName: {
     fontSize: 16,
     marginBottom: 12,
+  },
+  detailText: {
+    fontSize: 14,
+    marginBottom: 8,
   },
 });
 
