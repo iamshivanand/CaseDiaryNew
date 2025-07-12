@@ -13,21 +13,13 @@ import { CaseDocument } from '../../DataBase/schema';
 // The screen should ideally receive caseId if the case exists, or uniqueId if it's a new case.
 // Let's adjust props to reflect this possibility.
 export type DocumentUploadRouteParams = {
-  uniqueId: string; // For new cases, before DB ID is generated
-  caseId?: number;   // For existing cases
-  // update?: boolean; // From original props, seems less relevant now
+  caseId?: number; // For existing cases
 };
 
 type DocumentUploadScreenRouteProp = RouteProp<{ Documents: DocumentUploadRouteParams }, 'Documents'>;
 
-const DocumentUpload: React.FC = () => {
+const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
   const theme = useTheme();
-  const route = useRoute<DocumentUploadScreenRouteProp>();
-
-  // caseId will be present if we are editing an existing case.
-  // uniqueId is for new cases, but we can't save documents with it directly to CaseDocuments table
-  // as it requires a case_id.
-  const { caseId, uniqueId } = route.params;
 
   const [documents, setDocuments] = useState<CaseDocument[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,13 +53,6 @@ const DocumentUpload: React.FC = () => {
   );
 
   const handlePickAndUploadDocument = async () => {
-    if (!caseId) {
-      Alert.alert("Save Case First", "Please save the main case details before adding documents.");
-      // TODO: Implement temporary storage for documents if adding to a new (unsaved) case.
-      // For now, we only allow adding documents to an existing case with a caseId.
-      return;
-    }
-
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: "*/*", // Allow all file types, or specify (e.g., 'application/pdf', 'image/*')
@@ -200,16 +185,10 @@ const DocumentUpload: React.FC = () => {
         style={styles.addButton}
         icon="plus"
         loading={isUploading}
-        disabled={isUploading || !caseId} // Disable if no caseId (new case not yet saved)
+        disabled={isUploading}
       >
         Add Document
       </Button>
-      {!caseId && (
-        <Text style={styles.noticeText}>
-            Save the main case details first to enable document uploads.
-        </Text>
-      )}
-
       {loading && documents.length === 0 ? (
         <ActivityIndicator animating={true} size="large" style={styles.loader} />
       ) : (
@@ -219,7 +198,7 @@ const DocumentUpload: React.FC = () => {
           keyExtractor={(item) => item.id.toString()}
           ItemSeparatorComponent={() => <Divider />}
           ListEmptyComponent={
-            !loading && caseId ? <Text style={styles.emptyText}>No documents attached to this case yet.</Text> : null
+            !loading ? <Text style={styles.emptyText}>No Documents Yet</Text> : null
           }
           contentContainerStyle={styles.listContentContainer}
         />

@@ -224,18 +224,52 @@ const CaseDetailsScreen: React.FC = () => {
               dateString={item.data.lastUpdate}
               iconName="update"
             />
-            <Text style={styles.detailText}>Case Number: {item.data.case_number}</Text>
-            <Text style={styles.detailText}>Case Year: {item.data.case_year}</Text>
-            <Text style={styles.detailText}>Court Name: {item.data.court_name}</Text>
-            <Text style={styles.detailText}>Case Type: {item.data.case_type_name}</Text>
-            <Text style={styles.detailText}>On Behalf Of: {item.data.OnBehalfOf}</Text>
-            <Text style={styles.detailText}>First Party: {item.data.FirstParty}</Text>
-            <Text style={styles.detailText}>Opposite Party: {item.data.OppositeParty}</Text>
-            <Text style={styles.detailText}>Accused: {item.data.Accussed}</Text>
-            <Text style={styles.detailText}>Under Section: {item.data.Undersection}</Text>
-            <Text style={styles.detailText}>Priority: {item.data.Priority}</Text>
-            <Text style={styles.detailText}>Case Description: {item.data.CaseDescription}</Text>
-            <Text style={styles.detailText}>Case Notes: {item.data.CaseNotes}</Text>
+            <View style={styles.detailsContainer}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Case Number:</Text>
+                <Text style={styles.detailValue}>{item.data.case_number || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Case Year:</Text>
+                <Text style={styles.detailValue}>{item.data.case_year || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Court Name:</Text>
+                <Text style={styles.detailValue}>{item.data.court_name || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Case Type:</Text>
+                <Text style={styles.detailValue}>{item.data.case_type_name || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>On Behalf Of:</Text>
+                <Text style={styles.detailValue}>{item.data.OnBehalfOf || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>First Party:</Text>
+                <Text style={styles.detailValue}>{item.data.FirstParty || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Opposite Party:</Text>
+                <Text style={styles.detailValue}>{item.data.OppositeParty || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Accused:</Text>
+                <Text style={styles.detailValue}>{item.data.Accussed || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Under Section:</Text>
+                <Text style={styles.detailValue}>{item.data.Undersection || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Priority:</Text>
+                <Text style={styles.detailValue}>{item.data.Priority || 'N/A'}</Text>
+              </View>
+            </View>
+            <Text style={styles.detailLabel}>Case Description:</Text>
+            <Text style={styles.detailValue}>{item.data.CaseDescription || 'N/A'}</Text>
+            <Text style={styles.detailLabel}>Case Notes:</Text>
+            <Text style={styles.detailValue}>{item.data.CaseNotes || 'N/A'}</Text>
             <ActionButton
               title="Edit Case"
               onPress={handleEditCase}
@@ -304,9 +338,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 12,
   },
-  detailText: {
-    fontSize: 14,
+  detailsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  detailRow: {
+    width: '48%',
     marginBottom: 8,
+  },
+  detailLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  detailValue: {
+    fontSize: 14,
   },
 });
 
