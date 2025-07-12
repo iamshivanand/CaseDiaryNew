@@ -1,466 +1,343 @@
-import { Fontisto } from "@expo/vector-icons";
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
-import { Picker } from "@react-native-picker/picker";
-import { RouteProp, useNavigation } from "@react-navigation/native";
-import { StackNavigationProp } from "@react-navigation/stack";
 import { Formik, FormikProps } from "formik";
-import React, { useEffect, useState } from "react";
+import React, { useMemo } from "react";
 import {
   StyleSheet,
   Text,
-  TextInput,
   View,
-  Button,
-  TouchableOpacity,
   ScrollView,
+  Alert, // Added for user feedback
 } from "react-native";
-import Autocomplete from "react-native-autocomplete-input";
 import * as Yup from "yup";
+import { RouteProp, useNavigation } from "@react-navigation/native";
+import { v4 as uuidv4 } from "uuid";
 
 import {
-  insertFormAsync,
-  updateFormAsync,
-  FormData,
-  getSuggestions,
+  addCase,
+  updateCase,
+  CaseInsertData,
+  CaseUpdateData,
 } from "../../DataBase";
-import { RootStackParamList } from "../../Types/navigationtypes";
-import { formatDate } from "../../utils/commonFunctions";
+import { HomeStackParamList } from "../../Types/navigationtypes";
 import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen";
-import SuggestionInput from "../CommonComponents/SuggestionsInput";
+import { CaseData, DropdownOption as AppDropdownOption, caseStatusOptions, priorityOptions } from "../../Types/appTypes";
 
-interface Field {
-  name: string;
-  type: string;
+import FormInput from '../CommonComponents/FormInput';
+import DropdownPicker from '../CommonComponents/DropdownPicker';
+import DatePickerField from '../CommonComponents/DatePickerField';
+import ActionButton from "../CommonComponents/ActionButton";
+// import { EditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle"; // Will use its own themed styles
+import { ThemeContext, Theme } from "../../Providers/ThemeProvider"; // Import ThemeContext and Theme
+import { getEditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle"; // For base screen style
+
+interface FieldDefinition {
+  name: keyof CaseData;
+  type: "text" | "select" | "date" | "multiline";
   placeholder?: string;
   label: string;
-  options?: { label: string; value: string }[];
+  options?: AppDropdownOption[];
 }
 
-type AddCaseScreenRouteProp = RouteProp<RootStackParamList, "AddCase">;
+type AddCaseScreenRouteProp = RouteProp<HomeStackParamList, "AddCaseDetails">;
 
-type AddCaseScreenNavigationProp = StackNavigationProp<
-  RootStackParamList,
-  "AddCase" | "CaseDetail"
->;
-
-interface Props {
-  fields: Field[];
-  onSubmit: (values: { [key: string]: string }) => void;
-  update?: boolean;
-  initialValues?: CaseDetails;
-  route?: AddCaseScreenRouteProp;
-  navigation?: AddCaseScreenNavigationProp;
+interface AddCaseProps {
+  route: AddCaseScreenRouteProp;
 }
 
-const suggestionsInputFields = [
-  {
-    name: "CourtName",
-    type: "text",
-    placeholder: "Enter Court Name",
-    label: "Court Name",
-    //manual add
-  },
-  {
-    name: "OnBehalfOf",
-    type: "text",
-    placeholder: "On Behalf of",
-    label: "On Behalf of",
-    //this should contain the manual add
-  },
-  {
-    name: "Undersection",
-    type: "text",
-    placeholder: "UnderSection",
-    label: "UnderSection",
-  },
-  {
-    name: "PoliceStation",
-    type: "text",
-    placeholder: "Enter Police Station",
-    label: "Police Station",
-  },
-  {
-    name: "CaseStatus",
-    type: "text",
-    label: "Case Status",
-    placeholder: " Case Status",
-  },
+const dummyCaseTypeOptionsForAdd: AppDropdownOption[] = [
+  { label: 'Select Case Type...', value: '' }, { label: 'Civil Suit', value: 1 }, { label: 'Criminal Defense', value: 2 }, { label: 'Family Law', value: 3 }, { label: 'Corporate', value: 4 }, { label: 'Other', value: 99 },
+];
+const dummyCourtOptionsForAdd: AppDropdownOption[] = [
+  { label: 'Select Court...', value: '' }, { label: 'District Court - City Center', value: 1 }, { label: 'High Court - State Capital', value: 2 }, { label: 'Supreme Court', value: 3 },
 ];
 
-const Samplefields = [
-  {
-    name: "CNRNumber",
-    type: "text",
-    placeholder: "Enter CNR Number",
-    label: " CNR Number",
-  },
-  {
-    name: "CourtName",
-    type: "text",
-    placeholder: "Enter Court Name",
-    label: "Court Name",
-    //manual add
-  },
-  {
-    name: "caseType",
-    type: "select",
-    label: "Case Type",
-    options: [
-      { label: "Civil", value: "civil" },
-      { label: "Criminal", value: "criminal" },
-      { label: "Family", value: "family" },
-    ],
-    //options should be added manually
-  },
-  { name: "dateFiled", type: "date", label: "Date Filed" },
-  {
-    name: "CaseNo",
-    type: "text",
-    placeholder: "Enter Case Number",
-    label: "CaseNumber/STNumber",
-    //this must also have year field with dropdown and search
-  },
-  {
-    name: "CrimeNo",
-    type: "text",
-    placeholder: "Enter Crime Number",
-    label: "Crime Number",
-    //this must also have year field with dropdown and search
-  },
-  {
-    name: "OnBehalfOf",
-    type: "text",
-    placeholder: "On Behalf of",
-    label: "On Behalf of",
-    //this should contain the manual add
-  },
-  {
-    name: "FirstParty",
-    type: "text",
-    placeholder: "Enter First Party",
-    label: "Enter First Party",
-  },
-  {
-    name: "OppositeParty",
-    type: "text",
-    placeholder: "Enter Opposite Party",
-    label: "Enter Opposite Party",
-  },
-  {
-    name: "ClientContactNumber",
-    type: "text",
-    placeholder: "Enter Contact Number",
-    label: "Client Contact Number",
-  },
-  {
-    name: "Accussed",
-    type: "text",
-    placeholder: "Enter Accused Name",
-    label: "Accused",
-  },
-  {
-    name: "Undersection",
-    type: "text",
-    placeholder: "UnderSection",
-    label: "UnderSection",
-  },
-  {
-    name: "PoliceStation",
-    type: "text",
-    placeholder: "Enter Police Station",
-    label: "Police Station",
-  },
-  {
-    name: "District",
-    type: "select",
-    label: "District",
-    options: [
-      { label: "Bareilly", value: "Bareilly" },
-      { label: "Lucknow", value: "Lucknow" },
-    ],
-    //List all the Districts in india with search
-  },
-  {
-    name: "OppositeAdvocate",
-    type: "text",
-    label: "Opposite Advocate",
-    placeholder: "Opposite Advocate",
-  },
-  {
-    name: "OppAdvocateContactNumber",
-    type: "text",
-    label: "Opp. Advocate Contact No.",
-    placeholder: "Contact Number",
-  },
-  {
-    name: "CaseStatus",
-    type: "text",
-    label: "Case Status",
-    placeholder: " Case Status",
-  },
-  { name: "PreviousDate", type: "date", label: "Previous Date" },
-  { name: "NextDate", type: "date", label: "Next Date" },
-
-  // Add more fields with different types as needed
+const formFieldsDefinition: FieldDefinition[] = [
+  { name: "CaseTitle", type: "text", placeholder: "e.g., State vs. John Doe", label: "Case Title*" },
+  { name: "ClientName", type: "text", placeholder: "Enter Client's Full Name", label: "Client Name" },
+  { name: "case_number", type: "text", placeholder: "e.g., CS/123/2023", label: "Case Number" },
+  { name: "CNRNumber", type: "text", placeholder: "Enter CNR Number", label: "CNR Number"},
+  { name: "case_type_id", type: "select", label: "Case Type", options: dummyCaseTypeOptionsForAdd, placeholder: "Select Case Type..." },
+  { name: "court_id", type: "select", label: "Court", options: dummyCourtOptionsForAdd, placeholder: "Select Court..." },
+  { name: "FiledDate", type: "date", label: "Date Filed", placeholder: "Select date case was filed" },
+  { name: "JudgeName", type: "text", placeholder: "Enter Judge's Name", label: "Presiding Judge" },
+  { name: "OpposingCounsel", type: "text", placeholder: "Enter Opposing Counsel's Name", label: "Opposing Counsel" },
+  { name: "Status", type: "select", label: "Case Status", options: caseStatusOptions, placeholder: "Select Status..." },
+  { name: "Priority", type: "select", label: "Priority Level", options: priorityOptions, placeholder: "Select Priority..." },
+  { name: "HearingDate", type: "date", label: "Next Hearing Date", placeholder: "Select next hearing date" },
+  { name: "StatuteOfLimitations", type: "date", label: "Statute of Limitations", placeholder: "Select SOL date" },
+  { name: "FirstParty", type: "text", placeholder: "Enter First Party Name", label: "First Party" },
+  { name: "OppositeParty", type: "text", placeholder: "Enter Opposite Party Name", label: "Opposite Party" },
+  { name: "ClientContactNumber", type: "text", placeholder: "Enter Client's Contact Number", label: "Client Contact No." },
+  { name: "Accussed", type: "text", placeholder: "Enter Accused Name(s)", label: "Accused" },
+  { name: "Undersection", type: "text", placeholder: "e.g., Section 302 IPC", label: "Under Section(s)" },
+  { name: "CaseDescription", type: "multiline", placeholder: "Provide a brief summary...", label: "Case Description" },
+  { name: "CaseNotes", type: "multiline", placeholder: "Add any private notes...", label: "Internal Notes" },
+  // Example for other ID based fields that might become text or have text counterparts
+  // { name: "police_station_id", type: "select", label: "Police Station", options: [], placeholder: "Select Police Station..." }, // Needs data
+  // { name: "case_year", type: "text", placeholder: "YYYY", label: "Case Year"},
+  // { name: "crime_number", type: "text", placeholder: "Enter Crime Number", label: "Crime Number"},
+  // { name: "crime_year", type: "text", placeholder: "YYYY", label: "Crime Year"},
+  // { name: "OppAdvocateContactNumber", type: "text", placeholder: "Opposing Counsel Contact", label: "Opp. Counsel Contact"},
+  // { name: "PreviousDate", type: "date", label: "Previous Hearing Date", placeholder: "Select previous hearing date"},
 ];
 
-// Sample validation schema
 const validationSchema = Yup.object().shape({
-  // Define your validation rules here based on your fields
+  CaseTitle: Yup.string().required("Case Title is required"),
+  // Add other validations as needed
 });
 
-// Define a component to render different types of form inputs
-const FormField: React.FC<{
-  field: Field;
-  handleChange: FormikProps<{ [key: string]: string }>["handleChange"];
-  handleBlur: FormikProps<{ [key: string]: string }>["handleBlur"];
-  values: CaseDetails | { [key: string]: string };
-  errors: { [key: string]: string | undefined };
-  openDatePicker: () => void;
-  suggestionArray: string[];
-}> = ({
-  field,
-  handleChange,
-  handleBlur,
-  values,
-  errors,
-  openDatePicker,
-  suggestionArray,
-}) => {
-  switch (field.type) {
+const FormFieldRenderer: React.FC<{
+  fieldConfig: FieldDefinition;
+  formik: FormikProps<Partial<CaseData>>;
+}> = ({ fieldConfig, formik }) => {
+  const { values, errors, touched, setFieldValue } = formik;
+  const fieldName = fieldConfig.name;
+  const commonInputProps = {
+    label: fieldConfig.label,
+    error: (touched[fieldName] && errors[fieldName]) ? errors[fieldName] : undefined,
+  };
+
+  switch (fieldConfig.type) {
     case "text":
-      return (
-        // <View>
-        //   <Text style={styles.label}>{field.label}</Text>
-        //   <TextInput
-        //     id={field.name}
-        //     style={styles.inputField}
-        //     onChangeText={handleChange(field.name)}
-        //     onBlur={() => handleBlur(field.name)}
-        //     value={values[field.name]}
-        //     placeholder={field.placeholder}
-        //     data-name={field.name}
-        //   />
-        //   {errors[field.name] && (
-        //     <Text style={{ color: "red" }}>{errors[field.name]}</Text>
-        //   )}
-        // </View>
-        <SuggestionInput
-          key={field.name}
-          label={field.label}
-          placeholder={field.placeholder}
-          value={values[field.name]}
-          suggestions={suggestionArray}
-          onChangeText={handleChange(field.name)}
-          onBlur={handleBlur(field.name)}
-        />
-      );
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} />;
+    case "multiline":
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} style={{ minHeight: 80 }} />;
     case "select":
-      return (
-        <View>
-          <Text style={styles.label}>{field.label}</Text>
-          <View style={styles.dropdownContainer}>
-            <Picker
-              id={field.name}
-              selectedValue={values[field.name]}
-              onValueChange={(itemValue: string) =>
-                handleChange(field.name)(itemValue)
-              }
-              style={styles.dropdownContainer}
-            >
-              {field.options!.map((option, index) => (
-                <Picker.Item
-                  style={styles.dropdown}
-                  key={index}
-                  label={option.label}
-                  value={option.value}
-                />
-              ))}
-            </Picker>
-          </View>
-          {errors[field.name] && (
-            <Text style={{ color: "red" }}>{errors[field.name]}</Text>
-          )}
-        </View>
-      );
+      return <DropdownPicker {...commonInputProps} selectedValue={values[fieldName] as string | number | undefined} onValueChange={(itemValue) => setFieldValue(fieldName, itemValue)} options={fieldConfig.options || []} placeholder={fieldConfig.placeholder || `Select ${fieldConfig.label}...`} />;
     case "date":
-      return (
-        <View>
-          <Text style={styles.label}>{field.label}</Text>
-          <View style={styles.datePickerContainer}>
-            <TouchableOpacity onPress={openDatePicker}>
-              <Fontisto name="date" size={24} color="black" />
-            </TouchableOpacity>
-            {values[field.name] && (
-              <Text>{new Date(values[field.name]).toDateString()}</Text>
-            )}
-            {errors[field.name] && (
-              <Text style={{ color: "red" }}>{errors[field.name]}</Text>
-            )}
-          </View>
-        </View>
-      );
+      return <DatePickerField {...commonInputProps} value={values[fieldName] ? new Date(values[fieldName] as string) : null} onChange={(date) => setFieldValue(fieldName, date ? date.toISOString() : null)} placeholder={fieldConfig.placeholder || "Select date"} />;
     default:
+      console.warn("Unsupported field type:", fieldConfig.type);
       return null;
   }
 };
 
-const AddCase: React.FC<Props> = ({ fields = Samplefields, route }) => {
-  const { update = false, initialValues, uniqueId } = route?.params;
-  console.log("uniqueId value inAddcase", uniqueId);
+const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+  const params = route.params;
+  const { update = false, initialValues, uniqueId: routeUniqueId } = params ?? {};
+  const { theme } = React.useContext(ThemeContext); // Get theme
+  const styles = getAddCaseStyles(theme); // Generate styles with theme
+
   const navigation = useNavigation();
-  const [selectedDateField, setSelectedDateField] = useState<string | null>(
-    null
-  );
-  const [suggestions, setSuggestions] = useState({});
-  useEffect(() => {
-    // Reset selectedDateField state when the component re-renders
-    setSelectedDateField(null);
-  }, []);
-  useEffect(() => {
-    async function FetchSuggestion() {
-      try {
-        const data = await getSuggestions(global.db, suggestionsInputFields);
-        console.log("Suggestion bala data is ", data);
-        setSuggestions(data);
-      } catch (error) {
-        console.log("error fetching the Suggestions", error);
-      }
-    }
-    FetchSuggestion();
-  }, []);
+  const generatedUniqueId = useMemo(() => uuidv4(), []);
+  const uniqueIdToUse = routeUniqueId || initialValues?.uniqueId || generatedUniqueId;
 
-  const handleDatePickerChange = (
-    fieldName: string,
-    event: DateTimePickerEvent,
-    selectedDate?: Date,
-    setFieldValue?: (field: string, value: any) => void
-  ) => {
-    if (event.type === "set" && selectedDate) {
-      console.log("selectedDate is :", selectedDate);
-      setFieldValue(fieldName, formatDate(selectedDate.toISOString()));
+  const prepareFormInitialValues = (): Partial<CaseData> => {
+    const defaults: Partial<CaseData> = { uniqueId: uniqueIdToUse }; // Ensure uniqueId is part of defaults
+    formFieldsDefinition.forEach(field => {
+      if (field.name !== 'uniqueId') { // uniqueId is already set
+        defaults[field.name] = field.type === "date" ? null : (field.type === "select" ? (field.options?.[0]?.value ?? '') : '');
+      }
+    });
+
+    if (update && initialValues) {
+      const mappedInitialValues: Partial<CaseData> = { ...defaults };
+      // Map from CaseDetails (summary) to CaseData form fields
+      if (initialValues.uniqueId) mappedInitialValues.uniqueId = initialValues.uniqueId;
+      if (initialValues.id) mappedInitialValues.id = initialValues.id;
+      if (initialValues.caseNumber) mappedInitialValues.CaseTitle = initialValues.caseNumber;
+      if (initialValues.dateFiled) mappedInitialValues.FiledDate = initialValues.dateFiled.toISOString();
+
+      // For court & caseType, initialValues has names. formFieldsDefinition uses _id for selection.
+      // If we want to pre-select based on names, we'd need to find the ID from dummyOptions.
+      // For simplicity now, if updating, these will show placeholder unless full CaseData is passed.
+      const initialCourt = dummyCourtOptionsForAdd.find(opt => opt.label === initialValues.court);
+      if (initialCourt) mappedInitialValues.court_id = initialCourt.value;
+
+      const initialCaseType = dummyCaseTypeOptionsForAdd.find(opt => opt.label === initialValues.caseType);
+      if (initialCaseType) mappedInitialValues.case_type_id = initialCaseType.value;
+
+      // TODO: Map other fields from initialValues (CaseDetails) to respective CaseData fields if they exist
+      // Example: if (initialValues.onBehalfOf) mappedInitialValues.OnBehalfOf = initialValues.onBehalfOf;
+      // This part needs to be robust based on what CaseDetails actually contains.
+      return mappedInitialValues;
     }
-    setSelectedDateField(null);
+    return defaults;
   };
+
   const getChangedValues = (
-    initialValues: CaseDetails,
-    currentValues: { [key: string]: string }
-  ) => {
-    return Object.keys(currentValues).reduce(
-      (acc, key) => {
-        if (currentValues[key] !== initialValues[key]) {
-          acc[key] = currentValues[key];
+    initial: Partial<CaseData>,
+    current: Partial<CaseData>
+  ): Partial<CaseData> => {
+    const changed: Partial<CaseData> = {};
+    for (const key in current) {
+      if (Object.prototype.hasOwnProperty.call(current, key)) {
+        const currentKey = key as keyof CaseData;
+        if (current[currentKey] !== initial[currentKey]) {
+          changed[currentKey] = current[currentKey];
         }
-        return acc;
-      },
-      {} as { [key: string]: string }
-    );
-  };
-  const handleFinalSubmit = async (values: { [key: string]: string }) => {
-    console.log("Final form values:", values); // Log the final form values
-    try {
-      if (update) {
-        // Perform update operation
-        //to update need to pass unique Id field
-        //can filter the values those are changed
-        const changedValues = getChangedValues(
-          initialValues as CaseDetails,
-          values
-        );
-        await updateFormAsync(global.db, uniqueId, changedValues);
-        navigation.navigate("CaseDetail", {
-          caseDetails: values as CaseDetails,
-        });
-      } else {
-        // Perform insert operation
-        await insertFormAsync(global.db, { ...values, uniqueId });
-        console.log("Successfully inserted");
-        navigation.navigate("Documents" as never);
       }
-    } catch (error) {
-      console.log("Error in submitting the form", error);
-      return false;
     }
-    // onSubmit(values);
+    return changed;
   };
 
-  const openDatePicker = (fieldName: string) => {
-    setSelectedDateField(fieldName);
+
+  const handleSubmitForm = async (formValues: Partial<CaseData>) => {
+    console.log("Submitting form values:", formValues);
+
+    const selectedCourtOption = dummyCourtOptionsForAdd.find(opt => opt.value === formValues.court_id);
+    const courtNameString = selectedCourtOption && selectedCourtOption.value !== '' ? selectedCourtOption.label : null;
+    const selectedCaseTypeOption = dummyCaseTypeOptionsForAdd.find(opt => opt.value === formValues.case_type_id);
+    const caseTypeNameString = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : null;
+
+    if (update && initialValues?.id) {
+      const caseIdToUpdate = initialValues.id;
+
+      // Create a representation of initial form state based on 'initialValues' (CaseDetails)
+      // to correctly determine what has changed.
+      const initialFormStateForCompare = prepareFormInitialValues(); // This will use initialValues if in update mode.
+      const changedFields = getChangedValues(initialFormStateForCompare, formValues);
+
+      if (Object.keys(changedFields).length === 0) {
+        console.log("No changes detected to update.");
+        navigation.goBack();
+        return;
+      }
+
+      const updatePayload: CaseUpdateData = {
+        // Include only changed fields that are part of CaseUpdateData
+        ...(changedFields.CaseTitle && { CaseTitle: changedFields.CaseTitle }),
+        ...(changedFields.ClientName && { ClientName: changedFields.ClientName }),
+        ...(changedFields.CNRNumber && { CNRNumber: changedFields.CNRNumber }),
+        court_id: formValues.court_id || null, // Store the ID, FK constraint removed
+        court_name: courtNameString, // Store the name
+        dateFiled: changedFields.FiledDate,
+        case_type_id: formValues.case_type_id || null, // Store the ID, FK constraint removed
+        case_type_name: caseTypeNameString, // Store the name
+        ...(changedFields.case_number && { case_number: changedFields.case_number }),
+        ...(changedFields.case_year && { case_year: changedFields.case_year ? parseInt(changedFields.case_year as string, 10) : null }),
+        ...(changedFields.crime_number && { crime_number: changedFields.crime_number }),
+        ...(changedFields.crime_year && { crime_year: changedFields.crime_year ? parseInt(changedFields.crime_year as string, 10) : null }),
+        ...(changedFields.JudgeName && { JudgeName: changedFields.JudgeName }),
+        ...(changedFields.OnBehalfOf && { OnBehalfOf: changedFields.OnBehalfOf }),
+        ...(changedFields.FirstParty && { FirstParty: changedFields.FirstParty }),
+        ...(changedFields.OppositeParty && { OppositeParty: changedFields.OppositeParty }),
+        ...(changedFields.ClientContactNumber && { ClientContactNumber: changedFields.ClientContactNumber }),
+        ...(changedFields.Accussed && { Accussed: changedFields.Accussed }),
+        ...(changedFields.Undersection && { Undersection: changedFields.Undersection }),
+        ...(changedFields.police_station_id && { police_station_id: typeof changedFields.police_station_id === 'number' ? changedFields.police_station_id : null }),
+        ...(changedFields.StatuteOfLimitations && { StatuteOfLimitations: changedFields.StatuteOfLimitations }),
+        ...(changedFields.OpposingCounsel && { OpposingCounsel: changedFields.OpposingCounsel }),
+        ...(changedFields.OppositeAdvocate && { OppositeAdvocate: changedFields.OppositeAdvocate }),
+        ...(changedFields.OppAdvocateContactNumber && { OppAdvocateContactNumber: changedFields.OppAdvocateContactNumber }),
+        ...(changedFields.Status && { CaseStatus: changedFields.Status }), // Map form's Status to DB's CaseStatus
+        ...(changedFields.Priority && { Priority: changedFields.Priority }),
+        ...(changedFields.PreviousDate && { PreviousDate: changedFields.PreviousDate }),
+        ...(changedFields.HearingDate && { NextDate: changedFields.HearingDate }), // Map form's HearingDate to DB's NextDate
+        ...(changedFields.CaseDescription && { CaseDescription: changedFields.CaseDescription }),
+        ...(changedFields.CaseNotes && { CaseNotes: changedFields.CaseNotes }),
+      };
+       // Remove undefined properties from updatePayload
+       Object.keys(updatePayload).forEach(key => {
+        const K = key as keyof CaseUpdateData;
+        if (updatePayload[K] === undefined) {
+          delete updatePayload[K];
+        }
+      });
+
+
+      console.log("Attempting to update with payload:", JSON.stringify(updatePayload, null, 2));
+      try {
+        const success = await updateCase(caseIdToUpdate, updatePayload);
+        if (success) {
+          Alert.alert("Success", "Case updated successfully.");
+          const navDetails: CaseDetails = {
+            uniqueId: formValues.uniqueId || initialValues.uniqueId, // Use updated uniqueId from form if available
+            id: caseIdToUpdate,
+            caseNumber: formValues.CaseTitle || initialValues.caseNumber,
+            court: courtNameString || initialValues.court,
+            caseType: caseTypeNameString || initialValues.caseType,
+            dateFiled: formValues.FiledDate || (initialValues.dateFiled ? initialValues.dateFiled.toISOString() : undefined),
+          };
+          navigation.navigate("CaseDetail", { // Changed from CaseDetailsV2
+            caseId: caseIdToUpdate,
+            caseTitleHeader: navDetails.caseNumber
+          });
+        } else { Alert.alert("Error", "Failed to update case."); }
+      } catch (e) { console.error("Error updating case:", e); Alert.alert("Error", "An error occurred while updating.");}
+    } else { // ADD LOGIC
+      const insertPayload: CaseInsertData = {
+        uniqueId: formValues.uniqueId || uniqueIdToUse,
+        user_id: null,
+        CaseTitle: formValues.CaseTitle || null,
+        ClientName: formValues.ClientName || null,
+        CNRNumber: formValues.CNRNumber || null,
+        court_id: formValues.court_id || null,
+        court_name: courtNameString,
+        dateFiled: formValues.FiledDate || null,
+        case_type_id: formValues.case_type_id || null,
+        case_type_name: caseTypeNameString,
+        case_number: formValues.case_number || null,
+        case_year: formValues.case_year ? parseInt(formValues.case_year as string, 10) : null,
+        crime_number: formValues.crime_number || null,
+        crime_year: formValues.crime_year ? parseInt(formValues.crime_year as string, 10) : null,
+        JudgeName: formValues.JudgeName || null,
+        OnBehalfOf: formValues.OnBehalfOf || null,
+        FirstParty: formValues.FirstParty || null,
+        OppositeParty: formValues.OppositeParty || null,
+        ClientContactNumber: formValues.ClientContactNumber || null,
+        Accussed: formValues.Accussed || null,
+        Undersection: formValues.Undersection || null,
+        police_station_id: typeof formValues.police_station_id === 'number' ? formValues.police_station_id : null,
+        StatuteOfLimitations: formValues.StatuteOfLimitations || null,
+        OpposingCounsel: formValues.OpposingCounsel || null,
+        OppositeAdvocate: formValues.OppositeAdvocate || null,
+        OppAdvocateContactNumber: formValues.OppAdvocateContactNumber || null,
+        CaseStatus: formValues.Status || null,
+        Priority: formValues.Priority || null,
+        PreviousDate: formValues.PreviousDate || null,
+        NextDate: formValues.HearingDate || null,
+        CaseDescription: formValues.CaseDescription || null,
+        CaseNotes: formValues.CaseNotes || null,
+      };
+
+      console.log("Attempting to insert with payload:", JSON.stringify(insertPayload, null, 2));
+      try {
+        const newCaseId = await addCase(insertPayload);
+        if (newCaseId) {
+          Alert.alert("Success", "Case added successfully.");
+          navigation.navigate("CaseDetail", { // Changed from CaseDetailsV2
+            caseId: newCaseId,
+            caseTitleHeader: insertPayload.CaseTitle || insertPayload.case_number || "New Case"
+          });
+        } else { Alert.alert("Error", "Failed to add case."); }
+      } catch (e) { console.error("Error adding case:", e); Alert.alert("Error", "An error occurred while adding case."); }
+    }
   };
+
   return (
-    <ScrollView keyboardShouldPersistTaps="always">
-      <View style={styles.AddCaseContainer}>
-        <Text>{update ? "Update" : "Add"} a case</Text>
-        <Text>Fill the below form to {update ? "Update" : "add new"} Case</Text>
-        <View style={styles.FormContainer}>
-          <Formik
-            initialValues={
-              initialValues
-                ? initialValues
-                : fields?.reduce<{ [key: string]: string }>(
-                    (acc, field) => ({
-                      ...acc,
-                      [field.name]:
-                        field.type === "date" ? formatDate(new Date()) : "",
-                    }),
-                    {}
-                  )
-            }
-            validationSchema={validationSchema}
-            onSubmit={handleFinalSubmit}
-          >
-            {({
-              handleChange,
-              handleBlur,
-              handleSubmit,
-              values,
-              setFieldValue,
-              errors,
-            }) => (
-              <View>
-                {fields?.map((field, index) => (
-                  <View key={index}>
-                    <FormField
-                      field={field}
-                      handleChange={handleChange}
-                      handleBlur={handleBlur}
-                      values={values}
-                      errors={errors}
-                      openDatePicker={() => openDatePicker(field.name)}
-                      suggestionArray={suggestions[field.name]}
-                    />
-                    {selectedDateField === field.name && (
-                      <DateTimePicker
-                        id={field.name}
-                        value={
-                          values[field.name]
-                            ? new Date(values[field.name])
-                            : new Date()
-                        }
-                        mode="date"
-                        display="default"
-                        onChange={(event, selectedDate) =>
-                          handleDatePickerChange(
-                            field.name,
-                            event,
-                            selectedDate,
-                            setFieldValue
-                          )
-                        }
-                      />
-                    )}
-                  </View>
-                ))}
-                <Button
-                  title={update ? "Update" : "Submit"}
-                  onPress={() => handleSubmit()}
+    <ScrollView
+      style={styles.scrollViewStyle}
+      contentContainerStyle={styles.scrollContentContainerStyle}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.formScreenContainer}>
+        <Text style={styles.screenTitle}>{update ? "Update Case Details" : "Add New Case"}</Text>
+        <Formik
+          initialValues={prepareFormInitialValues()}
+          validationSchema={validationSchema}
+          onSubmit={handleSubmitForm}
+          enableReinitialize
+        >
+          {(formikProps) => (
+            <View>
+              {formFieldsDefinition.map((fieldConfig) => (
+                <FormFieldRenderer key={fieldConfig.name} fieldConfig={fieldConfig} formik={formikProps} />
+              ))}
+              <View style={styles.actionButtonContainer}>
+                <ActionButton
+                  title={update ? "Save Changes" : "Save Case"}
+                  onPress={() => formikProps.handleSubmit()}
+                  type="primary"
+                />
+                <ActionButton
+                  title="Cancel"
+                  onPress={() => navigation.goBack()}
+                  type="secondary"
                 />
               </View>
-            )}
-          </Formik>
-        </View>
+            </View>
+          )}
+        </Formik>
       </View>
     </ScrollView>
   );
@@ -468,52 +345,29 @@ const AddCase: React.FC<Props> = ({ fields = Samplefields, route }) => {
 
 export default AddCase;
 
-const styles = StyleSheet.create({
-  AddCaseContainer: {
-    height: "100%",
-    padding: 10,
+const getAddCaseStyles = (theme: Theme) => StyleSheet.create({
+  scrollViewStyle: {
+    flex: 1,
+    backgroundColor: theme.colors.screenBackground || theme.colors.background,
   },
-  AddCaseHeader: {},
-  FormContainer: {},
-  inputField: {
-    height: 40,
-    minWidth: "90%",
-    borderWidth: 1, // Set the border width
-    borderColor: "gray", // Set the border color
-    borderRadius: 5, // Set the border radius for rounded corners
-    paddingHorizontal: 10,
-    marginBottom: 20,
+  scrollContentContainerStyle: {
+    flexGrow: 1,
+    paddingBottom: 20,
   },
-  errorInput: {
-    borderColor: "red",
+  formScreenContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
   },
-  dropdownContainer: {
-    height: 40,
-    minWidth: "90%",
-    borderWidth: 1,
-    borderColor: "#7a7a7a",
-    borderRadius: 5,
-    marginBottom: 20,
-    overflow: "hidden",
+  screenTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 24,
+    color: theme.colors.text,
+    textAlign: 'center',
   },
-  dropdown: {
-    minWidth: "90%",
-    height: 40,
-    paddingHorizontal: 10,
-  },
-  datePickerContainer: {
-    height: 40,
-    width: "90%",
-    borderWidth: 1,
-    borderColor: "gray",
-    borderRadius: 5,
-    marginBottom: 20,
-  },
-  datePicker: {
-    height: 40,
-    minWidth: "90%",
-  },
-  label: {
-    marginBottom: 2,
+  actionButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 30,
   },
 });

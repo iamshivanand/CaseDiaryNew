@@ -11,9 +11,9 @@ import {
 } from "react-native";
 
 import {
-  getFormsAsync,
-  searchFormsAccordingToFieldsAsync,
-  searchFormsAsync,
+  getCases,
+  // searchFormsAccordingToFieldsAsync, // To be replaced or refactored
+  searchCases, // Replaces searchFormsAsync
 } from "../../DataBase";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { formatDate } from "../../utils/commonFunctions";
@@ -35,83 +35,107 @@ const CasesList = ({ navigation, routes }) => {
 
   const handleSearch = async (text) => {
     setSearchText(text);
-    // Implement your search logic here
     try {
-      const result = await searchFormsAsync(global.db, text);
-      setTotalCases(result._array);
+      // Assuming MOCK_CURRENT_USER_ID or actual user ID logic will be added here if needed by searchCases
+      // const userId = null; // Placeholder for actual user ID
+      const results = await searchCases(text /*, userId */);
+      setTotalCases(results || []); // searchCases returns CaseWithDetails[] directly
     } catch (error) {
-      console.error("Error fetching forms:", error);
+      console.error("Error searching cases:", error);
+      setTotalCases([]); // Clear cases on error or show a message
     }
   };
+
+  // Temporarily commenting out handleSearchForFilters and its usage
+  // as searchFormsAccordingToFieldsAsync needs a proper replacement strategy.
   const handleSearchForFilters = async (
     FieldName: string,
     searchValue: string,
     comparisonOperator: string = "="
   ) => {
-    try {
-      const result = await searchFormsAccordingToFieldsAsync(
-        global.db,
-        FieldName,
-        searchValue,
-        comparisonOperator
-      );
-      console.log("result from this is ", result._array);
-      setTotalCases(result._array);
-    } catch (error) {
-      console.error("Error fetching forms:", error);
-    }
+    console.warn(
+      "handleSearchForFilters is not implemented with current searchCases. Field:",
+      FieldName, "Value:", searchValue
+    );
+    // try {
+    //   // This function (searchFormsAccordingToFieldsAsync) needs to be refactored or replaced.
+    //   // const result = await searchFormsAccordingToFieldsAsync(
+    //   //   global.db,
+    //   //   FieldName,
+    //   //   searchValue,
+    //   //   comparisonOperator
+    //   // );
+    //   // console.log("result from this is ", result._array);
+    //   // setTotalCases(result._array);
+    // } catch (error) {
+    //   console.error("Error fetching forms with filters:", error);
+    // }
   };
+
   useEffect(() => {
-    // eslint-disable-next-line no-unused-expressions
-    // type ? handleSearch(type)
     let currentDate;
     let yesterday;
     let tomorrow;
     let yesterdayDate;
     let tomorrowDate;
-    switch (params?.Filter) {
-      case "todaysCases":
-        currentDate = formatDate(new Date());
-        console.log("current date is ", currentDate);
-        handleSearchForFilters("NextDate", currentDate);
-        // handleSearch(currentDate);
-        break;
-      case "tomorrowCases":
-        currentDate = new Date();
-        tomorrow = new Date(currentDate);
-        tomorrow.setDate(currentDate.getDate() + 1);
-        tomorrowDate = formatDate(tomorrow);
-        handleSearchForFilters("NextDate", tomorrowDate);
-        break;
-      case "yesterdayCases":
-        currentDate = new Date();
-        yesterday = new Date(currentDate);
-        yesterday.setDate(currentDate.getDate() - 1);
-        yesterdayDate = formatDate(yesterday);
-        console.log("yesterdays date", yesterdayDate);
-        handleSearchForFilters("NextDate", yesterdayDate);
-        break;
-      case "undatedCases":
-        currentDate = new Date();
-        yesterday = new Date(currentDate);
-        yesterday.setDate(currentDate.getDate() - 1);
-        yesterdayDate = formatDate(yesterday);
-        handleSearchForFilters("NextDate", yesterdayDate, "<");
-        break;
-      default:
+
+    // Temporarily disable filter logic that uses handleSearchForFilters
+    const filter = params?.Filter;
+    if (filter === "todaysCases" || filter === "tomorrowCases" || filter === "yesterdayCases" || filter === "undatedCases") {
+        console.warn(`Filter '${filter}' is temporarily disabled as handleSearchForFilters is not fully implemented.`);
+        // Default to fetching all data if specific filter logic is disabled
+        fetchData();
+    } else {
         fetchData();
     }
-  }, []);
+
+    // switch (params?.Filter) {
+    //   case "todaysCases":
+    //     currentDate = formatDate(new Date());
+    //     console.log("current date is ", currentDate);
+    //     // handleSearchForFilters("NextDate", currentDate); // Disabled
+    //     break;
+    //   case "tomorrowCases":
+    //     currentDate = new Date();
+    //     tomorrow = new Date(currentDate);
+    //     tomorrow.setDate(currentDate.getDate() + 1);
+    //     tomorrowDate = formatDate(tomorrow);
+    //     // handleSearchForFilters("NextDate", tomorrowDate); // Disabled
+    //     break;
+    //   case "yesterdayCases":
+    //     currentDate = new Date();
+    //     yesterday = new Date(currentDate);
+    //     yesterday.setDate(currentDate.getDate() - 1);
+    //     yesterdayDate = formatDate(yesterday);
+    //     // console.log("yesterdays date", yesterdayDate);
+    //     // handleSearchForFilters("NextDate", yesterdayDate); // Disabled
+    //     break;
+    //   case "undatedCases":
+    //     currentDate = new Date();
+    //     yesterday = new Date(currentDate);
+    //     yesterday.setDate(currentDate.getDate() - 1);
+    //     yesterdayDate = formatDate(yesterday);
+    //     // handleSearchForFilters("NextDate", yesterdayDate, "<"); // Disabled
+    //     break;
+    //   default:
+    //     fetchData();
+    // }
+  }, [params?.Filter]); // Added params?.Filter to dependency array
+
   const handleDelete = () => {
-    fetchData();
+    fetchData(); // Re-fetch all data after a delete
   };
+
   const fetchData = async () => {
     try {
-      const result = await getFormsAsync(global.db);
-      console.log(" result now is ", result);
-      setTotalCases(result._array.reverse());
+      // Assuming MOCK_CURRENT_USER_ID or actual user ID logic will be added here if needed by getCases
+      // const userId = null; // Placeholder for actual user ID
+      const results = await getCases(/* userId */);
+      console.log("Fetched cases: ", results);
+      setTotalCases(results ? results.reverse() : []); // getCases returns CaseWithDetails[] directly
     } catch (error) {
-      console.error("Error fetching forms:", error);
+      console.error("Error fetching cases:", error);
+      setTotalCases([]); // Clear cases on error or show a message
     }
   };
   return (
