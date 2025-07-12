@@ -1,209 +1,320 @@
-import { AntDesign } from "@expo/vector-icons";
-import { useRoute, RouteProp } from "@react-navigation/native";
+import { AntDesign, Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native"; // Removed useRoute, RouteProp
 import React, { useContext, useEffect, useState } from "react";
 import {
-  Dimensions,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
-} from "react-native";
+  TouchableOpacity,
+  SafeAreaView,
+  FlatList,
+} from "react-native"; // Removed Dimensions, ScrollView
 
-import {
-  getCases,
-  // searchFormsAccordingToFieldsAsync, // To be replaced or refactored
-  searchCases, // Replaces searchFormsAsync
-} from "../../DataBase";
+// import {
+//   getCases,
+//   searchCases,
+// } from "../../DataBase"; // DB functions will be adapted or replaced by sample data initially
 import { ThemeContext } from "../../Providers/ThemeProvider";
-import { formatDate } from "../../utils/commonFunctions";
-import CaseCard from "../CommonComponents/CaseCard";
+// import { formatDate } from "../../utils/commonFunctions"; // May not be needed with new data structure
+import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
+import { CaseDataScreen } from "../../Types/appTypes"; // Import the new data type
 
-const windowWidth = Dimensions.get("window").width;
-interface RouteParams {
-  Filter?: string;
-}
-type CasesListRouteProp = RouteProp<{ params: RouteParams }, "params">;
+// const windowWidth = Dimensions.get("window").width; // Removed as not used in current styles
 
-const CasesList = ({ navigation, routes }) => {
-  const route = useRoute<CasesListRouteProp>();
-  const { params } = route;
-  const { theme } = useContext(ThemeContext);
-  const [TotalCases, setTotalCases] = useState([]);
+// Sample Data based on requirements
+const sampleCases: CaseDataScreen[] = [
+  {
+    id: "1",
+    title: "Estate of Johnson",
+    client: "Sarah Johnson",
+    status: "Active",
+    nextHearing: "Dec 15, 2023",
+    lastUpdate: "Nov 20, 2023",
+    previousHearing: "Oct 25, 2023",
+  },
+  {
+    id: "2",
+    title: "Smith vs. Jones",
+    client: "Michael Smith",
+    status: "Pending",
+    nextHearing: "Jan 10, 2024",
+    lastUpdate: "Nov 18, 2023",
+    previousHearing: "Sep 30, 2023",
+  },
+  {
+    id: "3",
+    title: "Alpha Corp Litigation",
+    client: "Alpha Corp",
+    status: "Active",
+    nextHearing: "Feb 22, 2024",
+    lastUpdate: "Jan 05, 2024",
+    previousHearing: "Dec 01, 2023",
+  },
+  {
+    id: "4",
+    title: "Property Dispute - Williams",
+    client: "Robert Williams",
+    status: "Closed",
+    nextHearing: "N/A",
+    lastUpdate: "Oct 10, 2023",
+    previousHearing: "Sep 15, 2023",
+  },
+  {
+    id: "5",
+    title: "Commercial Contract - Davis",
+    client: "Linda Davis",
+    status: "Pending",
+    nextHearing: "Mar 05, 2024",
+    lastUpdate: "Jan 15, 2024",
+    previousHearing: "Nov 25, 2023",
+  },
+   {
+    id: "6",
+    title: "Another Active Case",
+    client: "Active Client",
+    status: "Active",
+    nextHearing: "Mar 01, 2024",
+    lastUpdate: "Jan 20, 2024",
+    previousHearing: "Dec 10, 2023",
+  },
+  {
+    id: "7",
+    title: "A Closed Case",
+    client: "Closed Client Inc.",
+    status: "Closed",
+    nextHearing: "N/A",
+    lastUpdate: "Sep 01, 2023",
+    previousHearing: "Aug 01, 2023",
+  },
+];
+
+type FilterStatus = "Active" | "Closed";
+
+const CasesList = (/*{ navigation, routes }*/) => { // Removed navigation, routes from props as useNavigation is used
+  // const route = useRoute<CasesListRouteProp>(); // Not using route params for now
+  // const { params } = route;
+  const navigation = useNavigation();
+  const { theme } = useContext(ThemeContext); // Keep theme for styling
+
+  const [allCases, setAllCases] = useState<CaseDataScreen[]>(sampleCases); // Initialize with sample data
+  const [filteredCases, setFilteredCases] = useState<CaseDataScreen[]>([]);
   const [searchText, setSearchText] = useState("");
-  console.log("type text ", params?.Filter);
+  const [activeFilter, setActiveFilter] = useState<FilterStatus>("Active");
 
-  const handleSearch = async (text) => {
-    setSearchText(text);
-    try {
-      // Assuming MOCK_CURRENT_USER_ID or actual user ID logic will be added here if needed by searchCases
-      // const userId = null; // Placeholder for actual user ID
-      const results = await searchCases(text /*, userId */);
-      setTotalCases(results || []); // searchCases returns CaseWithDetails[] directly
-    } catch (error) {
-      console.error("Error searching cases:", error);
-      setTotalCases([]); // Clear cases on error or show a message
-    }
-  };
-
-  // Temporarily commenting out handleSearchForFilters and its usage
-  // as searchFormsAccordingToFieldsAsync needs a proper replacement strategy.
-  const handleSearchForFilters = async (
-    FieldName: string,
-    searchValue: string,
-    comparisonOperator: string = "="
-  ) => {
-    console.warn(
-      "handleSearchForFilters is not implemented with current searchCases. Field:",
-      FieldName, "Value:", searchValue
-    );
-    // try {
-    //   // This function (searchFormsAccordingToFieldsAsync) needs to be refactored or replaced.
-    //   // const result = await searchFormsAccordingToFieldsAsync(
-    //   //   global.db,
-    //   //   FieldName,
-    //   //   searchValue,
-    //   //   comparisonOperator
-    //   // );
-    //   // console.log("result from this is ", result._array);
-    //   // setTotalCases(result._array);
-    // } catch (error) {
-    //   console.error("Error fetching forms with filters:", error);
-    // }
-  };
-
+  // Initial data load and filtering
   useEffect(() => {
-    let currentDate;
-    let yesterday;
-    let tomorrow;
-    let yesterdayDate;
-    let tomorrowDate;
+    // fetchData(); // Replace with actual data fetching if needed
+    filterAndSearchCases();
+  }, [activeFilter, searchText, allCases]); // Re-filter when filter, search text, or allCases change
 
-    // Temporarily disable filter logic that uses handleSearchForFilters
-    const filter = params?.Filter;
-    if (filter === "todaysCases" || filter === "tomorrowCases" || filter === "yesterdayCases" || filter === "undatedCases") {
-        console.warn(`Filter '${filter}' is temporarily disabled as handleSearchForFilters is not fully implemented.`);
-        // Default to fetching all data if specific filter logic is disabled
-        fetchData();
-    } else {
-        fetchData();
+  // const fetchData = async () => {
+  //   try {
+  //     // Replace with actual DB call if using getCases
+  //     // const results = await getCases(/* userId */);
+  //     // setAllCases(results ? results.map(transformApiCaseToCaseDataScreen) : []); // Transform if necessary
+  //     setAllCases(sampleCases); // Using sample data
+  //   } catch (error) {
+  //     console.error("Error fetching cases:", error);
+  //     setAllCases([]);
+  //   }
+  // };
+
+  const filterAndSearchCases = () => {
+    let tempCases = allCases;
+
+    // Filter by status
+    if (activeFilter === "Active") {
+      tempCases = tempCases.filter(c => c.status === "Active" || c.status === "Pending");
+    } else if (activeFilter === "Closed") {
+      tempCases = tempCases.filter(c => c.status === "Closed");
     }
 
-    // switch (params?.Filter) {
-    //   case "todaysCases":
-    //     currentDate = formatDate(new Date());
-    //     console.log("current date is ", currentDate);
-    //     // handleSearchForFilters("NextDate", currentDate); // Disabled
-    //     break;
-    //   case "tomorrowCases":
-    //     currentDate = new Date();
-    //     tomorrow = new Date(currentDate);
-    //     tomorrow.setDate(currentDate.getDate() + 1);
-    //     tomorrowDate = formatDate(tomorrow);
-    //     // handleSearchForFilters("NextDate", tomorrowDate); // Disabled
-    //     break;
-    //   case "yesterdayCases":
-    //     currentDate = new Date();
-    //     yesterday = new Date(currentDate);
-    //     yesterday.setDate(currentDate.getDate() - 1);
-    //     yesterdayDate = formatDate(yesterday);
-    //     // console.log("yesterdays date", yesterdayDate);
-    //     // handleSearchForFilters("NextDate", yesterdayDate); // Disabled
-    //     break;
-    //   case "undatedCases":
-    //     currentDate = new Date();
-    //     yesterday = new Date(currentDate);
-    //     yesterday.setDate(currentDate.getDate() - 1);
-    //     yesterdayDate = formatDate(yesterday);
-    //     // handleSearchForFilters("NextDate", yesterdayDate, "<"); // Disabled
-    //     break;
-    //   default:
-    //     fetchData();
-    // }
-  }, [params?.Filter]); // Added params?.Filter to dependency array
-
-  const handleDelete = () => {
-    fetchData(); // Re-fetch all data after a delete
-  };
-
-  const fetchData = async () => {
-    try {
-      // Assuming MOCK_CURRENT_USER_ID or actual user ID logic will be added here if needed by getCases
-      // const userId = null; // Placeholder for actual user ID
-      const results = await getCases(/* userId */);
-      console.log("Fetched cases: ", results);
-      setTotalCases(results ? results.reverse() : []); // getCases returns CaseWithDetails[] directly
-    } catch (error) {
-      console.error("Error fetching cases:", error);
-      setTotalCases([]); // Clear cases on error or show a message
+    // Filter by search text (searches title and client)
+    if (searchText.trim() !== "") {
+      const lowerSearchText = searchText.toLowerCase();
+      tempCases = tempCases.filter(
+        (c) =>
+          c.title.toLowerCase().includes(lowerSearchText) ||
+          c.client.toLowerCase().includes(lowerSearchText)
+      );
     }
+    setFilteredCases(tempCases);
   };
+
+  const handleSearchChange = (text: string) => {
+    setSearchText(text);
+  };
+
+  const handleUpdateHearing = (caseId: string | number | undefined) => {
+    console.log("Update Hearing pressed for case ID from list:", caseId);
+    // Navigate to update hearing screen or show modal
+  };
+
+  const navigateToAddCase = () => {
+    // @ts-ignore
+    navigation.navigate("AddCase"); // Assuming 'AddCase' is the name of the route for adding a new case
+  };
+
   return (
-    <ScrollView>
-      <View
-        style={{
-          height: "100%",
-          padding: 10,
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: theme.colors.background,
-        }}
-      >
-        <View style={styles.searchContainer}>
-          <View style={styles.inputContainer}>
-            <AntDesign
-              name="search1"
-              size={24}
-              color="black"
-              style={styles.icon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Search"
-              onChangeText={handleSearch}
-              value={searchText}
-              //autoFocus // Optional: Auto-focus on the input field
-            />
-          </View>
-        </View>
-        {TotalCases ? (
-          TotalCases.map((caseItem) => (
-            <CaseCard
-              key={caseItem.id}
-              caseDetails={caseItem}
-              onDelete={handleDelete}
-            />
-          ))
-        ) : (
-          <Text>Loading...</Text>
-        )}
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Cases</Text>
+        <TouchableOpacity onPress={navigateToAddCase} style={styles.addButton}>
+          <Ionicons name="add-circle-outline" size={32} color={theme.colors.primary || "#007AFF"} />
+        </TouchableOpacity>
       </View>
-    </ScrollView>
+
+      <View style={styles.searchContainer}>
+        <View style={[styles.inputWrapper, {backgroundColor: theme.colors.card}]}>
+          <AntDesign
+            name="search1"
+            size={20}
+            color={theme.colors.textSecondary || "#8E8E93"}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={[styles.input, { color: theme.colors.text }]}
+            placeholder="Search cases..."
+            placeholderTextColor={theme.colors.textSecondary || "#8E8E93"}
+            onChangeText={handleSearchChange}
+            value={searchText}
+          />
+        </View>
+      </View>
+
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            activeFilter === "Active" ? styles.activeButton : styles.inactiveButton,
+            activeFilter === "Active" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.cardDeep ||'#E0E0E0'}
+          ]}
+          onPress={() => setActiveFilter("Active")}
+        >
+          <Text style={activeFilter === "Active" ? styles.activeButtonText : [styles.inactiveButtonText, {color: theme.colors.text}]}>
+            Active
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            activeFilter === "Closed" ? styles.activeButton : styles.inactiveButton,
+            activeFilter === "Closed" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.cardDeep ||'#E0E0E0'}
+          ]}
+          onPress={() => setActiveFilter("Closed")}
+        >
+          <Text style={activeFilter === "Closed" ? styles.activeButtonText : [styles.inactiveButtonText, {color: theme.colors.text}]}>
+            Closed
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <FlatList
+        data={filteredCases}
+        renderItem={({ item }) => (
+          <NewCaseCard
+            caseDetails={item}
+            onUpdateHearingPress={handleUpdateHearing}
+          />
+        )}
+        keyExtractor={(item) => item.id?.toString() || Math.random().toString()} // Ensure key is a string
+        ListEmptyComponent={
+          <View style={styles.emptyListContainer}>
+            <Text style={[styles.emptyListText, {color: theme.colors.textSecondary}]}>No cases found.</Text>
+          </View>
+        }
+        contentContainerStyle={styles.listContentContainer}
+      />
+    </SafeAreaView>
   );
 };
 
 export default CasesList;
 
 const styles = StyleSheet.create({
-  container: {},
-  searchContainer: { padding: 10, alignItems: "center" },
-  inputContainer: {
-    height: 40,
+  safeArea: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    // borderBottomWidth: 1, // Optional: if you want a separator
+    // borderBottomColor: '#E0E0E0', // Optional
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  addButton: {
+    padding: 6, // Make it easier to tap
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    width: windowWidth - 40,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 5,
-    paddingHorizontal: 10,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    // backgroundColor: '#F0F0F0', // Light grey background for search bar
+    borderWidth: 1, // Optional: if you prefer a border
+    borderColor: '#D1D1D6', // Optional
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   input: {
-    flex: 1, // Take up remaining space
-    height: 40,
-    fontSize: 16, // Adjust font size based on your design
+    flex: 1,
+    height: 44, // Standard iOS height
+    fontSize: 16,
   },
-  icon: {
-    marginRight: 10,
+  toggleContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around", // Or 'center' with margin on buttons
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  toggleButton: {
+    flex: 1, // Make buttons take equal width
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: "center",
+    marginHorizontal: 5, // Add some space between buttons
+  },
+  activeButton: {
+    // backgroundColor: "#007AFF", // Blue for active
+  },
+  inactiveButton: {
+    // backgroundColor: "#E0E0E0", // Grey for inactive
+  },
+  activeButtonText: {
+    color: "#FFFFFF", // White text for active
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  inactiveButtonText: {
+    // color: "#000000", // Black text for inactive
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  listContentContainer: {
+    paddingBottom: 16, // Add some padding at the bottom of the list
+  },
+  emptyListContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 50, // Adjust as needed
+  },
+  emptyListText: {
+    fontSize: 16,
+    // color: "#8E8E93", // Grey color for empty message
   },
 });

@@ -124,3 +124,14 @@ export const priorityOptions: DropdownOption[] = [
 // Lookup type options (examples, assuming these would be populated from the database)
 export interface CaseTypeOption extends DropdownOption { value: number; }
 export interface CourtOption extends DropdownOption { value: number; }
+
+// New CaseData interface for the Cases screen
+export interface CaseDataScreen {
+  id?: string | number; // Optional: for keys or navigation
+  title: string;
+  client: string;
+  status: "Active" | "Pending" | "Closed";
+  nextHearing: string;
+  lastUpdate: string;
+  previousHearing: string;
+}
