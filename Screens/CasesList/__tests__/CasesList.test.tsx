@@ -13,14 +13,15 @@ jest.mock("../../../DataBase", () => ({
         CaseTitle: "Test Case 1",
         ClientName: "Test Client 1",
         CaseStatus: "Active",
-        NextDate: "2024-01-01",
+        NextDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString(),
         updated_at: "2024-01-01",
         PreviousDate: "2023-12-01",
       },
     ])
   ),
-  addTimelineEvent: jest.fn(() => Promise.resolve(1)),
+  addCaseTimelineEvent: jest.fn(() => Promise.resolve(1)),
   updateCase: jest.fn(() => Promise.resolve(true)),
+  getCaseById: jest.fn(() => Promise.resolve({ id: 1 })),
 }));
 
 // Mocking the NewCaseCard component
