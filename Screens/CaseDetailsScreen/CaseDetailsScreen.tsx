@@ -108,27 +108,29 @@ const CaseDetailsScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const caseIdToLoad = parseInt(caseId.toString(), 10);
-    const fetchAllData = async () => {
-      if (!caseIdToLoad || isNaN(caseIdToLoad)) {
-        Alert.alert("Error", "No valid Case ID provided.");
-        setIsLoading(false);
-        if (navigation.canGoBack()) navigation.goBack();
-        return;
-      }
-      setIsLoading(true);
-      try {
-        await loadCaseDetails(caseIdToLoad);
-        await loadDocumentsAndTimeline(caseIdToLoad);
-      } catch (error) {
-        console.error("Error fetching case details:", error);
-        Alert.alert("Error", "Could not load case details.");
-        if (navigation.canGoBack()) navigation.goBack();
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchAllData();
+    if (caseId) {
+      const caseIdToLoad = parseInt(caseId.toString(), 10);
+      const fetchAllData = async () => {
+        if (!caseIdToLoad || isNaN(caseIdToLoad)) {
+          Alert.alert("Error", "No valid Case ID provided.");
+          setIsLoading(false);
+          if (navigation.canGoBack()) navigation.goBack();
+          return;
+        }
+        setIsLoading(true);
+        try {
+          await loadCaseDetails(caseIdToLoad);
+          await loadDocumentsAndTimeline(caseIdToLoad);
+        } catch (error) {
+          console.error("Error fetching case details:", error);
+          Alert.alert("Error", "Could not load case details.");
+          if (navigation.canGoBack()) navigation.goBack();
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchAllData();
+    }
   }, [caseId, navigation, loadDocumentsAndTimeline, loadCaseDetails]);
 
   const handleEditCase = () => {
