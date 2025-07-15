@@ -24,7 +24,6 @@ import DatePickerField from "../CommonComponents/DatePickerField";
 import SectionHeader from "../CommonComponents/SectionHeader";
 import ActionButton from "../CommonComponents/ActionButton";
 import DocumentItem from "./components/DocumentItem";
-import TimelineItem from "./components/TimelineItem"; // Assuming this is the display component
 
 import {
   CaseData,
@@ -34,6 +33,7 @@ import {
   caseStatusOptions,
   priorityOptions,
 } from "../../Types/appTypes";
+import TimelineItem from "./components/TimelineItem";
 import { RootStackParamList } from "../../Types/navigationtypes";
 import { CaseWithDetails, TimelineEventRow } from "../../DataBase"; // Import TimelineEventRow
 import { PRIMARY_BLUE_COLOR_FOR_LOADER } from "../CaseDetailsScreen/CaseDetailsScreen";
@@ -742,15 +742,6 @@ const EditCaseScreen: React.FC = () => {
                   />
                 ))
             )}
-            <ActionButton
-              title="Add New Timeline Event"
-              onPress={handleAddTimelineEvent}
-              type="dashed"
-              style={styles.fullWidthDashedButton}
-              leftIcon={
-                <Ionicons name="calendar-outline" size={20} color="#1D4ED8" />
-              }
-            />
           </View>
         </View>
       </ScrollView>

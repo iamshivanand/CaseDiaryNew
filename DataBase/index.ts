@@ -56,6 +56,7 @@ interface UploadOptions {
 }
 export const uploadCaseDocument = async (options: UploadOptions): Promise<number | null> => {
   const db = await getDb(); const { originalFileName, fileType, fileUri, caseId, userId, fileSize } = options;
+  console.log("Uploading document with options:", options);
   const timestamp = Date.now(); const nameParts = originalFileName.split('.');
   const extension = nameParts.length > 1 ? nameParts.pop() : 'dat'; const baseName = nameParts.join('.');
   const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -63,9 +64,14 @@ export const uploadCaseDocument = async (options: UploadOptions): Promise<number
   const mimeTypeForDb = fileType;
   try {
     const dirInfo = await FileSystem.getInfoAsync(DOCUMENTS_DIRECTORY);
-    if (!dirInfo.exists) { await FileSystem.makeDirectoryAsync(DOCUMENTS_DIRECTORY, { intermediates: true }); }
+    if (!dirInfo.exists) {
+      console.log("Documents directory does not exist, creating it...");
+      await FileSystem.makeDirectoryAsync(DOCUMENTS_DIRECTORY, { intermediates: true });
+    }
     const destinationUri = DOCUMENTS_DIRECTORY + uniqueStoredFileName;
+    console.log("Copying file from", fileUri, "to", destinationUri);
     await FileSystem.copyAsync({ from: fileUri, to: destinationUri });
+    console.log("File copied successfully");
     const result = await db.runAsync(
       "INSERT INTO CaseDocuments (case_id, stored_filename, original_display_name, file_type, file_size, user_id) VALUES (?, ?, ?, ?, ?, ?)",
       [caseId, uniqueStoredFileName, originalFileName, mimeTypeForDb, fileSize ?? null, userId ?? null]
