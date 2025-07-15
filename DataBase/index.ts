@@ -119,14 +119,18 @@ export interface CaseWithDetails extends CaseRow {
   districtName?: string | null; policeStationName?: string | null;
 }
 
-export const getCases = async (userId?: number | null): Promise<CaseWithDetails[]> => {
+export const getCases = async (userId?: number | null, limit: number = 10, offset: number = 0): Promise<CaseWithDetails[]> => {
   const db = await getDb();
   let sql = `SELECT c.*, ps.name as policeStationName, d.name as districtName FROM Cases c
              LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
              LEFT JOIN Districts d ON ps.district_id = d.id`;
   const params: any[] = [];
-  if (userId != null) { sql += " WHERE c.user_id = ?"; params.push(userId); }
-  sql += " ORDER BY c.updated_at DESC";
+  if (userId != null) {
+    sql += " WHERE c.user_id = ?";
+    params.push(userId);
+  }
+  sql += " ORDER BY c.NextDate DESC LIMIT ? OFFSET ?";
+  params.push(limit, offset);
   return db.getAllAsync<CaseWithDetails>(sql, params);
 };
 

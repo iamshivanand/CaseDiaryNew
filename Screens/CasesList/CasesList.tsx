@@ -77,9 +77,7 @@ const CasesList = (/*{ navigation, routes }*/) => {
 
     // Filter by status
     if (activeFilter === "Active") {
-      tempCases = tempCases.filter(
-        (c) => c.status === "Active" || c.status === "Pending" || c.status === "Open"
-      );
+      tempCases = tempCases.filter((c) => c.status !== "Closed");
     } else if (activeFilter === "Closed") {
       tempCases = tempCases.filter((c) => c.status === "Closed");
     }
@@ -117,11 +115,13 @@ const CasesList = (/*{ navigation, routes }*/) => {
         return;
       }
       // 1. Add timeline event
-      await addCaseTimelineEvent({
-        case_id: caseId,
-        hearing_date: new Date().toISOString(),
-        notes: notes,
-      });
+      if (notes) {
+        await addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: new Date().toISOString(),
+          notes: notes,
+        });
+      }
 
       // 2. Update case's next hearing date
       await updateCase(caseId, {
