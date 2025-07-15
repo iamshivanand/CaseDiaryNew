@@ -91,13 +91,12 @@ const CasesList = (/*{ navigation, routes }*/) => {
           c.client.toLowerCase().includes(lowerSearchText)
       );
     }
-    const now = new Date();
-    tempCases = tempCases.filter(c => {
-      if (c.nextHearing === 'N/A') return false;
-      return new Date(c.nextHearing) >= now;
-    });
     tempCases.sort((a, b) => {
-      return new Date(a.nextHearing).getTime() - new Date(b.nextHearing).getTime();
+      const aDate = new Date(a.nextHearing);
+      const bDate = new Date(b.nextHearing);
+      if (a.nextHearing === 'N/A') return 1;
+      if (b.nextHearing === 'N/A') return -1;
+      return aDate.getTime() - bDate.getTime();
     });
     setFilteredCases(tempCases);
   };
