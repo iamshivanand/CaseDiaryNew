@@ -34,7 +34,7 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
     <TouchableOpacity
       style={styles.card}
       onPress={() =>
-        navigation.navigate("CaseDetails", { caseDetails: caseDetails })
+        navigation.navigate("CaseDetails", { caseId: id })
       }
     >
       <View style={styles.headerContainer}>

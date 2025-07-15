@@ -64,9 +64,13 @@ const CaseDetailsScreen: React.FC = () => {
   }, [navigation, caseDetails]);
 
   const loadCaseDetails = useCallback(async (caseId: number) => {
+    console.log("Loading case details for caseId:", caseId);
     const details = await getCaseById(caseId);
     if (details) {
+      console.log("Case details found:", details);
       setCaseDetails(details);
+    } else {
+      console.log("Case details not found for caseId:", caseId);
     }
   }, []);
 
@@ -187,13 +191,6 @@ const CaseDetailsScreen: React.FC = () => {
     }
   };
 
-  if (!caseDetails) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
 
   const listData: ListItemType[] = [];
   listData.push({ type: "summary", data: caseDetails });
@@ -222,6 +219,13 @@ const CaseDetailsScreen: React.FC = () => {
   const renderListItem = ({ item }: { item: ListItemType }) => {
     switch (item.type) {
       case "summary":
+        if (!caseDetails) {
+          return (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" />
+            </View>
+          );
+        }
         return (
           <View style={styles.summarySection}>
             <Text style={styles.mainCaseTitle}>{caseDetails.CaseTitle}</Text>
