@@ -3,7 +3,7 @@ import { View, StyleSheet, FlatList, Alert, Platform } from 'react-native';
 import { Button, List, Text, useTheme, IconButton, ActivityIndicator, Divider } from 'react-native-paper';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import * as IntentLauncher from 'expo-intent-launcher';
+import * as Sharing from 'expo-sharing';
 import { RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
 
 import * as db from '../../DataBase'; // Corrected import
@@ -97,66 +97,33 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
     }
   };
 
-  const confirmDeleteDocument = (doc: CaseDocument) => {
-    Alert.alert(
-      "Confirm Delete",
-      `Are you sure you want to delete "${doc.original_display_name}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => handleDeleteDocument(doc.id) }
-      ]
-    );
-  };
-
-  const handleDeleteDocument = async (documentId: number) => {
-    setLoading(true); // Or a specific deleting loader
-    try {
-      const success = await db.deleteCaseDocument(documentId);
-      if (success) {
-        Alert.alert("Success", "Document deleted.");
-        loadDocuments(); // Refresh list
-      } else {
-        Alert.alert("Error", "Failed to delete document.");
-      }
-    } catch (error) {
-      console.error("Error deleting document:", error);
-      Alert.alert("Error", "Could not delete document.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOpenDocument = async (doc: CaseDocument) => {
+  const handleDownloadDocument = async (doc: CaseDocument) => {
     if (!doc.stored_filename) {
-        Alert.alert("Error", "Document path not found.");
-        return;
+      Alert.alert("Error", "Document path not found.");
+      return;
     }
     const localUri = db.getFullDocumentPath(doc.stored_filename);
     if (!localUri) {
-         Alert.alert("Error", "Could not construct document path.");
-        return;
+      Alert.alert("Error", "Could not construct document path.");
+      return;
     }
 
     try {
-        const fileInfo = await FileSystem.getInfoAsync(localUri);
-        if (!fileInfo.exists) {
-            Alert.alert("Error", "File does not exist at the specified path. It might have been moved or deleted.");
-            return;
-        }
+      const fileInfo = await FileSystem.getInfoAsync(localUri);
+      if (!fileInfo.exists) {
+        Alert.alert("Error", "File does not exist at the specified path. It might have been moved or deleted.");
+        return;
+      }
 
-        const contentUri = await FileSystem.getContentUriAsync(localUri);
-
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-            data: contentUri,
-            flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-            type: doc.file_type || '*/*', // MIME type
-        });
+      await Sharing.shareAsync(localUri, {
+        mimeType: doc.file_type || '*/*',
+        dialogTitle: 'Download Document',
+      });
     } catch (error) {
-        console.error("Error opening document:", error);
-        Alert.alert("Error", "Could not open document. Ensure you have an app that can open this file type.");
+      console.error("Error downloading document:", error);
+      Alert.alert("Error", "Could not download document. Please try again.");
     }
   };
-
 
   const renderItem = ({ item }: { item: CaseDocument }) => (
     <List.Item
@@ -168,12 +135,10 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
       right={props => (
         <IconButton
           {...props}
-          icon="delete-outline"
-          iconColor={theme.colors.error}
-          onPress={() => confirmDeleteDocument(item)}
+          icon="download"
+          onPress={() => handleDownloadDocument(item)}
         />
       )}
-      onPress={() => handleOpenDocument(item)}
     />
   );
 

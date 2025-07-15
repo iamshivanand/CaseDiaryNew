@@ -35,7 +35,7 @@ import {
 } from "../../Types/appTypes";
 import TimelineItem from "./components/TimelineItem";
 import { RootStackParamList } from "../../Types/navigationtypes";
-import { CaseWithDetails, TimelineEventRow } from "../../DataBase"; // Import TimelineEventRow
+import { CaseWithDetails } from "../../DataBase"; // Import TimelineEventRow
 import { PRIMARY_BLUE_COLOR_FOR_LOADER } from "../CaseDetailsScreen/CaseDetailsScreen";
 
 const dummyCaseTypeOptions: DropdownOption[] = [
@@ -137,14 +137,12 @@ const EditCaseScreen: React.FC = () => {
     if (!currentCaseId) return;
     setIsLoadingTimeline(true);
     try {
-      const fetchedEvents: TimelineEventRow[] =
-        await db.getTimelineEventsByCaseId(currentCaseId);
+      const fetchedEvents = await db.getCaseTimelineEventsByCaseId(currentCaseId);
       const uiEvents: TimelineEvent[] = fetchedEvents.map((dbEvent) => ({
         id: dbEvent.id,
         case_id: dbEvent.case_id,
-        date: dbEvent.event_date,
-        description: dbEvent.description,
-        user_id: dbEvent.user_id,
+        date: dbEvent.hearing_date,
+        description: dbEvent.notes,
         _status: "synced",
       }));
       setTimelineEvents(uiEvents);
