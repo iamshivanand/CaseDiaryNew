@@ -3,7 +3,7 @@ import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-nativ
 import * as db from '../../DataBase';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
 import NewCaseCard from '../CasesList/components/NewCaseCard';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
 import { getCurrentUserId } from '../../utils/commonFunctions';
 
@@ -44,9 +44,11 @@ const UndatedCasesScreen = () => {
     }
   };
 
-  useEffect(() => {
-    fetchUndatedCases();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchUndatedCases();
+    }, [])
+  );
 
   const handleUpdateHearing = (caseDetails: CaseDataScreen) => {
     setSelectedCase(caseDetails);

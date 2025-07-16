@@ -56,7 +56,7 @@ const AdvertisementBanner = () => {
 import NewCaseCard from '../CasesList/components/NewCaseCard';
 import * as db from '../../DataBase';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
 import { getCurrentUserId } from '../../utils/commonFunctions';
 
@@ -98,9 +98,11 @@ const TodaysCasesSection = () => {
     }
   };
 
-  useEffect(() => {
-    fetchTodaysCases();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchTodaysCases();
+    }, [])
+  );
 
   const handleUpdateHearing = (caseDetails: CaseDataScreen) => {
     setSelectedCase(caseDetails);
