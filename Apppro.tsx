@@ -15,6 +15,8 @@ import EditCaseScreen from "./Screens/EditCase/EditCaseScreen";
 import AddCase from "./Screens/Addcase/AddCase";
 import AddCaseDetails from "./Screens/Addcase/AddCaseDetails";
 import AddDocumentScreen from "./Screens/Addcase/AddDocument";
+import UndatedCasesScreen from "./Screens/UndatedCases/UndatedCasesScreen";
+import ViewClientsScreen from "./Screens/ViewClients/ViewClientsScreen";
 
 import SearchScreen from "./Screens/SearchScreen/SearchScreen";
 import CalendarScreen from "./Screens/Calendar/Calendar";
@@ -79,6 +81,16 @@ const HomeStack = () => (
       name="AddDocument"
       component={AddDocumentScreen}
       options={{ title: "Add Document" }}
+    />
+    <HomeStackNav.Screen
+      name="UndatedCases"
+      component={UndatedCasesScreen}
+      options={{ title: "Undated Cases" }}
+    />
+    <HomeStackNav.Screen
+      name="ViewClients"
+      component={ViewClientsScreen}
+      options={{ title: "View Clients" }}
     />
   </HomeStackNav.Navigator>
 );
