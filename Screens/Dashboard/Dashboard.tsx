@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView } from 'react-native';
 import { format } from 'date-fns';
 
 const WelcomeCard = () => {
@@ -23,15 +23,20 @@ const QuickActionButton = ({ icon, text, onPress, color }) => {
   );
 };
 
+import SectionHeader from '../CommonComponents/SectionHeader';
+
 const QuickActionsGrid = () => {
   const navigation = useNavigation();
 
   return (
-    <View style={styles.quickActionsContainer}>
-      <QuickActionButton icon="⚠️" text="Undated Cases" onPress={() => navigation.navigate('UndatedCases')} color="#FF6B00" />
-      <QuickActionButton icon="📂" text="View All Cases" onPress={() => navigation.navigate('AllCases')} color="#007BFF" />
-      <QuickActionButton icon="➕" text="Add New Case" onPress={() => navigation.navigate('AddCase')} color="#00CC44" />
-      <QuickActionButton icon="👤" text="View Clients" onPress={() => navigation.navigate('ViewClients')} color="#007BFF" />
+    <View>
+      <SectionHeader title="Quick Actions" />
+      <View style={styles.quickActionsContainer}>
+        <QuickActionButton icon="➕" text="Add New Case" onPress={() => navigation.navigate('AddCase')} color="#00CC44" />
+        <QuickActionButton icon="📂" text="View All Cases" onPress={() => navigation.navigate('AllCases')} color="#007BFF" />
+        <QuickActionButton icon="👤" text="View Clients" onPress={() => navigation.navigate('ViewClients')} color="#007BFF" />
+        <QuickActionButton icon="⚠️" text="Undated Cases" onPress={() => navigation.navigate('UndatedCases')} color="#FF6B00" />
+      </View>
     </View>
   );
 };
@@ -105,21 +110,26 @@ const TodaysCasesSection = () => {
 
 const DashboardScreen = () => {
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <WelcomeCard />
-        <QuickActionsGrid />
-        <AdvertisementBanner />
-        <TodaysCasesSection />
-      </View>
-    </ScrollView>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
+        <View style={styles.content}>
+          <WelcomeCard />
+          <QuickActionsGrid />
+          <AdvertisementBanner />
+          <TodaysCasesSection />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  container: {
+    flex: 1,
   },
   content: {
     padding: 16,
