@@ -7,7 +7,7 @@ import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { ThemeContext } from "./Providers/ThemeProvider";
 
 // Import Screens for Stacks
-import HomeScreen from "./Screens/HomeScreen/HomeScreen";
+import DashboardScreen from "./Screens/Dashboard/Dashboard";
 import CasesList from "./Screens/CasesList/CasesList";
 import CaseDetailsScreen from "./Screens/CaseDetailsScreen/CaseDetailsScreen"; // This is now the new, refactored screen
 // import CaseDetailsScreenV2 from "./Screens/CaseDetailsScreenV2/CaseDetailsScreenV2"; // V2 Import removed
@@ -46,7 +46,7 @@ const HomeStack = () => (
     {/* Default to true for this stack */}
     <HomeStackNav.Screen
       name="HomeScreen"
-      component={HomeScreen}
+      component={DashboardScreen}
       options={{ headerShown: false }}
     />
     {/* HomeScreen has custom header */}
