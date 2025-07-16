@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform, Animated } from 'react-native';
 import { format } from 'date-fns';
 
 const WelcomeCard = () => {
@@ -59,6 +59,28 @@ import { CaseData, CaseDataScreen } from '../../Types/appTypes';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
 import { getCurrentUserId } from '../../utils/commonFunctions';
+
+const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      delay: index * 100,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim, index]);
+
+  return (
+    <Animated.View style={{ opacity: fadeAnim }}>
+      <NewCaseCard
+        caseDetails={caseDetails}
+        onUpdateHearingPress={onUpdateHearingPress}
+      />
+    </Animated.View>
+  );
+};
 
 const TodaysCasesSection = () => {
   const [todaysCases, setTodaysCases] = useState<CaseDataScreen[]>([]);
@@ -147,11 +169,12 @@ const TodaysCasesSection = () => {
       {loading ? (
         <ActivityIndicator />
       ) : todaysCases.length > 0 ? (
-        todaysCases.map(caseData => (
-          <NewCaseCard
+        todaysCases.map((caseData, index) => (
+          <AnimatedNewCaseCard
             key={caseData.id}
             caseDetails={caseData}
             onUpdateHearingPress={() => handleUpdateHearing(caseData)}
+            index={index}
           />
         ))
       ) : (

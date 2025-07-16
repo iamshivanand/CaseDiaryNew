@@ -1,11 +1,35 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Animated } from 'react-native';
 import * as db from '../../DataBase';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
 import NewCaseCard from '../CasesList/components/NewCaseCard';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
 import { getCurrentUserId } from '../../utils/commonFunctions';
+
+import { SafeAreaView, Platform } from "react-native";
+
+const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      delay: index * 100,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim, index]);
+
+  return (
+    <Animated.View style={{ opacity: fadeAnim }}>
+      <NewCaseCard
+        caseDetails={caseDetails}
+        onUpdateHearingPress={onUpdateHearingPress}
+      />
+    </Animated.View>
+  );
+};
 
 const UndatedCasesScreen = () => {
   const [undatedCases, setUndatedCases] = useState<CaseDataScreen[]>([]);
@@ -96,14 +120,15 @@ const UndatedCasesScreen = () => {
   }
 
   return (
-    <View style={{flex: 1}}>
+    <SafeAreaView style={styles.safeArea}>
       <FlatList
         data={undatedCases}
         keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <NewCaseCard
+        renderItem={({ item, index }) => (
+          <AnimatedNewCaseCard
             caseDetails={item}
             onUpdateHearingPress={() => handleUpdateHearing(item)}
+            index={index}
           />
         )}
         ListEmptyComponent={<Text style={styles.emptyText}>No undated cases found.</Text>}
@@ -118,11 +143,16 @@ const UndatedCasesScreen = () => {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'android' ? 25 : 0,
+  },
   container: {
     padding: 16,
   },
