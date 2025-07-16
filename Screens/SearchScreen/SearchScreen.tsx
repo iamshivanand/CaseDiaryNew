@@ -6,9 +6,9 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as db from "../../DataBase"; // Import db functions
 import { CaseWithDetails } from "../../DataBase"; // Import the type for results
 import { ThemeContext } from "../../Providers/ThemeProvider";
-import CaseCard from "../CommonComponents/CaseCard";
+import NewCaseCard from "../CasesList/components/NewCaseCard";
 import ActionButton from "../CommonComponents/ActionButton"; // For search button
-import { CaseDetails as CaseCardPropsType } from "../CommonComponents/CaseCard"; // Type expected by CaseCard
+import { CaseDataScreen } from "../../Types/appTypes";
 
 const windowWidth = Dimensions.get("window").width;
 
@@ -53,17 +53,16 @@ const SearchScreen: React.FC = () => {
 
   const renderItem = ({ item }: { item: CaseWithDetails }) => {
     // Map CaseWithDetails to the CaseDetails type expected by CaseCard
-    const caseCardDetails: CaseCardPropsType = {
+    const caseCardDetails: CaseDataScreen = {
       id: item.id,
-      uniqueId: item.uniqueId,
-      caseNumber: item.CaseTitle || item.case_number || "N/A", // Prioritize CaseTitle
-      caseType: item.case_type_name || "N/A",
-      court: item.court_name || "N/A",
-      // CaseCard expects dateFiled as string; FiledDate or dateFiled from DB is ISO string
-      dateFiled: item.FiledDate || item.dateFiled || "N/A",
-      // Add other fields if CaseCard displays them and they are available in CaseWithDetails
+      title: item.CaseTitle || 'No Title',
+      client: item.ClientName || 'Unknown Client',
+      status: item.CaseStatus || 'Pending',
+      nextHearing: item.NextDate ? new Date(item.NextDate).toLocaleDateString() : 'N/A',
+      lastUpdate: item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A',
+      previousHearing: item.PreviousDate ? new Date(item.PreviousDate).toLocaleDateString() : 'N/A',
     };
-    return <CaseCard caseDetails={caseCardDetails} onDelete={() => handleCaseDeleted(item.id)} />;
+    return <NewCaseCard caseDetails={caseCardDetails} />;
   };
 
   return (

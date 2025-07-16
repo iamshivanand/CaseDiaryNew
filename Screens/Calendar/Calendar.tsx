@@ -12,7 +12,8 @@ import {
   fetchFieldsAsync,
   searchFormsAccordingToFieldsAsync,
 } from "../../DataBase";
-import CaseCard from "../CommonComponents/CaseCard";
+import NewCaseCard from "../CasesList/components/NewCaseCard";
+import { CaseData, CaseDataScreen } from "../../Types/appTypes";
 
 interface Props {
   // Add your prop types here
@@ -23,7 +24,7 @@ const CalendarScreen: React.FC<Props> = () => {
   const [selected, setSelected] = useState(
     currentDate.toISOString().slice(0, 10)
   );
-  const [ResultToshow, setResultToShow] = useState([]);
+  const [ResultToshow, setResultToShow] = useState<CaseDataScreen[]>([]);
   const [markedDates, setMarkedDates] = useState({});
 
   const getResultFromDate = async (date: string) => {
@@ -32,7 +33,16 @@ const CalendarScreen: React.FC<Props> = () => {
       "NextDate",
       date
     );
-    setResultToShow(result._array);
+    const mappedCases: CaseDataScreen[] = result._array.map((c: CaseData) => ({
+        id: c.id,
+        title: c.CaseTitle || 'No Title',
+        client: c.ClientName || 'Unknown Client',
+        status: c.CaseStatus || 'Pending',
+        nextHearing: c.NextDate ? new Date(c.NextDate).toLocaleDateString() : 'N/A',
+        lastUpdate: c.updated_at ? new Date(c.updated_at).toLocaleDateString() : 'N/A',
+        previousHearing: c.PreviousDate ? new Date(c.PreviousDate).toLocaleDateString() : 'N/A',
+    }));
+    setResultToShow(mappedCases);
   };
 
   const fetchAllDates = async () => {
@@ -162,7 +172,7 @@ const CalendarScreen: React.FC<Props> = () => {
         <View style={styles.CardsContainer}>
           <Text>Selected Date is {selected}</Text>
           {ResultToshow?.map((each, index) => (
-            <CaseCard key={index} caseDetails={each} />
+            <NewCaseCard key={index} caseDetails={each} />
           ))}
         </View>
       </ScrollView>
