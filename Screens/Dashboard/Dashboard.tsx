@@ -34,7 +34,7 @@ const QuickActionsGrid = () => {
       <View style={styles.quickActionsContainer}>
         <QuickActionButton icon="➕" text="Add New Case" onPress={() => navigation.navigate('AddCase')} color="#00CC44" />
         <QuickActionButton icon="📂" text="View All Cases" onPress={() => navigation.navigate('AllCases')} color="#007BFF" />
-        <QuickActionButton icon="👤" text="View Clients" onPress={() => navigation.navigate('ViewClients')} color="#007BFF" />
+        <QuickActionButton icon="📅" text="Yesterday's Cases" onPress={() => navigation.navigate('YesterdaysCases')} color="#007BFF" />
         <QuickActionButton icon="⚠️" text="Undated Cases" onPress={() => navigation.navigate('UndatedCases')} color="#FF6B00" />
       </View>
     </View>
@@ -66,7 +66,7 @@ const TodaysCasesSection = () => {
   useEffect(() => {
     const fetchTodaysCases = async () => {
       try {
-        const allCases = await db.getAllCases();
+        const allCases = await db.getCases();
         const today = new Date();
         const todayString = today.toISOString().split('T')[0];
 

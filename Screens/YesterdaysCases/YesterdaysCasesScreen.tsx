@@ -5,33 +5,36 @@ import { CaseData } from '../../Types/appTypes';
 import CaseCard from '../CommonComponents/CaseCard';
 import { useNavigation } from '@react-navigation/native';
 
-const UndatedCasesScreen = () => {
-  const [undatedCases, setUndatedCases] = useState<CaseData[]>([]);
+const YesterdaysCasesScreen = () => {
+  const [yesterdaysCases, setYesterdaysCases] = useState<CaseData[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
 
   useEffect(() => {
-    const fetchUndatedCases = async () => {
+    const fetchYesterdaysCases = async () => {
       try {
         const allCases = await db.getCases();
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        const yesterdayString = yesterday.toISOString().split('T')[0];
 
         const filteredCases = allCases.filter(c => {
-          if (!c.NextDate) return true;
+          if (!c.NextDate) return false;
           const nextHearingDate = new Date(c.NextDate);
-          return nextHearingDate < today;
+          const nextHearingDateString = nextHearingDate.toISOString().split('T')[0];
+          return nextHearingDateString === yesterdayString;
         });
 
-        setUndatedCases(filteredCases);
+        setYesterdaysCases(filteredCases);
       } catch (error) {
-        console.error("Error fetching undated cases:", error);
+        console.error("Error fetching yesterday's cases:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUndatedCases();
+    fetchYesterdaysCases();
   }, []);
 
   if (loading) {
@@ -44,7 +47,7 @@ const UndatedCasesScreen = () => {
 
   return (
     <FlatList
-      data={undatedCases}
+      data={yesterdaysCases}
       keyExtractor={(item) => item.id.toString()}
       renderItem={({ item }) => (
         <CaseCard
@@ -52,7 +55,7 @@ const UndatedCasesScreen = () => {
           onPress={() => navigation.navigate('CaseDetails', { caseId: item.id })}
         />
       )}
-      ListEmptyComponent={<Text style={styles.emptyText}>No undated cases found.</Text>}
+      ListEmptyComponent={<Text style={styles.emptyText}>No cases found for yesterday.</Text>}
       contentContainerStyle={styles.container}
     />
   );
@@ -74,4 +77,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default UndatedCasesScreen;
+export default YesterdaysCasesScreen;
