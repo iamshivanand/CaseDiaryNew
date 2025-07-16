@@ -60,14 +60,6 @@ const CalendarScreen: React.FC<Props> = () => {
       return acc;
     }, {});
 
-    Object.keys(formattedDates).forEach((date) => {
-      formattedDates[date] = {
-        ...formattedDates[date],
-        dotColor: 'orange',
-        marked: true
-      };
-    });
-
     setMarkedDates(formattedDates);
   };
 
@@ -78,6 +70,39 @@ const CalendarScreen: React.FC<Props> = () => {
   useEffect(() => {
     getResultFromDate(selected);
   }, [selected]);
+
+  const renderDay = (day, item) => {
+    const isSelected = selected === day.dateString;
+    const dayMarking = markedDates[day.dateString];
+
+    return (
+      <TouchableOpacity
+        onPress={() => {
+          setSelected(day.dateString);
+        }}
+        style={[
+          styles.dayContainer,
+          isSelected && styles.selectedDay,
+        ]}
+      >
+        <Text
+          style={[
+            styles.dayText,
+            isSelected && styles.selectedDayText,
+          ]}
+        >
+          {day.day}
+        </Text>
+        {dayMarking && (
+          <View style={styles.eventBubble}>
+            <Text style={styles.eventBubbleText}>
+              {dayMarking.eventsCount}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -94,27 +119,7 @@ const CalendarScreen: React.FC<Props> = () => {
             selectedTextColor: 'white'
           },
         }}
-        theme={{
-          backgroundColor: '#ffffff',
-          calendarBackground: '#ffffff',
-          textSectionTitleColor: '#b6c1cd',
-          selectedDayBackgroundColor: '#00adf5',
-          selectedDayTextColor: '#ffffff',
-          todayTextColor: '#00adf5',
-          dayTextColor: '#2d4150',
-          textDisabledColor: '#d9e1e8',
-          dotColor: '#00adf5',
-          selectedDotColor: '#ffffff',
-          arrowColor: 'orange',
-          monthTextColor: 'blue',
-          indicatorColor: 'blue',
-          textDayFontWeight: '300',
-          textMonthFontWeight: 'bold',
-          textDayHeaderFontWeight: '300',
-          textDayFontSize: 16,
-          textMonthFontSize: 16,
-          textDayHeaderFontSize: 16
-        }}
+        dayComponent={({ date, state }) => renderDay(date, markedDates[date.dateString])}
       />
       <ScrollView
         style={styles.container}
@@ -144,5 +149,36 @@ const styles = StyleSheet.create({
   CardsContainer: {
     alignItems: "center",
     padding: 16,
+  },
+  dayContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+  },
+  selectedDay: {
+    backgroundColor: 'blue',
+  },
+  dayText: {
+    fontSize: 16,
+  },
+  selectedDayText: {
+    color: 'white',
+  },
+  eventBubble: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: 'orange',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  eventBubbleText: {
+    color: 'white',
+    fontSize: 12,
   },
 });

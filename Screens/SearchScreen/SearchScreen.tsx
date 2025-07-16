@@ -1,58 +1,65 @@
 import { AntDesign } from "@expo/vector-icons";
-import React, { useContext, useState, useCallback } from "react";
+import React, { useContext, useState, useCallback, useEffect, useRef } from "react";
 import { View, Text, TextInput, StyleSheet, Dimensions, FlatList, ActivityIndicator, SafeAreaView, Platform } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-
 import * as db from "../../DataBase"; // Import db functions
 import { CaseWithDetails } from "../../DataBase"; // Import the type for results
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
-import ActionButton from "../CommonComponents/ActionButton"; // For search button
 import { CaseDataScreen } from "../../Types/appTypes";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 const windowWidth = Dimensions.get("window").width;
 
 const SearchScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
-  // Generate styles with theme
   const styles = getSearchScreenStyles(theme);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<CaseWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false); // To track if a search has been performed
+  const [hasSearched, setHasSearched] = useState(false);
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const executeSearch = async () => {
-    if (!searchQuery.trim()) {
+  const executeSearch = async (query: string) => {
+    if (!query.trim()) {
       setResults([]);
-      setHasSearched(false); // Reset if query is empty
+      setHasSearched(false);
       return;
     }
     setIsLoading(true);
     setHasSearched(true);
     try {
-      // Assuming db.searchCases takes query and optional userId.
-      // For now, not passing userId.
-      const fetchedCases = await db.searchCases(searchQuery.trim());
+      const fetchedCases = await db.searchCases(query.trim());
       setResults(fetchedCases);
     } catch (error) {
       console.error("Error searching cases:", error);
       setResults([]);
-      // Optionally, show an error alert to the user
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Function to be called if a case is deleted from CaseCard (via CaseDetailScreen)
-  // to refresh search results or clear them.
+  useEffect(() => {
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+    searchTimeout.current = setTimeout(() => {
+      executeSearch(searchQuery);
+    }, 500); // 500ms delay
+
+    return () => {
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current);
+      }
+    };
+  }, [searchQuery]);
+
   const handleCaseDeleted = (deletedCaseId: number | string) => {
     setResults(prevResults => prevResults.filter(item => item.id !== deletedCaseId));
   };
 
-
   const renderItem = ({ item }: { item: CaseWithDetails }) => {
-    // Map CaseWithDetails to the CaseDetails type expected by CaseCard
     const caseCardDetails: CaseDataScreen = {
       id: item.id,
       title: item.CaseTitle || 'No Title',
@@ -72,7 +79,7 @@ const SearchScreen: React.FC = () => {
           <View style={styles.inputContainer}>
             <AntDesign
               name="search1"
-              size={22} // Slightly smaller icon
+              size={22}
               color={theme.colors.textSecondary || "#555"}
               style={styles.icon}
             />
@@ -82,22 +89,16 @@ const SearchScreen: React.FC = () => {
               placeholderTextColor={theme.colors.textSecondary || "#888"}
               onChangeText={setSearchQuery}
               value={searchQuery}
-              onSubmitEditing={executeSearch} // Allow search on keyboard submit
               returnKeyType="search"
             />
           </View>
-          <ActionButton
-            title="Search"
-            onPress={executeSearch}
-            type="primary"
-            style={styles.searchButton}
-            textStyle={styles.searchButtonText}
-            disabled={isLoading}
-          />
         </View>
 
         {isLoading ? (
-          <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loader} />
+          <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.loader}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={{color: theme.colors.text}}>Searching...</Text>
+          </Animated.View>
         ) : (
           <FlatList
             data={results}
@@ -106,9 +107,9 @@ const SearchScreen: React.FC = () => {
             contentContainerStyle={styles.listContentContainer}
             ListEmptyComponent={() => {
               if (!hasSearched) {
-                return <Text style={[styles.emptyText, {color: theme.colors.text}]}>Enter a query and press Search.</Text>;
+                return <Text style={[styles.emptyText, {color: theme.colors.text}]}>Enter a query to start searching.</Text>;
               }
-              if (results.length === 0 && !isLoading) { // This condition is slightly redundant due to FlatList's empty check
+              if (results.length === 0 && !isLoading) {
                 return <Text style={[styles.emptyText, {color: theme.colors.text}]}>No cases found matching your query.</Text>;
               }
               return null;
@@ -131,12 +132,11 @@ const getSearchScreenStyles = (theme: Theme) => StyleSheet.create({
   screenContainer: {
     flex: 1,
     backgroundColor: theme.colors.background, // Added theme background
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   searchSection: {
-    paddingHorizontal: 15,
     paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border || '#e0e0e0',
     backgroundColor: theme.colors.background, // Ensure section bg matches screen if needed
   },
   inputContainer: {
