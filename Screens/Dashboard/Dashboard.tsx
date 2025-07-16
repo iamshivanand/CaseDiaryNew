@@ -53,13 +53,13 @@ const AdvertisementBanner = () => {
   );
 }
 
-import CaseCard from '../CommonComponents/CaseCard';
+import NewCaseCard from '../CasesList/components/NewCaseCard';
 import * as db from '../../DataBase';
-import { CaseData } from '../../Types/appTypes';
+import { CaseData, CaseDataScreen } from '../../Types/appTypes';
 import { useNavigation } from '@react-navigation/native';
 
 const TodaysCasesSection = () => {
-  const [todaysCases, setTodaysCases] = useState<CaseData[]>([]);
+  const [todaysCases, setTodaysCases] = useState<CaseDataScreen[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
 
@@ -77,7 +77,17 @@ const TodaysCasesSection = () => {
           return nextHearingDateString === todayString;
         });
 
-        setTodaysCases(filteredCases);
+        const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
+          id: c.id,
+          title: c.CaseTitle || 'No Title',
+          client: c.ClientName || 'Unknown Client',
+          status: c.CaseStatus || 'Pending',
+          nextHearing: c.NextDate ? new Date(c.NextDate).toLocaleDateString() : 'N/A',
+          lastUpdate: c.updated_at ? new Date(c.updated_at).toLocaleDateString() : 'N/A',
+          previousHearing: c.PreviousDate ? new Date(c.PreviousDate).toLocaleDateString() : 'N/A',
+        }));
+
+        setTodaysCases(mappedCases);
       } catch (error) {
         console.error("Error fetching today's cases:", error);
       } finally {
@@ -95,10 +105,9 @@ const TodaysCasesSection = () => {
         <ActivityIndicator />
       ) : todaysCases.length > 0 ? (
         todaysCases.map(caseData => (
-          <CaseCard
+          <NewCaseCard
             key={caseData.id}
             caseDetails={caseData}
-            onPress={() => navigation.navigate('CaseDetails', { caseId: caseData.id })}
           />
         ))
       ) : (
