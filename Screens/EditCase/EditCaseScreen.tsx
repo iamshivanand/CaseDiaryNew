@@ -733,7 +733,7 @@ const EditCaseScreen: React.FC = () => {
                 .map((event, index, arr) => (
                   <TimelineItem
                     key={event._clientSideId || event.id.toString()}
-                    event={event}
+                    item={event}
                     onEdit={handleEditTimelineEvent}
                     onDelete={handleDeleteTimelineEvent}
                     isLastItem={index === arr.length - 1}
