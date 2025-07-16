@@ -51,7 +51,7 @@ const YesterdaysCasesScreen = () => {
       keyExtractor={(item) => item.id.toString()}
       renderItem={({ item }) => (
         <CaseCard
-          caseData={item}
+          caseDetails={item}
           onPress={() => navigation.navigate('CaseDetails', { caseId: item.id })}
         />
       )}

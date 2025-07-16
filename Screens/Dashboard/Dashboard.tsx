@@ -97,7 +97,7 @@ const TodaysCasesSection = () => {
         todaysCases.map(caseData => (
           <CaseCard
             key={caseData.id}
-            caseData={caseData}
+            caseDetails={caseData}
             onPress={() => navigation.navigate('CaseDetails', { caseId: caseData.id })}
           />
         ))
