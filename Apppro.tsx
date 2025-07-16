@@ -2,7 +2,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React, { useContext } from "react";
 import { View } from "react-native"; // Removed ScrollView, Text
-import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import Ionicons from "react-native-vector-icons/Ionicons";
 
 import { ThemeContext } from "./Providers/ThemeProvider";
 
@@ -140,26 +140,20 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
             borderTopWidth: 0.5, // A subtle top border
           },
           tabBarIcon: ({ color, size, focused }) => {
-            let iconName: keyof typeof MaterialIcons.glyphMap = "home"; // Default, ensure type safety
+            let iconName: keyof typeof Ionicons.glyphMap = "home"; // Default, ensure type safety
 
             if (route.name === "HomeTab") {
-              iconName = focused ? "home" : "home-outline"; // Example: use outline for inactive
+              iconName = focused ? "home" : "home-outline";
             } else if (route.name === "SearchTab") {
               iconName = focused ? "search" : "search-outline";
             } else if (route.name === "CalendarTab") {
               iconName = focused ? "calendar" : "calendar-outline";
             } else if (route.name === "ProfileTab") {
-              iconName = focused ? "account-circle" : "account-circle-outline";
+              iconName = focused ? "person-circle" : "person-circle-outline";
             }
-            // For outline icons, you might need a different icon set like MaterialCommunityIcons or Ionicons
-            // Sticking to MaterialIcons for now, so using filled versions.
-            if (route.name === "HomeTab") iconName = "home";
-            else if (route.name === "SearchTab") iconName = "search";
-            else if (route.name === "CalendarTab") iconName = "date-range";
-            else if (route.name === "ProfileTab") iconName = "account-circle";
 
             return (
-              <MaterialIcons name={iconName} size={focused ? size + 2 : size} color={color} />
+              <Ionicons name={iconName} size={focused ? size + 2 : size} color={color} />
             );
           },
           tabBarActiveTintColor: theme.colors.primary || "#020748",

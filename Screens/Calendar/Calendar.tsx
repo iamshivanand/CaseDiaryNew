@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  SafeAreaView,
+  Platform,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 
@@ -61,15 +63,8 @@ const CalendarScreen: React.FC<Props> = () => {
     Object.keys(formattedDates).forEach((date) => {
       formattedDates[date] = {
         ...formattedDates[date],
-        customStyles: {
-          container: {
-            backgroundColor: "orange",
-            borderRadius: 10,
-          },
-          text: {
-            color: "white",
-          },
-        },
+        dotColor: 'orange',
+        marked: true
       };
     });
 
@@ -84,90 +79,45 @@ const CalendarScreen: React.FC<Props> = () => {
     getResultFromDate(selected);
   }, [selected]);
 
-  const CustomDayComponent = ({
-    date,
-    state,
-    marking,
-  }: {
-    date: any;
-    state: string;
-    marking: any;
-  }) => {
-    const isSelected = selected === date.dateString;
-    return (
-      <TouchableOpacity
-        onPress={() => {
-          setSelected(date.dateString);
-          console.log("Selected Date:", date.dateString);
-        }}
-        style={{
-          backgroundColor: isSelected
-            ? "blue"
-            : marking
-              ? marking.customStyles.container.backgroundColor
-              : "transparent",
-          borderRadius: isSelected
-            ? 10
-            : marking
-              ? marking.customStyles.container.borderRadius
-              : 0,
-          justifyContent: "center",
-          alignItems: "center",
-          width: 32,
-          height: 32,
-        }}
-      >
-        <Text
-          style={{
-            color: isSelected
-              ? "white"
-              : marking
-                ? marking.customStyles.text.color
-                : state === "disabled"
-                  ? "gray"
-                  : "black",
-          }}
-        >
-          {date.day}
-        </Text>
-        {marking && marking.eventsCount > 1 && (
-          <Text style={{ color: "#ffffff", fontSize: 10 }}>
-            {marking.eventsCount}
-          </Text>
-        )}
-      </TouchableOpacity>
-    );
-  };
-
   return (
-    <View style={{ flex: 1 }}>
-      <View>
-        <Calendar
-          markingType="custom"
-          markedDates={{
-            ...markedDates,
-            [selected]: {
-              selected: true,
-              customStyles: {
-                container: {
-                  backgroundColor: "blue",
-                  borderRadius: 10,
-                },
-                text: {
-                  color: "white",
-                },
-              },
-            },
-          }}
-          dayComponent={({ date, state, marking }) => (
-            <CustomDayComponent date={date} state={state} marking={marking} />
-          )}
-        />
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <Calendar
+        onDayPress={(day) => {
+          setSelected(day.dateString);
+        }}
+        markedDates={{
+          ...markedDates,
+          [selected]: {
+            selected: true,
+            disableTouchEvent: true,
+            selectedColor: 'blue',
+            selectedTextColor: 'white'
+          },
+        }}
+        theme={{
+          backgroundColor: '#ffffff',
+          calendarBackground: '#ffffff',
+          textSectionTitleColor: '#b6c1cd',
+          selectedDayBackgroundColor: '#00adf5',
+          selectedDayTextColor: '#ffffff',
+          todayTextColor: '#00adf5',
+          dayTextColor: '#2d4150',
+          textDisabledColor: '#d9e1e8',
+          dotColor: '#00adf5',
+          selectedDotColor: '#ffffff',
+          arrowColor: 'orange',
+          monthTextColor: 'blue',
+          indicatorColor: 'blue',
+          textDayFontWeight: '300',
+          textMonthFontWeight: 'bold',
+          textDayHeaderFontWeight: '300',
+          textDayFontSize: 16,
+          textMonthFontSize: 16,
+          textDayHeaderFontSize: 16
+        }}
+      />
       <ScrollView
         style={styles.container}
-        scrollEventThrottle={16}
-        decelerationRate="fast"
       >
         <View style={styles.CardsContainer}>
           <Text>Selected Date is {selected}</Text>
@@ -176,20 +126,23 @@ const CalendarScreen: React.FC<Props> = () => {
           ))}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
 export default CalendarScreen;
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'android' ? 25 : 0,
+  },
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    paddingBottom: 150,
-    marginBottom: 0,
   },
   CardsContainer: {
     alignItems: "center",
+    padding: 16,
   },
 });

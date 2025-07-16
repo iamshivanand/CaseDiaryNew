@@ -1,6 +1,6 @@
 import { AntDesign } from "@expo/vector-icons";
 import React, { useContext, useState, useCallback } from "react";
-import { View, Text, TextInput, StyleSheet, Dimensions, FlatList, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, StyleSheet, Dimensions, FlatList, ActivityIndicator, SafeAreaView, Platform } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 
 import * as db from "../../DataBase"; // Import db functions
@@ -66,64 +66,70 @@ const SearchScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.screenContainer, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.searchSection}>
-        <View style={styles.inputContainer}>
-          <AntDesign
-            name="search1"
-            size={22} // Slightly smaller icon
-            color={theme.colors.textSecondary || "#555"}
-            style={styles.icon}
-          />
-          <TextInput
-            style={[styles.input, { color: theme.colors.text }]}
-            placeholder="Search cases..."
-            placeholderTextColor={theme.colors.textSecondary || "#888"}
-            onChangeText={setSearchQuery}
-            value={searchQuery}
-            onSubmitEditing={executeSearch} // Allow search on keyboard submit
-            returnKeyType="search"
+    <SafeAreaView style={styles.safeArea}>
+      <View style={[styles.screenContainer, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.searchSection}>
+          <View style={styles.inputContainer}>
+            <AntDesign
+              name="search1"
+              size={22} // Slightly smaller icon
+              color={theme.colors.textSecondary || "#555"}
+              style={styles.icon}
+            />
+            <TextInput
+              style={[styles.input, { color: theme.colors.text }]}
+              placeholder="Search cases..."
+              placeholderTextColor={theme.colors.textSecondary || "#888"}
+              onChangeText={setSearchQuery}
+              value={searchQuery}
+              onSubmitEditing={executeSearch} // Allow search on keyboard submit
+              returnKeyType="search"
+            />
+          </View>
+          <ActionButton
+            title="Search"
+            onPress={executeSearch}
+            type="primary"
+            style={styles.searchButton}
+            textStyle={styles.searchButtonText}
+            disabled={isLoading}
           />
         </View>
-        <ActionButton
-          title="Search"
-          onPress={executeSearch}
-          type="primary"
-          style={styles.searchButton}
-          textStyle={styles.searchButtonText}
-          disabled={isLoading}
-        />
-      </View>
 
-      {isLoading ? (
-        <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loader} />
-      ) : (
-        <FlatList
-          data={results}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContentContainer}
-          ListEmptyComponent={() => {
-            if (!hasSearched) {
-              return <Text style={[styles.emptyText, {color: theme.colors.text}]}>Enter a query and press Search.</Text>;
-            }
-            if (results.length === 0 && !isLoading) { // This condition is slightly redundant due to FlatList's empty check
-              return <Text style={[styles.emptyText, {color: theme.colors.text}]}>No cases found matching your query.</Text>;
-            }
-            return null;
-          }}
-        />
-      )}
-    </View>
+        {isLoading ? (
+          <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loader} />
+        ) : (
+          <FlatList
+            data={results}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContentContainer}
+            ListEmptyComponent={() => {
+              if (!hasSearched) {
+                return <Text style={[styles.emptyText, {color: theme.colors.text}]}>Enter a query and press Search.</Text>;
+              }
+              if (results.length === 0 && !isLoading) { // This condition is slightly redundant due to FlatList's empty check
+                return <Text style={[styles.emptyText, {color: theme.colors.text}]}>No cases found matching your query.</Text>;
+              }
+              return null;
+            }}
+          />
+        )}
+      </View>
+    </SafeAreaView>
   );
 };
 
 export default SearchScreen;
 
 const getSearchScreenStyles = (theme: Theme) => StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'android' ? 25 : 0,
+  },
   screenContainer: {
     flex: 1,
-    paddingTop: 10,
     backgroundColor: theme.colors.background, // Added theme background
   },
   searchSection: {

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform, Animated } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
 import { format } from 'date-fns';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const WelcomeCard = () => {
   const today = new Date();
@@ -14,10 +15,12 @@ const WelcomeCard = () => {
   );
 };
 
+import Ionicons from "react-native-vector-icons/Ionicons";
+
 const QuickActionButton = ({ icon, text, onPress, color }) => {
   return (
     <TouchableOpacity style={styles.quickAction} onPress={onPress}>
-      <Text style={[styles.quickActionIcon, { color }]}>{icon}</Text>
+      <Ionicons name={icon} size={30} color={color} />
       <Text style={styles.quickActionText}>{text}</Text>
     </TouchableOpacity>
   );
@@ -32,10 +35,10 @@ const QuickActionsGrid = () => {
     <View>
       <SectionHeader title="Quick Actions" />
       <View style={styles.quickActionsContainer}>
-        <QuickActionButton icon="➕" text="Add New Case" onPress={() => navigation.navigate('AddCase')} color="#00CC44" />
-        <QuickActionButton icon="📂" text="View All Cases" onPress={() => navigation.navigate('AllCases')} color="#007BFF" />
-        <QuickActionButton icon="📅" text="Yesterday's Cases" onPress={() => navigation.navigate('YesterdaysCases')} color="#007BFF" />
-        <QuickActionButton icon="⚠️" text="Undated Cases" onPress={() => navigation.navigate('UndatedCases')} color="#FF6B00" />
+        <QuickActionButton icon="add-circle" text="Add New Case" onPress={() => navigation.navigate('AddCase')} color="#00CC44" />
+        <QuickActionButton icon="folder-open" text="View All Cases" onPress={() => navigation.navigate('AllCases')} color="#007BFF" />
+        <QuickActionButton icon="calendar" text="Yesterday's Cases" onPress={() => navigation.navigate('YesterdaysCases')} color="#007BFF" />
+        <QuickActionButton icon="alert-circle" text="Undated Cases" onPress={() => navigation.navigate('UndatedCases')} color="#FF6B00" />
       </View>
     </View>
   );
@@ -61,19 +64,8 @@ import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPop
 import { getCurrentUserId } from '../../utils/commonFunctions';
 
 const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      delay: index * 100,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim, index]);
-
   return (
-    <Animated.View style={{ opacity: fadeAnim }}>
+    <Animated.View entering={FadeInDown.delay(index * 100)}>
       <NewCaseCard
         caseDetails={caseDetails}
         onUpdateHearingPress={onUpdateHearingPress}

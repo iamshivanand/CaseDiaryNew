@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Animated } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import * as db from '../../DataBase';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
 import NewCaseCard from '../CasesList/components/NewCaseCard';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -10,19 +11,8 @@ import { getCurrentUserId } from '../../utils/commonFunctions';
 import { SafeAreaView, Platform } from "react-native";
 
 const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      delay: index * 100,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim, index]);
-
   return (
-    <Animated.View style={{ opacity: fadeAnim }}>
+    <Animated.View entering={FadeInDown.delay(index * 100)}>
       <NewCaseCard
         caseDetails={caseDetails}
         onUpdateHearingPress={onUpdateHearingPress}
