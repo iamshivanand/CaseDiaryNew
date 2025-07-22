@@ -1,14 +1,19 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+
+const adUnitId = __DEV__ ? TestIds.BANNER : 'ca-app-pub-xxxxxxxx~xxxxxxxx/xxxxxxxx';
 
 const Advertisement = () => {
   return (
     <View style={styles.adBanner}>
-      <Text style={styles.adLabel}>ADVERTISEMENT</Text>
-      <Text style={styles.adMessage}>Boost your practice with Premium features!</Text>
-      <TouchableOpacity style={styles.adButton}>
-        <Text style={styles.adButtonText}>Learn More</Text>
-      </TouchableOpacity>
+      <BannerAd
+        unitId={adUnitId}
+        size={BannerAdSize.MEDIUM_RECTANGLE}
+        requestOptions={{
+          requestNonPersonalizedAdsOnly: true,
+        }}
+      />
     </View>
   );
 };
