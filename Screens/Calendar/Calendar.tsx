@@ -1,3 +1,4 @@
+import { useFocusEffect } from "@react-navigation/native";
 import React, { useEffect, useState, useCallback } from "react";
 import {
   ScrollView,
@@ -10,10 +11,7 @@ import {
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 
-import {
-  fetchFieldsAsync,
-  searchFormsAccordingToFieldsAsync,
-} from "../../DataBase";
+import * as db from "../../DataBase";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { CaseData, CaseDataScreen } from "../../Types/appTypes";
 
@@ -30,12 +28,15 @@ const CalendarScreen: React.FC<Props> = () => {
   const [markedDates, setMarkedDates] = useState({});
 
   const getResultFromDate = async (date: string) => {
-    const result = await searchFormsAccordingToFieldsAsync(
-      global.db,
-      "NextDate",
-      date
-    );
-    const mappedCases: CaseDataScreen[] = result._array.map((c: CaseData) => ({
+    const allCases = await db.getCases();
+    const filteredCases = allCases.filter(c => {
+      if (!c.NextDate) return false;
+      const nextHearingDate = new Date(c.NextDate);
+      const nextHearingDateString = nextHearingDate.toISOString().split('T')[0];
+      return nextHearingDateString === date;
+    });
+
+    const mappedCases: CaseDataScreen[] = filteredCases.map((c: CaseData) => ({
         id: c.id,
         title: c.CaseTitle || 'No Title',
         client: c.ClientName || 'Unknown Client',
@@ -48,14 +49,15 @@ const CalendarScreen: React.FC<Props> = () => {
   };
 
   const fetchAllDates = async () => {
-    const result = await fetchFieldsAsync(global.db, ["NextDate"]);
-    const datesArray = result.map((item) => item.NextDate);
+    const allCases = await db.getCases();
+    const datesArray = allCases.map((item) => item.NextDate).filter(Boolean);
 
     const formattedDates = datesArray.reduce((acc, date) => {
-      if (acc[date]) {
-        acc[date].eventsCount += 1;
+      const dateString = new Date(date).toISOString().split('T')[0];
+      if (acc[dateString]) {
+        acc[dateString].eventsCount += 1;
       } else {
-        acc[date] = { marked: true, eventsCount: 1 };
+        acc[dateString] = { marked: true, eventsCount: 1 };
       }
       return acc;
     }, {});
@@ -63,13 +65,12 @@ const CalendarScreen: React.FC<Props> = () => {
     setMarkedDates(formattedDates);
   };
 
-  useEffect(() => {
-    fetchAllDates();
-  }, []);
-
-  useEffect(() => {
-    getResultFromDate(selected);
-  }, [selected]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchAllDates();
+      getResultFromDate(selected);
+    }, [selected])
+  );
 
   const renderDay = (day, item) => {
     const isSelected = selected === day.dateString;
@@ -83,12 +84,14 @@ const CalendarScreen: React.FC<Props> = () => {
         style={[
           styles.dayContainer,
           isSelected && styles.selectedDay,
+          !dayMarking && styles.noCasesDay,
         ]}
       >
         <Text
           style={[
             styles.dayText,
             isSelected && styles.selectedDayText,
+            !dayMarking && styles.noCasesDayText,
           ]}
         >
           {day.day}
@@ -165,6 +168,12 @@ const styles = StyleSheet.create({
   },
   selectedDayText: {
     color: 'white',
+  },
+  noCasesDay: {
+    backgroundColor: '#f0f0f0',
+  },
+  noCasesDayText: {
+    color: '#d9e1e8',
   },
   eventBubble: {
     position: 'absolute',
