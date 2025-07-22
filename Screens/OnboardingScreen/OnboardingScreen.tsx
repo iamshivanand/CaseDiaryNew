@@ -19,7 +19,7 @@ import { getDb, updateUserProfile, addUser } from "../../DataBase";
 import { LawyerProfileData } from "../../Types/appTypes";
 import ActionButton from "../CommonComponents/ActionButton";
 
-const OnboardingScreen = ({ navigation }) => {
+const OnboardingScreen = ({ onOnboardingComplete }) => {
   const { theme } = useContext(ThemeContext);
   const [name, setName] = useState("");
   const [designation, setDesignation] = useState("");
@@ -95,7 +95,7 @@ const OnboardingScreen = ({ navigation }) => {
         await AsyncStorage.setItem("@user_id", userId.toString());
         console.log("Onboarding status set to complete.");
         translateY.value = withTiming(-1000, { duration: 500 }, () => {
-          navigation.replace("MainApp");
+          onOnboardingComplete();
         });
       } else {
         Alert.alert("Error", "An error occurred while creating your account.");

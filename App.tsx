@@ -87,7 +87,17 @@ export default function App() {
                 )}
               </Stack.Screen>
             ) : (
-              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+              <Stack.Screen name="Onboarding">
+                {(props) => (
+                  <OnboardingScreen
+                    {...props}
+                    onOnboardingComplete={() => {
+                      setOnboardingComplete(true);
+                      translateY.value = withTiming(0, { duration: 500 });
+                    }}
+                  />
+                )}
+              </Stack.Screen>
             )}
           </Stack.Navigator>
         </SafeAreaView>
