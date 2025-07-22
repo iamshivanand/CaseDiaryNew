@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,11 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Animatable from "react-native-animatable";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from "react-native-reanimated";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { getDb, updateUserProfile, addUser } from "../../DataBase";
 import { LawyerProfileData } from "../../Types/appTypes";
@@ -24,7 +28,7 @@ const OnboardingScreen = ({ navigation }) => {
   const [address, setAddress] = useState("");
   const [yearsOfPractice, setYearsOfPractice] = useState("");
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
-  const viewRef = useRef<any>(null);
+  const translateY = useSharedValue(0);
 
   const handleChooseImage = async () => {
     if (Platform.OS !== "web") {
@@ -48,6 +52,12 @@ const OnboardingScreen = ({ navigation }) => {
       setAvatarUri(result.assets[0].uri);
     }
   };
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: translateY.value }],
+    };
+  });
 
   const handleSave = async () => {
     console.log("Attempting to save onboarding data...");
@@ -84,7 +94,7 @@ const OnboardingScreen = ({ navigation }) => {
         await AsyncStorage.setItem("@onboarding_complete", "true");
         await AsyncStorage.setItem("@user_id", userId.toString());
         console.log("Onboarding status set to complete.");
-        viewRef.current.animate("fadeOutUp").then(() => {
+        translateY.value = withTiming(-1000, { duration: 500 }, () => {
           navigation.replace("MainApp");
         });
       } else {
@@ -97,10 +107,12 @@ const OnboardingScreen = ({ navigation }) => {
   };
 
   return (
-    <Animatable.View
-      ref={viewRef}
-      animation="fadeIn"
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    <Animated.View
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.background },
+        animatedStyle,
+      ]}
     >
       <Text style={styles.title}>Welcome!</Text>
       <Text style={styles.subtitle}>
@@ -150,7 +162,7 @@ const OnboardingScreen = ({ navigation }) => {
         keyboardType="number-pad"
       />
       <ActionButton title="Save and Continue" onPress={handleSave} />
-    </Animatable.View>
+    </Animated.View>
   );
 };
 
