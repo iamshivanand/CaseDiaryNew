@@ -8,6 +8,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
+import emitter from "./utils/event-emitter";
 
 import { getDb, getUserProfile } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
@@ -54,6 +55,17 @@ export default function App() {
     };
 
     initialize();
+
+    const onOnboardingComplete = () => {
+      setOnboardingComplete(true);
+      translateY.value = withTiming(0, { duration: 500 });
+    };
+
+    emitter.on("onboardingComplete", onOnboardingComplete);
+
+    return () => {
+      emitter.off("onboardingComplete", onOnboardingComplete);
+    };
   }, []);
 
   if (isSplashscreenVisible) {
@@ -87,15 +99,7 @@ export default function App() {
                 )}
               </Stack.Screen>
             ) : (
-              <Stack.Screen name="Onboarding"
-                component={OnboardingScreen}
-                initialParams={{
-                  onOnboardingComplete: () => {
-                    setOnboardingComplete(true);
-                    translateY.value = withTiming(0, { duration: 500 });
-                  }
-                }}
-              />
+              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             )}
           </Stack.Navigator>
         </SafeAreaView>

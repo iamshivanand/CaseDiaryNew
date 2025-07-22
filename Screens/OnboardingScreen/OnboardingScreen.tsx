@@ -14,13 +14,13 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
+import emitter from "../../utils/event-emitter";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { getDb, updateUserProfile, addUser } from "../../DataBase";
 import { LawyerProfileData } from "../../Types/appTypes";
 import ActionButton from "../CommonComponents/ActionButton";
 
-const OnboardingScreen = ({ route }) => {
-  const { onOnboardingComplete } = route.params;
+const OnboardingScreen = () => {
   const { theme } = useContext(ThemeContext);
   const [name, setName] = useState("");
   const [designation, setDesignation] = useState("");
@@ -96,7 +96,7 @@ const OnboardingScreen = ({ route }) => {
         await AsyncStorage.setItem("@user_id", userId.toString());
         console.log("Onboarding status set to complete.");
         translateY.value = withTiming(-1000, { duration: 500 }, () => {
-          onOnboardingComplete();
+          emitter.emit("onboardingComplete");
         });
       } else {
         Alert.alert("Error", "An error occurred while creating your account.");
