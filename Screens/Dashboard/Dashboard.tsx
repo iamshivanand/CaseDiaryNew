@@ -44,18 +44,7 @@ const QuickActionsGrid = () => {
   );
 };
 
-const AdvertisementBanner = () => {
-  return (
-    <View style={styles.adBanner}>
-      <Text style={styles.adLabel}>ADVERTISEMENT</Text>
-      <Text style={styles.adMessage}>Boost your practice with Premium features!</Text>
-      <TouchableOpacity style={styles.adButton}>
-        <Text style={styles.adButtonText}>Learn More</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
+import AdvertisementSection from './components/AdvertisementSection';
 import NewCaseCard from '../CasesList/components/NewCaseCard';
 import * as db from '../../DataBase';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
@@ -192,7 +181,7 @@ const DashboardScreen = () => {
         <View style={styles.content}>
           <WelcomeCard />
           <QuickActionsGrid />
-          <AdvertisementBanner />
+          <AdvertisementSection />
           <TodaysCasesSection />
         </View>
       </ScrollView>
