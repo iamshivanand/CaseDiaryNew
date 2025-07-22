@@ -1,4 +1,4 @@
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState, useCallback } from "react";
 import {
   ScrollView,
@@ -14,6 +14,8 @@ import { Calendar } from "react-native-calendars";
 import * as db from "../../DataBase";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { CaseData, CaseDataScreen } from "../../Types/appTypes";
+import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
+import { getCurrentUserId } from "../../utils/commonFunctions";
 
 interface Props {
   // Add your prop types here
@@ -26,6 +28,9 @@ const CalendarScreen: React.FC<Props> = () => {
   );
   const [ResultToshow, setResultToShow] = useState<CaseDataScreen[]>([]);
   const [markedDates, setMarkedDates] = useState({});
+  const [isPopupVisible, setPopupVisible] = useState(false);
+  const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
+  const navigation = useNavigation();
 
   const getResultFromDate = async (date: string) => {
     const allCases = await db.getCases();
@@ -71,6 +76,44 @@ const CalendarScreen: React.FC<Props> = () => {
       getResultFromDate(selected);
     }, [selected])
   );
+
+  const handleUpdateHearing = (caseDetails: CaseDataScreen) => {
+    setSelectedCase(caseDetails);
+    setPopupVisible(true);
+  };
+
+  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number) => {
+    if (!selectedCase || !selectedCase.id) return;
+    const caseId = parseInt(selectedCase.id.toString(), 10);
+    if(isNaN(caseId)) return;
+
+    try {
+      const caseExists = await db.getCaseById(caseId);
+      if(!caseExists) {
+        console.error("Case not found");
+        return;
+      }
+      // 1. Add timeline event
+      if (notes) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: new Date().toISOString(),
+          notes: notes,
+        });
+      }
+
+      // 2. Update case's next hearing date
+      await db.updateCase(caseId, {
+        NextDate: nextHearingDate.toISOString(),
+      }, userId);
+
+      // 3. Refresh the list
+      fetchAllDates();
+      getResultFromDate(selected);
+    } catch (error) {
+      console.error("Error updating hearing:", error);
+    }
+  };
 
   const renderDay = (day, item) => {
     const isSelected = selected === day.dateString;
@@ -129,10 +172,19 @@ const CalendarScreen: React.FC<Props> = () => {
         <View style={styles.CardsContainer}>
           <Text>Selected Date is {selected}</Text>
           {ResultToshow?.map((each, index) => (
-            <NewCaseCard key={index} caseDetails={each} />
+            <NewCaseCard key={index} caseDetails={each} onUpdateHearingPress={() => handleUpdateHearing(each)} />
           ))}
         </View>
       </ScrollView>
+      {selectedCase && (
+        <UpdateHearingPopup
+          visible={isPopupVisible}
+          onClose={() => setPopupVisible(false)}
+          onSave={(notes, nextHearingDate) =>
+            handleSaveHearing(notes, nextHearingDate, getCurrentUserId())
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };

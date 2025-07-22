@@ -8,6 +8,8 @@ import { ThemeContext } from "../../Providers/ThemeProvider";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { CaseDataScreen } from "../../Types/appTypes";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
+import { getCurrentUserId } from "../../utils/commonFunctions";
 
 const windowWidth = Dimensions.get("window").width;
 
@@ -20,6 +22,8 @@ const SearchScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [isPopupVisible, setPopupVisible] = useState(false);
+  const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
 
   const executeSearch = async (query: string) => {
     if (!query.trim()) {
@@ -59,6 +63,43 @@ const SearchScreen: React.FC = () => {
     setResults(prevResults => prevResults.filter(item => item.id !== deletedCaseId));
   };
 
+  const handleUpdateHearing = (caseDetails: CaseDataScreen) => {
+    setSelectedCase(caseDetails);
+    setPopupVisible(true);
+  };
+
+  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number) => {
+    if (!selectedCase || !selectedCase.id) return;
+    const caseId = parseInt(selectedCase.id.toString(), 10);
+    if(isNaN(caseId)) return;
+
+    try {
+      const caseExists = await db.getCaseById(caseId);
+      if(!caseExists) {
+        console.error("Case not found");
+        return;
+      }
+      // 1. Add timeline event
+      if (notes) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: new Date().toISOString(),
+          notes: notes,
+        });
+      }
+
+      // 2. Update case's next hearing date
+      await db.updateCase(caseId, {
+        NextDate: nextHearingDate.toISOString(),
+      }, userId);
+
+      // 3. Refresh the list
+      executeSearch(searchQuery);
+    } catch (error) {
+      console.error("Error updating hearing:", error);
+    }
+  };
+
   const renderItem = ({ item }: { item: CaseWithDetails }) => {
     const caseCardDetails: CaseDataScreen = {
       id: item.id,
@@ -69,7 +110,7 @@ const SearchScreen: React.FC = () => {
       lastUpdate: item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A',
       previousHearing: item.PreviousDate ? new Date(item.PreviousDate).toLocaleDateString() : 'N/A',
     };
-    return <NewCaseCard caseDetails={caseCardDetails} />;
+    return <NewCaseCard caseDetails={caseCardDetails} onUpdateHearingPress={() => handleUpdateHearing(caseCardDetails)} />;
   };
 
   return (
@@ -117,6 +158,15 @@ const SearchScreen: React.FC = () => {
           />
         )}
       </View>
+      {selectedCase && (
+        <UpdateHearingPopup
+          visible={isPopupVisible}
+          onClose={() => setPopupVisible(false)}
+          onSave={(notes, nextHearingDate) =>
+            handleSaveHearing(notes, nextHearingDate, getCurrentUserId())
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
