@@ -19,7 +19,8 @@ import { getDb, updateUserProfile, addUser } from "../../DataBase";
 import { LawyerProfileData } from "../../Types/appTypes";
 import ActionButton from "../CommonComponents/ActionButton";
 
-const OnboardingScreen = ({ onOnboardingComplete }) => {
+const OnboardingScreen = ({ route }) => {
+  const { onOnboardingComplete } = route.params;
   const { theme } = useContext(ThemeContext);
   const [name, setName] = useState("");
   const [designation, setDesignation] = useState("");
