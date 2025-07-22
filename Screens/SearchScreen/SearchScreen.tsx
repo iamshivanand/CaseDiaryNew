@@ -1,137 +1,192 @@
 import { AntDesign } from "@expo/vector-icons";
-import React, { useContext, useState, useCallback } from "react";
-import { View, Text, TextInput, StyleSheet, Dimensions, FlatList, ActivityIndicator } from "react-native";
+import React, { useContext, useState, useCallback, useEffect, useRef } from "react";
+import { View, Text, TextInput, StyleSheet, Dimensions, FlatList, ActivityIndicator, SafeAreaView, Platform } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-
 import * as db from "../../DataBase"; // Import db functions
 import { CaseWithDetails } from "../../DataBase"; // Import the type for results
 import { ThemeContext } from "../../Providers/ThemeProvider";
-import CaseCard from "../CommonComponents/CaseCard";
-import ActionButton from "../CommonComponents/ActionButton"; // For search button
-import { CaseDetails as CaseCardPropsType } from "../CommonComponents/CaseCard"; // Type expected by CaseCard
+import NewCaseCard from "../CasesList/components/NewCaseCard";
+import { CaseDataScreen } from "../../Types/appTypes";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
+import { getCurrentUserId } from "../../utils/commonFunctions";
 
 const windowWidth = Dimensions.get("window").width;
 
 const SearchScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
-  // Generate styles with theme
   const styles = getSearchScreenStyles(theme);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<CaseWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false); // To track if a search has been performed
+  const [hasSearched, setHasSearched] = useState(false);
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [isPopupVisible, setPopupVisible] = useState(false);
+  const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
 
-  const executeSearch = async () => {
-    if (!searchQuery.trim()) {
+  const executeSearch = async (query: string) => {
+    if (!query.trim()) {
       setResults([]);
-      setHasSearched(false); // Reset if query is empty
+      setHasSearched(false);
       return;
     }
     setIsLoading(true);
     setHasSearched(true);
     try {
-      // Assuming db.searchCases takes query and optional userId.
-      // For now, not passing userId.
-      const fetchedCases = await db.searchCases(searchQuery.trim());
+      const fetchedCases = await db.searchCases(query.trim());
       setResults(fetchedCases);
     } catch (error) {
       console.error("Error searching cases:", error);
       setResults([]);
-      // Optionally, show an error alert to the user
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Function to be called if a case is deleted from CaseCard (via CaseDetailScreen)
-  // to refresh search results or clear them.
+  useEffect(() => {
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+    searchTimeout.current = setTimeout(() => {
+      executeSearch(searchQuery);
+    }, 500); // 500ms delay
+
+    return () => {
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current);
+      }
+    };
+  }, [searchQuery]);
+
   const handleCaseDeleted = (deletedCaseId: number | string) => {
     setResults(prevResults => prevResults.filter(item => item.id !== deletedCaseId));
   };
 
+  const handleUpdateHearing = (caseDetails: CaseDataScreen) => {
+    setSelectedCase(caseDetails);
+    setPopupVisible(true);
+  };
+
+  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number) => {
+    if (!selectedCase || !selectedCase.id) return;
+    const caseId = parseInt(selectedCase.id.toString(), 10);
+    if(isNaN(caseId)) return;
+
+    try {
+      const caseExists = await db.getCaseById(caseId);
+      if(!caseExists) {
+        console.error("Case not found");
+        return;
+      }
+      // 1. Add timeline event
+      if (notes) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: new Date().toISOString(),
+          notes: notes,
+        });
+      }
+
+      // 2. Update case's next hearing date
+      await db.updateCase(caseId, {
+        NextDate: nextHearingDate.toISOString(),
+      }, userId);
+
+      // 3. Refresh the list
+      executeSearch(searchQuery);
+    } catch (error) {
+      console.error("Error updating hearing:", error);
+    }
+  };
 
   const renderItem = ({ item }: { item: CaseWithDetails }) => {
-    // Map CaseWithDetails to the CaseDetails type expected by CaseCard
-    const caseCardDetails: CaseCardPropsType = {
+    const caseCardDetails: CaseDataScreen = {
       id: item.id,
-      uniqueId: item.uniqueId,
-      caseNumber: item.CaseTitle || item.case_number || "N/A", // Prioritize CaseTitle
-      caseType: item.case_type_name || "N/A",
-      court: item.court_name || "N/A",
-      // CaseCard expects dateFiled as string; FiledDate or dateFiled from DB is ISO string
-      dateFiled: item.FiledDate || item.dateFiled || "N/A",
-      // Add other fields if CaseCard displays them and they are available in CaseWithDetails
+      title: item.CaseTitle || 'No Title',
+      client: item.ClientName || 'Unknown Client',
+      status: item.CaseStatus || 'Pending',
+      nextHearing: item.NextDate ? new Date(item.NextDate).toLocaleDateString() : 'N/A',
+      lastUpdate: item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A',
+      previousHearing: item.PreviousDate ? new Date(item.PreviousDate).toLocaleDateString() : 'N/A',
     };
-    return <CaseCard caseDetails={caseCardDetails} onDelete={() => handleCaseDeleted(item.id)} />;
+    return <NewCaseCard caseDetails={caseCardDetails} onUpdateHearingPress={() => handleUpdateHearing(caseCardDetails)} />;
   };
 
   return (
-    <View style={[styles.screenContainer, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.searchSection}>
-        <View style={styles.inputContainer}>
-          <AntDesign
-            name="search1"
-            size={22} // Slightly smaller icon
-            color={theme.colors.textSecondary || "#555"}
-            style={styles.icon}
-          />
-          <TextInput
-            style={[styles.input, { color: theme.colors.text }]}
-            placeholder="Search cases..."
-            placeholderTextColor={theme.colors.textSecondary || "#888"}
-            onChangeText={setSearchQuery}
-            value={searchQuery}
-            onSubmitEditing={executeSearch} // Allow search on keyboard submit
-            returnKeyType="search"
-          />
+    <SafeAreaView style={styles.safeArea}>
+      <View style={[styles.screenContainer, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.searchSection}>
+          <View style={styles.inputContainer}>
+            <AntDesign
+              name="search1"
+              size={22}
+              color={theme.colors.textSecondary || "#555"}
+              style={styles.icon}
+            />
+            <TextInput
+              style={[styles.input, { color: theme.colors.text }]}
+              placeholder="Search cases..."
+              placeholderTextColor={theme.colors.textSecondary || "#888"}
+              onChangeText={setSearchQuery}
+              value={searchQuery}
+              returnKeyType="search"
+            />
+          </View>
         </View>
-        <ActionButton
-          title="Search"
-          onPress={executeSearch}
-          type="primary"
-          style={styles.searchButton}
-          textStyle={styles.searchButtonText}
-          disabled={isLoading}
-        />
-      </View>
 
-      {isLoading ? (
-        <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loader} />
-      ) : (
-        <FlatList
-          data={results}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContentContainer}
-          ListEmptyComponent={() => {
-            if (!hasSearched) {
-              return <Text style={[styles.emptyText, {color: theme.colors.text}]}>Enter a query and press Search.</Text>;
-            }
-            if (results.length === 0 && !isLoading) { // This condition is slightly redundant due to FlatList's empty check
-              return <Text style={[styles.emptyText, {color: theme.colors.text}]}>No cases found matching your query.</Text>;
-            }
-            return null;
-          }}
+        {isLoading ? (
+          <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.loader}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={{color: theme.colors.text}}>Searching...</Text>
+          </Animated.View>
+        ) : (
+          <FlatList
+            data={results}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContentContainer}
+            ListEmptyComponent={() => {
+              if (!hasSearched) {
+                return <Text style={[styles.emptyText, {color: theme.colors.text}]}>Enter a query to start searching.</Text>;
+              }
+              if (results.length === 0 && !isLoading) {
+                return <Text style={[styles.emptyText, {color: theme.colors.text}]}>No cases found matching your query.</Text>;
+              }
+              return null;
+            }}
+          />
+        )}
+      </View>
+      {selectedCase && (
+        <UpdateHearingPopup
+          visible={isPopupVisible}
+          onClose={() => setPopupVisible(false)}
+          onSave={(notes, nextHearingDate) =>
+            handleSaveHearing(notes, nextHearingDate, getCurrentUserId())
+          }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
 export default SearchScreen;
 
 const getSearchScreenStyles = (theme: Theme) => StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'android' ? 25 : 0,
+  },
   screenContainer: {
     flex: 1,
-    paddingTop: 10,
     backgroundColor: theme.colors.background, // Added theme background
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   searchSection: {
-    paddingHorizontal: 15,
     paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border || '#e0e0e0',
     backgroundColor: theme.colors.background, // Ensure section bg matches screen if needed
   },
   inputContainer: {

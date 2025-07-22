@@ -138,14 +138,13 @@ export interface Case {
   updated_at: string;
 }
 
-export interface TimelineEventRow {
+export interface CaseTimelineRow {
   id: number;
   case_id: number; // Foreign Key to Cases table
-  event_date: string; // ISO8601 "YYYY-MM-DD" or full timestamp
-  description: string;
+  hearing_date: string; // ISO8601 "YYYY-MM-DD" or full timestamp
+  notes: string;
   created_at: string; // ISO8601
   updated_at: string; // ISO8601
-  user_id?: number | null; // Optional: if events are user-specific or for audit
 }
 
 
@@ -295,49 +294,31 @@ BEGIN
   UPDATE Cases SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = OLD.id;
 END;`;
 
-// Future table for CaseHistoryLog (defined here for completeness of schema design)
-export const CREATE_CASE_HISTORY_LOG_TABLE = `
-CREATE TABLE IF NOT EXISTS CaseHistoryLog (
+export const CREATE_CASE_TIMELINE_TABLE = `
+CREATE TABLE IF NOT EXISTS CaseTimeline (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   case_id INTEGER NOT NULL,
-  timestamp TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-  user_id INTEGER, -- Who made the change (if available)
-  field_changed TEXT NOT NULL,
-  old_value TEXT,
-  new_value TEXT,
-  FOREIGN KEY (case_id) REFERENCES Cases(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE SET NULL
-);`;
-export const CREATE_CASE_HISTORY_LOG_CASE_ID_INDEX = `
-CREATE INDEX IF NOT EXISTS idx_casehistorylog_case_id ON CaseHistoryLog(case_id);
-`;
-
-export const CREATE_TIMELINE_EVENTS_TABLE = `
-CREATE TABLE IF NOT EXISTS TimelineEvents (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  case_id INTEGER NOT NULL,
-  event_date TEXT NOT NULL, -- Store as ISO8601 string
-  description TEXT NOT NULL,
-  user_id INTEGER, -- Optional: who created this event
+  notes TEXT,
+  hearing_date TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
   updated_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-  FOREIGN KEY (case_id) REFERENCES Cases(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE SET NULL
+  FOREIGN KEY (case_id) REFERENCES Cases(id) ON DELETE CASCADE
 );`;
 
 // Index for faster timeline event lookups per case
-export const CREATE_TIMELINE_EVENTS_CASE_ID_INDEX = `
-CREATE INDEX IF NOT EXISTS idx_timelineevents_case_id ON TimelineEvents(case_id);
+export const CREATE_CASE_TIMELINE_CASE_ID_INDEX = `
+CREATE INDEX IF NOT EXISTS idx_casetimeline_case_id ON CaseTimeline(case_id);
 `;
 
-// Trigger to update 'updated_at' timestamp on TimelineEvents table
-export const CREATE_TIMELINE_EVENTS_UPDATED_AT_TRIGGER = `
-CREATE TRIGGER IF NOT EXISTS trigger_timelineevents_updated_at
-AFTER UPDATE ON TimelineEvents
+// Trigger to update 'updated_at' timestamp on CaseTimeline table
+export const CREATE_CASE_TIMELINE_UPDATED_AT_TRIGGER = `
+CREATE TRIGGER IF NOT EXISTS trigger_casetimeline_updated_at
+AFTER UPDATE ON CaseTimeline
 FOR EACH ROW
 BEGIN
-  UPDATE TimelineEvents SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = OLD.id;
+  UPDATE CaseTimeline SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = OLD.id;
 END;`;
+
 
 // Function to execute all DDL statements
 export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void> => {
@@ -364,11 +345,9 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   await db.execAsync(CREATE_CASES_UPDATED_AT_TRIGGER); // Trigger for Cases
   await db.execAsync(CREATE_CASE_DOCUMENTS_TABLE);
   await db.execAsync(CREATE_CASE_DOCUMENTS_CASE_ID_INDEX);
-  await db.execAsync(CREATE_CASE_HISTORY_LOG_TABLE);
-  await db.execAsync(CREATE_CASE_HISTORY_LOG_CASE_ID_INDEX);
-  await db.execAsync(CREATE_TIMELINE_EVENTS_TABLE);
-  await db.execAsync(CREATE_TIMELINE_EVENTS_CASE_ID_INDEX);
-  await db.execAsync(CREATE_TIMELINE_EVENTS_UPDATED_AT_TRIGGER);
+  await db.execAsync(CREATE_CASE_TIMELINE_TABLE);
+  await db.execAsync(CREATE_CASE_TIMELINE_CASE_ID_INDEX);
+  await db.execAsync(CREATE_CASE_TIMELINE_UPDATED_AT_TRIGGER);
 
   console.log("Database schema initialized.");
 };
