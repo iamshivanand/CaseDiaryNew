@@ -5,6 +5,7 @@ import { View } from "react-native"; // Removed ScrollView, Text
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 import { ThemeContext } from "./Providers/ThemeProvider";
+import { RewardedAdProvider } from "./Providers/RewardedAdProvider";
 
 // Import Screens for Stacks
 import DashboardScreen from "./Screens/Dashboard/Dashboard";
@@ -130,10 +131,11 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
   return (
     // View style={{ flex: 1 }} is important for the navigator to fill the space
     // Removed the ScrollView that was wrapping Tab.Navigator
-    <View style={{ flex: 1 }}>
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false, // Headers are managed by inner stacks
+    <RewardedAdProvider>
+      <View style={{ flex: 1 }}>
+        <Tab.Navigator
+          screenOptions={({ route }) => ({
+            headerShown: false, // Headers are managed by inner stacks
           tabBarStyle: {
             paddingBottom: 5, // Consider adjusting for safe areas on some devices
             height: 55,      // Slightly increased height for better touchability
@@ -173,6 +175,7 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
         <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: "Profile" }} />
       </Tab.Navigator>
     </View>
+    </RewardedAdProvider>
   );
 };
 

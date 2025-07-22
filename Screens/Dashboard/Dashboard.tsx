@@ -45,6 +45,7 @@ const QuickActionsGrid = () => {
 };
 
 import AdvertisementSection from './components/AdvertisementSection';
+import RewardedAdvertisement from './components/RewardedAdvertisement';
 import NewCaseCard from '../CasesList/components/NewCaseCard';
 import * as db from '../../DataBase';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
@@ -174,7 +175,11 @@ const TodaysCasesSection = () => {
   );
 };
 
+import { useRewardedAd } from '../../Providers/RewardedAdProvider';
+
 const DashboardScreen = () => {
+  const { showRewardedAd, isRewardedAdLoaded } = useRewardedAd();
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
@@ -182,6 +187,12 @@ const DashboardScreen = () => {
           <WelcomeCard />
           <QuickActionsGrid />
           <AdvertisementSection />
+          {isRewardedAdLoaded && (
+            <TouchableOpacity style={styles.quickAction} onPress={showRewardedAd}>
+              <Ionicons name="film" size={30} color="#FFD700" />
+              <Text style={styles.quickActionText}>Show Rewarded Ad</Text>
+            </TouchableOpacity>
+          )}
           <TodaysCasesSection />
         </View>
       </ScrollView>
