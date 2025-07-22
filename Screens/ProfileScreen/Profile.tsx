@@ -9,7 +9,13 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { ThemeContext } from "../../Providers/ThemeProvider";
-import { getDb, getUserProfile, updateUserProfile } from "../../DataBase";
+import {
+  getDb,
+  getUserProfile,
+  updateUserProfile,
+  getTotalCases,
+  getUpcomingHearings,
+} from "../../DataBase";
 import ProfileHeader from "./components/ProfileHeader";
 import ActionButton from "../CommonComponents/ActionButton";
 import StatCard from "./components/StatCard"; // For non-editable stats
@@ -18,7 +24,6 @@ import TabSelector from "./components/TabSelector";
 import AboutMe from "./components/AboutMe";
 import ContactInfo from "./components/ContactInfo";
 import Languages from "./components/Languages";
-import RecentActivity from "./components/RecentActivity"; // Remains non-editable
 import { LawyerProfileData } from "../../Types/appTypes";
 
 type EditableSection =
@@ -55,8 +60,17 @@ const ProfileScreen: React.FC = () => {
       const db = await getDb();
       // Assuming a single user for now with id = 1
       const profile = await getUserProfile(db, 1);
+      const totalCases = await getTotalCases(db, 1);
+      const upcomingHearings = await getUpcomingHearings(db, 1);
       if (profile) {
-        setProfileData(profile);
+        setProfileData({
+          ...profile,
+          stats: {
+            ...profile.stats,
+            totalCases,
+            upcomingHearings,
+          },
+        });
       }
     };
     fetchProfile();
@@ -219,7 +233,7 @@ const ProfileScreen: React.FC = () => {
   };
 
 
-  const profileTabs = ["Profile", "Clients", "Reviews", "Settings"];
+  const profileTabs = ["Profile", "Settings"];
   // Dummy handlers for old buttons - these are now replaced by edit icons
   // const handleEditProfile = () => console.log("Edit Profile Pressed");
   // const handleViewSchedule = () => console.log("View Schedule Pressed");
@@ -259,13 +273,8 @@ const ProfileScreen: React.FC = () => {
             onSave={() => handleSave("languages")}
             onCancel={handleCancel}
           />
-          <RecentActivity activities={profileData.recentActivity} />
         </>
       );
-    } else if (selectedTab === "Clients") {
-      return <Text style={styles.tabContentText}>Clients Content Coming Soon</Text>;
-    } else if (selectedTab === "Reviews") {
-      return <Text style={styles.tabContentText}>Reviews Content Coming Soon</Text>;
     } else if (selectedTab === "Settings") {
       return <Text style={styles.tabContentText}>Settings Content Coming Soon</Text>;
     }

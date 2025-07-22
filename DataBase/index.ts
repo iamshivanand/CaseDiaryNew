@@ -284,6 +284,31 @@ export const getSuggestionsForField = async (
     return results.map(item => ({ id: item.id, name: item.name }));
 };
 
+export const getTotalCases = async (userId?: number | null): Promise<number> => {
+    const db = await getDb();
+    let sql = "SELECT COUNT(*) as count FROM Cases";
+    const params: any[] = [];
+    if (userId != null) {
+        sql += " WHERE user_id = ?";
+        params.push(userId);
+    }
+    const result = await db.getFirstAsync<{ count: number }>(sql, params);
+    return result?.count ?? 0;
+};
+
+export const getUpcomingHearings = async (userId?: number | null): Promise<number> => {
+    const db = await getDb();
+    const today = new Date().toISOString().split('T')[0];
+    let sql = "SELECT COUNT(*) as count FROM Cases WHERE NextDate > ?";
+    const params: any[] = [today];
+    if (userId != null) {
+        sql += " AND user_id = ?";
+        params.push(userId);
+    }
+    const result = await db.getFirstAsync<{ count: number }>(sql, params);
+    return result?.count ?? 0;
+};
+
 // Ensure other specific lookup CRUDs like getDistricts, getPoliceStations are also defined or imported if used by getSuggestionsForField
 // Placeholder for getDistricts and getPoliceStations if they were removed and are needed by getSuggestionsForField
 export const getDistricts = async (userId?: number | null): Promise<District[]> => { /* ... implementation ... */ return []; };
