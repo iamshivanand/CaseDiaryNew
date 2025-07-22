@@ -312,6 +312,10 @@ export const getUpcomingHearings = async (userId?: number | null): Promise<numbe
 export const addUser = async (name: string, email: string): Promise<number | null> => {
     const db = await getDb();
     try {
+        const existingUser = await db.getFirstAsync<User>("SELECT * FROM Users WHERE email = ?", [email]);
+        if (existingUser) {
+            return existingUser.id;
+        }
         const result = await db.runAsync("INSERT INTO Users (name, email) VALUES (?, ?)", [name, email]);
         return result.lastInsertRowId;
     } catch (error) {
