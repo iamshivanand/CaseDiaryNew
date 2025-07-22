@@ -8,6 +8,7 @@ import { getDb } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
 import Routes from "./Routes/Routes";
 import OnboardingScreen from "./Screens/OnboardingScreen/OnboardingScreen";
+import { requestAllPermissions } from "./utils/permissions";
 
 const Stack = createNativeStackNavigator();
 
@@ -26,6 +27,8 @@ export default function App() {
         );
         if (onboardingStatus === "true") {
           setOnboardingComplete(true);
+        } else {
+          await requestAllPermissions();
         }
       } catch (error) {
         console.error("Failed to initialize database from App.tsx:", error);

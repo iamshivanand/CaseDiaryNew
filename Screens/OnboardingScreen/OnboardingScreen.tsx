@@ -47,34 +47,44 @@ const OnboardingScreen = ({ navigation }) => {
   };
 
   const handleSave = async () => {
+    console.log("Attempting to save onboarding data...");
     if (!name || !designation || !phone || !email || !address) {
       Alert.alert("Error", "Please fill all the fields.");
+      console.error("Validation failed: Not all fields are filled.");
       return;
     }
-    const db = await getDb();
-    const newProfile: LawyerProfileData = {
-      avatarUrl: avatarUri,
-      name,
-      designation,
-      practiceAreas: [],
-      stats: {
-        totalCases: 0,
-        upcomingHearings: 0,
-        yearsOfPractice: 0,
-        yearsOfPracticeLastUpdated: new Date().toISOString(),
-      },
-      aboutMe: "",
-      contactInfo: {
-        email,
-        phone,
-        address,
-      },
-      languages: [],
-      recentActivity: [],
-    };
-    await updateUserProfile(db, 1, newProfile); // Assuming user id 1
-    await AsyncStorage.setItem("@onboarding_complete", "true");
-    navigation.replace("App");
+    try {
+      const db = await getDb();
+      const newProfile: LawyerProfileData = {
+        avatarUrl: avatarUri,
+        name,
+        designation,
+        practiceAreas: [],
+        stats: {
+          totalCases: 0,
+          upcomingHearings: 0,
+          yearsOfPractice: 0,
+          yearsOfPracticeLastUpdated: new Date().toISOString(),
+        },
+        aboutMe: "",
+        contactInfo: {
+          email,
+          phone,
+          address,
+        },
+        languages: [],
+        recentActivity: [],
+      };
+      console.log("Saving new profile data:", newProfile);
+      await updateUserProfile(db, 1, newProfile); // Assuming user id 1
+      console.log("Profile data saved successfully.");
+      await AsyncStorage.setItem("@onboarding_complete", "true");
+      console.log("Onboarding status set to complete.");
+      navigation.replace("App");
+    } catch (error) {
+      console.error("Error saving onboarding data:", error);
+      Alert.alert("Error", "An error occurred while saving your data.");
+    }
   };
 
   return (
