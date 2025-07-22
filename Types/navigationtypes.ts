@@ -25,14 +25,15 @@ export type HomeStackParamList = {
 // Stack for the "Search" Tab
 export type SearchStackParamList = {
   SearchScreen: undefined;
-  // Example: SearchResults: { query: string };
-  // Example: SearchCaseDetail: { caseDetails: CaseDetails }; // If search results navigate to a detail view
+  CaseDetails: { caseId: number };
+  EditCase: { caseId: number, initialCaseData?: Partial<CaseData> };
 };
 
 // Stack for the "Calendar" Tab
 export type CalendarStackParamList = {
   CalendarScreen: undefined;
-  // Example: EventDetail: { eventId: string };
+  CaseDetails: { caseId: number };
+  EditCase: { caseId: number, initialCaseData?: Partial<CaseData> };
 };
 
 // Stack for the "Profile" Tab (can include Settings)

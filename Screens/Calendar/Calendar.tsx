@@ -172,7 +172,7 @@ const CalendarScreen: React.FC<Props> = () => {
         <View style={styles.CardsContainer}>
           <Text>Selected Date is {selected}</Text>
           {ResultToshow?.map((each, index) => (
-            <NewCaseCard key={index} caseDetails={each} onUpdateHearingPress={() => handleUpdateHearing(each)} />
+            <NewCaseCard key={index} caseDetails={each} onUpdateHearingPress={() => handleUpdateHearing(each)} onPress={() => navigation.navigate('CaseDetails', { caseId: each.id })} />
           ))}
         </View>
       </ScrollView>

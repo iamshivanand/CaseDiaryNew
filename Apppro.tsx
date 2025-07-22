@@ -96,16 +96,18 @@ const HomeStack = () => (
 );
 
 const SearchStack = () => (
-  <SearchStackNav.Navigator screenOptions={{ headerShown: false }}>
-    <SearchStackNav.Screen name="SearchScreen" component={SearchScreen} />
-    {/* Add SearchResults, SearchCaseDetail screens here */}
+  <SearchStackNav.Navigator screenOptions={{ headerShown: true }}>
+    <SearchStackNav.Screen name="SearchScreen" component={SearchScreen} options={{ headerShown: false }} />
+    <SearchStackNav.Screen name="CaseDetails" component={CaseDetailsScreen} options={{ title: "Case Details" }} />
+    <SearchStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
   </SearchStackNav.Navigator>
 );
 
 const CalendarStack = () => (
-  <CalendarStackNav.Navigator screenOptions={{ headerShown: false }}>
-    <CalendarStackNav.Screen name="CalendarScreen" component={CalendarScreen} />
-    {/* Add EventDetail screens here */}
+  <CalendarStackNav.Navigator screenOptions={{ headerShown: true }}>
+    <CalendarStackNav.Screen name="CalendarScreen" component={CalendarScreen} options={{ headerShown: false }} />
+    <CalendarStackNav.Screen name="CaseDetails" component={CaseDetailsScreen} options={{ title: "Case Details" }} />
+    <CalendarStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
   </CalendarStackNav.Navigator>
 );
 
