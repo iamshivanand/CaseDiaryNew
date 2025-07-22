@@ -8,7 +8,6 @@ import {
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Animatable from "react-native-animatable";
 import { ThemeContext } from "../../Providers/ThemeProvider";
@@ -85,13 +84,6 @@ const OnboardingScreen = ({ navigation }) => {
         await AsyncStorage.setItem("@onboarding_complete", "true");
         await AsyncStorage.setItem("@user_id", userId.toString());
         console.log("Onboarding status set to complete.");
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "Onboarding Complete!",
-            body: "Welcome to Case Diary!",
-          },
-          trigger: null,
-        });
         viewRef.current.animate("fadeOutUp").then(() => {
           navigation.replace("MainApp");
         });
