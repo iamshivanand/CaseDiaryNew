@@ -83,15 +83,14 @@ const CalendarScreen: React.FC<Props> = () => {
         }}
         style={[
           styles.dayContainer,
+          dayMarking && styles.hasCasesDay,
           isSelected && styles.selectedDay,
-          !dayMarking && styles.noCasesDay,
         ]}
       >
         <Text
           style={[
             styles.dayText,
             isSelected && styles.selectedDayText,
-            !dayMarking && styles.noCasesDayText,
           ]}
         >
           {day.day}
@@ -150,7 +149,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   CardsContainer: {
-    alignItems: "center",
     padding: 16,
   },
   dayContainer: {
@@ -161,19 +159,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   selectedDay: {
-    backgroundColor: 'blue',
+    backgroundColor: '#007BFF',
+  },
+  hasCasesDay: {
+    backgroundColor: '#EBF5FF',
   },
   dayText: {
     fontSize: 16,
+    color: '#333',
   },
   selectedDayText: {
     color: 'white',
-  },
-  noCasesDay: {
-    backgroundColor: '#f0f0f0',
-  },
-  noCasesDayText: {
-    color: '#d9e1e8',
   },
   eventBubble: {
     position: 'absolute',
