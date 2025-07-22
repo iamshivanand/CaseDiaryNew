@@ -3,6 +3,7 @@ import React, { useContext, useEffect, useState } from "react";
 import { SafeAreaView, ActivityIndicator, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import * as Animatable from "react-native-animatable";
 
 import { getDb } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
@@ -59,7 +60,13 @@ export default function App() {
         >
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             {onboardingComplete ? (
-              <Stack.Screen name="App" component={Routes} />
+              <Stack.Screen name="App">
+                {(props) => (
+                  <Animatable.View animation="fadeInDown" style={{ flex: 1 }}>
+                    <Routes {...props} />
+                  </Animatable.View>
+                )}
+              </Stack.Screen>
             ) : (
               <Stack.Screen name="Onboarding" component={OnboardingScreen} />
             )}

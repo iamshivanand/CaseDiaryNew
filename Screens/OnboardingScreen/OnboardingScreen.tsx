@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useRef } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,9 @@ import {
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Animatable from "react-native-animatable";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { getDb, updateUserProfile, addUser } from "../../DataBase";
 import { LawyerProfileData } from "../../Types/appTypes";
@@ -23,6 +25,7 @@ const OnboardingScreen = ({ navigation }) => {
   const [address, setAddress] = useState("");
   const [yearsOfPractice, setYearsOfPractice] = useState("");
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const viewRef = useRef<any>(null);
 
   const handleChooseImage = async () => {
     if (Platform.OS !== "web") {
@@ -82,7 +85,16 @@ const OnboardingScreen = ({ navigation }) => {
         await AsyncStorage.setItem("@onboarding_complete", "true");
         await AsyncStorage.setItem("@user_id", userId.toString());
         console.log("Onboarding status set to complete.");
-        navigation.replace("App");
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "Onboarding Complete!",
+            body: "Welcome to Case Diary!",
+          },
+          trigger: null,
+        });
+        viewRef.current.animate("fadeOutUp").then(() => {
+          navigation.replace("MainApp");
+        });
       } else {
         Alert.alert("Error", "An error occurred while creating your account.");
       }
@@ -93,7 +105,11 @@ const OnboardingScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <Animatable.View
+      ref={viewRef}
+      animation="fadeIn"
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <Text style={styles.title}>Welcome!</Text>
       <Text style={styles.subtitle}>
         Let's get your profile set up.
@@ -142,7 +158,7 @@ const OnboardingScreen = ({ navigation }) => {
         keyboardType="number-pad"
       />
       <ActionButton title="Save and Continue" onPress={handleSave} />
-    </View>
+    </Animatable.View>
   );
 };
 
