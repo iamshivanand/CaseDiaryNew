@@ -14,7 +14,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
-import emitter from "../../utils/event-emitter";
+import { emitter } from "../../utils/event-emitter";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { getDb, updateUserProfile, addUser } from "../../DataBase";
 import { LawyerProfileData } from "../../Types/appTypes";
@@ -95,6 +95,7 @@ const OnboardingScreen = () => {
         await AsyncStorage.setItem("@onboarding_complete", "true");
         await AsyncStorage.setItem("@user_id", userId.toString());
         console.log("Onboarding status set to complete.");
+        console.log("Emitter object:", emitter);
         translateY.value = withTiming(-1000, { duration: 500 }, () => {
           emitter.emit("onboardingComplete");
         });

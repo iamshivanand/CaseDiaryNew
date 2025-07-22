@@ -8,7 +8,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
-import emitter from "./utils/event-emitter";
+import { emitter } from "./utils/event-emitter";
 
 import { getDb, getUserProfile } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
