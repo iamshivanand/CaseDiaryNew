@@ -1,19 +1,10 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
-
-const adUnitId = __DEV__ ? TestIds.BANNER : 'ca-app-pub-xxxxxxxx~xxxxxxxx/xxxxxxxx';
+import { View, StyleSheet, Text } from 'react-native';
 
 const Advertisement = () => {
   return (
     <View style={styles.adBanner}>
-      <BannerAd
-        unitId={adUnitId}
-        size={BannerAdSize.MEDIUM_RECTANGLE}
-        requestOptions={{
-          requestNonPersonalizedAdsOnly: true,
-        }}
-      />
+      <Text>Advertisement</Text>
     </View>
   );
 };
