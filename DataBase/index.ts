@@ -309,6 +309,17 @@ export const getUpcomingHearings = async (userId?: number | null): Promise<numbe
     return result?.count ?? 0;
 };
 
+export const addUser = async (name: string, email: string): Promise<number | null> => {
+    const db = await getDb();
+    try {
+        const result = await db.runAsync("INSERT INTO Users (name, email) VALUES (?, ?)", [name, email]);
+        return result.lastInsertRowId;
+    } catch (error) {
+        console.error("Error adding user:", error);
+        return null;
+    }
+};
+
 // Ensure other specific lookup CRUDs like getDistricts, getPoliceStations are also defined or imported if used by getSuggestionsForField
 // Placeholder for getDistricts and getPoliceStations if they were removed and are needed by getSuggestionsForField
 export const getDistricts = async (userId?: number | null): Promise<District[]> => { /* ... implementation ... */ return []; };

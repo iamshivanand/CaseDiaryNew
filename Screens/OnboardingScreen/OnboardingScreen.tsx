@@ -10,7 +10,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeContext } from "../../Providers/ThemeProvider";
-import { getDb, updateUserProfile } from "../../DataBase";
+import { getDb, updateUserProfile, addUser } from "../../DataBase";
 import { LawyerProfileData } from "../../Types/appTypes";
 import ActionButton from "../CommonComponents/ActionButton";
 
@@ -21,6 +21,7 @@ const OnboardingScreen = ({ navigation }) => {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
+  const [yearsOfPractice, setYearsOfPractice] = useState("");
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
   const handleChooseImage = async () => {
@@ -48,39 +49,43 @@ const OnboardingScreen = ({ navigation }) => {
 
   const handleSave = async () => {
     console.log("Attempting to save onboarding data...");
-    if (!name || !designation || !phone || !email || !address) {
+    if (!name || !designation || !phone || !email || !address || !yearsOfPractice) {
       Alert.alert("Error", "Please fill all the fields.");
       console.error("Validation failed: Not all fields are filled.");
       return;
     }
     try {
       const db = await getDb();
-      const newProfile: LawyerProfileData = {
-        avatarUrl: avatarUri,
-        name,
-        designation,
-        practiceAreas: [],
-        stats: {
-          totalCases: 0,
-          upcomingHearings: 0,
-          yearsOfPractice: 0,
-          yearsOfPracticeLastUpdated: new Date().toISOString(),
-        },
-        aboutMe: "",
-        contactInfo: {
-          email,
-          phone,
-          address,
-        },
-        languages: [],
-        recentActivity: [],
-      };
-      console.log("Saving new profile data:", newProfile);
-      await updateUserProfile(db, 1, newProfile); // Assuming user id 1
-      console.log("Profile data saved successfully.");
-      await AsyncStorage.setItem("@onboarding_complete", "true");
-      console.log("Onboarding status set to complete.");
-      navigation.replace("App");
+      const userId = await addUser(name, email);
+      if (userId) {
+        const newProfile: Omit<LawyerProfileData, 'stats'> & { stats: Omit<LawyerProfileData['stats'], 'totalCases' | 'upcomingHearings'> } = {
+          avatarUrl: avatarUri,
+          name,
+          designation,
+          practiceAreas: [],
+          stats: {
+            yearsOfPractice: parseInt(yearsOfPractice, 10) || 0,
+            yearsOfPracticeLastUpdated: new Date().toISOString(),
+          },
+          aboutMe: "",
+          contactInfo: {
+            email,
+            phone,
+            address,
+          },
+          languages: [],
+          recentActivity: [],
+        };
+        console.log("Saving new profile data:", newProfile);
+        await updateUserProfile(db, userId, newProfile as LawyerProfileData);
+        console.log("Profile data saved successfully.");
+        await AsyncStorage.setItem("@onboarding_complete", "true");
+        await AsyncStorage.setItem("@user_id", userId.toString());
+        console.log("Onboarding status set to complete.");
+        navigation.replace("App");
+      } else {
+        Alert.alert("Error", "An error occurred while creating your account.");
+      }
     } catch (error) {
       console.error("Error saving onboarding data:", error);
       Alert.alert("Error", "An error occurred while saving your data.");
@@ -128,6 +133,13 @@ const OnboardingScreen = ({ navigation }) => {
         placeholder="Office Address"
         value={address}
         onChangeText={setAddress}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Years of Practice"
+        value={yearsOfPractice}
+        onChangeText={setYearsOfPractice}
+        keyboardType="number-pad"
       />
       <ActionButton title="Save and Continue" onPress={handleSave} />
     </View>
