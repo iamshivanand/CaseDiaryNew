@@ -1,5 +1,4 @@
 import * as ImagePicker from "expo-image-picker";
-import * as Notifications from "expo-notifications";
 import { Alert, Platform } from "react-native";
 
 export const requestAllPermissions = async (): Promise<void> => {
@@ -15,11 +14,6 @@ export const requestAllPermissions = async (): Promise<void> => {
       name: "Media Library",
       request: ImagePicker.requestMediaLibraryPermissionsAsync,
       check: ImagePicker.getMediaLibraryPermissionsAsync,
-    },
-    {
-      name: "Notifications",
-      request: Notifications.requestPermissionsAsync,
-      check: Notifications.getPermissionsAsync,
     },
   ];
 
