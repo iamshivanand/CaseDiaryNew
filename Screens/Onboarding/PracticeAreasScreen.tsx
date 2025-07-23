@@ -83,13 +83,22 @@ const PracticeAreasScreen = ({ navigation }) => {
         <View style={styles.buttonContainer}>
           <PrimaryButton
             title="Continue"
-            onPress={() => {
+            onPress={async () => {
               const practiceAreas = [...selectedAreas];
               if (selectedAreas.includes('Other') && otherArea) {
                 practiceAreas.push(otherArea);
               }
-              setOnboardingData({ ...onboardingData, practiceAreas });
-              navigation.navigate('Done');
+              const finalOnboardingData = { ...onboardingData, practiceAreas };
+
+              const db = await getDb();
+              const userId = await addUser(finalOnboardingData.fullName, finalOnboardingData.email);
+              if (userId) {
+                await updateUserProfile(db, userId, finalOnboardingData);
+                await AsyncStorage.setItem('@onboarding_complete', 'true');
+                await AsyncStorage.setItem('@user_id', userId.toString());
+                emitter.emit('onboardingComplete');
+                navigation.navigate('Done');
+              }
             }}
           />
           <TouchableOpacity onPress={() => navigation.goBack()}>

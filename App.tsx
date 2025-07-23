@@ -26,10 +26,15 @@ const OnboardingStack = createNativeStackNavigator();
 
 import DoneScreen from "./Screens/Onboarding/DoneScreen";
 
+import { CardStyleInterpolators } from '@react-navigation/stack';
+
 const OnboardingNavigator = () => (
   <OnboardingStack.Navigator
     initialRouteName="OnboardingSteps"
-    screenOptions={{ headerShown: false }}
+    screenOptions={{
+      headerShown: false,
+      cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+    }}
   >
     <OnboardingStack.Screen
       name="OnboardingSteps"

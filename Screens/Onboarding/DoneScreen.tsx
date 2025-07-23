@@ -1,29 +1,8 @@
-import React, { useContext, useEffect } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import PrimaryButton from './components/PrimaryButton';
 import { Ionicons } from '@expo/vector-icons';
-import { OnboardingContext } from '../../Providers/OnboardingProvider';
-import { getDb, addUser, updateUserProfile } from '../../DataBase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { emitter } from '../../utils/event-emitter';
 
 const DoneScreen = () => {
-  const { onboardingData } = useContext(OnboardingContext);
-
-  useEffect(() => {
-    const saveProfile = async () => {
-      const db = await getDb();
-      const userId = await addUser(onboardingData.fullName, onboardingData.email);
-      if (userId) {
-        await updateUserProfile(db, userId, onboardingData);
-        await AsyncStorage.setItem('@onboarding_complete', 'true');
-        await AsyncStorage.setItem('@user_id', userId.toString());
-        emitter.emit('onboardingComplete');
-      }
-    };
-    saveProfile();
-  }, []);
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>

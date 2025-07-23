@@ -43,13 +43,14 @@ const StepperIndicator: React.FC<StepperIndicatorProps> = ({ steps, currentStep 
 
 const styles = StyleSheet.create({
   container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 20,
   },
   stepContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
   },
   circle: {
     width: 32,
@@ -75,8 +76,9 @@ const styles = StyleSheet.create({
     color: '#1E1E1E',
   },
   stepLabel: {
-    marginLeft: 12,
-    fontSize: 16,
+    marginTop: 8,
+    fontSize: 12,
+    textAlign: 'center',
   },
   activeLabel: {
     color: '#1E1E1E',
@@ -86,12 +88,10 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   connector: {
-    position: 'absolute',
-    top: 32,
-    left: 15,
-    width: 2,
-    height: 20,
+    flex: 1,
+    height: 2,
     backgroundColor: '#E5E7EB',
+    marginHorizontal: -10,
   },
 });
 
