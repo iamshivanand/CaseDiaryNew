@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
+import TemplateCard from './components/TemplateCard';
 
 const templates = [
   { id: '1', name: 'Non-Disclosure Agreement' },
@@ -13,9 +14,7 @@ const templates = [
 
 const LegalTemplatesScreen = () => {
   const renderItem = ({ item }) => (
-    <View style={styles.item}>
-      <Text style={styles.title}>{item.name}</Text>
-    </View>
+    <TemplateCard template={item} onPress={() => {}} />
   );
 
   return (
@@ -25,6 +24,7 @@ const LegalTemplatesScreen = () => {
         data={templates}
         renderItem={renderItem}
         keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContainer}
       />
     </View>
   );
@@ -33,21 +33,17 @@ const LegalTemplatesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    color: '#333',
   },
-  item: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-  },
-  title: {
-    fontSize: 18,
+  listContainer: {
+    paddingHorizontal: 16,
   },
 });
 
