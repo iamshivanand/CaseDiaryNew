@@ -312,7 +312,7 @@ export const getUpcomingHearings = async (userId?: number | null): Promise<numbe
 export const addUser = async (name: string, email: string): Promise<number | null> => {
     const db = await getDb();
     try {
-        const existingUser = await db.getFirstAsync<User>("SELECT * FROM Users WHERE email = ?", [email]);
+        const existingUser = await db.getFirstAsync<User>("SELECT * FROM Users");
         if (existingUser) {
             return existingUser.id;
         }

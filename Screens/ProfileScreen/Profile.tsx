@@ -292,34 +292,7 @@ const ProfileScreen: React.FC = () => {
   if (!profileData) {
     return (
       <View style={styles.centered}>
-        <Text>Loading profile...</Text>
-        <ActionButton
-          title="Create Profile"
-          onPress={() => {
-            // Create a default profile and save it
-            const defaultProfile: LawyerProfileData = {
-              avatarUrl: "",
-              name: "Your Name",
-              designation: "Your Designation",
-              practiceAreas: [],
-              stats: {
-                totalCases: 0,
-                upcomingHearings: 0,
-                yearsOfPractice: 0,
-                yearsOfPracticeLastUpdated: new Date().toISOString(),
-              },
-              aboutMe: "",
-              contactInfo: {
-                email: "",
-                phone: "",
-                address: "",
-              },
-              languages: [],
-              recentActivity: [],
-            };
-            setProfileData(defaultProfile);
-          }}
-        />
+        <ActivityIndicator size="large" />
       </View>
     );
   }
