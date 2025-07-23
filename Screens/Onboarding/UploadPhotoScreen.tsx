@@ -94,6 +94,7 @@ const styles = StyleSheet.create({
   },
   stepText: {
     textAlign: 'center',
+    paddingTop: 20,
     marginBottom: 20,
     fontSize: 16,
     color: '#6B7280',

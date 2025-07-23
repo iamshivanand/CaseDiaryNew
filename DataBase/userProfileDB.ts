@@ -6,6 +6,7 @@ export const CREATE_LAWYER_PROFILES_TABLE = `
 CREATE TABLE IF NOT EXISTS LawyerProfiles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
+  name TEXT,
   avatarUrl TEXT,
   designation TEXT,
   practiceAreas TEXT,
