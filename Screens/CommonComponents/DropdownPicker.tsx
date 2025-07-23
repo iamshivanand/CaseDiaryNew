@@ -15,6 +15,7 @@ interface DropdownPickerProps {
   error?: string | null;
   placeholder?: string;
   onOtherValueChange?: (text: string) => void;
+  testID?: string;
 }
 
 const DropdownPicker: React.FC<DropdownPickerProps> = ({
@@ -26,6 +27,7 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
   error,
   placeholder,
   onOtherValueChange,
+  testID,
 }) => {
   const { theme } = useContext(ThemeContext);
   const styles = getDropdownPickerStyles(theme);
@@ -60,6 +62,7 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
         ]}
       >
         <Picker
+          testID={testID}
           selectedValue={selectedValue}
           onValueChange={handleValueChange}
           enabled={enabled}

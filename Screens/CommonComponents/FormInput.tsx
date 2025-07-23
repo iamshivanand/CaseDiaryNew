@@ -1,21 +1,19 @@
 // Screens/CommonComponents/FormInput.tsx
-import React, { useContext } from "react";
+import React, { useContext } from "react"; // Added useContext
 import { View, Text, TextInput, KeyboardTypeOptions, TextInputProps } from "react-native";
-import { getFormInputStyles } from "./FormInputStyle";
-import { ThemeContext } from "../../Providers/ThemeProvider";
-import SuggestionInput from "./SuggestionsInput";
+import { getFormInputStyles } from "./FormInputStyle"; // Import function
+import { ThemeContext } from "../../Providers/ThemeProvider"; // Adjust path
 
 interface FormInputProps extends Omit<TextInputProps, 'onChangeText' | 'value'> {
   label: string;
   value?: string;
-  onChangeText?: (text: string) => void;
+  onChangeText?: (text: string) => void; // Make sure this is included
   placeholder?: string;
   keyboardType?: KeyboardTypeOptions;
   secureTextEntry?: boolean;
   multiline?: boolean;
   numberOfLines?: number;
   error?: string | null;
-  suggestions?: string[];
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -29,24 +27,10 @@ const FormInput: React.FC<FormInputProps> = ({
   numberOfLines,
   error,
   style,
-  suggestions,
   ...rest
 }) => {
   const { theme } = useContext(ThemeContext);
-  const styles = getFormInputStyles(theme);
-
-  if (suggestions) {
-    return (
-      <SuggestionInput
-        label={label}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        suggestions={suggestions}
-        onBlur={() => {}}
-      />
-    );
-  }
+  const styles = getFormInputStyles(theme); // Generate styles
 
   return (
     <View style={styles.inputContainer}>
@@ -55,7 +39,7 @@ const FormInput: React.FC<FormInputProps> = ({
         style={[
           styles.textInput,
           multiline && styles.textInputMultiline,
-          error ? { borderColor: theme.colors.errorBorder || 'red' } : {},
+          error ? { borderColor: theme.colors.errorBorder || 'red' } : {}, // Use theme error border color
           style
         ]}
         value={value}
@@ -65,7 +49,7 @@ const FormInput: React.FC<FormInputProps> = ({
         secureTextEntry={secureTextEntry}
         multiline={multiline}
         numberOfLines={multiline ? numberOfLines || 4 : 1}
-        placeholderTextColor={theme.colors.placeholderText || "#9CA3AF"}
+        placeholderTextColor={theme.colors.placeholderText || "#9CA3AF"} // Use theme placeholder color
         {...rest}
       />
       {error && <Text style={styles.errorText}>{error}</Text>}

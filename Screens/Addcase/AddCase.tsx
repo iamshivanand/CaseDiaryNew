@@ -40,6 +40,7 @@ interface FieldDefinition {
   label: string;
   options?: AppDropdownOption[];
   suggestions?: boolean;
+  testID?: string;
 }
 
 type AddCaseScreenRouteProp = RouteProp<HomeStackParamList, "AddCaseDetails">;
@@ -60,8 +61,8 @@ const formFieldsDefinition: FieldDefinition[] = [
   { name: "ClientName", type: "text", placeholder: "Enter Client's Full Name", label: "Client Name", suggestions: true },
   { name: "case_number", type: "text", placeholder: "e.g., CS/123/2023", label: "Case Number" },
   { name: "CNRNumber", type: "text", placeholder: "Enter CNR Number", label: "CNR Number"},
-  { name: "case_type_id", type: "select", label: "Case Type", options: dummyCaseTypeOptionsForAdd, placeholder: "Select Case Type..." },
-  { name: "court_id", type: "select", label: "Court", options: dummyCourtOptionsForAdd, placeholder: "Select Court..." },
+  { name: "case_type_id", type: "select", label: "Case Type", options: dummyCaseTypeOptionsForAdd, placeholder: "Select Case Type...", testID: "case_type_id" },
+  { name: "court_id", type: "select", label: "Court", options: dummyCourtOptionsForAdd, placeholder: "Select Court...", testID: "court_id" },
   { name: "FiledDate", type: "date", label: "Date Filed", placeholder: "Select date case was filed" },
   { name: "JudgeName", type: "text", placeholder: "Enter Judge's Name", label: "Presiding Judge", suggestions: true },
   { name: "OpposingCounsel", type: "text", placeholder: "Enter Opposing Counsel's Name", label: "Opposing Counsel", suggestions: true },
@@ -102,7 +103,7 @@ const FormFieldRenderer: React.FC<{
     case "multiline":
       return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} style={{ minHeight: 80, paddingTop: 10, paddingBottom: 10 }} />;
     case "select":
-      return <DropdownPicker {...commonInputProps} selectedValue={values[fieldName] as string | number | undefined} onValueChange={(itemValue) => setFieldValue(fieldName, itemValue)} options={fieldConfig.options || []} placeholder={fieldConfig.placeholder || `Select ${fieldConfig.label}...`} onOtherValueChange={(text) => setOtherValue(fieldName, text)} />;
+      return <DropdownPicker {...commonInputProps} selectedValue={values[fieldName] as string | number | undefined} onValueChange={(itemValue) => setFieldValue(fieldName, itemValue)} options={fieldConfig.options || []} placeholder={fieldConfig.placeholder || `Select ${fieldConfig.label}...`} onOtherValueChange={(text) => setOtherValue(fieldName, text)} testID={fieldConfig.testID} />;
     case "date":
       return <DatePickerField {...commonInputProps} value={values[fieldName] ? new Date(values[fieldName] as string) : null} onChange={(date) => setFieldValue(fieldName, date ? date.toISOString() : null)} placeholder={fieldConfig.placeholder || "Select date"} />;
     default:
@@ -146,7 +147,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
     const defaults: Partial<CaseData> = { uniqueId: uniqueIdToUse };
     formFieldsDefinition.forEach(field => {
       if (field.name !== 'uniqueId') {
-        defaults[field.name] = field.type === "date" ? null : (field.type === "select" ? (field.options?.[0]?.value ?? '') : '');
+        defaults[field.name] = field.type === "date" ? null : (field.type === "select" ? '' : '');
       }
     });
 
@@ -270,21 +271,8 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const success = await updateCase(caseIdToUpdate, updatePayload);
         if (success) {
           Alert.alert("Success", "Case updated successfully.");
-          const navDetails: CaseDataScreen = {
-            id: caseIdToUpdate.toString(),
-            title: formValues.CaseTitle || "No Title",
-            client: formValues.ClientName || "N/A",
-            status: formValues.Status || "N/A",
-            nextHearing: formValues.HearingDate
-              ? formatDate(formValues.HearingDate)
-              : "N/A",
-            lastUpdate: new Date().toISOString(),
-            previousHearing: formValues.PreviousDate
-              ? formatDate(formValues.PreviousDate)
-              : "N/A",
-          };
           navigation.navigate("CaseDetails", {
-            caseDetails: navDetails,
+            caseId: caseIdToUpdate,
           });
         } else { Alert.alert("Error", "Failed to update case."); }
       } catch (e) { console.error("Error updating case:", e); Alert.alert("Error", "An error occurred while updating.");}
@@ -329,23 +317,8 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const newCaseId = await addCase(insertPayload);
         if (newCaseId) {
           Alert.alert("Success", "Case added successfully.");
-          const navDetails: CaseDataScreen = {
-            id: newCaseId.toString(),
-            title: insertPayload.CaseTitle || "No Title",
-            client: insertPayload.ClientName || "N/A",
-            status: insertPayload.CaseStatus || "N/A",
-            nextHearing: insertPayload.NextDate
-              ? formatDate(insertPayload.NextDate)
-              : "N/A",
-            lastUpdate: insertPayload.updated_at
-              ? formatDate(insertPayload.updated_at)
-              : "N/A",
-            previousHearing: insertPayload.PreviousDate
-              ? formatDate(insertPayload.PreviousDate)
-              : "N/A",
-          };
           navigation.navigate("CaseDetails", {
-            caseDetails: navDetails,
+            caseId: newCaseId,
           });
         } else {
           Alert.alert("Error", "Failed to add case.");
@@ -397,30 +370,3 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
 };
 
 export default AddCase;
-
-const getAddCaseStyles = (theme: Theme) => StyleSheet.create({
-  scrollViewStyle: {
-    flex: 1,
-    backgroundColor: theme.colors.screenBackground || theme.colors.background,
-  },
-  scrollContentContainerStyle: {
-    flexGrow: 1,
-    paddingBottom: 20,
-  },
-  formScreenContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-  },
-  screenTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 24,
-    color: theme.colors.text,
-    textAlign: 'center',
-  },
-  actionButtonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 30,
-  },
-});
