@@ -34,15 +34,14 @@ export default function App() {
   useEffect(() => {
     const initialize = async () => {
       try {
-        const db = await getDb();
+        await getDb();
         console.log("Database initialized successfully from App.tsx");
-        const userId = await AsyncStorage.getItem("@user_id");
-        if (userId) {
-          const profile = await getUserProfile(db, parseInt(userId, 10));
-          if (profile && profile.name && profile.avatarUrl) {
-            setOnboardingComplete(true);
-            translateY.value = withTiming(0, { duration: 500 });
-          }
+        const onboardingStatus = await AsyncStorage.getItem(
+          "@onboarding_complete"
+        );
+        if (onboardingStatus === "true") {
+          setOnboardingComplete(true);
+          translateY.value = withTiming(0, { duration: 500 });
         }
       } catch (error) {
         console.error("Failed to initialize database from App.tsx:", error);

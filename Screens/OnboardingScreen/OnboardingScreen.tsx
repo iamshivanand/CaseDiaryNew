@@ -22,6 +22,7 @@ import ActionButton from "../CommonComponents/ActionButton";
 
 const OnboardingScreen = () => {
   const { theme } = useContext(ThemeContext);
+  const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [designation, setDesignation] = useState("");
   const [phone, setPhone] = useState("");
@@ -106,6 +107,75 @@ const OnboardingScreen = () => {
     }
   };
 
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return (
+          <>
+            <Text style={styles.title}>Welcome!</Text>
+            <Text style={styles.subtitle}>Let's get your profile set up.</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Name"
+              value={name}
+              onChangeText={setName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Designation"
+              value={designation}
+              onChangeText={setDesignation}
+            />
+          </>
+        );
+      case 2:
+        return (
+          <>
+            <Text style={styles.title}>Contact Info</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Phone Number"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Office Address"
+              value={address}
+              onChangeText={setAddress}
+            />
+          </>
+        );
+      case 3:
+        return (
+          <>
+            <Text style={styles.title}>Professional Info</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Years of Practice"
+              value={yearsOfPractice}
+              onChangeText={setYearsOfPractice}
+              keyboardType="number-pad"
+            />
+            <ActionButton
+              title={avatarUri ? "Change Photo" : "Upload Photo"}
+              onPress={handleChooseImage}
+            />
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Animated.View
       style={[
@@ -114,54 +184,18 @@ const OnboardingScreen = () => {
         animatedStyle,
       ]}
     >
-      <Text style={styles.title}>Welcome!</Text>
-      <Text style={styles.subtitle}>
-        Let's get your profile set up.
-      </Text>
-      <ActionButton
-        title={avatarUri ? "Change Photo" : "Upload Photo"}
-        onPress={handleChooseImage}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Name"
-        value={name}
-        onChangeText={setName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Designation"
-        value={designation}
-        onChangeText={setDesignation}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Phone Number"
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Office Address"
-        value={address}
-        onChangeText={setAddress}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Years of Practice"
-        value={yearsOfPractice}
-        onChangeText={setYearsOfPractice}
-        keyboardType="number-pad"
-      />
-      <ActionButton title="Save and Continue" onPress={handleSave} />
+      {renderStep()}
+      <View style={styles.buttonContainer}>
+        {step > 1 && (
+          <ActionButton title="Previous" onPress={() => setStep(step - 1)} />
+        )}
+        {step < 3 && (
+          <ActionButton title="Next" onPress={() => setStep(step + 1)} />
+        )}
+        {step === 3 && (
+          <ActionButton title="Save and Continue" onPress={handleSave} />
+        )}
+      </View>
     </Animated.View>
   );
 };
@@ -189,6 +223,11 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     marginBottom: 15,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 20,
   },
 });
 
