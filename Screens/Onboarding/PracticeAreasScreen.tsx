@@ -5,6 +5,7 @@ import StepperIndicator from './components/StepperIndicator';
 import InputField from './components/InputField';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 import { getDb, addUser, updateUserProfile } from '../../DataBase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const practiceAreas = [
   'Criminal Law',

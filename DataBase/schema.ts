@@ -321,6 +321,7 @@ END;`;
 
 
 import { initializeUserProfileDB } from './userProfileDB';
+import { initializeUserInformationDB } from './userInformationDB';
 // Function to execute all DDL statements
 export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void> => {
   // Enable foreign keys - this is important for SQLite to enforce constraints
@@ -350,6 +351,7 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   await db.execAsync(CREATE_CASE_TIMELINE_CASE_ID_INDEX);
   await db.execAsync(CREATE_CASE_TIMELINE_UPDATED_AT_TRIGGER);
   await initializeUserProfileDB(db);
+  await initializeUserInformationDB(db);
 
   console.log("Database schema initialized.");
 };
