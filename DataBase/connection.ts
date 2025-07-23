@@ -8,12 +8,12 @@ let dbInstance: SQLite.SQLiteDatabase | null = null;
 /**
  * ONLY FOR TEST ENVIRONMENTS. Clears the singleton dbInstance.
  */
-export const __TEST_ONLY_resetDbInstance_connection = () => { // Renamed to avoid conflict if re-exported
+export const __TEST_ONLY_resetDbInstance = () => {
   if (process.env.NODE_ENV === 'test') {
     console.log("Resetting DB instance from connection.ts for test environment.");
     dbInstance = null;
   } else {
-    console.warn("__TEST_ONLY_resetDbInstance_connection called outside of test environment. This is not allowed.");
+    console.warn("__TEST_ONLY_resetDbInstance called outside of test environment. This is not allowed.");
   }
 };
 

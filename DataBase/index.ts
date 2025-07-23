@@ -5,7 +5,7 @@ import * as FileSystem from 'expo-file-system';
 import { CaseType, Court, District, PoliceStation, CaseDocument, Case as CaseRow, User } from './schema';
 
 // getDb is now imported from connection.ts
-import { getDb, __TEST_ONLY_resetDbInstance_connection as __TEST_ONLY_resetDbInstance } from './connection';
+import { getDb, __TEST_ONLY_resetDbInstance } from './connection';
 
 // Re-export getDb so it's available when importing from './DataBase'
 export { getDb };
@@ -55,22 +55,40 @@ interface UploadOptions {
   originalFileName: string; fileType: string; fileUri: string; caseId: number; userId?: number | null; fileSize?: number | null;
 }
 export const uploadCaseDocument = async (options: UploadOptions): Promise<number | null> => {
-  const db = await getDb(); const { originalFileName, fileType, fileUri, caseId, userId, fileSize } = options;
-  const timestamp = Date.now(); const nameParts = originalFileName.split('.');
-  const extension = nameParts.length > 1 ? nameParts.pop() : 'dat'; const baseName = nameParts.join('.');
+  const db = await getDb();
+  const { originalFileName, fileType, fileUri, caseId, userId, fileSize } = options;
+  console.log("Uploading document with options:", options);
+  const caseExists = await getCaseById(caseId);
+  if (!caseExists) {
+    console.error("Case not found");
+    return null;
+  }
+  const timestamp = Date.now();
+  const nameParts = originalFileName.split('.');
+  const extension = nameParts.length > 1 ? nameParts.pop() : 'dat';
+  const baseName = nameParts.join('.');
   const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, '_');
   const uniqueStoredFileName = `${caseId}_${timestamp}_${sanitizedBaseName}.${extension}`;
   const mimeTypeForDb = fileType;
   try {
     const dirInfo = await FileSystem.getInfoAsync(DOCUMENTS_DIRECTORY);
-    if (!dirInfo.exists) { await FileSystem.makeDirectoryAsync(DOCUMENTS_DIRECTORY, { intermediates: true }); }
+    if (!dirInfo.exists) {
+      console.log("Documents directory does not exist, creating it...");
+      await FileSystem.makeDirectoryAsync(DOCUMENTS_DIRECTORY, { intermediates: true });
+    }
     const destinationUri = DOCUMENTS_DIRECTORY + uniqueStoredFileName;
+    console.log("Copying file from", fileUri, "to", destinationUri);
     await FileSystem.copyAsync({ from: fileUri, to: destinationUri });
+    console.log("File copied successfully");
     const result = await db.runAsync(
       "INSERT INTO CaseDocuments (case_id, stored_filename, original_display_name, file_type, file_size, user_id) VALUES (?, ?, ?, ?, ?, ?)",
       [caseId, uniqueStoredFileName, originalFileName, mimeTypeForDb, fileSize ?? null, userId ?? null]
-    ); return result.lastInsertRowId;
-  } catch (error) { console.error("Error uploading file:", error); return null; }
+    );
+    return result.lastInsertRowId;
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    return null;
+  }
 };
 export const getCaseDocuments = async (caseId: number): Promise<CaseDocument[]> => {
   const db = await getDb(); return db.getAllAsync<CaseDocument>("SELECT * FROM CaseDocuments WHERE case_id = ? ORDER BY created_at DESC", [caseId]);
@@ -119,14 +137,18 @@ export interface CaseWithDetails extends CaseRow {
   districtName?: string | null; policeStationName?: string | null;
 }
 
-export const getCases = async (userId?: number | null): Promise<CaseWithDetails[]> => {
+export const getCases = async (userId?: number | null, limit: number = 10, offset: number = 0): Promise<CaseWithDetails[]> => {
   const db = await getDb();
   let sql = `SELECT c.*, ps.name as policeStationName, d.name as districtName FROM Cases c
              LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
              LEFT JOIN Districts d ON ps.district_id = d.id`;
   const params: any[] = [];
-  if (userId != null) { sql += " WHERE c.user_id = ?"; params.push(userId); }
-  sql += " ORDER BY c.updated_at DESC";
+  if (userId != null) {
+    sql += " WHERE c.user_id = ?";
+    params.push(userId);
+  }
+  sql += " ORDER BY c.NextDate DESC LIMIT ? OFFSET ?";
+  params.push(limit, offset);
   return db.getAllAsync<CaseWithDetails>(sql, params);
 };
 
@@ -137,13 +159,22 @@ export const getCaseById = async (id: number, userId?: number | null): Promise<C
              LEFT JOIN Districts d ON ps.district_id = d.id
              WHERE c.id = ?`;
   const params: any[] = [id];
-  if (userId != null) { sql += " AND c.user_id = ?"; params.push(userId); }
-  const result = await db.getFirstAsync<CaseWithDetails>(sql, params); return result ?? null;
+  if (userId != null) {
+    sql += " AND c.user_id = ?";
+    params.push(userId);
+  }
+  const result = await db.getFirstAsync<CaseWithDetails>(sql, params);
+  return result ?? null;
 };
 
 export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?: number | null): Promise<boolean> => {
-  const db = await getDb(); const currentCaseData = await getCaseById(id, actorUserId);
-  if (!currentCaseData) { console.warn(`Case ${id} not found or not accessible.`); return false; }
+  const db = await getDb();
+  console.log("Updating case with ID:", id, "and data:", data);
+  const currentCaseData = await getCaseById(id);
+  if (!currentCaseData) {
+    console.warn(`Case ${id} not found.`);
+    return false;
+  }
   const validUpdateData: { [key: string]: any } = {};
   for (const key in data) {
     if (Object.prototype.hasOwnProperty.call(data, key)) {
@@ -151,54 +182,36 @@ export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?:
       if (data[typedKey] !== undefined) validUpdateData[typedKey] = data[typedKey];
     }
   }
-  if (Object.keys(validUpdateData).length === 0) { console.warn("No fields for update."); return false; }
-  const fieldsToUpdate = Object.keys(validUpdateData).map(key => `${key} = ?`).join(", ");
-  const valuesToUpdate = Object.values(validUpdateData).map(val => (val === undefined ? null : val));
+  if (Object.keys(validUpdateData).length === 0) {
+    console.warn("No fields for update.");
+    return false;
+  }
+  const fieldsToUpdate = Object.keys(validUpdateData)
+    .map((key) => `${key} = ?`)
+    .join(", ");
+  const valuesToUpdate = Object.values(validUpdateData).map((val) =>
+    val === undefined ? null : val
+  );
   valuesToUpdate.push(id);
   let sql = `UPDATE Cases SET ${fieldsToUpdate} WHERE id = ?`;
   console.log("Executing SQL for updateCase:", sql, valuesToUpdate);
   try {
     const result = await db.runAsync(sql, valuesToUpdate);
     if (result.changes > 0) {
-      await logCaseChanges(id, currentCaseData, data, actorUserId); return true;
-    } return false;
-  } catch (error) { console.error(`Error updating case ID ${id}:`, error, "SQL:", sql, "Values:", valuesToUpdate); throw error; }
-};
-
-const TRACKED_CASE_FIELDS: Array<keyof Omit<CaseRow, 'id' | 'uniqueId' | 'created_at' | 'updated_at'>> = [
-  'user_id', 'CaseTitle', 'ClientName', 'OnBehalfOf', 'CNRNumber', 'case_number', 'case_year',
-  'court_id', 'court_name', 'case_type_id', 'case_type_name',
-  'dateFiled', 'NextDate', 'PreviousDate', 'StatuteOfLimitations', 'ClosedDate', // Added ClosedDate
-  'crime_number', 'crime_year', 'police_station_id', 'Undersection',
-  'FirstParty', 'OppositeParty', 'Accussed', 'ClientContactNumber',
-  'JudgeName', 'OpposingCounsel', 'OppositeAdvocate', 'OppAdvocateContactNumber',
-  'CaseStatus', 'Priority', 'CaseDescription', 'CaseNotes'
-];
-interface CaseHistoryLogEntryData { case_id: number; field_changed: string; old_value: string | null; new_value: string | null; user_id?: number | null; }
-
-export const addCaseHistoryEntry = async (entry: CaseHistoryLogEntryData): Promise<number | null> => {
-    const db = await getDb();
-    try {
-        const result = await db.runAsync(
-        "INSERT INTO CaseHistoryLog (case_id, user_id, field_changed, old_value, new_value, timestamp) VALUES (?, ?, ?, ?, ?, STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))",
-        [entry.case_id, entry.user_id ?? null, entry.field_changed, entry.old_value, entry.new_value]
-        );
-        return result.lastInsertRowId;
-    } catch (error) { console.error("Error adding case history entry:", error); throw error; }
-};
-
-const logCaseChanges = async ( caseId: number, oldData: CaseRow, newData: CaseUpdateData, actorUserId?: number | null) => {
-    for (const key of TRACKED_CASE_FIELDS) {
-        if (newData.hasOwnProperty(key)) {
-            const oldValue = oldData[key] !== undefined && oldData[key] !== null ? String(oldData[key]) : null;
-            const newValue = newData[key as keyof CaseUpdateData] !== undefined && newData[key as keyof CaseUpdateData] !== null ? String(newData[key as keyof CaseUpdateData]) : null;
-            if (oldValue !== newValue) {
-                await addCaseHistoryEntry({
-                    case_id: caseId, field_changed: key, old_value: oldValue, new_value: newValue, user_id: actorUserId
-                });
-            }
-        }
+      return true;
     }
+    return false;
+  } catch (error) {
+    console.error(
+      `Error updating case ID ${id}:`,
+      error,
+      "SQL:",
+      sql,
+      "Values:",
+      valuesToUpdate
+    );
+    throw error;
+  }
 };
 
 export const deleteCase = async (id: number, userId?: number | null): Promise<boolean> => {
@@ -245,7 +258,10 @@ export const searchCases = async (query: string, userId?: number | null): Promis
 };
 
 // Export timeline CRUD functions
-export * from './timelineDb';
+export * from './caseTimelineDb';
+
+// Export user profile functions
+export * from './userProfileDB';
 // Export Suggestion an other lookup functions if they are still in use and correct
 // For example:
 // export const getSuggestionsForField = async (...) => { ... } // This was present before
@@ -266,6 +282,46 @@ export const getSuggestionsForField = async (
         default: console.warn(`Suggestions not implemented for field: ${fieldName}`); return [];
     }
     return results.map(item => ({ id: item.id, name: item.name }));
+};
+
+export const getTotalCases = async (userId?: number | null): Promise<number> => {
+    const db = await getDb();
+    let sql = "SELECT COUNT(*) as count FROM Cases";
+    const params: any[] = [];
+    if (userId != null) {
+        sql += " WHERE user_id = ?";
+        params.push(userId);
+    }
+    const result = await db.getFirstAsync<{ count: number }>(sql, params);
+    return result?.count ?? 0;
+};
+
+export const getUpcomingHearings = async (userId?: number | null): Promise<number> => {
+    const db = await getDb();
+    const today = new Date().toISOString().split('T')[0];
+    let sql = "SELECT COUNT(*) as count FROM Cases WHERE NextDate > ?";
+    const params: any[] = [today];
+    if (userId != null) {
+        sql += " AND user_id = ?";
+        params.push(userId);
+    }
+    const result = await db.getFirstAsync<{ count: number }>(sql, params);
+    return result?.count ?? 0;
+};
+
+export const addUser = async (name: string, email: string): Promise<number | null> => {
+    const db = await getDb();
+    try {
+        const existingUser = await db.getFirstAsync<User>("SELECT * FROM Users");
+        if (existingUser) {
+            return existingUser.id;
+        }
+        const result = await db.runAsync("INSERT INTO Users (name, email) VALUES (?, ?)", [name, email]);
+        return result.lastInsertRowId;
+    } catch (error) {
+        console.error("Error adding user:", error);
+        return null;
+    }
 };
 
 // Ensure other specific lookup CRUDs like getDistricts, getPoliceStations are also defined or imported if used by getSuggestionsForField

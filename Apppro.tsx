@@ -2,18 +2,21 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React, { useContext } from "react";
 import { View } from "react-native"; // Removed ScrollView, Text
-import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import Ionicons from "react-native-vector-icons/Ionicons";
 
 import { ThemeContext } from "./Providers/ThemeProvider";
 
 // Import Screens for Stacks
-import HomeScreen from "./Screens/HomeScreen/HomeScreen";
+import DashboardScreen from "./Screens/Dashboard/Dashboard";
 import CasesList from "./Screens/CasesList/CasesList";
 import CaseDetailsScreen from "./Screens/CaseDetailsScreen/CaseDetailsScreen"; // This is now the new, refactored screen
 // import CaseDetailsScreenV2 from "./Screens/CaseDetailsScreenV2/CaseDetailsScreenV2"; // V2 Import removed
 import EditCaseScreen from "./Screens/EditCase/EditCaseScreen";
 import AddCase from "./Screens/Addcase/AddCase";
 import AddCaseDetails from "./Screens/Addcase/AddCaseDetails";
+import AddDocumentScreen from "./Screens/Addcase/AddDocument";
+import UndatedCasesScreen from "./Screens/UndatedCases/UndatedCasesScreen";
+import YesterdaysCasesScreen from "./Screens/YesterdaysCases/YesterdaysCasesScreen";
 
 import SearchScreen from "./Screens/SearchScreen/SearchScreen";
 import CalendarScreen from "./Screens/Calendar/Calendar";
@@ -39,33 +42,72 @@ const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
 // Define Stack Navigators for each tab
 
 const HomeStack = () => (
-  <HomeStackNav.Navigator screenOptions={{ headerShown: true }}>{/* Default to true for this stack */}
-    <HomeStackNav.Screen name="HomeScreen" component={HomeScreen} options={{ headerShown: false }} />{/* HomeScreen has custom header */}
-    <HomeStackNav.Screen name="AllCases" component={CasesList} options={{ title: "All Cases" }} />
+  <HomeStackNav.Navigator screenOptions={{ headerShown: true }}>
+    {/* Default to true for this stack */}
+    <HomeStackNav.Screen
+      name="HomeScreen"
+      component={DashboardScreen}
+      options={{ headerShown: false }}
+    />
+    {/* HomeScreen has custom header */}
+    <HomeStackNav.Screen
+      name="AllCases"
+      component={CasesList}
+      options={{ title: "All Cases" }}
+    />
     {/* CaseDetail now points to the new CaseDetailsScreen (which was CaseDetailsScreenV2) */}
     <HomeStackNav.Screen
-      name="CaseDetail"
+      name="CaseDetails"
       component={CaseDetailsScreen} // This should be the new one, as CaseDetailsScreenV2 was renamed to this.
       options={{ title: "Case Details" }} // Title is set dynamically within the screen
     />
     {/* CaseDetailsV2 screen entry removed */}
-    <HomeStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
-    <HomeStackNav.Screen name="AddCase" component={AddCase} options={{ title: "Add New Case" }} />
-    <HomeStackNav.Screen name="AddCaseDetails" component={AddCaseDetails} options={{ title: "Case Form" }} />
+    <HomeStackNav.Screen
+      name="EditCase"
+      component={EditCaseScreen}
+      options={{ title: "Edit Case" }}
+    />
+    <HomeStackNav.Screen
+      name="AddCase"
+      component={AddCase}
+      options={{ title: "Add New Case" }}
+    />
+    <HomeStackNav.Screen
+      name="AddCaseDetails"
+      component={AddCaseDetails}
+      options={{ title: "Case Form" }}
+    />
+    <HomeStackNav.Screen
+      name="AddDocument"
+      component={AddDocumentScreen}
+      options={{ title: "Add Document" }}
+    />
+    <HomeStackNav.Screen
+      name="UndatedCases"
+      component={UndatedCasesScreen}
+      options={{ title: "Undated Cases" }}
+    />
+    <HomeStackNav.Screen
+      name="YesterdaysCases"
+      component={YesterdaysCasesScreen}
+      options={{ title: "Yesterday's Cases" }}
+    />
   </HomeStackNav.Navigator>
 );
 
 const SearchStack = () => (
-  <SearchStackNav.Navigator screenOptions={{ headerShown: false }}>
-    <SearchStackNav.Screen name="SearchScreen" component={SearchScreen} />
-    {/* Add SearchResults, SearchCaseDetail screens here */}
+  <SearchStackNav.Navigator screenOptions={{ headerShown: true }}>
+    <SearchStackNav.Screen name="SearchScreen" component={SearchScreen} options={{ headerShown: false }} />
+    <SearchStackNav.Screen name="CaseDetails" component={CaseDetailsScreen} options={{ title: "Case Details" }} />
+    <SearchStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
   </SearchStackNav.Navigator>
 );
 
 const CalendarStack = () => (
-  <CalendarStackNav.Navigator screenOptions={{ headerShown: false }}>
-    <CalendarStackNav.Screen name="CalendarScreen" component={CalendarScreen} />
-    {/* Add EventDetail screens here */}
+  <CalendarStackNav.Navigator screenOptions={{ headerShown: true }}>
+    <CalendarStackNav.Screen name="CalendarScreen" component={CalendarScreen} options={{ headerShown: false }} />
+    <CalendarStackNav.Screen name="CaseDetails" component={CaseDetailsScreen} options={{ title: "Case Details" }} />
+    <CalendarStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
   </CalendarStackNav.Navigator>
 );
 
@@ -100,26 +142,20 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
             borderTopWidth: 0.5, // A subtle top border
           },
           tabBarIcon: ({ color, size, focused }) => {
-            let iconName: keyof typeof MaterialIcons.glyphMap = "home"; // Default, ensure type safety
+            let iconName: keyof typeof Ionicons.glyphMap = "home"; // Default, ensure type safety
 
             if (route.name === "HomeTab") {
-              iconName = focused ? "home" : "home-outline"; // Example: use outline for inactive
+              iconName = focused ? "home" : "home-outline";
             } else if (route.name === "SearchTab") {
               iconName = focused ? "search" : "search-outline";
             } else if (route.name === "CalendarTab") {
               iconName = focused ? "calendar" : "calendar-outline";
             } else if (route.name === "ProfileTab") {
-              iconName = focused ? "account-circle" : "account-circle-outline";
+              iconName = focused ? "person-circle" : "person-circle-outline";
             }
-            // For outline icons, you might need a different icon set like MaterialCommunityIcons or Ionicons
-            // Sticking to MaterialIcons for now, so using filled versions.
-            if (route.name === "HomeTab") iconName = "home";
-            else if (route.name === "SearchTab") iconName = "search";
-            else if (route.name === "CalendarTab") iconName = "date-range";
-            else if (route.name === "ProfileTab") iconName = "account-circle";
 
             return (
-              <MaterialIcons name={iconName} size={focused ? size + 2 : size} color={color} />
+              <Ionicons name={iconName} size={focused ? size + 2 : size} color={color} />
             );
           },
           tabBarActiveTintColor: theme.colors.primary || "#020748",

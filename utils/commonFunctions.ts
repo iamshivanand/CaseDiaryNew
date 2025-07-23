@@ -6,3 +6,7 @@ export function formatDate(dateString) {
 
   return `${year}-${month}-${day}`;
 }
+
+export const getCurrentUserId = () => {
+  return 1;
+};

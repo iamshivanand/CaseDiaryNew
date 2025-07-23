@@ -1,0 +1,214 @@
+import React, { useState, useContext } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  Alert,
+  Platform,
+} from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from "react-native-reanimated";
+import { emitter } from "../../utils/event-emitter";
+import { ThemeContext } from "../../Providers/ThemeProvider";
+import { getDb, updateUserProfile, addUser } from "../../DataBase";
+import { LawyerProfileData } from "../../Types/appTypes";
+import ActionButton from "../CommonComponents/ActionButton";
+
+const OnboardingScreen = () => {
+  const { theme } = useContext(ThemeContext);
+  const [step, setStep] = useState(1);
+  const [name, setName] = useState("");
+  const [designation, setDesignation] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [yearsOfPractice, setYearsOfPractice] = useState("");
+  const translateY = useSharedValue(0);
+  const nameInputRef = useRef<TextInput>(null);
+  const phoneInputRef = useRef<TextInput>(null);
+  const yearsOfPracticeInputRef = useRef<TextInput>(null);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: translateY.value }],
+    };
+  });
+
+  const handleSave = async () => {
+    console.log("Attempting to save onboarding data...");
+    if (!name || !designation || !phone || !email || !address || !yearsOfPractice) {
+      Alert.alert("Error", "Please fill all the fields.");
+      console.error("Validation failed: Not all fields are filled.");
+      return;
+    }
+    try {
+      const db = await getDb();
+      const userId = await addUser(name, email);
+      if (userId) {
+        const newProfile: Omit<LawyerProfileData, 'stats' | 'avatarUrl'> & { stats: Omit<LawyerProfileData['stats'], 'totalCases' | 'upcomingHearings'> } = {
+          name,
+          designation,
+          practiceAreas: [],
+          stats: {
+            yearsOfPractice: parseInt(yearsOfPractice, 10) || 0,
+            yearsOfPracticeLastUpdated: new Date().toISOString(),
+          },
+          aboutMe: "",
+          contactInfo: {
+            email,
+            phone,
+            address,
+          },
+          languages: [],
+          recentActivity: [],
+        };
+        console.log("Saving new profile data:", newProfile);
+        await updateUserProfile(db, userId, newProfile as LawyerProfileData);
+        console.log("Profile data saved successfully.");
+        await AsyncStorage.setItem("@onboarding_complete", "true");
+        await AsyncStorage.setItem("@user_id", userId.toString());
+        console.log("Onboarding status set to complete.");
+        emitter.emit("onboardingComplete");
+        translateY.value = withTiming(-1000, { duration: 500 });
+      } else {
+        Alert.alert("Error", "An error occurred while creating your account.");
+      }
+    } catch (error) {
+      console.error("Error saving onboarding data:", error);
+      Alert.alert("Error", "An error occurred while saving your data.");
+    }
+  };
+
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return (
+          <Animated.View entering={FadeIn} exiting={FadeOut}>
+            <Text style={styles.title}>Welcome!</Text>
+            <Text style={styles.subtitle}>Let's get your profile set up.</Text>
+            <TextInput
+              ref={nameInputRef}
+              style={styles.input}
+              placeholder="Name"
+              value={name}
+              onChangeText={setName}
+              autoFocus
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Designation"
+              value={designation}
+              onChangeText={setDesignation}
+            />
+          </Animated.View>
+        );
+      case 2:
+        return (
+          <Animated.View entering={FadeIn} exiting={FadeOut}>
+            <Text style={styles.title}>Contact Info</Text>
+            <TextInput
+              ref={phoneInputRef}
+              style={styles.input}
+              placeholder="Phone Number"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              autoFocus
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Office Address"
+              value={address}
+              onChangeText={setAddress}
+            />
+          </Animated.View>
+        );
+      case 3:
+        return (
+          <Animated.View entering={FadeIn} exiting={FadeOut}>
+            <Text style={styles.title}>Professional Info</Text>
+            <TextInput
+              ref={yearsOfPracticeInputRef}
+              style={styles.input}
+              placeholder="Years of Practice"
+              value={yearsOfPractice}
+              onChangeText={setYearsOfPractice}
+              keyboardType="number-pad"
+              autoFocus
+            />
+          </Animated.View>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <Animated.View
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.background },
+        animatedStyle,
+      ]}
+    >
+      {renderStep()}
+      <View style={styles.buttonContainer}>
+        {step > 1 && (
+          <ActionButton title="Previous" onPress={() => setStep(step - 1)} />
+        )}
+        {step < 3 && (
+          <ActionButton title="Next" onPress={() => setStep(step + 1)} />
+        )}
+        {step === 3 && (
+          <ActionButton title="Save and Continue" onPress={handleSave} />
+        )}
+      </View>
+    </Animated.View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    justifyContent: "center",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 15,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 20,
+  },
+});
+
+export default OnboardingScreen;

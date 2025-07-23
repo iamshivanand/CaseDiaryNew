@@ -6,10 +6,18 @@ import {
   Text,
   Alert,
   Platform,
+  ActivityIndicator,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { ThemeContext } from "../../Providers/ThemeProvider";
-import { mockLawyerProfileData } from "./mockData";
+import {
+  getDb,
+  getUserProfile,
+  updateUserProfile,
+  getTotalCases,
+  getUpcomingHearings,
+} from "../../DataBase";
 import ProfileHeader from "./components/ProfileHeader";
 import ActionButton from "../CommonComponents/ActionButton";
 import StatCard from "./components/StatCard"; // For non-editable stats
@@ -18,7 +26,6 @@ import TabSelector from "./components/TabSelector";
 import AboutMe from "./components/AboutMe";
 import ContactInfo from "./components/ContactInfo";
 import Languages from "./components/Languages";
-import RecentActivity from "./components/RecentActivity"; // Remains non-editable
 import { LawyerProfileData } from "../../Types/appTypes";
 
 type EditableSection =
@@ -32,27 +39,57 @@ type EditableSection =
 
 const ProfileScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
-  const [profileData, setProfileData] =
-    useState<LawyerProfileData>(mockLawyerProfileData);
+  const [profileData, setProfileData] = useState<LawyerProfileData | null>(
+    null
+  );
   const [selectedTab, setSelectedTab] = useState<string>("Profile");
   const [editingSection, setEditingSection] = useState<EditableSection>(null);
 
   // Temporary state for editable fields
   const [tempAvatarUri, setTempAvatarUri] = useState<string | null>(null);
-  const [tempName, setTempName] = useState(profileData.name);
-  const [tempDesignation, setTempDesignation] = useState(profileData.designation);
-  const [tempPracticeAreas, setTempPracticeAreas] = useState(profileData.practiceAreas.join(", "));
-  const [tempAboutMe, setTempAboutMe] = useState(profileData.aboutMe);
-  const [tempEmail, setTempEmail] = useState(profileData.contactInfo.email);
-  const [tempPhone, setTempPhone] = useState(profileData.contactInfo.phone);
-  const [tempAddress, setTempAddress] = useState(profileData.contactInfo.address);
-  const [tempLanguages, setTempLanguages] = useState(profileData.languages.join(", "));
-  const [tempYearsOfPractice, setTempYearsOfPractice] = useState(profileData.stats.yearsOfPractice.toString());
+  const [tempName, setTempName] = useState("");
+  const [tempDesignation, setTempDesignation] = useState("");
+  const [tempPracticeAreas, setTempPracticeAreas] = useState("");
+  const [tempAboutMe, setTempAboutMe] = useState("");
+  const [tempEmail, setTempEmail] = useState("");
+  const [tempPhone, setTempPhone] = useState("");
+  const [tempAddress, setTempAddress] = useState("");
+  const [tempLanguages, setTempLanguages] = useState("");
+  const [tempYearsOfPractice, setTempYearsOfPractice] = useState("");
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      console.log("Fetching profile data...");
+      const db = await getDb();
+      const userId = await AsyncStorage.getItem("@user_id");
+      console.log("User ID from AsyncStorage:", userId);
+      if (userId) {
+        const profile = await getUserProfile(db, parseInt(userId, 10));
+        console.log("Profile data from DB:", profile);
+        const totalCases = await getTotalCases(db, parseInt(userId, 10));
+        const upcomingHearings = await getUpcomingHearings(
+          db,
+          parseInt(userId, 10)
+        );
+        if (profile) {
+          setProfileData({
+            ...profile,
+            stats: {
+              ...profile.stats,
+              totalCases,
+              upcomingHearings,
+            },
+          });
+        }
+      }
+    };
+    fetchProfile();
+  }, [AsyncStorage]);
 
   // Effect to reset temp states if actual data changes from elsewhere (e.g. future API refresh)
   // or when exiting an edit mode.
   useEffect(() => {
-    if (!editingSection) {
+    if (profileData && !editingSection) {
       setTempAvatarUri(profileData.avatarUrl);
       setTempName(profileData.name);
       setTempDesignation(profileData.designation);
@@ -62,7 +99,9 @@ const ProfileScreen: React.FC = () => {
       setTempPhone(profileData.contactInfo.phone);
       setTempAddress(profileData.contactInfo.address);
       setTempLanguages(profileData.languages.join(", "));
-      setTempYearsOfPractice(profileData.stats.yearsOfPractice.toString());
+      if (profileData.stats && profileData.stats.yearsOfPractice) {
+        setTempYearsOfPractice(profileData.stats.yearsOfPractice.toString());
+      }
     }
   }, [profileData, editingSection]);
 
@@ -86,46 +125,47 @@ const ProfileScreen: React.FC = () => {
     setEditingSection(null); // Resets temp fields via useEffect
   };
 
-  const handleSave = (section: EditableSection) => {
-    setProfileData((prev) => {
-      let newPracticeAreas = prev.practiceAreas;
-      if (section === "info") {
-         newPracticeAreas = tempPracticeAreas.split(",").map(s => s.trim()).filter(s => s);
-      }
-      let newLanguages = prev.languages;
-      if (section === "languages") {
-        newLanguages = tempLanguages.split(",").map(s => s.trim()).filter(s => s);
-      }
-      let newYears = prev.stats.yearsOfPractice;
-      let newYearsLastUpdated = prev.stats.yearsOfPracticeLastUpdated;
-      if (section === "yearsOfPractice") {
-        const parsedYears = parseInt(tempYearsOfPractice, 10);
-        if (!isNaN(parsedYears)) {
-            newYears = parsedYears;
-            newYearsLastUpdated = new Date().toISOString().split('T')[0];
-        }
-      }
+  const handleSave = async (section: EditableSection) => {
+    if (!profileData) return;
 
-      return {
-        ...prev,
-        avatarUrl: section === "avatar" ? tempAvatarUri : prev.avatarUrl,
-        name: section === "info" ? tempName : prev.name,
-        designation: section === "info" ? tempDesignation : prev.designation,
-        practiceAreas: section === "info" ? newPracticeAreas : prev.practiceAreas,
-        aboutMe: section === "about" ? tempAboutMe : prev.aboutMe,
-        contactInfo: section === "contact" ? {
-          email: tempEmail,
-          phone: tempPhone,
-          address: tempAddress,
-        } : prev.contactInfo,
-        languages: section === "languages" ? newLanguages : prev.languages,
-        stats: {
-            ...prev.stats,
-            yearsOfPractice: newYears,
-            yearsOfPracticeLastUpdated: newYearsLastUpdated,
-        }
+    const updatedProfile = { ...profileData };
+
+    if (section === "info") {
+      updatedProfile.name = tempName;
+      updatedProfile.designation = tempDesignation;
+      updatedProfile.practiceAreas = tempPracticeAreas
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s);
+    } else if (section === "about") {
+      updatedProfile.aboutMe = tempAboutMe;
+    } else if (section === "contact") {
+      updatedProfile.contactInfo = {
+        email: tempEmail,
+        phone: tempPhone,
+        address: tempAddress,
       };
-    });
+    } else if (section === "languages") {
+      updatedProfile.languages = tempLanguages
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s);
+    } else if (section === "yearsOfPractice") {
+      const parsedYears = parseInt(tempYearsOfPractice, 10);
+      if (!isNaN(parsedYears)) {
+        updatedProfile.stats.yearsOfPractice = parsedYears;
+        updatedProfile.stats.yearsOfPracticeLastUpdated = new Date().toISOString();
+      }
+    } else if (section === "avatar") {
+      updatedProfile.avatarUrl = tempAvatarUri;
+    }
+
+    setProfileData(updatedProfile);
+    const db = await getDb();
+    const userId = await AsyncStorage.getItem("@user_id");
+    if (userId) {
+      await updateUserProfile(db, parseInt(userId, 10), updatedProfile);
+    }
     setEditingSection(null);
   };
 
@@ -196,6 +236,7 @@ const ProfileScreen: React.FC = () => {
 
   // Calculate displayed years of practice
   const getDisplayedYearsOfPractice = () => {
+    if (!profileData) return 0;
     const { yearsOfPractice, yearsOfPracticeLastUpdated } = profileData.stats;
     if (!yearsOfPracticeLastUpdated) {
       return yearsOfPractice;
@@ -203,11 +244,11 @@ const ProfileScreen: React.FC = () => {
     const lastUpdatedYear = new Date(yearsOfPracticeLastUpdated).getFullYear();
     const currentYear = new Date().getFullYear();
     const diff = currentYear - lastUpdatedYear;
-    return yearsOfPractice + (diff > 0 ? diff : 0) ;
+    return yearsOfPractice + (diff > 0 ? diff : 0);
   };
 
 
-  const profileTabs = ["Profile", "Clients", "Reviews", "Settings"];
+  const profileTabs = ["Profile", "Settings"];
   // Dummy handlers for old buttons - these are now replaced by edit icons
   // const handleEditProfile = () => console.log("Edit Profile Pressed");
   // const handleViewSchedule = () => console.log("View Schedule Pressed");
@@ -247,18 +288,21 @@ const ProfileScreen: React.FC = () => {
             onSave={() => handleSave("languages")}
             onCancel={handleCancel}
           />
-          <RecentActivity activities={profileData.recentActivity} />
         </>
       );
-    } else if (selectedTab === "Clients") {
-      return <Text style={styles.tabContentText}>Clients Content Coming Soon</Text>;
-    } else if (selectedTab === "Reviews") {
-      return <Text style={styles.tabContentText}>Reviews Content Coming Soon</Text>;
     } else if (selectedTab === "Settings") {
       return <Text style={styles.tabContentText}>Settings Content Coming Soon</Text>;
     }
     return null;
   };
+
+  if (!profileData) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -353,6 +397,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: 30,
     color: "#555",
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 

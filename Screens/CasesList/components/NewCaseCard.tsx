@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'; // Removed Dimensions
-import { CaseDataScreen } from '../../../Types/appTypes'; // Adjust path as necessary
+import { useNavigation } from "@react-navigation/native";
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native"; // Removed Dimensions
+import { CaseDataScreen } from "../../../Types/appTypes"; // Adjust path as necessary
 
 interface NewCaseCardProps {
   caseDetails: CaseDataScreen;
@@ -8,28 +9,39 @@ interface NewCaseCardProps {
 }
 
 const statusColors = {
-  Active: '#4CAF50', // Green
-  Pending: '#FF9800', // Orange
-  Closed: '#9E9E9E',   // Grey
+  Active: "#4CAF50", // Green
+  Pending: "#FF9800", // Orange
+  Closed: "#9E9E9E", // Grey
 };
 
-const NewCaseCard: React.FC<NewCaseCardProps> = ({ caseDetails, onUpdateHearingPress }) => {
-  const { title, client, status, nextHearing, lastUpdate, previousHearing, id } = caseDetails;
-
+const NewCaseCard: React.FC<NewCaseCardProps> = ({
+  caseDetails,
+  onUpdateHearingPress,
+}) => {
+  const { title, client, status, nextHearing, lastUpdate, previousHearing, id } =
+    caseDetails;
+  const navigation = useNavigation();
   const handleUpdatePress = () => {
     if (onUpdateHearingPress) {
       onUpdateHearingPress(id);
     } else {
       // Default action or navigation if not handled by parent
-      console.log('Update Hearing pressed for case ID:', id);
+      console.log("Update Hearing pressed for case ID:", id);
     }
   };
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() =>
+        navigation.navigate("CaseDetails", { caseId: id })
+      }
+    >
       <View style={styles.headerContainer}>
         <Text style={styles.title}>{title}</Text>
-        <View style={[styles.badge, { backgroundColor: statusColors[status] }]}>
+        <View
+          style={[styles.badge, { backgroundColor: statusColors[status] }]}
+        >
           <Text style={styles.badgeText}>{status}</Text>
         </View>
       </View>
@@ -51,7 +63,7 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({ caseDetails, onUpdateHearingP
       <TouchableOpacity style={styles.updateButton} onPress={handleUpdatePress}>
         <Text style={styles.updateButtonText}>Update Hearing</Text>
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 };
 
