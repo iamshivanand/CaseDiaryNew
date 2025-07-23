@@ -3,30 +3,33 @@ import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator
 import { format } from 'date-fns';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getUserProfile } from '../../DataBase';
+import { getDb, getUserProfile } from '../../DataBase';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 const WelcomeCard = () => {
   const [userName, setUserName] = useState("User");
   const today = new Date();
   const formattedDate = format(today, "eeee, MMMM d, yyyy");
 
-  useEffect(() => {
-    const fetchUserName = async () => {
-      try {
-        const userId = await AsyncStorage.getItem("@user_id");
-        if (userId) {
-          const db = await getDb();
-          const profile = await getUserProfile(db, parseInt(userId, 10));
-          if (profile && profile.name) {
-            setUserName(profile.name);
+  useFocusEffect(
+    useCallback(() => {
+      const fetchUserName = async () => {
+        try {
+          const userId = await AsyncStorage.getItem("@user_id");
+          if (userId) {
+            const db = await getDb();
+            const profile = await getUserProfile(db, parseInt(userId, 10));
+            if (profile && profile.name) {
+              setUserName(profile.name);
+            }
           }
+        } catch (error) {
+          console.error("Error fetching user name:", error);
         }
-      } catch (error) {
-        console.error("Error fetching user name:", error);
-      }
-    };
-    fetchUserName();
-  }, []);
+      };
+      fetchUserName();
+    }, [])
+  );
 
   return (
     <View style={styles.welcomeCard}>
@@ -69,7 +72,6 @@ import AdvertisementSection from './components/AdvertisementSection';
 import NewCaseCard from '../CasesList/components/NewCaseCard';
 import * as db from '../../DataBase';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
 import { getCurrentUserId } from '../../utils/commonFunctions';
 
