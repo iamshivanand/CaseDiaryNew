@@ -10,13 +10,28 @@ import Animated, {
 } from "react-native-reanimated";
 import { emitter } from "./utils/event-emitter";
 
-import { getDb, getUserProfile } from "./DataBase";
+import { getDb } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
 import Routes from "./Routes/Routes";
-import OnboardingScreen from "./Screens/OnboardingScreen/OnboardingScreen";
+import OnboardingStepsScreen from "./Screens/Onboarding/OnboardingStepsScreen";
+import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
+import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
+import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
+import PracticeAreasScreen from "./Screens/Onboarding/PracticeAreasScreen";
 import SplashScreen from "./Screens/SplashScreen/SplashScreen";
 
 const Stack = createNativeStackNavigator();
+const OnboardingStack = createNativeStackNavigator();
+
+const OnboardingNavigator = () => (
+  <OnboardingStack.Navigator screenOptions={{ headerShown: false }}>
+    <OnboardingStack.Screen name="OnboardingSteps" component={OnboardingStepsScreen} />
+    <OnboardingStack.Screen name="PersonalDetails" component={PersonalDetailsScreen} />
+    <OnboardingStack.Screen name="UploadPhoto" component={UploadPhotoScreen} />
+    <OnboardingStack.Screen name="SetupProfile" component={SetupProfileScreen} />
+    <OnboardingStack.Screen name="PracticeAreas" component={PracticeAreasScreen} />
+  </OnboardingStack.Navigator>
+);
 
 export default function App() {
   const { theme } = useContext(ThemeContext);
@@ -98,7 +113,7 @@ export default function App() {
                 )}
               </Stack.Screen>
             ) : (
-              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+              <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
             )}
           </Stack.Navigator>
         </SafeAreaView>

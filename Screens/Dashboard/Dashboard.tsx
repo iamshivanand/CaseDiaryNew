@@ -4,12 +4,27 @@ import { format } from 'date-fns';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const WelcomeCard = () => {
+  const [userName, setUserName] = useState("User");
   const today = new Date();
   const formattedDate = format(today, "eeee, MMMM d, yyyy");
 
+  useEffect(() => {
+    const fetchUserName = async () => {
+      const db = await db.getDb();
+      const userId = await AsyncStorage.getItem("@user_id");
+      if (userId) {
+        const profile = await db.getUserProfile(db, parseInt(userId, 10));
+        if (profile && profile.name) {
+          setUserName(profile.name);
+        }
+      }
+    };
+    fetchUserName();
+  }, []);
+
   return (
     <View style={styles.welcomeCard}>
-      <Text style={styles.welcomeTitle}>Good morning, John!</Text>
+      <Text style={styles.welcomeTitle}>Good morning, {userName}!</Text>
       <Text style={styles.welcomeSubtitle}>{formattedDate}</Text>
     </View>
   );

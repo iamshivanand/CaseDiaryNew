@@ -29,31 +29,10 @@ const OnboardingScreen = () => {
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [yearsOfPractice, setYearsOfPractice] = useState("");
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const translateY = useSharedValue(0);
-
-  const handleChooseImage = async () => {
-    if (Platform.OS !== "web") {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission Denied",
-          "Sorry, we need camera roll permissions to make this work!"
-        );
-        return;
-      }
-    }
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setAvatarUri(result.assets[0].uri);
-    }
-  };
+  const nameInputRef = useRef<TextInput>(null);
+  const phoneInputRef = useRef<TextInput>(null);
+  const yearsOfPracticeInputRef = useRef<TextInput>(null);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -72,8 +51,7 @@ const OnboardingScreen = () => {
       const db = await getDb();
       const userId = await addUser(name, email);
       if (userId) {
-        const newProfile: Omit<LawyerProfileData, 'stats'> & { stats: Omit<LawyerProfileData['stats'], 'totalCases' | 'upcomingHearings'> } = {
-          avatarUrl: avatarUri,
+        const newProfile: Omit<LawyerProfileData, 'stats' | 'avatarUrl'> & { stats: Omit<LawyerProfileData['stats'], 'totalCases' | 'upcomingHearings'> } = {
           name,
           designation,
           practiceAreas: [],
@@ -111,14 +89,16 @@ const OnboardingScreen = () => {
     switch (step) {
       case 1:
         return (
-          <>
+          <Animated.View entering={FadeIn} exiting={FadeOut}>
             <Text style={styles.title}>Welcome!</Text>
             <Text style={styles.subtitle}>Let's get your profile set up.</Text>
             <TextInput
+              ref={nameInputRef}
               style={styles.input}
               placeholder="Name"
               value={name}
               onChangeText={setName}
+              autoFocus
             />
             <TextInput
               style={styles.input}
@@ -126,18 +106,20 @@ const OnboardingScreen = () => {
               value={designation}
               onChangeText={setDesignation}
             />
-          </>
+          </Animated.View>
         );
       case 2:
         return (
-          <>
+          <Animated.View entering={FadeIn} exiting={FadeOut}>
             <Text style={styles.title}>Contact Info</Text>
             <TextInput
+              ref={phoneInputRef}
               style={styles.input}
               placeholder="Phone Number"
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
+              autoFocus
             />
             <TextInput
               style={styles.input}
@@ -152,24 +134,22 @@ const OnboardingScreen = () => {
               value={address}
               onChangeText={setAddress}
             />
-          </>
+          </Animated.View>
         );
       case 3:
         return (
-          <>
+          <Animated.View entering={FadeIn} exiting={FadeOut}>
             <Text style={styles.title}>Professional Info</Text>
             <TextInput
+              ref={yearsOfPracticeInputRef}
               style={styles.input}
               placeholder="Years of Practice"
               value={yearsOfPractice}
               onChangeText={setYearsOfPractice}
               keyboardType="number-pad"
+              autoFocus
             />
-            <ActionButton
-              title={avatarUri ? "Change Photo" : "Upload Photo"}
-              onPress={handleChooseImage}
-            />
-          </>
+          </Animated.View>
         );
       default:
         return null;

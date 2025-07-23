@@ -58,19 +58,24 @@ const ProfileScreen: React.FC = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       const db = await getDb();
-      // Assuming a single user for now with id = 1
-      const profile = await getUserProfile(db, 1);
-      const totalCases = await getTotalCases(db, 1);
-      const upcomingHearings = await getUpcomingHearings(db, 1);
-      if (profile) {
-        setProfileData({
-          ...profile,
-          stats: {
-            ...profile.stats,
-            totalCases,
-            upcomingHearings,
-          },
-        });
+      const userId = await AsyncStorage.getItem("@user_id");
+      if (userId) {
+        const profile = await getUserProfile(db, parseInt(userId, 10));
+        const totalCases = await getTotalCases(db, parseInt(userId, 10));
+        const upcomingHearings = await getUpcomingHearings(
+          db,
+          parseInt(userId, 10)
+        );
+        if (profile) {
+          setProfileData({
+            ...profile,
+            stats: {
+              ...profile.stats,
+              totalCases,
+              upcomingHearings,
+            },
+          });
+        }
       }
     };
     fetchProfile();
@@ -150,7 +155,10 @@ const ProfileScreen: React.FC = () => {
 
     setProfileData(updatedProfile);
     const db = await getDb();
-    await updateUserProfile(db, 1, updatedProfile); // Assuming user id 1
+    const userId = await AsyncStorage.getItem("@user_id");
+    if (userId) {
+      await updateUserProfile(db, parseInt(userId, 10), updatedProfile);
+    }
     setEditingSection(null);
   };
 
