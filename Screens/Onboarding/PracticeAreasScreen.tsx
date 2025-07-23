@@ -84,6 +84,10 @@ const PracticeAreasScreen = ({ navigation }) => {
           <PrimaryButton
             title="Continue"
             onPress={async () => {
+              if (selectedAreas.length === 0) {
+                Alert.alert('Error', 'Please select at least one practice area.');
+                return;
+              }
               const practiceAreas = [...selectedAreas];
               if (selectedAreas.includes('Other') && otherArea) {
                 practiceAreas.push(otherArea);

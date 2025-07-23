@@ -48,6 +48,13 @@ const SetupProfileScreen = ({ navigation }) => {
           <PrimaryButton
             title="Continue"
             onPress={() => {
+              if (!title || !experience) {
+                Alert.alert(
+                  'Error',
+                  'Please enter your professional title and years of experience.'
+                );
+                return;
+              }
               setOnboardingData({ ...onboardingData, title, experience, license, location });
               navigation.navigate('PracticeAreas');
             }}

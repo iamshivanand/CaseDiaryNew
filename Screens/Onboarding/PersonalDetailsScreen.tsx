@@ -54,6 +54,10 @@ const PersonalDetailsScreen = ({ navigation }) => {
           <PrimaryButton
             title="Continue"
             onPress={() => {
+              if (!fullName) {
+                Alert.alert('Error', 'Please enter your full name.');
+                return;
+              }
               setOnboardingData({ fullName, phone, email, gender });
               navigation.navigate('UploadPhoto');
             }}

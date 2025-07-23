@@ -1,17 +1,40 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+} from 'react-native-reanimated';
 
-const DoneScreen = () => {
+const DoneScreen = ({ navigation }) => {
+  const opacity = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value,
+    };
+  });
+
+  useEffect(() => {
+    opacity.value = withDelay(
+      2000,
+      withTiming(0, { duration: 500 }, () => {
+        navigation.navigate('MainApp');
+      })
+    );
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <Animated.View style={[styles.content, animatedStyle]}>
         <Ionicons name="checkmark-circle-outline" size={100} color="#2D60FF" />
         <Text style={styles.title}>You're All Set!</Text>
         <Text style={styles.subtitle}>
           Your profile has been created successfully.
         </Text>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 };
