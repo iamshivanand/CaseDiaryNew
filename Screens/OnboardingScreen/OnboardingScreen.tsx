@@ -95,10 +95,8 @@ const OnboardingScreen = () => {
         await AsyncStorage.setItem("@onboarding_complete", "true");
         await AsyncStorage.setItem("@user_id", userId.toString());
         console.log("Onboarding status set to complete.");
-        console.log("Emitter object:", emitter);
-        translateY.value = withTiming(-1000, { duration: 500 }, () => {
-          emitter.emit("onboardingComplete");
-        });
+        emitter.emit("onboardingComplete");
+        translateY.value = withTiming(-1000, { duration: 500 });
       } else {
         Alert.alert("Error", "An error occurred while creating your account.");
       }
