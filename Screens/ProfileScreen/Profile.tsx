@@ -99,7 +99,9 @@ const ProfileScreen: React.FC = () => {
       setTempPhone(profileData.contactInfo.phone);
       setTempAddress(profileData.contactInfo.address);
       setTempLanguages(profileData.languages.join(", "));
-      setTempYearsOfPractice(profileData.stats.yearsOfPractice.toString());
+      if (profileData.stats && profileData.stats.yearsOfPractice) {
+        setTempYearsOfPractice(profileData.stats.yearsOfPractice.toString());
+      }
     }
   }, [profileData, editingSection]);
 
