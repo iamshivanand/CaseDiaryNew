@@ -30,7 +30,7 @@ import FormInput from '../CommonComponents/FormInput';
 import DropdownPicker from '../CommonComponents/DropdownPicker';
 import DatePickerField from '../CommonComponents/DatePickerField';
 import ActionButton from "../CommonComponents/ActionButton";
-import { getAddCaseStyles } from "../EditCase/EditCaseScreenStyle";
+import { getAddCaseStyles } from "./AddCaseStyle";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 
 interface FieldDefinition {
