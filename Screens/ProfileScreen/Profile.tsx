@@ -239,12 +239,12 @@ const ProfileScreen: React.FC = () => {
     if (!profileData) return 0;
     const { yearsOfPractice, yearsOfPracticeLastUpdated } = profileData.stats;
     if (!yearsOfPracticeLastUpdated) {
-      return yearsOfPractice;
+      return parseInt(yearsOfPractice, 10);
     }
     const lastUpdatedYear = new Date(yearsOfPracticeLastUpdated).getFullYear();
     const currentYear = new Date().getFullYear();
     const diff = currentYear - lastUpdatedYear;
-    return yearsOfPractice + (diff > 0 ? diff : 0);
+    return parseInt(yearsOfPractice, 10) + (diff > 0 ? diff : 0);
   };
 
 

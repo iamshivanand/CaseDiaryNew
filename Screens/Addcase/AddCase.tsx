@@ -1,11 +1,11 @@
 import { Formik, FormikProps } from "formik";
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
-  Alert,
+  Alert, // Added for user feedback
 } from "react-native";
 import * as Yup from "yup";
 import { RouteProp, useNavigation } from "@react-navigation/native";
@@ -16,9 +16,6 @@ import {
   updateCase,
   CaseInsertData,
   CaseUpdateData,
-  addCaseType,
-  addCourt,
-  getSuggestionsForField,
 } from "../../DataBase";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { CaseDataScreen } from "../../Types/appTypes";
@@ -30,13 +27,13 @@ import FormInput from '../CommonComponents/FormInput';
 import DropdownPicker from '../CommonComponents/DropdownPicker';
 import DatePickerField from '../CommonComponents/DatePickerField';
 import ActionButton from "../CommonComponents/ActionButton";
-import { getAddCaseStyles } from "../EditCase/EditCaseScreenStyle";
-import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
-import SuggestionInput from "../CommonComponents/SuggestionsInput";
+// import { EditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle"; // Will use its own themed styles
+import { ThemeContext, Theme } from "../../Providers/ThemeProvider"; // Import ThemeContext and Theme
+import { getEditCaseScreenStyles } from "../EditCase/EditCaseScreenStyle"; // For base screen style
 
 interface FieldDefinition {
   name: keyof CaseData;
-  type: "text" | "select" | "date" | "multiline" | "suggestions";
+  type: "text" | "select" | "date" | "multiline";
   placeholder?: string;
   label: string;
   options?: AppDropdownOption[];
@@ -49,10 +46,10 @@ interface AddCaseProps {
 }
 
 const dummyCaseTypeOptionsForAdd: AppDropdownOption[] = [
-  { label: 'Select Case Type...', value: '' }, { label: 'Civil Suit', value: 1 }, { label: 'Criminal Defense', value: 2 }, { label: 'Family Law', value: 3 }, { label: 'Corporate', value: 4 }, { label: 'Other', value: 'Other' },
+  { label: 'Select Case Type...', value: '' }, { label: 'Civil Suit', value: 1 }, { label: 'Criminal Defense', value: 2 }, { label: 'Family Law', value: 3 }, { label: 'Corporate', value: 4 }, { label: 'Other', value: 99 },
 ];
 const dummyCourtOptionsForAdd: AppDropdownOption[] = [
-  { label: 'Select Court...', value: '' }, { label: 'District Court - City Center', value: 1 }, { label: 'High Court - State Capital', value: 2 }, { label: 'Supreme Court', value: 3 }, { label: 'Other', value: 'Other' },
+  { label: 'Select Court...', value: '' }, { label: 'District Court - City Center', value: 1 }, { label: 'High Court - State Capital', value: 2 }, { label: 'Supreme Court', value: 3 },
 ];
 
 const formFieldsDefinition: FieldDefinition[] = [
@@ -63,7 +60,7 @@ const formFieldsDefinition: FieldDefinition[] = [
   { name: "case_type_id", type: "select", label: "Case Type", options: dummyCaseTypeOptionsForAdd, placeholder: "Select Case Type..." },
   { name: "court_id", type: "select", label: "Court", options: dummyCourtOptionsForAdd, placeholder: "Select Court..." },
   { name: "FiledDate", type: "date", label: "Date Filed", placeholder: "Select date case was filed" },
-  { name: "JudgeName", type: "suggestions", placeholder: "Enter Judge's Name", label: "Presiding Judge" },
+  { name: "JudgeName", type: "text", placeholder: "Enter Judge's Name", label: "Presiding Judge" },
   { name: "OpposingCounsel", type: "text", placeholder: "Enter Opposing Counsel's Name", label: "Opposing Counsel" },
   { name: "Status", type: "select", label: "Case Status", options: caseStatusOptions, placeholder: "Select Status..." },
   { name: "Priority", type: "select", label: "Priority Level", options: priorityOptions, placeholder: "Select Priority..." },
@@ -73,22 +70,27 @@ const formFieldsDefinition: FieldDefinition[] = [
   { name: "OppositeParty", type: "text", placeholder: "Enter Opposite Party Name", label: "Opposite Party" },
   { name: "ClientContactNumber", type: "text", placeholder: "Enter Client's Contact Number", label: "Client Contact No." },
   { name: "Accussed", type: "text", placeholder: "Enter Accused Name(s)", label: "Accused" },
-  { name: "Undersection", type: "suggestions", placeholder: "e.g., Section 302 IPC", label: "Under Section(s)" },
+  { name: "Undersection", type: "text", placeholder: "e.g., Section 302 IPC", label: "Under Section(s)" },
   { name: "CaseDescription", type: "multiline", placeholder: "Provide a brief summary...", label: "Case Description" },
   { name: "CaseNotes", type: "multiline", placeholder: "Add any private notes...", label: "Internal Notes" },
+  // Example for other ID based fields that might become text or have text counterparts
+  // { name: "police_station_id", type: "select", label: "Police Station", options: [], placeholder: "Select Police Station..." }, // Needs data
+  // { name: "case_year", type: "text", placeholder: "YYYY", label: "Case Year"},
+  // { name: "crime_number", type: "text", placeholder: "Enter Crime Number", label: "Crime Number"},
+  // { name: "crime_year", type: "text", placeholder: "YYYY", label: "Crime Year"},
+  // { name: "OppAdvocateContactNumber", type: "text", placeholder: "Opposing Counsel Contact", label: "Opp. Counsel Contact"},
+  // { name: "PreviousDate", type: "date", label: "Previous Hearing Date", placeholder: "Select previous hearing date"},
 ];
 
 const validationSchema = Yup.object().shape({
   CaseTitle: Yup.string().required("Case Title is required"),
+  // Add other validations as needed
 });
 
 const FormFieldRenderer: React.FC<{
   fieldConfig: FieldDefinition;
   formik: FormikProps<Partial<CaseData>>;
-  otherValues: { [key: string]: string };
-  setOtherValue: (fieldName: string, value: string) => void;
-  suggestions: { [key: string]: string[] };
-}> = ({ fieldConfig, formik, otherValues, setOtherValue, suggestions }) => {
+}> = ({ fieldConfig, formik }) => {
   const { values, errors, touched, setFieldValue } = formik;
   const fieldName = fieldConfig.name;
   const commonInputProps = {
@@ -100,13 +102,11 @@ const FormFieldRenderer: React.FC<{
     case "text":
       return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} />;
     case "multiline":
-      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} style={{ minHeight: 80, paddingTop: 10, paddingBottom: 10 }} />;
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} style={{ minHeight: 80 }} />;
     case "select":
-      return <DropdownPicker {...commonInputProps} selectedValue={values[fieldName] as string | number | undefined} onValueChange={(itemValue) => setFieldValue(fieldName, itemValue)} options={fieldConfig.options || []} placeholder={fieldConfig.placeholder || `Select ${fieldConfig.label}...`} onOtherValueChange={(text) => setOtherValue(fieldName, text)} />;
+      return <DropdownPicker {...commonInputProps} selectedValue={values[fieldName] as string | number | undefined} onValueChange={(itemValue) => setFieldValue(fieldName, itemValue)} options={fieldConfig.options || []} placeholder={fieldConfig.placeholder || `Select ${fieldConfig.label}...`} />;
     case "date":
       return <DatePickerField {...commonInputProps} value={values[fieldName] ? new Date(values[fieldName] as string) : null} onChange={(date) => setFieldValue(fieldName, date ? date.toISOString() : null)} placeholder={fieldConfig.placeholder || "Select date"} />;
-    case "suggestions":
-      return <SuggestionInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} suggestions={suggestions[fieldName] || []} onBlur={() => {}} />;
     default:
       console.warn("Unsupported field type:", fieldConfig.type);
       return null;
@@ -116,53 +116,41 @@ const FormFieldRenderer: React.FC<{
 const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const params = route.params;
   const { update = false, initialValues, uniqueId: routeUniqueId } = params ?? {};
-  const { theme } = React.useContext(ThemeContext);
-  const styles = getAddCaseStyles(theme);
+  const { theme } = React.useContext(ThemeContext); // Get theme
+  const styles = getAddCaseStyles(theme); // Generate styles with theme
 
   const navigation = useNavigation();
   const generatedUniqueId = useMemo(() => uuidv4(), []);
   const uniqueIdToUse = routeUniqueId || initialValues?.uniqueId || generatedUniqueId;
 
-  const [otherValues, setOtherValues] = useState<{ [key: string]: string }>({});
-  const setOtherValue = (fieldName: string, value: string) => {
-    setOtherValues((prev) => ({ ...prev, [fieldName]: value }));
-  };
-
-  const [suggestions, setSuggestions] = useState<{ [key: string]: string[] }>({});
-
-  useEffect(() => {
-    const fetchSuggestions = async () => {
-      const judgeNameSuggestions = await getSuggestionsForField("JudgeName");
-      const undersectionSuggestions = await getSuggestionsForField("Undersection");
-      setSuggestions({
-        JudgeName: judgeNameSuggestions.map((s) => s.name),
-        Undersection: undersectionSuggestions.map((s) => s.name),
-      });
-    };
-    fetchSuggestions();
-  }, []);
-
   const prepareFormInitialValues = (): Partial<CaseData> => {
-    const defaults: Partial<CaseData> = { uniqueId: uniqueIdToUse };
+    const defaults: Partial<CaseData> = { uniqueId: uniqueIdToUse }; // Ensure uniqueId is part of defaults
     formFieldsDefinition.forEach(field => {
-      if (field.name !== 'uniqueId') {
+      if (field.name !== 'uniqueId') { // uniqueId is already set
         defaults[field.name] = field.type === "date" ? null : (field.type === "select" ? (field.options?.[0]?.value ?? '') : '');
       }
     });
 
     if (update && initialValues) {
       const mappedInitialValues: Partial<CaseData> = { ...defaults };
+      // Map from CaseDetails (summary) to CaseData form fields
       if (initialValues.uniqueId) mappedInitialValues.uniqueId = initialValues.uniqueId;
       if (initialValues.id) mappedInitialValues.id = initialValues.id;
       if (initialValues.caseNumber) mappedInitialValues.CaseTitle = initialValues.caseNumber;
       if (initialValues.dateFiled) mappedInitialValues.FiledDate = initialValues.dateFiled.toISOString();
 
+      // For court & caseType, initialValues has names. formFieldsDefinition uses _id for selection.
+      // If we want to pre-select based on names, we'd need to find the ID from dummyOptions.
+      // For simplicity now, if updating, these will show placeholder unless full CaseData is passed.
       const initialCourt = dummyCourtOptionsForAdd.find(opt => opt.label === initialValues.court);
       if (initialCourt) mappedInitialValues.court_id = initialCourt.value;
 
       const initialCaseType = dummyCaseTypeOptionsForAdd.find(opt => opt.label === initialValues.caseType);
       if (initialCaseType) mappedInitialValues.case_type_id = initialCaseType.value;
 
+      // TODO: Map other fields from initialValues (CaseDetails) to respective CaseData fields if they exist
+      // Example: if (initialValues.onBehalfOf) mappedInitialValues.OnBehalfOf = initialValues.onBehalfOf;
+      // This part needs to be robust based on what CaseDetails actually contains.
       return mappedInitialValues;
     }
     return defaults;
@@ -188,35 +176,17 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const handleSubmitForm = async (formValues: Partial<CaseData>) => {
     console.log("Submitting form values:", formValues);
 
-    let courtNameString = null;
-    if (formValues.court_id === 'Other') {
-      courtNameString = otherValues['court_id'];
-      if (courtNameString) {
-        const newCourtId = await addCourt(courtNameString);
-        formValues.court_id = newCourtId;
-      }
-    } else {
-      const selectedCourtOption = dummyCourtOptionsForAdd.find(opt => opt.value === formValues.court_id);
-      courtNameString = selectedCourtOption && selectedCourtOption.value !== '' ? selectedCourtOption.label : null;
-    }
-
-    let caseTypeNameString = null;
-    if (formValues.case_type_id === 'Other') {
-      caseTypeNameString = otherValues['case_type_id'];
-      if (caseTypeNameString) {
-        const newCaseTypeId = await addCaseType(caseTypeNameString);
-        formValues.case_type_id = newCaseTypeId;
-      }
-    } else {
-      const selectedCaseTypeOption = dummyCaseTypeOptionsForAdd.find(opt => opt.value === formValues.case_type_id);
-      caseTypeNameString = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : null;
-    }
-
+    const selectedCourtOption = dummyCourtOptionsForAdd.find(opt => opt.value === formValues.court_id);
+    const courtNameString = selectedCourtOption && selectedCourtOption.value !== '' ? selectedCourtOption.label : null;
+    const selectedCaseTypeOption = dummyCaseTypeOptionsForAdd.find(opt => opt.value === formValues.case_type_id);
+    const caseTypeNameString = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : null;
 
     if (update && initialValues?.id) {
       const caseIdToUpdate = initialValues.id;
 
-      const initialFormStateForCompare = prepareFormInitialValues();
+      // Create a representation of initial form state based on 'initialValues' (CaseDetails)
+      // to correctly determine what has changed.
+      const initialFormStateForCompare = prepareFormInitialValues(); // This will use initialValues if in update mode.
       const changedFields = getChangedValues(initialFormStateForCompare, formValues);
 
       if (Object.keys(changedFields).length === 0) {
@@ -226,14 +196,15 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       }
 
       const updatePayload: CaseUpdateData = {
+        // Include only changed fields that are part of CaseUpdateData
         ...(changedFields.CaseTitle && { CaseTitle: changedFields.CaseTitle }),
         ...(changedFields.ClientName && { ClientName: changedFields.ClientName }),
         ...(changedFields.CNRNumber && { CNRNumber: changedFields.CNRNumber }),
-        court_id: formValues.court_id || null,
-        court_name: courtNameString,
+        court_id: formValues.court_id || null, // Store the ID, FK constraint removed
+        court_name: courtNameString, // Store the name
         dateFiled: changedFields.FiledDate,
-        case_type_id: formValues.case_type_id || null,
-        case_type_name: caseTypeNameString,
+        case_type_id: formValues.case_type_id || null, // Store the ID, FK constraint removed
+        case_type_name: caseTypeNameString, // Store the name
         ...(changedFields.case_number && { case_number: changedFields.case_number }),
         ...(changedFields.case_year && { case_year: changedFields.case_year ? parseInt(changedFields.case_year as string, 10) : null }),
         ...(changedFields.crime_number && { crime_number: changedFields.crime_number }),
@@ -250,13 +221,14 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         ...(changedFields.OpposingCounsel && { OpposingCounsel: changedFields.OpposingCounsel }),
         ...(changedFields.OppositeAdvocate && { OppositeAdvocate: changedFields.OppositeAdvocate }),
         ...(changedFields.OppAdvocateContactNumber && { OppAdvocateContactNumber: changedFields.OppAdvocateContactNumber }),
-        ...(changedFields.Status && { CaseStatus: changedFields.Status }),
+        ...(changedFields.Status && { CaseStatus: changedFields.Status }), // Map form's Status to DB's CaseStatus
         ...(changedFields.Priority && { Priority: changedFields.Priority }),
         ...(changedFields.PreviousDate && { PreviousDate: changedFields.PreviousDate }),
-        ...(changedFields.HearingDate && { NextDate: changedFields.HearingDate }),
+        ...(changedFields.HearingDate && { NextDate: changedFields.HearingDate }), // Map form's HearingDate to DB's NextDate
         ...(changedFields.CaseDescription && { CaseDescription: changedFields.CaseDescription }),
         ...(changedFields.CaseNotes && { CaseNotes: changedFields.CaseNotes }),
       };
+       // Remove undefined properties from updatePayload
        Object.keys(updatePayload).forEach(key => {
         const K = key as keyof CaseUpdateData;
         if (updatePayload[K] === undefined) {
@@ -288,7 +260,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           });
         } else { Alert.alert("Error", "Failed to update case."); }
       } catch (e) { console.error("Error updating case:", e); Alert.alert("Error", "An error occurred while updating.");}
-    } else {
+    } else { // ADD LOGIC
       const insertPayload: CaseInsertData = {
         uniqueId: formValues.uniqueId || uniqueIdToUse,
         user_id: null,
@@ -374,7 +346,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           {(formikProps) => (
             <View>
               {formFieldsDefinition.map((fieldConfig) => (
-                <FormFieldRenderer key={fieldConfig.name} fieldConfig={fieldConfig} formik={formikProps} otherValues={otherValues} setOtherValue={setOtherValue} suggestions={suggestions} />
+                <FormFieldRenderer key={fieldConfig.name} fieldConfig={fieldConfig} formik={formikProps} />
               ))}
               <View style={styles.actionButtonContainer}>
                 <ActionButton
