@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Text } from 'react-native';
+import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Text, Alert } from 'react-native';
 import InputField from './components/InputField';
 import PrimaryButton from './components/PrimaryButton';
 import StepperIndicator from './components/StepperIndicator';

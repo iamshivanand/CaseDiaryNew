@@ -1,9 +1,10 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
 import PrimaryButton from './components/PrimaryButton';
 import StepperIndicator from './components/StepperIndicator';
 import InputField from './components/InputField';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
+import { getDb, addUser, updateUserProfile } from '../../DataBase';
 
 const practiceAreas = [
   'Criminal Law',
@@ -84,6 +85,7 @@ const PracticeAreasScreen = ({ navigation }) => {
           <PrimaryButton
             title="Continue"
             onPress={async () => {
+              console.log('Continue button pressed');
               if (selectedAreas.length === 0) {
                 Alert.alert('Error', 'Please select at least one practice area.');
                 return;
@@ -93,15 +95,22 @@ const PracticeAreasScreen = ({ navigation }) => {
                 practiceAreas.push(otherArea);
               }
               const finalOnboardingData = { ...onboardingData, practiceAreas };
+              console.log('Final onboarding data:', finalOnboardingData);
 
-              const db = await getDb();
-              const userId = await addUser(finalOnboardingData.fullName, finalOnboardingData.email);
-              if (userId) {
-                await updateUserProfile(db, userId, finalOnboardingData);
-                await AsyncStorage.setItem('@onboarding_complete', 'true');
-                await AsyncStorage.setItem('@user_id', userId.toString());
-                emitter.emit('onboardingComplete');
-                navigation.navigate('Done');
+              try {
+                const db = await getDb();
+                console.log('Database instance:', db);
+                const userId = await addUser(finalOnboardingData.fullName, finalOnboardingData.email);
+                console.log('User ID:', userId);
+                if (userId) {
+                  await updateUserProfile(db, userId, finalOnboardingData);
+                  await AsyncStorage.setItem('@onboarding_complete', 'true');
+                  await AsyncStorage.setItem('@user_id', userId.toString());
+                  emitter.emit('onboardingComplete');
+                  navigation.navigate('Done');
+                }
+              } catch (error) {
+                console.error('Error saving onboarding data:', error);
               }
             }}
           />
