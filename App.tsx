@@ -53,7 +53,6 @@ const OnboardingNavigator = () => (
       name="PracticeAreas"
       component={PracticeAreasScreen}
     />
-    <OnboardingStack.Screen name="Done" component={DoneScreen} />
   </OnboardingStack.Navigator>
 );
 

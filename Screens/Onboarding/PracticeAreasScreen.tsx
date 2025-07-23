@@ -85,9 +85,9 @@ const PracticeAreasScreen = ({ navigation }) => {
         )}
         <View style={styles.buttonContainer}>
           <PrimaryButton
-            title="Continue"
+            title="Finish"
             onPress={async () => {
-              console.log('Continue button pressed');
+              console.log('Finish button pressed');
               if (selectedAreas.length === 0) {
                 Alert.alert('Error', 'Please select at least one practice area.');
                 return;
@@ -109,7 +109,6 @@ const PracticeAreasScreen = ({ navigation }) => {
                   await AsyncStorage.setItem('@onboarding_complete', 'true');
                   await AsyncStorage.setItem('@user_id', userId.toString());
                   emitter.emit('onboardingComplete');
-                  navigation.navigate('Done');
                 }
               } catch (error) {
                 console.error('Error saving onboarding data:', error);
