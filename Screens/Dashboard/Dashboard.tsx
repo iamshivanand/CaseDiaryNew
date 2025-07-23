@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
 import { format } from 'date-fns';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUserProfile } from '../../DataBase';
 
 const WelcomeCard = () => {
   const [userName, setUserName] = useState("User");
@@ -11,9 +13,9 @@ const WelcomeCard = () => {
   useEffect(() => {
     const fetchUserName = async () => {
       try {
-        const db = await getDb();
         const userId = await AsyncStorage.getItem("@user_id");
         if (userId) {
+          const db = await getDb();
           const profile = await getUserProfile(db, parseInt(userId, 10));
           if (profile && profile.name) {
             setUserName(profile.name);

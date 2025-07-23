@@ -79,11 +79,10 @@ export const updateUserProfile = async (
 
   await db.runAsync(
     `INSERT OR REPLACE INTO LawyerProfiles (
-      user_id, name, avatarUrl, designation, practiceAreas, aboutMe, contactInfo, languages, stats
+      user_id, avatarUrl, designation, practiceAreas, aboutMe, contactInfo, languages, stats, name
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       userId,
-      fullName,
       avatarUrl,
       designation,
       JSON.stringify(practiceAreas),
@@ -91,6 +90,7 @@ export const updateUserProfile = async (
       JSON.stringify(contactInfo),
       JSON.stringify(languages),
       JSON.stringify(stats),
+      fullName,
     ]
   );
 };

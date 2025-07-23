@@ -1,6 +1,6 @@
 import { NavigationContainer } from "@react-navigation/native";
 import React, { useContext, useEffect, useState } from "react";
-import { SafeAreaView, ActivityIndicator, View } from "react-native";
+import { SafeAreaView, ActivityIndicator, View, StatusBar } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Animated, {
@@ -124,6 +124,10 @@ export default function App() {
               backgroundColor: theme.colors.background,
             }}
           >
+            <StatusBar
+              barStyle={theme.dark ? "light-content" : "dark-content"}
+              backgroundColor={theme.colors.background}
+            />
             <Stack.Navigator screenOptions={{ headerShown: false }}>
               {onboardingComplete ? (
                 <Stack.Screen name="App">
