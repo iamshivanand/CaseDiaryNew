@@ -1,17 +1,15 @@
 import React, { useContext } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image } from 'react-native';
 import PrimaryButton from './components/PrimaryButton';
 import { Ionicons } from '@expo/vector-icons';
-import StepperIndicator from './components/StepperIndicator';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 import * as ImagePicker from 'expo-image-picker';
 
 const UploadPhotoScreen = ({ navigation }) => {
   const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
-  const steps = ['Personal Details', 'Upload Photo', 'Setup Profile', 'Practice Areas', 'Done'];
-  const currentStep = 2;
 
   const handleChooseImage = async () => {
+    console.log('handleChooseImage called');
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -20,17 +18,24 @@ const UploadPhotoScreen = ({ navigation }) => {
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
+      console.log('Image selected:', result.assets[0].uri);
       setOnboardingData({ ...onboardingData, avatarUrl: result.assets[0].uri });
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StepperIndicator steps={steps} currentStep={currentStep} />
+      <Text style={styles.stepText}>Step 2 of 4</Text>
       <View style={styles.content}>
         <TouchableOpacity style={styles.uploadBox} onPress={handleChooseImage}>
-          <Ionicons name="cloud-upload-outline" size={48} color="#6B7280" />
-          <Text style={styles.uploadText}>Tap to upload your photo</Text>
+          {onboardingData.avatarUrl ? (
+            <Image source={{ uri: onboardingData.avatarUrl }} style={styles.previewImage} />
+          ) : (
+            <>
+              <Ionicons name="cloud-upload-outline" size={48} color="#6B7280" />
+              <Text style={styles.uploadText}>Tap to upload your photo</Text>
+            </>
+          )}
         </TouchableOpacity>
         <View style={styles.buttonContainer}>
           <PrimaryButton
@@ -86,6 +91,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     width: '100%',
     paddingHorizontal: 24,
+  },
+  stepText: {
+    textAlign: 'center',
+    marginBottom: 20,
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
   },
 });
 

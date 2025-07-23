@@ -2,7 +2,6 @@ import React, { useState, useContext } from 'react';
 import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Text, Alert } from 'react-native';
 import InputField from './components/InputField';
 import PrimaryButton from './components/PrimaryButton';
-import StepperIndicator from './components/StepperIndicator';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 
 const SetupProfileScreen = ({ navigation }) => {
@@ -12,12 +11,9 @@ const SetupProfileScreen = ({ navigation }) => {
   const [license, setLicense] = useState('');
   const [location, setLocation] = useState('');
 
-  const steps = ['Personal Details', 'Upload Photo', 'Setup Profile', 'Practice Areas', 'Done'];
-  const currentStep = 3;
-
   return (
     <SafeAreaView style={styles.container}>
-      <StepperIndicator steps={steps} currentStep={currentStep} />
+      <Text style={styles.stepText}>Step 3 of 4</Text>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <InputField
           label="Professional Title"
@@ -48,6 +44,7 @@ const SetupProfileScreen = ({ navigation }) => {
           <PrimaryButton
             title="Continue"
             onPress={() => {
+              console.log('Continue button pressed on SetupProfileScreen');
               if (!title || !experience) {
                 Alert.alert(
                   'Error',
@@ -55,7 +52,9 @@ const SetupProfileScreen = ({ navigation }) => {
                 );
                 return;
               }
-              setOnboardingData({ ...onboardingData, title, experience, license, location });
+              const setupProfileData = { title, experience, license, location };
+              console.log('Saving setup profile data:', setupProfileData);
+              setOnboardingData({ ...onboardingData, ...setupProfileData });
               navigation.navigate('PracticeAreas');
             }}
           />
@@ -86,6 +85,12 @@ const styles = StyleSheet.create({
   skipText: {
     color: '#2D60FF',
     marginTop: 16,
+  },
+  stepText: {
+    textAlign: 'center',
+    marginBottom: 20,
+    fontSize: 16,
+    color: '#6B7280',
   },
 });
 

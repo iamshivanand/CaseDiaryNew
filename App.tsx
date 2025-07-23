@@ -14,12 +14,12 @@ import { getDb } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
 import OnboardingProvider from "./Providers/OnboardingProvider";
 import Routes from "./Routes/Routes";
-import OnboardingStepsScreen from "./Screens/Onboarding/OnboardingStepsScreen";
 import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
 import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
 import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
 import PracticeAreasScreen from "./Screens/Onboarding/PracticeAreasScreen";
 import SplashScreen from "./Screens/SplashScreen/SplashScreen";
+import GreetingScreen from "./Screens/Onboarding/GreetingScreen";
 
 const Stack = createNativeStackNavigator();
 const OnboardingStack = createNativeStackNavigator();
@@ -30,16 +30,13 @@ import { CardStyleInterpolators } from '@react-navigation/stack';
 
 const OnboardingNavigator = () => (
   <OnboardingStack.Navigator
-    initialRouteName="OnboardingSteps"
+    initialRouteName="Greeting"
     screenOptions={{
       headerShown: false,
       cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
     }}
   >
-    <OnboardingStack.Screen
-      name="OnboardingSteps"
-      component={OnboardingStepsScreen}
-    />
+    <OnboardingStack.Screen name="Greeting" component={GreetingScreen} />
     <OnboardingStack.Screen
       name="PersonalDetails"
       component={PersonalDetailsScreen}

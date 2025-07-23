@@ -1,9 +1,8 @@
 import React, { useState, useContext } from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, SafeAreaView, ScrollView, Alert, Text } from 'react-native';
 import InputField from './components/InputField';
 import PrimaryButton from './components/PrimaryButton';
 import { Picker } from '@react-native-picker/picker';
-import StepperIndicator from './components/StepperIndicator';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 
 const PersonalDetailsScreen = ({ navigation }) => {
@@ -13,12 +12,9 @@ const PersonalDetailsScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [gender, setGender] = useState('Male');
 
-  const steps = ['Personal Details', 'Upload Photo', 'Setup Profile', 'Practice Areas', 'Done'];
-  const currentStep = 1;
-
   return (
     <SafeAreaView style={styles.container}>
-      <StepperIndicator steps={steps} currentStep={currentStep} />
+      <Text style={styles.stepText}>Step 1 of 4</Text>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <InputField
           label="Full Name"
@@ -54,11 +50,14 @@ const PersonalDetailsScreen = ({ navigation }) => {
           <PrimaryButton
             title="Continue"
             onPress={() => {
+              console.log('Continue button pressed on PersonalDetailsScreen');
               if (!fullName) {
                 Alert.alert('Error', 'Please enter your full name.');
                 return;
               }
-              setOnboardingData({ fullName, phone, email, gender });
+              const personalDetails = { fullName, phone, email, gender };
+              console.log('Saving personal details:', personalDetails);
+              setOnboardingData(personalDetails);
               navigation.navigate('UploadPhoto');
             }}
           />
@@ -85,6 +84,12 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     paddingHorizontal: 24,
+  },
+  stepText: {
+    textAlign: 'center',
+    marginBottom: 20,
+    fontSize: 16,
+    color: '#6B7280',
   },
 });
 

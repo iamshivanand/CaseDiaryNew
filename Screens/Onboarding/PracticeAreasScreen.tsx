@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
 import PrimaryButton from './components/PrimaryButton';
-import StepperIndicator from './components/StepperIndicator';
+import { Text, TextInput } from 'react-native';
 import InputField from './components/InputField';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 import { getDb, addUser, updateUserProfile } from '../../DataBase';
@@ -28,12 +28,9 @@ const PracticeAreasScreen = ({ navigation }) => {
     );
   };
 
-  const steps = ['Personal Details', 'Upload Photo', 'Setup Profile', 'Practice Areas', 'Done'];
-  const currentStep = 4;
-
   return (
     <SafeAreaView style={styles.container}>
-      <StepperIndicator steps={steps} currentStep={currentStep} />
+      <Text style={styles.stepText}>Step 4 of 4</Text>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Text style={styles.title}>Select Practice Areas</Text>
         <View style={styles.grid}>
@@ -173,6 +170,12 @@ const styles = StyleSheet.create({
   skipText: {
     color: '#2D60FF',
     marginTop: 16,
+  },
+  stepText: {
+    textAlign: 'center',
+    marginBottom: 20,
+    fontSize: 16,
+    color: '#6B7280',
   },
 });
 

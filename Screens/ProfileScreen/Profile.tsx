@@ -58,10 +58,13 @@ const ProfileScreen: React.FC = () => {
 
   useEffect(() => {
     const fetchProfile = async () => {
+      console.log("Fetching profile data...");
       const db = await getDb();
       const userId = await AsyncStorage.getItem("@user_id");
+      console.log("User ID from AsyncStorage:", userId);
       if (userId) {
         const profile = await getUserProfile(db, parseInt(userId, 10));
+        console.log("Profile data from DB:", profile);
         const totalCases = await getTotalCases(db, parseInt(userId, 10));
         const upcomingHearings = await getUpcomingHearings(
           db,
@@ -80,7 +83,7 @@ const ProfileScreen: React.FC = () => {
       }
     };
     fetchProfile();
-  }, []);
+  }, [AsyncStorage]);
 
   // Effect to reset temp states if actual data changes from elsewhere (e.g. future API refresh)
   // or when exiting an edit mode.
