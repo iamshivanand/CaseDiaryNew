@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     paddingHorizontal: 16,
-    paddingTop: 24,
+    paddingTop: 40,
     paddingBottom: 8,
   },
   listContainer: {
