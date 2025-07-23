@@ -8,6 +8,7 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import {
