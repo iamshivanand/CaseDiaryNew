@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import TemplateCard from './components/TemplateCard';
 
 const templates = [
@@ -13,8 +14,14 @@ const templates = [
 ];
 
 const LegalTemplatesScreen = () => {
+  const navigation = useNavigation();
+
+  const handleTemplatePress = (template) => {
+    navigation.navigate('TemplateFormScreen', { template });
+  };
+
   const renderItem = ({ item }) => (
-    <TemplateCard template={item} onPress={() => {}} />
+    <TemplateCard template={item} onPress={() => handleTemplatePress(item)} />
   );
 
   return (
@@ -36,14 +43,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   header: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
     color: '#333',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
   listContainer: {
     paddingHorizontal: 16,
+    paddingBottom: 16,
   },
 });
 

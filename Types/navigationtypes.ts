@@ -50,6 +50,7 @@ export type ProfileStackParamList = {
 // Stack for the "Templates" Tab
 export type TemplatesStackParamList = {
   LegalTemplatesScreen: undefined;
+  TemplateFormScreen: { template: { id: string; name: string } };
 };
 
 // This defines the routes for the BottomTabNavigator itself

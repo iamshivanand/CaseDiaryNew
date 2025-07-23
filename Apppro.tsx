@@ -127,9 +127,12 @@ const ProfileStack = () => (
   </ProfileStackNav.Navigator>
 );
 
+import TemplateFormScreen from "./Screens/LegalTemplates/TemplateFormScreen";
+
 const TemplatesStack = () => (
   <TemplatesStackNav.Navigator screenOptions={{ headerShown: true }}>
     <TemplatesStackNav.Screen name="LegalTemplatesScreen" component={LegalTemplatesScreen} options={{ headerShown: false }} />
+    <TemplatesStackNav.Screen name="TemplateFormScreen" component={TemplateFormScreen} options={{ title: "Template Form" }} />
   </TemplatesStackNav.Navigator>
 );
 
