@@ -72,9 +72,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
+    padding: 24,
   },
   scrollContainer: {
-    padding: 24,
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   pickerContainer: {
     borderWidth: 1,

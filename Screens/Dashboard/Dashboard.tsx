@@ -10,13 +10,17 @@ const WelcomeCard = () => {
 
   useEffect(() => {
     const fetchUserName = async () => {
-      const db = await db.getDb();
-      const userId = await AsyncStorage.getItem("@user_id");
-      if (userId) {
-        const profile = await db.getUserProfile(db, parseInt(userId, 10));
-        if (profile && profile.name) {
-          setUserName(profile.name);
+      try {
+        const db = await getDb();
+        const userId = await AsyncStorage.getItem("@user_id");
+        if (userId) {
+          const profile = await getUserProfile(db, parseInt(userId, 10));
+          if (profile && profile.name) {
+            setUserName(profile.name);
+          }
         }
+      } catch (error) {
+        console.error("Error fetching user name:", error);
       }
     };
     fetchUserName();

@@ -48,22 +48,48 @@ export const getUserProfile = async (
 export const updateUserProfile = async (
   db: SQLite.SQLiteDatabase,
   userId: number,
-  profileData: LawyerProfileData
+  profileData: any
 ): Promise<void> => {
+  const {
+    avatarUrl,
+    fullName,
+    designation,
+    practiceAreas,
+    aboutMe,
+    email,
+    phone,
+    address,
+    languages,
+    experience,
+    license,
+    location,
+  } = profileData;
+
+  const stats = {
+    yearsOfPractice: experience || 0,
+    yearsOfPracticeLastUpdated: new Date().toISOString(),
+  };
+
+  const contactInfo = {
+    email,
+    phone,
+    address,
+  };
+
   await db.runAsync(
     `INSERT OR REPLACE INTO LawyerProfiles (
-      user_id, avatarUrl, designation, practiceAreas, aboutMe, contactInfo, languages, stats, recentActivity
+      user_id, avatarUrl, designation, practiceAreas, aboutMe, contactInfo, languages, stats, name
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       userId,
-      profileData.avatarUrl,
-      profileData.designation,
-      JSON.stringify(profileData.practiceAreas),
-      profileData.aboutMe,
-      JSON.stringify(profileData.contactInfo),
-      JSON.stringify(profileData.languages),
-      JSON.stringify(profileData.stats),
-      JSON.stringify(profileData.recentActivity),
+      avatarUrl,
+      designation,
+      JSON.stringify(practiceAreas),
+      aboutMe,
+      JSON.stringify(contactInfo),
+      JSON.stringify(languages),
+      JSON.stringify(stats),
+      fullName,
     ]
   );
 };
