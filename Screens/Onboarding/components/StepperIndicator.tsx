@@ -1,5 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 
 interface StepperIndicatorProps {
   steps: string[];
@@ -7,20 +12,38 @@ interface StepperIndicatorProps {
 }
 
 const StepperIndicator: React.FC<StepperIndicatorProps> = ({ steps, currentStep }) => {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withTiming((currentStep - 1) / (steps.length - 1), {
+      duration: 500,
+    });
+  }, [currentStep]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      width: `${progress.value * 100}%`,
+    };
+  });
+
   return (
     <View style={styles.container}>
+      <View style={styles.connectorContainer}>
+        <View style={styles.connector} />
+        <Animated.View style={[styles.connector, styles.activeConnector, animatedStyle]} />
+      </View>
       {steps.map((step, index) => (
         <View key={index} style={styles.stepContainer}>
           <View
             style={[
               styles.circle,
-              index + 1 === currentStep ? styles.activeCircle : styles.inactiveCircle,
+              index + 1 <= currentStep ? styles.activeCircle : styles.inactiveCircle,
             ]}
           >
             <Text
               style={[
                 styles.stepText,
-                index + 1 === currentStep ? styles.activeText : styles.inactiveText,
+                index + 1 <= currentStep ? styles.activeText : styles.inactiveText,
               ]}
             >
               {index + 1}
@@ -34,7 +57,6 @@ const StepperIndicator: React.FC<StepperIndicatorProps> = ({ steps, currentStep 
           >
             {step}
           </Text>
-          {index < steps.length - 1 && <View style={styles.connector} />}
         </View>
       ))}
     </View>
@@ -45,12 +67,14 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingTop: 40,
+    paddingBottom: 20,
   },
   stepContainer: {
     alignItems: 'center',
+    flex: 1,
   },
   circle: {
     width: 32,
@@ -87,11 +111,24 @@ const styles = StyleSheet.create({
   inactiveLabel: {
     color: '#6B7280',
   },
+  connectorContainer: {
+    position: 'absolute',
+    top: 15,
+    left: '50%',
+    right: '-50%',
+    height: 2,
+  },
   connector: {
     flex: 1,
     height: 2,
     backgroundColor: '#E5E7EB',
-    marginHorizontal: -10,
+  },
+  activeConnector: {
+    backgroundColor: '#2D60FF',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
   },
 });
 
