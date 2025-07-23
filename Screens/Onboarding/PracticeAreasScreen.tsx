@@ -6,6 +6,7 @@ import InputField from './components/InputField';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 import { getDb, addUser, updateUserProfile } from '../../DataBase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { emitter } from '../../utils/event-emitter';
 
 const practiceAreas = [
   'Criminal Law',
