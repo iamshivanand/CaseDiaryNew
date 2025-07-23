@@ -47,10 +47,16 @@ export type ProfileStackParamList = {
   // Example: AccountDetails: undefined;
 };
 
+// Stack for the "Templates" Tab
+export type TemplatesStackParamList = {
+  LegalTemplatesScreen: undefined;
+};
+
 // This defines the routes for the BottomTabNavigator itself
 export type MainAppTabParamList = {
   HomeTab: NavigatorScreenParams<HomeStackParamList>; // "HomeTab" is the route name for the tab
   SearchTab: NavigatorScreenParams<SearchStackParamList>;
+  TemplatesTab: NavigatorScreenParams<TemplatesStackParamList>;
   CalendarTab: NavigatorScreenParams<CalendarStackParamList>;
   ProfileTab: NavigatorScreenParams<ProfileStackParamList>;
   // The names "HomeTab", "SearchTab" etc. will be used in Apppro.tsx for Tab.Screen names

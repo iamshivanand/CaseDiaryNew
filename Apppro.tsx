@@ -23,6 +23,7 @@ import CalendarScreen from "./Screens/Calendar/Calendar";
 import ProfileScreen from "./Screens/ProfileScreen/Profile"; // Renamed import for clarity
 import SettingsScreen from "./Screens/Settings/SettingsScreen";
 import ManageLookupCategoryScreen from "./Screens/Settings/ManageLookupCategoryScreen";
+import LegalTemplatesScreen from "./Screens/LegalTemplates/LegalTemplatesScreen";
 
 // Import ParamList types
 import {
@@ -31,6 +32,7 @@ import {
   SearchStackParamList,
   CalendarStackParamList,
   ProfileStackParamList,
+  TemplatesStackParamList,
 } from "./Types/navigationtypes";
 
 const Tab = createBottomTabNavigator<MainAppTabParamList>();
@@ -38,6 +40,7 @@ const HomeStackNav = createNativeStackNavigator<HomeStackParamList>();
 const SearchStackNav = createNativeStackNavigator<SearchStackParamList>();
 const CalendarStackNav = createNativeStackNavigator<CalendarStackParamList>();
 const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
+const TemplatesStackNav = createNativeStackNavigator<TemplatesStackParamList>();
 
 // Define Stack Navigators for each tab
 
@@ -124,6 +127,12 @@ const ProfileStack = () => (
   </ProfileStackNav.Navigator>
 );
 
+const TemplatesStack = () => (
+  <TemplatesStackNav.Navigator screenOptions={{ headerShown: true }}>
+    <TemplatesStackNav.Screen name="LegalTemplatesScreen" component={LegalTemplatesScreen} options={{ headerShown: false }} />
+  </TemplatesStackNav.Navigator>
+);
+
 
 const Appro: React.FC = () => { // Props interface removed as it was empty
   const { theme } = useContext(ThemeContext);
@@ -148,6 +157,8 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
               iconName = focused ? "home" : "home-outline";
             } else if (route.name === "SearchTab") {
               iconName = focused ? "search" : "search-outline";
+            } else if (route.name === "TemplatesTab") {
+              iconName = focused ? "document-text" : "document-text-outline";
             } else if (route.name === "CalendarTab") {
               iconName = focused ? "calendar" : "calendar-outline";
             } else if (route.name === "ProfileTab") {
@@ -169,6 +180,7 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
         {/* Tab.Screen names now refer to routes in MainAppTabParamList */}
         <Tab.Screen name="HomeTab" component={HomeStack} options={{ tabBarLabel: "Home" }} />
         <Tab.Screen name="SearchTab" component={SearchStack} options={{ tabBarLabel: "Search" }} />
+        <Tab.Screen name="TemplatesTab" component={TemplatesStack} options={{ tabBarLabel: "Templates" }} />
         <Tab.Screen name="CalendarTab" component={CalendarStack} options={{ tabBarLabel: "Calendar" }} />
         <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: "Profile" }} />
       </Tab.Navigator>
