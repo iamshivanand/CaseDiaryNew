@@ -12,6 +12,7 @@ import { emitter } from "./utils/event-emitter";
 
 import { getDb } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
+import OnboardingProvider from "./Providers/OnboardingProvider";
 import Routes from "./Routes/Routes";
 import OnboardingStepsScreen from "./Screens/Onboarding/OnboardingStepsScreen";
 import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
@@ -23,13 +24,31 @@ import SplashScreen from "./Screens/SplashScreen/SplashScreen";
 const Stack = createNativeStackNavigator();
 const OnboardingStack = createNativeStackNavigator();
 
+import DoneScreen from "./Screens/Onboarding/DoneScreen";
+
 const OnboardingNavigator = () => (
-  <OnboardingStack.Navigator screenOptions={{ headerShown: false }}>
-    <OnboardingStack.Screen name="OnboardingSteps" component={OnboardingStepsScreen} />
-    <OnboardingStack.Screen name="PersonalDetails" component={PersonalDetailsScreen} />
+  <OnboardingStack.Navigator
+    initialRouteName="OnboardingSteps"
+    screenOptions={{ headerShown: false }}
+  >
+    <OnboardingStack.Screen
+      name="OnboardingSteps"
+      component={OnboardingStepsScreen}
+    />
+    <OnboardingStack.Screen
+      name="PersonalDetails"
+      component={PersonalDetailsScreen}
+    />
     <OnboardingStack.Screen name="UploadPhoto" component={UploadPhotoScreen} />
-    <OnboardingStack.Screen name="SetupProfile" component={SetupProfileScreen} />
-    <OnboardingStack.Screen name="PracticeAreas" component={PracticeAreasScreen} />
+    <OnboardingStack.Screen
+      name="SetupProfile"
+      component={SetupProfileScreen}
+    />
+    <OnboardingStack.Screen
+      name="PracticeAreas"
+      component={PracticeAreasScreen}
+    />
+    <OnboardingStack.Screen name="Done" component={DoneScreen} />
   </OnboardingStack.Navigator>
 );
 
@@ -96,28 +115,33 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <NavigationContainer>
-        <SafeAreaView
-          style={{
-            flex: 1,
-            backgroundColor: theme.colors.background,
-          }}
-        >
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {onboardingComplete ? (
-              <Stack.Screen name="App">
-                {(props) => (
-                  <Animated.View style={[{ flex: 1 }, animatedStyle]}>
-                    <Routes {...props} />
-                  </Animated.View>
-                )}
-              </Stack.Screen>
-            ) : (
-              <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
-            )}
-          </Stack.Navigator>
-        </SafeAreaView>
-      </NavigationContainer>
+      <OnboardingProvider>
+        <NavigationContainer>
+          <SafeAreaView
+            style={{
+              flex: 1,
+              backgroundColor: theme.colors.background,
+            }}
+          >
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+              {onboardingComplete ? (
+                <Stack.Screen name="App">
+                  {(props) => (
+                    <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+                      <Routes {...props} />
+                    </Animated.View>
+                  )}
+                </Stack.Screen>
+              ) : (
+                <Stack.Screen
+                  name="Onboarding"
+                  component={OnboardingNavigator}
+                />
+              )}
+            </Stack.Navigator>
+          </SafeAreaView>
+        </NavigationContainer>
+      </OnboardingProvider>
     </ThemeProvider>
   );
 }

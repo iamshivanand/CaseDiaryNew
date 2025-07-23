@@ -1,16 +1,23 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import React, { useState, useContext } from 'react';
+import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Text } from 'react-native';
 import InputField from './components/InputField';
 import PrimaryButton from './components/PrimaryButton';
+import StepperIndicator from './components/StepperIndicator';
+import { OnboardingContext } from '../../Providers/OnboardingProvider';
 
 const SetupProfileScreen = ({ navigation }) => {
+  const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
   const [title, setTitle] = useState('');
   const [experience, setExperience] = useState('');
   const [license, setLicense] = useState('');
   const [location, setLocation] = useState('');
 
+  const steps = ['Personal Details', 'Upload Photo', 'Setup Profile', 'Practice Areas', 'Done'];
+  const currentStep = 3;
+
   return (
     <SafeAreaView style={styles.container}>
+      <StepperIndicator steps={steps} currentStep={currentStep} />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <InputField
           label="Professional Title"
@@ -37,10 +44,18 @@ const SetupProfileScreen = ({ navigation }) => {
           value={location}
           onChangeText={setLocation}
         />
-        <PrimaryButton
-          title="Continue"
-          onPress={() => navigation.navigate('PracticeAreas')}
-        />
+        <View style={styles.buttonContainer}>
+          <PrimaryButton
+            title="Continue"
+            onPress={() => {
+              setOnboardingData({ ...onboardingData, title, experience, license, location });
+              navigation.navigate('PracticeAreas');
+            }}
+          />
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.skipText}>Previous</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -50,9 +65,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
   },
   scrollContainer: {
     padding: 24,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    paddingHorizontal: 24,
+  },
+  skipText: {
+    color: '#2D60FF',
+    marginTop: 16,
   },
 });
 

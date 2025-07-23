@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useContext } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import PrimaryButton from './components/PrimaryButton';
+import StepperIndicator from './components/StepperIndicator';
+import InputField from './components/InputField';
+import { OnboardingContext } from '../../Providers/OnboardingProvider';
 
 const practiceAreas = [
   'Criminal Law',
@@ -12,7 +15,9 @@ const practiceAreas = [
 ];
 
 const PracticeAreasScreen = ({ navigation }) => {
+  const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+  const [otherArea, setOtherArea] = useState('');
 
   const toggleArea = (area: string) => {
     setSelectedAreas((prev) =>
@@ -20,8 +25,12 @@ const PracticeAreasScreen = ({ navigation }) => {
     );
   };
 
+  const steps = ['Personal Details', 'Upload Photo', 'Setup Profile', 'Practice Areas', 'Done'];
+  const currentStep = 4;
+
   return (
     <SafeAreaView style={styles.container}>
+      <StepperIndicator steps={steps} currentStep={currentStep} />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Text style={styles.title}>Select Practice Areas</Text>
         <View style={styles.grid}>
@@ -45,8 +54,48 @@ const PracticeAreasScreen = ({ navigation }) => {
               </Text>
             </TouchableOpacity>
           ))}
+          <TouchableOpacity
+            style={[
+              styles.pill,
+              selectedAreas.includes('Other') ? styles.activePill : styles.inactivePill,
+            ]}
+            onPress={() => toggleArea('Other')}
+          >
+            <Text
+              style={
+                selectedAreas.includes('Other')
+                  ? styles.activePillText
+                  : styles.inactivePillText
+              }
+            >
+              Other
+            </Text>
+          </TouchableOpacity>
         </View>
-        <PrimaryButton title="Continue" onPress={() => navigation.navigate('Done')} />
+        {selectedAreas.includes('Other') && (
+          <InputField
+            label="Other Practice Area"
+            placeholder="Please specify"
+            value={otherArea}
+            onChangeText={setOtherArea}
+          />
+        )}
+        <View style={styles.buttonContainer}>
+          <PrimaryButton
+            title="Continue"
+            onPress={() => {
+              const practiceAreas = [...selectedAreas];
+              if (selectedAreas.includes('Other') && otherArea) {
+                practiceAreas.push(otherArea);
+              }
+              setOnboardingData({ ...onboardingData, practiceAreas });
+              navigation.navigate('Done');
+            }}
+          />
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.skipText}>Previous</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -56,6 +105,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
   },
   scrollContainer: {
     padding: 24,
@@ -90,6 +140,16 @@ const styles = StyleSheet.create({
   inactivePillText: {
     color: '#6B7280',
     fontWeight: '500',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    paddingHorizontal: 24,
+  },
+  skipText: {
+    color: '#2D60FF',
+    marginTop: 16,
   },
 });
 

@@ -1,17 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import InputField from './components/InputField';
 import PrimaryButton from './components/PrimaryButton';
 import { Picker } from '@react-native-picker/picker';
+import StepperIndicator from './components/StepperIndicator';
+import { OnboardingContext } from '../../Providers/OnboardingProvider';
 
 const PersonalDetailsScreen = ({ navigation }) => {
+  const { setOnboardingData } = useContext(OnboardingContext);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [gender, setGender] = useState('Male');
 
+  const steps = ['Personal Details', 'Upload Photo', 'Setup Profile', 'Practice Areas', 'Done'];
+  const currentStep = 1;
+
   return (
     <SafeAreaView style={styles.container}>
+      <StepperIndicator steps={steps} currentStep={currentStep} />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <InputField
           label="Full Name"
@@ -43,10 +50,15 @@ const PersonalDetailsScreen = ({ navigation }) => {
             <Picker.Item label="Other" value="Other" />
           </Picker>
         </View>
-        <PrimaryButton
-          title="Continue"
-          onPress={() => navigation.navigate('UploadPhoto')}
-        />
+        <View style={styles.buttonContainer}>
+          <PrimaryButton
+            title="Continue"
+            onPress={() => {
+              setOnboardingData({ fullName, phone, email, gender });
+              navigation.navigate('UploadPhoto');
+            }}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -56,6 +68,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
   },
   scrollContainer: {
     padding: 24,
@@ -65,6 +78,9 @@ const styles = StyleSheet.create({
     borderColor: '#D1D5DB',
     borderRadius: 10,
     marginBottom: 20,
+  },
+  buttonContainer: {
+    paddingHorizontal: 24,
   },
 });
 
