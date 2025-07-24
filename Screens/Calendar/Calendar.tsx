@@ -1,5 +1,6 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState, useCallback } from "react";
+import { formatDate } from "../../utils/commonFunctions";
 import {
   ScrollView,
   StyleSheet,
@@ -37,8 +38,10 @@ const CalendarScreen: React.FC<Props> = () => {
     const filteredCases = allCases.filter(c => {
       if (!c.NextDate) return false;
       const nextHearingDate = new Date(c.NextDate);
-      const nextHearingDateString = nextHearingDate.toISOString().split('T')[0];
-      return nextHearingDateString === date;
+      nextHearingDate.setHours(0, 0, 0, 0);
+      const selectedDate = new Date(date);
+      selectedDate.setHours(0, 0, 0, 0);
+      return nextHearingDate.getTime() === selectedDate.getTime();
     });
 
     const mappedCases: CaseDataScreen[] = filteredCases.map((c: CaseData) => ({
@@ -46,9 +49,9 @@ const CalendarScreen: React.FC<Props> = () => {
         title: c.CaseTitle || 'No Title',
         client: c.ClientName || 'Unknown Client',
         status: c.CaseStatus || 'Pending',
-        nextHearing: c.NextDate ? new Date(c.NextDate).toLocaleDateString() : 'N/A',
-        lastUpdate: c.updated_at ? new Date(c.updated_at).toLocaleDateString() : 'N/A',
-        previousHearing: c.PreviousDate ? new Date(c.PreviousDate).toLocaleDateString() : 'N/A',
+        nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
+        lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
+        previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
     }));
     setResultToShow(mappedCases);
   };

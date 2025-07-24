@@ -5,7 +5,7 @@ import { CaseDataScreen } from "../../../Types/appTypes"; // Adjust path as nece
 
 interface NewCaseCardProps {
   caseDetails: CaseDataScreen;
-  onUpdateHearingPress?: (caseId: string | number | undefined) => void; // Optional: If you want to handle press in parent
+  onUpdateHearingPress?: (caseDetails: CaseDataScreen) => void;
 }
 
 const statusColors = {
@@ -23,7 +23,7 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
   const navigation = useNavigation();
   const handleUpdatePress = () => {
     if (onUpdateHearingPress) {
-      onUpdateHearingPress(id);
+      onUpdateHearingPress(caseDetails);
     } else {
       // Default action or navigation if not handled by parent
       console.log("Update Hearing pressed for case ID:", id);

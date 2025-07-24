@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
 import { format } from 'date-fns';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { getDb, getUserProfile } from '../../DataBase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const WelcomeCard = () => {
   const [userName, setUserName] = useState("User");
@@ -69,7 +71,7 @@ import * as db from '../../DataBase';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
-import { getCurrentUserId } from '../../utils/commonFunctions';
+import { getCurrentUserId, formatDate } from '../../utils/commonFunctions';
 
 const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
   return (
@@ -93,13 +95,13 @@ const TodaysCasesSection = () => {
     try {
       const allCases = await db.getCases();
       const today = new Date();
-      const todayString = today.toISOString().split('T')[0];
+      today.setHours(0, 0, 0, 0);
 
       const filteredCases = allCases.filter(c => {
         if (!c.NextDate) return false;
         const nextHearingDate = new Date(c.NextDate);
-        const nextHearingDateString = nextHearingDate.toISOString().split('T')[0];
-        return nextHearingDateString === todayString;
+        nextHearingDate.setHours(0, 0, 0, 0);
+        return nextHearingDate.getTime() === today.getTime();
       });
 
       const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
@@ -107,9 +109,9 @@ const TodaysCasesSection = () => {
         title: c.CaseTitle || 'No Title',
         client: c.ClientName || 'Unknown Client',
         status: c.CaseStatus || 'Pending',
-        nextHearing: c.NextDate ? new Date(c.NextDate).toLocaleDateString() : 'N/A',
-        lastUpdate: c.updated_at ? new Date(c.updated_at).toLocaleDateString() : 'N/A',
-        previousHearing: c.PreviousDate ? new Date(c.PreviousDate).toLocaleDateString() : 'N/A',
+        nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
+        lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
+        previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
       }));
 
       setTodaysCases(mappedCases);
