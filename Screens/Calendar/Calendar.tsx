@@ -37,11 +37,9 @@ const CalendarScreen: React.FC<Props> = () => {
     const allCases = await db.getCases();
     const filteredCases = allCases.filter(c => {
       if (!c.NextDate) return false;
-      const nextHearingDate = new Date(c.NextDate);
-      nextHearingDate.setHours(0, 0, 0, 0);
-      const selectedDate = new Date(date);
-      selectedDate.setHours(0, 0, 0, 0);
-      return nextHearingDate.getTime() === selectedDate.getTime();
+      const nextHearingDate = new Date(c.NextDate).toISOString().split('T')[0];
+      const selectedDate = new Date(date).toISOString().split('T')[0];
+      return nextHearingDate === selectedDate;
     });
 
     const mappedCases: CaseDataScreen[] = filteredCases.map((c: CaseData) => ({

@@ -94,14 +94,12 @@ const TodaysCasesSection = () => {
   const fetchTodaysCases = async () => {
     try {
       const allCases = await db.getCases();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const today = new Date().toISOString().split('T')[0];
 
       const filteredCases = allCases.filter(c => {
         if (!c.NextDate) return false;
-        const nextHearingDate = new Date(c.NextDate);
-        nextHearingDate.setHours(0, 0, 0, 0);
-        return nextHearingDate.getTime() === today.getTime();
+        const nextHearingDate = new Date(c.NextDate).toISOString().split('T')[0];
+        return nextHearingDate === today;
       });
 
       const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
