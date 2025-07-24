@@ -1,5 +1,6 @@
 import { AntDesign } from "@expo/vector-icons";
 import React, { useContext, useState, useCallback, useEffect, useRef } from "react";
+import { formatDate } from "../../utils/commonFunctions";
 import { View, Text, TextInput, StyleSheet, Dimensions, FlatList, ActivityIndicator, SafeAreaView, Platform } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import * as db from "../../DataBase"; // Import db functions
@@ -106,9 +107,9 @@ const SearchScreen: React.FC = () => {
       title: item.CaseTitle || 'No Title',
       client: item.ClientName || 'Unknown Client',
       status: item.CaseStatus || 'Pending',
-      nextHearing: item.NextDate ? new Date(item.NextDate).toLocaleDateString() : 'N/A',
-      lastUpdate: item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A',
-      previousHearing: item.PreviousDate ? new Date(item.PreviousDate).toLocaleDateString() : 'N/A',
+      nextHearing: item.NextDate ? formatDate(item.NextDate) : 'N/A',
+      lastUpdate: item.updated_at ? formatDate(item.updated_at) : 'N/A',
+      previousHearing: item.PreviousDate ? formatDate(item.PreviousDate) : 'N/A',
     };
     return <NewCaseCard caseDetails={caseCardDetails} onUpdateHearingPress={() => handleUpdateHearing(caseCardDetails)} />;
   };

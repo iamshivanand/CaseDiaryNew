@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { formatDate } from '../../utils/commonFunctions';
 import * as db from '../../DataBase';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
@@ -48,9 +49,9 @@ const YesterdaysCasesScreen = () => {
           title: c.CaseTitle || 'No Title',
           client: c.ClientName || 'Unknown Client',
           status: c.CaseStatus || 'Pending',
-          nextHearing: c.NextDate ? new Date(c.NextDate).toLocaleDateString() : 'N/A',
-          lastUpdate: c.updated_at ? new Date(c.updated_at).toLocaleDateString() : 'N/A',
-          previousHearing: c.PreviousDate ? new Date(c.PreviousDate).toLocaleDateString() : 'N/A',
+          nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
+          lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
+          previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
           }));
 
       setYesterdaysCases(mappedCases);
