@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React, { useContext } from "react";
 import { View } from "react-native"; // Removed ScrollView, Text
 import Ionicons from "react-native-vector-icons/Ionicons";
+import { AdMobBanner } from "expo-ads-admob";
 
 import { ThemeContext } from "./Providers/ThemeProvider";
 
@@ -172,6 +173,12 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
         <Tab.Screen name="CalendarTab" component={CalendarStack} options={{ tabBarLabel: "Calendar" }} />
         <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: "Profile" }} />
       </Tab.Navigator>
+      <AdMobBanner
+        bannerSize="fullBanner"
+        adUnitID="ca-app-pub-3940256099942544/6300978111"
+        servePersonalizedAds
+        onDidFailToReceiveAdWithError={(err) => console.log(err)}
+      />
     </View>
   );
 };

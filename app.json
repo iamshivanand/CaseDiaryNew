@@ -34,12 +34,15 @@
           "iCloudContainerEnvironment": "Production"
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-ads-admob",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ]
     ],
-    "react-native-google-mobile-ads": {
-      "android_app_id": "ca-app-pub-xxxxxxxx~xxxxxxxx",
-      "ios_app_id": "ca-app-pub-xxxxxxxx~xxxxxxxx"
-    },
     "extra": {
       "eas": {
         "projectId": "609b464f-72b2-40c3-ba40-1a28d28d68f3"

@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { emitter } from "./utils/event-emitter";
+import { initializeAds } from "./Utils/AdManager";
 
 import { getDb } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
@@ -70,6 +71,7 @@ export default function App() {
     const initialize = async () => {
       try {
         await getDb();
+        await initializeAds();
         console.log("Database initialized successfully from App.tsx");
         const onboardingStatus = await AsyncStorage.getItem(
           "@onboarding_complete"

@@ -20,6 +20,7 @@ import {
   addCourt,
   getSuggestionsForField,
 } from "../../DataBase";
+import { showInterstitialAd } from "../../Utils/AdManager";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { CaseDataScreen } from "../../Types/appTypes";
 import { formatDate } from "../../utils/commonFunctions";
@@ -270,6 +271,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       try {
         const success = await updateCase(caseIdToUpdate, updatePayload);
         if (success) {
+          await showInterstitialAd();
           Alert.alert("Success", "Case updated successfully.");
           navigation.navigate("CaseDetails", {
             caseId: caseIdToUpdate,
@@ -316,6 +318,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       try {
         const newCaseId = await addCase(insertPayload);
         if (newCaseId) {
+          await showInterstitialAd();
           Alert.alert("Success", "Case added successfully.");
           navigation.navigate("CaseDetails", {
             caseId: newCaseId,

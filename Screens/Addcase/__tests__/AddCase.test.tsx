@@ -73,6 +73,8 @@ describe('AddCase', () => {
     fireEvent.press(saveButton);
     await waitFor(() => {
       expect(db.addCase).toHaveBeenCalled();
+    });
+    await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('CaseDetails', {
         caseId: 1,
       });
@@ -103,7 +105,12 @@ describe('AddCase', () => {
   });
 
   it('should show suggestions for the presiding judge field', async () => {
-    const { getByPlaceholderText, findByText } = render(<AddCase route={{ params: {} }} />);
+    let getByPlaceholderText, findByText;
+    await act(async () => {
+      const { getByPlaceholderText: getByPlaceholderTextResult, findByText: findByTextResult } = render(<AddCase route={{ params: {} }} />);
+      getByPlaceholderText = getByPlaceholderTextResult;
+      findByText = findByTextResult;
+    });
     const judgeNameInput = getByPlaceholderText("Enter Judge's Name");
     fireEvent.changeText(judgeNameInput, 'Test');
     await waitFor(() => {
@@ -112,10 +119,14 @@ describe('AddCase', () => {
   });
 
   it('should not show a duplicate placeholder in the dropdowns', async () => {
-    const { findAllByText } = render(<AddCase route={{ params: {} }} />);
-    await waitFor(async () => {
-      expect((await findAllByText('Select Case Type...')).length).toBe(1);
-      expect((await findAllByText('Select Court...')).length).toBe(1);
+    let getAllByText;
+    await act(async () => {
+      const { getAllByText: getAllByTextResult } = render(<AddCase route={{ params: {} }} />);
+      getAllByText = getAllByTextResult;
+    });
+    await waitFor(() => {
+      expect(getAllByText('Select Case Type...').length).toBe(1);
+      expect(getAllByText('Select Court...').length).toBe(1);
     });
   });
 });

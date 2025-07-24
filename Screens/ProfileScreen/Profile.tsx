@@ -7,7 +7,9 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  Button,
 } from "react-native";
+import { showRewardedAd } from "../../Utils/AdManager";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { ThemeContext } from "../../Providers/ThemeProvider";
@@ -362,6 +364,16 @@ const ProfileScreen: React.FC = () => {
       />
 
       <View style={styles.tabContentContainer}>{renderTabContent()}</View>
+      <View style={styles.rewardedAdContainer}>
+        <Button
+          title="Watch Ad for 100 Points"
+          onPress={() => {
+            showRewardedAd(() => {
+              Alert.alert("Reward!", "You have been rewarded with 100 points!");
+            });
+          }}
+        />
+      </View>
     </ScrollView>
   );
 };
@@ -402,6 +414,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  rewardedAdContainer: {
+    margin: 20,
   },
 });
 
