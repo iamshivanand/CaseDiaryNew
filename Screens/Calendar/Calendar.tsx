@@ -37,6 +37,7 @@ const CalendarScreen: React.FC<Props> = () => {
     const allCases = await db.getCases();
     const filteredCases = allCases.filter(c => {
       if (!c.NextDate) return false;
+      console.log(`Processing case ID: ${c.id}, NextDate: ${c.NextDate}`);
       const nextHearingDate = new Date(c.NextDate);
       nextHearingDate.setHours(0, 0, 0, 0);
       const selectedDate = new Date(date);

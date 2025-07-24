@@ -37,6 +37,9 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
         navigation.navigate("CaseDetails", { caseId: id })
       }
     >
+      {console.log("Next Hearing Date (Card):", nextHearing)}
+      {console.log("Previous Hearing Date (Card):", previousHearing)}
+      {console.log("Last Update Date (Card):", lastUpdate)}
       <View style={styles.headerContainer}>
         <Text style={styles.title}>{title}</Text>
         <View
