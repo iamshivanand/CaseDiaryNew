@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { emitter } from "./utils/event-emitter";
-import { initializeAds } from "./Utils/AdManager";
+import { initializeAds } from "./utils/AdManager";
 
 import { getDb } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";

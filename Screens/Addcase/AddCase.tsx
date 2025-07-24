@@ -20,7 +20,7 @@ import {
   addCourt,
   getSuggestionsForField,
 } from "../../DataBase";
-import { showInterstitialAd } from "../../Utils/AdManager";
+import { showInterstitialAd } from "../../utils/AdManager";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { CaseDataScreen } from "../../Types/appTypes";
 import { formatDate } from "../../utils/commonFunctions";
