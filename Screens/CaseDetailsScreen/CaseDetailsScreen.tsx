@@ -7,6 +7,7 @@ import React, {
   useLayoutEffect,
   useState,
 } from "react";
+import { formatDate } from "../../utils/commonFunctions";
 import {
   ActivityIndicator,
   Alert,
@@ -233,17 +234,17 @@ const CaseDetailsScreen: React.FC = () => {
             <StatusBadge status={caseDetails.CaseStatus} />
             <DateRow
               label="Next Hearing"
-              dateString={caseDetails.NextDate}
+              dateString={formatDate(caseDetails.NextDate)}
               iconName="gavel"
             />
             <DateRow
               label="Previous Hearing"
-              dateString={caseDetails.PreviousDate}
+              dateString={formatDate(caseDetails.PreviousDate)}
               iconName="history"
             />
             <DateRow
               label="Last Update"
-              dateString={caseDetails.updated_at}
+              dateString={formatDate(caseDetails.updated_at)}
               iconName="update"
             />
             <View style={styles.detailsContainer}>

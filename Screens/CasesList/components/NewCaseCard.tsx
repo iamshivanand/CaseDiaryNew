@@ -2,6 +2,7 @@ import { useNavigation } from "@react-navigation/native";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native"; // Removed Dimensions
 import { CaseDataScreen } from "../../../Types/appTypes"; // Adjust path as necessary
+import { formatDate } from "../../../utils/commonFunctions";
 
 interface NewCaseCardProps {
   caseDetails: CaseDataScreen;
@@ -37,9 +38,6 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
         navigation.navigate("CaseDetails", { caseId: id })
       }
     >
-      {console.log("Next Hearing Date (Card):", nextHearing)}
-      {console.log("Previous Hearing Date (Card):", previousHearing)}
-      {console.log("Last Update Date (Card):", lastUpdate)}
       <View style={styles.headerContainer}>
         <Text style={styles.title}>{title}</Text>
         <View
@@ -52,15 +50,15 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
       <View style={styles.detailsContainer}>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Next Hearing:</Text>
-          <Text style={styles.detailValue}>{nextHearing}</Text>
+          <Text style={styles.detailValue}>{formatDate(nextHearing)}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Last Update:</Text>
-          <Text style={styles.detailValue}>{lastUpdate}</Text>
+          <Text style={styles.detailValue}>{formatDate(lastUpdate)}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Previous Hearing:</Text>
-          <Text style={styles.detailValue}>{previousHearing}</Text>
+          <Text style={styles.detailValue}>{formatDate(previousHearing)}</Text>
         </View>
       </View>
       <TouchableOpacity style={styles.updateButton} onPress={handleUpdatePress}>
