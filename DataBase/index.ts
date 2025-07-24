@@ -268,20 +268,12 @@ export * from './userProfileDB';
 // Ensure all exported functions use the new getDb from './connection' if they interact with DB.
 // The getSuggestionsForField was in this file before, assuming it's still needed.
 export const getSuggestionsForField = async (
-    fieldName: 'CaseTypes' | 'Courts' | 'Districts' | 'PoliceStations',
+    fieldName: string,
     userId?: number | null,
-    districtIdForPoliceStations?: number | null
 ): Promise<Array<{id: number, name: string}>> => {
     const db = await getDb();
-    let results: Array<{id: number, name: string}> = [];
-    switch (fieldName) {
-        case 'CaseTypes': results = await getCaseTypes(userId); break;
-        case 'Courts': results = await getCourts(userId); break;
-        case 'Districts': results = await getDistricts(userId); break; // Assuming getDistricts is defined
-        case 'PoliceStations': results = await getPoliceStations(districtIdForPoliceStations, userId); break; // Assuming getPoliceStations is defined
-        default: console.warn(`Suggestions not implemented for field: ${fieldName}`); return [];
-    }
-    return results.map(item => ({ id: item.id, name: item.name }));
+    const results = await db.getAllAsync<any>(`SELECT DISTINCT ${fieldName} as name FROM Cases WHERE ${fieldName} IS NOT NULL AND user_id = ?`, [userId]);
+    return results.map((row, index) => ({ id: index, name: row.name }));
 };
 
 export const getTotalCases = async (userId?: number | null): Promise<number> => {
