@@ -1,12 +1,18 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
-import * as db from '../../DataBase';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { CaseData, CaseDataScreen } from '../../Types/appTypes';
-import NewCaseCard from '../CasesList/components/NewCaseCard';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
-import { getCurrentUserId } from '../../utils/commonFunctions';
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
+import * as db from "../../DataBase";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { CaseData, CaseDataScreen } from "../../Types/appTypes";
+import NewCaseCard from "../CasesList/components/NewCaseCard";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
+import { getCurrentUserId } from "../../utils/commonFunctions";
 
 import { SafeAreaView, Platform } from "react-native";
 
@@ -34,24 +40,32 @@ const YesterdaysCasesScreen = () => {
       const today = new Date();
       const yesterday = new Date(today);
       yesterday.setDate(today.getDate() - 1);
-      const yesterdayString = yesterday.toISOString().split('T')[0];
+      const yesterdayString = yesterday.toISOString().split("T")[0];
 
-      const filteredCases = allCases.filter(c => {
+      const filteredCases = allCases.filter((c) => {
         if (!c.NextDate) return false;
         const nextHearingDate = new Date(c.NextDate);
-        const nextHearingDateString = nextHearingDate.toISOString().split('T')[0];
+        const nextHearingDateString = nextHearingDate
+          .toISOString()
+          .split("T")[0];
         return nextHearingDateString === yesterdayString;
       });
 
-      const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
-          id: c.id,
-          title: c.CaseTitle || 'No Title',
-          client: c.ClientName || 'Unknown Client',
-          status: c.CaseStatus || 'Pending',
-          nextHearing: c.NextDate ? new Date(c.NextDate).toLocaleDateString() : 'N/A',
-          lastUpdate: c.updated_at ? new Date(c.updated_at).toLocaleDateString() : 'N/A',
-          previousHearing: c.PreviousDate ? new Date(c.PreviousDate).toLocaleDateString() : 'N/A',
-          }));
+      const mappedCases: CaseDataScreen[] = filteredCases.map((c) => ({
+        id: c.id,
+        title: c.CaseTitle || "No Title",
+        client: c.ClientName || "Unknown Client",
+        status: c.CaseStatus || "Pending",
+        nextHearing: c.NextDate
+          ? new Date(c.NextDate).toLocaleDateString()
+          : "N/A",
+        lastUpdate: c.updated_at
+          ? new Date(c.updated_at).toLocaleDateString()
+          : "N/A",
+        previousHearing: c.PreviousDate
+          ? new Date(c.PreviousDate).toLocaleDateString()
+          : "N/A",
+      }));
 
       setYesterdaysCases(mappedCases);
     } catch (error) {
@@ -72,14 +86,18 @@ const YesterdaysCasesScreen = () => {
     setPopupVisible(true);
   };
 
-  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number) => {
+  const handleSaveHearing = async (
+    notes: string,
+    nextHearingDate: Date,
+    userId: number
+  ) => {
     if (!selectedCase || !selectedCase.id) return;
     const caseId = parseInt(selectedCase.id.toString(), 10);
-    if(isNaN(caseId)) return;
+    if (isNaN(caseId)) return;
 
     try {
       const caseExists = await db.getCaseById(caseId);
-      if(!caseExists) {
+      if (!caseExists) {
         console.error("Case not found");
         return;
       }
@@ -93,13 +111,18 @@ const YesterdaysCasesScreen = () => {
       }
 
       // 2. Update case's next hearing date
-      await db.updateCase(caseId, {
-        NextDate: nextHearingDate.toISOString(),
-      }, userId);
+      await db.updateCase(
+        caseId,
+        {
+          NextDate: nextHearingDate.toISOString(),
+        },
+        userId
+      );
 
       // 3. Refresh the list
       fetchYesterdaysCases();
-    } catch (error)      console.error("Error updating hearing:", error);
+    } catch (error) {
+      console.error("Error updating hearing:", error);
     }
   };
 
@@ -123,7 +146,9 @@ const YesterdaysCasesScreen = () => {
             index={index}
           />
         )}
-        ListEmptyComponent={<Text style={styles.emptyText}>No cases found for yesterday.</Text>}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No cases found for yesterday.</Text>
+        }
         contentContainerStyle={styles.container}
       />
       {selectedCase && (
@@ -142,19 +167,19 @@ const YesterdaysCasesScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingTop: Platform.OS === 'android' ? 25 : 0,
+    backgroundColor: "#FFFFFF",
+    paddingTop: Platform.OS === "android" ? 25 : 0,
   },
   container: {
     padding: 16,
   },
   centered: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyText: {
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 50,
     fontSize: 16,
   },

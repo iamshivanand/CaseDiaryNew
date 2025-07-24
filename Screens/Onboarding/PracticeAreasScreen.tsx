@@ -1,26 +1,34 @@
-import React, { useState, useContext } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
-import PrimaryButton from './components/PrimaryButton';
-import { Text, TextInput } from 'react-native';
-import InputField from './components/InputField';
-import { OnboardingContext } from '../../Providers/OnboardingProvider';
-import { getDb, addUser, updateUserProfile } from '../../DataBase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { emitter } from '../../utils/event-emitter';
+import React, { useState, useContext } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  TextInput,
+} from "react-native";
+import PrimaryButton from "./components/PrimaryButton";
+import InputField from "./components/InputField";
+import { OnboardingContext } from "../../Providers/OnboardingProvider";
+import { getDb, addUser, updateUserProfile } from "../../DataBase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { emitter } from "../../utils/event-emitter";
 
 const practiceAreas = [
-  'Criminal Law',
-  'Civil Law',
-  'Corporate Law',
-  'Family Law',
-  'Intellectual Property',
-  'Real Estate Law',
+  "Criminal Law",
+  "Civil Law",
+  "Corporate Law",
+  "Family Law",
+  "Intellectual Property",
+  "Real Estate Law",
 ];
 
 const PracticeAreasScreen = ({ navigation }) => {
   const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
-  const [otherArea, setOtherArea] = useState('');
+  const [otherArea, setOtherArea] = useState("");
 
   const toggleArea = (area: string) => {
     setSelectedAreas((prev) =>
@@ -39,7 +47,9 @@ const PracticeAreasScreen = ({ navigation }) => {
               key={area}
               style={[
                 styles.pill,
-                selectedAreas.includes(area) ? styles.activePill : styles.inactivePill,
+                selectedAreas.includes(area)
+                  ? styles.activePill
+                  : styles.inactivePill,
               ]}
               onPress={() => toggleArea(area)}
             >
@@ -57,13 +67,15 @@ const PracticeAreasScreen = ({ navigation }) => {
           <TouchableOpacity
             style={[
               styles.pill,
-              selectedAreas.includes('Other') ? styles.activePill : styles.inactivePill,
+              selectedAreas.includes("Other")
+                ? styles.activePill
+                : styles.inactivePill,
             ]}
-            onPress={() => toggleArea('Other')}
+            onPress={() => toggleArea("Other")}
           >
             <Text
               style={
-                selectedAreas.includes('Other')
+                selectedAreas.includes("Other")
                   ? styles.activePillText
                   : styles.inactivePillText
               }
@@ -72,7 +84,7 @@ const PracticeAreasScreen = ({ navigation }) => {
             </Text>
           </TouchableOpacity>
         </View>
-        {selectedAreas.includes('Other') && (
+        {selectedAreas.includes("Other") && (
           <InputField
             label="Other Practice Area"
             placeholder="Please specify"
@@ -84,31 +96,37 @@ const PracticeAreasScreen = ({ navigation }) => {
           <PrimaryButton
             title="Finish"
             onPress={async () => {
-              console.log('Finish button pressed');
+              console.log("Finish button pressed");
               if (selectedAreas.length === 0) {
-                Alert.alert('Error', 'Please select at least one practice area.');
+                Alert.alert(
+                  "Error",
+                  "Please select at least one practice area."
+                );
                 return;
               }
               const practiceAreas = [...selectedAreas];
-              if (selectedAreas.includes('Other') && otherArea) {
+              if (selectedAreas.includes("Other") && otherArea) {
                 practiceAreas.push(otherArea);
               }
               const finalOnboardingData = { ...onboardingData, practiceAreas };
-              console.log('Final onboarding data:', finalOnboardingData);
+              console.log("Final onboarding data:", finalOnboardingData);
 
               try {
                 const db = await getDb();
-                console.log('Database instance:', db);
-                const userId = await addUser(finalOnboardingData.fullName, finalOnboardingData.email);
-                console.log('User ID:', userId);
+                console.log("Database instance:", db);
+                const userId = await addUser(
+                  finalOnboardingData.fullName,
+                  finalOnboardingData.email
+                );
+                console.log("User ID:", userId);
                 if (userId) {
                   await updateUserProfile(db, userId, finalOnboardingData);
-                  await AsyncStorage.setItem('@onboarding_complete', 'true');
-                  await AsyncStorage.setItem('@user_id', userId.toString());
-                  emitter.emit('onboardingComplete');
+                  await AsyncStorage.setItem("@onboarding_complete", "true");
+                  await AsyncStorage.setItem("@user_id", userId.toString());
+                  emitter.emit("onboardingComplete");
                 }
               } catch (error) {
-                console.error('Error saving onboarding data:', error);
+                console.error("Error saving onboarding data:", error);
               }
             }}
           />
@@ -134,13 +152,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '600',
-    color: '#1E1E1E',
+    fontWeight: "600",
+    color: "#1E1E1E",
     marginBottom: 20,
   },
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginBottom: 20,
   },
   pill: {
@@ -150,35 +168,35 @@ const styles = StyleSheet.create({
     margin: 5,
   },
   activePill: {
-    backgroundColor: '#2D60FF',
+    backgroundColor: "#2D60FF",
   },
   inactivePill: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: "#F3F4F6",
   },
   activePillText: {
-    color: '#FFFFFF',
-    fontWeight: '500',
+    color: "#FFFFFF",
+    fontWeight: "500",
   },
   inactivePillText: {
-    color: '#6B7280',
-    fontWeight: '500',
+    color: "#6B7280",
+    fontWeight: "500",
   },
   buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
     paddingHorizontal: 24,
   },
   skipText: {
-    color: '#2D60FF',
+    color: "#2D60FF",
     marginTop: 16,
   },
   stepText: {
-    textAlign: 'center',
+    textAlign: "center",
     paddingTop: 20,
     marginBottom: 20,
     fontSize: 16,
-    color: '#6B7280',
+    color: "#6B7280",
   },
 });
 
