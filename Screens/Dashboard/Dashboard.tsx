@@ -65,7 +65,7 @@ const QuickActionsGrid = () => {
   );
 };
 
-import AdvertisementSection from './components/AdvertisementSection';
+// import AdvertisementSection from './components/AdvertisementSection';
 import NewCaseCard from '../CasesList/components/NewCaseCard';
 import * as db from '../../DataBase';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
@@ -200,7 +200,7 @@ const DashboardScreen = () => {
         <View style={styles.content}>
           <WelcomeCard />
           <QuickActionsGrid />
-          <AdvertisementSection />
+          {/* <AdvertisementSection /> */}
           <TodaysCasesSection />
         </View>
       </ScrollView>
