@@ -36,10 +36,6 @@
       ],
       "expo-asset"
     ],
-    "react-native-google-mobile-ads": {
-      "android_app_id": "ca-app-pub-xxxxxxxx~xxxxxxxx",
-      "ios_app_id": "ca-app-pub-xxxxxxxx~xxxxxxxx"
-    },
     "extra": {
       "eas": {
         "projectId": "609b464f-72b2-40c3-ba40-1a28d28d68f3"
