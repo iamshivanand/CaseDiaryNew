@@ -2,10 +2,11 @@ import { useNavigation } from "@react-navigation/native";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native"; // Removed Dimensions
 import { CaseDataScreen } from "../../../Types/appTypes"; // Adjust path as necessary
+import { formatDate } from "../../../utils/commonFunctions";
 
 interface NewCaseCardProps {
   caseDetails: CaseDataScreen;
-  onUpdateHearingPress?: (caseId: string | number | undefined) => void; // Optional: If you want to handle press in parent
+  onUpdateHearingPress?: (caseDetails: CaseDataScreen) => void;
 }
 
 const statusColors = {
@@ -23,7 +24,7 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
   const navigation = useNavigation();
   const handleUpdatePress = () => {
     if (onUpdateHearingPress) {
-      onUpdateHearingPress(id);
+      onUpdateHearingPress(caseDetails);
     } else {
       // Default action or navigation if not handled by parent
       console.log("Update Hearing pressed for case ID:", id);
@@ -49,15 +50,15 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
       <View style={styles.detailsContainer}>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Next Hearing:</Text>
-          <Text style={styles.detailValue}>{nextHearing}</Text>
+          <Text style={styles.detailValue}>{formatDate(nextHearing)}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Last Update:</Text>
-          <Text style={styles.detailValue}>{lastUpdate}</Text>
+          <Text style={styles.detailValue}>{formatDate(lastUpdate)}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Previous Hearing:</Text>
-          <Text style={styles.detailValue}>{previousHearing}</Text>
+          <Text style={styles.detailValue}>{formatDate(previousHearing)}</Text>
         </View>
       </View>
       <TouchableOpacity style={styles.updateButton} onPress={handleUpdatePress}>

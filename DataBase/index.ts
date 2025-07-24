@@ -113,13 +113,19 @@ export const getFullDocumentPath = (storedFileName: string | null | undefined): 
 export type CaseInsertData = Omit<CaseRow, 'id' | 'created_at' | 'updated_at'>;
 export type CaseUpdateData = Partial<Omit<CaseRow, 'id' | 'uniqueId' | 'created_at' | 'updated_at'>>;
 
+import { formatDate } from '../utils/commonFunctions';
+
 export const addCase = async (caseData: CaseInsertData): Promise<number | null> => {
   const db = await getDb(); if (!caseData.uniqueId) throw new Error("uniqueId is required.");
   const validCaseData: { [key: string]: any } = {};
   for (const key in caseData) {
     if (Object.prototype.hasOwnProperty.call(caseData, key)) {
       const typedKey = key as keyof CaseInsertData;
-      if (caseData[typedKey] !== undefined) validCaseData[typedKey] = caseData[typedKey];
+      if (key === 'NextDate' || key === 'PreviousDate' || key === 'dateFiled' || key === 'StatuteOfLimitations') {
+        validCaseData[typedKey] = caseData[typedKey] ? formatDate(caseData[typedKey]) : null;
+      } else if (caseData[typedKey] !== undefined) {
+        validCaseData[typedKey] = caseData[typedKey];
+      }
     }
   }
   const fields = Object.keys(validCaseData).join(", ");
@@ -179,7 +185,11 @@ export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?:
   for (const key in data) {
     if (Object.prototype.hasOwnProperty.call(data, key)) {
       const typedKey = key as keyof CaseUpdateData;
-      if (data[typedKey] !== undefined) validUpdateData[typedKey] = data[typedKey];
+      if (key === 'NextDate' || key === 'PreviousDate' || key === 'dateFiled' || key === 'StatuteOfLimitations') {
+        validUpdateData[typedKey] = data[typedKey] ? formatDate(data[typedKey]) : null;
+      } else if (data[typedKey] !== undefined) {
+        validUpdateData[typedKey] = data[typedKey];
+      }
     }
   }
   if (Object.keys(validUpdateData).length === 0) {

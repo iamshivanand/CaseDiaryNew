@@ -5,26 +5,33 @@ import { Theme } from '../../Providers/ThemeProvider';
 export const getAddCaseStyles = (theme: Theme) => StyleSheet.create({
   scrollViewStyle: {
     flex: 1,
-    backgroundColor: theme.colors.screenBackground || theme.colors.background,
+    backgroundColor: theme.colors.background,
   },
   scrollContentContainerStyle: {
     flexGrow: 1,
-    paddingBottom: 20,
+    justifyContent: 'center',
   },
   formScreenContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
+    padding: 20,
+    margin: 16,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   screenTitle: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: 'bold',
+    color: theme.colors.primary,
     marginBottom: 24,
-    color: theme.colors.text,
     textAlign: 'center',
   },
   actionButtonContainer: {
+    marginTop: 20,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 30,
+    justifyContent: 'space-between',
   },
 });

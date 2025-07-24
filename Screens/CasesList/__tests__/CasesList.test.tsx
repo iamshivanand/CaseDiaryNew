@@ -2,7 +2,7 @@ import React from "react";
 import { render, fireEvent } from "@testing-library/react-native";
 import CasesList from "../CasesList";
 import { ThemeContext } from "../../../Providers/ThemeProvider";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, useRoute } from "@react-navigation/native";
 
 // Mocking the database functions
 jest.mock("../../../DataBase", () => ({
@@ -35,6 +35,16 @@ jest.mock("../components/NewCaseCard", () => {
       </TouchableOpacity>
     </View>
   );
+});
+
+jest.mock('@react-navigation/native', () => {
+  const actualNav = jest.requireActual('@react-navigation/native');
+  return {
+    ...actualNav,
+    useRoute: () => ({
+      params: {},
+    }),
+  };
 });
 
 const theme = {
