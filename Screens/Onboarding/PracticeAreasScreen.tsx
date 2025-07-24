@@ -1,7 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
 import PrimaryButton from './components/PrimaryButton';
-import { Text, TextInput } from 'react-native';
 import InputField from './components/InputField';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 import { getDb, addUser, updateUserProfile } from '../../DataBase';

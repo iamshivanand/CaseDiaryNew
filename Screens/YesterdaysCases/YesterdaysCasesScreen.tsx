@@ -100,7 +100,7 @@ const YesterdaysCasesScreen = () => {
 
       // 3. Refresh the list
       fetchYesterdaysCases();
-    } catch (error)      console.error("Error updating hearing:", error);
+    } catch (error)      {console.error("Error updating hearing:", error);
     }
   };
 
