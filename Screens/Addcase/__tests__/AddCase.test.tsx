@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import AddCase from '../AddCase';
 import * as db from '../../../DataBase';
 
@@ -106,13 +106,16 @@ describe('AddCase', () => {
     const { getByPlaceholderText, findByText } = render(<AddCase route={{ params: {} }} />);
     const judgeNameInput = getByPlaceholderText("Enter Judge's Name");
     fireEvent.changeText(judgeNameInput, 'Test');
-    const suggestion = await findByText('Test Judge');
-    expect(suggestion).toBeTruthy();
+    await waitFor(() => {
+      expect(findByText('Test Judge')).toBeTruthy();
+    });
   });
 
-  it('should not show a duplicate placeholder in the dropdowns', () => {
-    const { queryAllByText } = render(<AddCase route={{ params: {} }} />);
-    expect(queryAllByText('Select Case Type...').length).toBe(1);
-    expect(queryAllByText('Select Court...').length).toBe(1);
+  it('should not show a duplicate placeholder in the dropdowns', async () => {
+    const { findAllByText } = render(<AddCase route={{ params: {} }} />);
+    await waitFor(async () => {
+      expect((await findAllByText('Select Case Type...')).length).toBe(1);
+      expect((await findAllByText('Select Court...')).length).toBe(1);
+    });
   });
 });

@@ -105,6 +105,7 @@ const ProfileScreen: React.FC = () => {
     }
   }, [profileData, editingSection]);
 
+
   const handleEditPress = (section: EditableSection) => {
     // Reset temp fields to current profile data before starting to edit a new section
     setTempAvatarUri(profileData.avatarUrl);
@@ -153,8 +154,7 @@ const ProfileScreen: React.FC = () => {
       const parsedYears = parseInt(tempYearsOfPractice, 10);
       if (!isNaN(parsedYears)) {
         updatedProfile.stats.yearsOfPractice = parsedYears;
-        updatedProfile.stats.yearsOfPracticeLastUpdated =
-          new Date().toISOString();
+        updatedProfile.stats.yearsOfPracticeLastUpdated = new Date().toISOString();
       }
     } else if (section === "avatar") {
       updatedProfile.avatarUrl = tempAvatarUri;
@@ -171,13 +171,9 @@ const ProfileScreen: React.FC = () => {
 
   const requestMediaLibraryPermissions = async () => {
     if (Platform.OS !== "web") {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Permission Denied",
-          "Sorry, we need camera roll permissions to make this work!"
-        );
+        Alert.alert("Permission Denied", "Sorry, we need camera roll permissions to make this work!");
         return false;
       }
       return true;
@@ -189,10 +185,7 @@ const ProfileScreen: React.FC = () => {
     if (Platform.OS !== "web") {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Permission Denied",
-          "Sorry, we need camera permissions to make this work!"
-        );
+        Alert.alert("Permission Denied", "Sorry, we need camera permissions to make this work!");
         return false;
       }
       return true;
@@ -254,6 +247,7 @@ const ProfileScreen: React.FC = () => {
     return yearsOfPractice + (diff > 0 ? diff : 0);
   };
 
+
   const profileTabs = ["Profile", "Settings"];
   // Dummy handlers for old buttons - these are now replaced by edit icons
   // const handleEditProfile = () => console.log("Edit Profile Pressed");
@@ -297,9 +291,7 @@ const ProfileScreen: React.FC = () => {
         </>
       );
     } else if (selectedTab === "Settings") {
-      return (
-        <Text style={styles.tabContentText}>Settings Content Coming Soon</Text>
-      );
+      return <Text style={styles.tabContentText}>Settings Content Coming Soon</Text>;
     }
     return null;
   };
@@ -342,7 +334,10 @@ const ProfileScreen: React.FC = () => {
       {/* <View style={styles.actionButtonsContainer}> ... </View> */}
 
       <View style={styles.statsContainer}>
-        <StatCard label="Total Cases" value={profileData.stats.totalCases} />
+        <StatCard
+          label="Total Cases"
+          value={profileData.stats.totalCases}
+        />
         <StatCard
           label="Upcoming Hearings"
           value={profileData.stats.upcomingHearings}

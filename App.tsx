@@ -15,9 +15,9 @@ import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
 import OnboardingProvider from "./Providers/OnboardingProvider";
 import Routes from "./Routes/Routes";
 import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
-import PracticeAreasScreen from "./Screens/Onboarding/PracticeAreasScreen";
-import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
 import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
+import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
+import PracticeAreasScreen from "./Screens/Onboarding/PracticeAreasScreen";
 import SplashScreen from "./Screens/SplashScreen/SplashScreen";
 import GreetingScreen from "./Screens/Onboarding/GreetingScreen";
 

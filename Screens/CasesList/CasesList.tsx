@@ -1,5 +1,5 @@
 import { AntDesign, Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation } from "@react-navigation/native"; // Removed useRoute, RouteProp
+import { useFocusEffect, useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import React, { useCallback, useContext, useState, useEffect } from "react";
 import {
   FlatList,
@@ -33,10 +33,11 @@ const transformApiCaseToCaseDataScreen = (apiCase: Case): CaseDataScreen => {
 };
 type FilterStatus = "Active" | "Closed";
 
-const CasesList = (/*{ navigation, routes }*/) => {
-  // Removed navigation, routes from props as useNavigation is used
-  // const route = useRoute<CasesListRouteProp>(); // Not using route params for now
-  // const { params } = route;
+type CasesListRouteProp = RouteProp<{ params: { Filter?: string } }, 'params'>;
+
+const CasesList = () => {
+  const route = useRoute<CasesListRouteProp>();
+  const filterParam = route.params?.Filter;
   const navigation = useNavigation();
   const { theme } = useContext(ThemeContext); // Keep theme for styling
 
@@ -75,11 +76,43 @@ const CasesList = (/*{ navigation, routes }*/) => {
   const filterAndSearchCases = () => {
     let tempCases = allCases;
 
-    // Filter by status
-    if (activeFilter === "Active") {
-      tempCases = tempCases.filter((c) => c.status !== "Closed");
-    } else if (activeFilter === "Closed") {
-      tempCases = tempCases.filter((c) => c.status === "Closed");
+    if (filterParam) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (filterParam === 'todaysCases') {
+        tempCases = tempCases.filter(c => {
+          if (c.nextHearing === 'N/A') return false;
+          const hearingDate = new Date(c.nextHearing);
+          hearingDate.setHours(0, 0, 0, 0);
+          return hearingDate.getTime() === today.getTime();
+        });
+      } else if (filterParam === 'tomorrowCases') {
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        tempCases = tempCases.filter(c => {
+          if (c.nextHearing === 'N/A') return false;
+          const hearingDate = new Date(c.nextHearing);
+          hearingDate.setHours(0, 0, 0, 0);
+          return hearingDate.getTime() === tomorrow.getTime();
+        });
+      } else if (filterParam === 'yesterdayCases') {
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        tempCases = tempCases.filter(c => {
+          if (c.nextHearing === 'N/A') return false;
+          const hearingDate = new Date(c.nextHearing);
+          hearingDate.setHours(0, 0, 0, 0);
+          return hearingDate.getTime() === yesterday.getTime();
+        });
+      }
+    } else {
+      // Filter by status
+      if (activeFilter === "Active") {
+        tempCases = tempCases.filter((c) => c.status !== "Closed");
+      } else if (activeFilter === "Closed") {
+        tempCases = tempCases.filter((c) => c.status === "Closed");
+      }
     }
 
     // Filter by search text (searches title and client)

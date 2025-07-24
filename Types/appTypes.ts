@@ -106,7 +106,6 @@ export interface DropdownOption {
 
 // Specific dropdown option lists
 export const caseStatusOptions: DropdownOption[] = [
-  { label: "Select Status...", value: "" },
   { label: "Open", value: "Open" },
   { label: "In Progress", value: "In Progress" },
   { label: "Closed", value: "Closed" },
@@ -115,7 +114,6 @@ export const caseStatusOptions: DropdownOption[] = [
 ];
 
 export const priorityOptions: DropdownOption[] = [
-  { label: "Select Priority...", value: "" },
   { label: "High", value: "High" },
   { label: "Medium", value: "Medium" },
   { label: "Low", value: "Low" },
