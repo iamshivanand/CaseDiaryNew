@@ -344,13 +344,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingBottom: 100, // Ensure content is not hidden by bottom actions
+    paddingBottom: 100,
   },
   summarySection: {
     padding: 16,
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
   },
   mainCaseTitle: {
     fontSize: 22,
@@ -362,21 +359,36 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   detailsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
   },
   detailRow: {
-    width: '48%',
+    width: "48%",
     marginBottom: 8,
   },
   detailLabel: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 4,
   },
   detailValue: {
     fontSize: 14,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  documentsSection: {
+    paddingHorizontal: 16,
+  },
+  timelineSection: {
+    paddingHorizontal: 16,
+  },
+  noItemsText: {
+    textAlign: "center",
+    paddingVertical: 20,
   },
 });
 

@@ -3,6 +3,7 @@ import { Appearance, useColorScheme } from "react-native";
 import { useDB } from "../DataBase/DatabaseProvider";
 import { getUserProfile, updateUserProfile } from "../DataBase/userProfileDB";
 import { AuthContext } from "./AuthProvider";
+import { theme as defaultTheme } from "../styles/theme";
 
 export interface Theme {
   colors: {
@@ -24,38 +25,14 @@ interface ThemeContextType {
 }
 
 export const ThemeContext = createContext<ThemeContextType>({
-  theme: {
-    colors: {
-      primary: "#007bff",
-      secondary: "#ffc107",
-      background: "#fff",
-      text: "#000",
-      button: "#007bff",
-    },
-    fonts: {
-      fontFamily: "System",
-      fontSize: 16,
-    },
-  },
+  theme: defaultTheme,
   updateTheme: () => {}, // Function to update the theme
 });
 
 const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { db } = useDB();
   const { user } = useContext(AuthContext);
-  const [theme, setTheme] = useState<Theme>({
-    colors: {
-      primary: "#007bff",
-      secondary: "#ffc107",
-      background: "white",
-      text: "black",
-      button: "#007bff",
-    },
-    fonts: {
-      fontFamily: "System",
-      fontSize: 16,
-    },
-  });
+  const [theme, setTheme] = useState<Theme>(defaultTheme);
 
   useEffect(() => {
     const loadTheme = async () => {

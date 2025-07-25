@@ -9,16 +9,14 @@ interface NewCaseCardProps {
   onUpdateHearingPress?: (caseDetails: CaseDataScreen) => void;
 }
 
-const statusColors = {
-  Active: "#4CAF50", // Green
-  Pending: "#FF9800", // Orange
-  Closed: "#9E9E9E", // Grey
-};
+import { ThemeContext } from "../../../Providers/ThemeProvider";
+import { useContext } from "react";
 
 const NewCaseCard: React.FC<NewCaseCardProps> = ({
   caseDetails,
   onUpdateHearingPress,
 }) => {
+  const { theme } = useContext(ThemeContext);
   const { title, client, status, nextHearing, lastUpdate, previousHearing, id } =
     caseDetails;
   const navigation = useNavigation();
@@ -26,10 +24,90 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
     if (onUpdateHearingPress) {
       onUpdateHearingPress(caseDetails);
     } else {
-      // Default action or navigation if not handled by parent
       console.log("Update Hearing pressed for case ID:", id);
     }
   };
+
+  const statusColors = {
+    Active: theme.colors.primary,
+    Pending: theme.colors.secondary,
+    Closed: "#9E9E9E",
+  };
+
+  const styles = StyleSheet.create({
+    card: {
+      backgroundColor: theme.colors.background,
+      borderRadius: 8,
+      padding: 16,
+      marginVertical: 8,
+      marginHorizontal: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    headerContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    title: {
+      fontSize: theme.fontSizes.heading,
+      fontFamily: theme.fontStyles.bold,
+      color: theme.colors.text,
+      flexShrink: 1,
+    },
+    badge: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      marginLeft: 8,
+    },
+    badgeText: {
+      color: theme.colors.background,
+      fontSize: theme.fontSizes.caption,
+      fontFamily: theme.fontStyles.semiBold,
+    },
+    clientInfo: {
+      fontSize: theme.fontSizes.body,
+      fontFamily: theme.fontStyles.regular,
+      color: theme.colors.secondary,
+      marginBottom: 12,
+    },
+    detailsContainer: {
+      marginBottom: 12,
+    },
+    detailRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 6,
+    },
+    detailLabel: {
+      fontSize: theme.fontSizes.caption,
+      fontFamily: theme.fontStyles.regular,
+      color: theme.colors.secondary,
+    },
+    detailValue: {
+      fontSize: theme.fontSizes.caption,
+      fontFamily: theme.fontStyles.semiBold,
+      color: theme.colors.text,
+    },
+    updateButton: {
+      backgroundColor: theme.colors.primary,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 6,
+      alignItems: "center",
+      marginTop: 8,
+    },
+    updateButtonText: {
+      color: theme.colors.background,
+      fontSize: theme.fontSizes.body,
+      fontFamily: theme.fontStyles.bold,
+    },
+  });
 
   return (
     <TouchableOpacity
@@ -67,79 +145,5 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
     </TouchableOpacity>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 16,
-    marginVertical: 8,
-    marginHorizontal: 16, // Or use Dimensions to make it more responsive
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3, // for Android shadow
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333333',
-    flexShrink: 1, // Allows text to shrink and wrap if too long
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12, // Make it more pill-shaped
-    marginLeft: 8, // Add some space between title and badge
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  clientInfo: {
-    fontSize: 14,
-    color: '#555555',
-    marginBottom: 12,
-  },
-  detailsContainer: {
-    marginBottom: 12,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  detailLabel: {
-    fontSize: 13,
-    color: '#777777',
-    fontWeight: '500',
-  },
-  detailValue: {
-    fontSize: 13,
-    color: '#444444',
-    fontWeight: '500',
-  },
-  updateButton: {
-    backgroundColor: '#007AFF', // Blue color
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  updateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});
 
 export default NewCaseCard;

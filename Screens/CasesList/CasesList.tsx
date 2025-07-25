@@ -275,15 +275,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    // borderBottomWidth: 1, // Optional: if you want a separator
-    // borderBottomColor: '#E0E0E0', // Optional
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
   },
   addButton: {
-    padding: 6, // Make it easier to tap
+    padding: 6,
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -294,60 +292,52 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 8,
     paddingHorizontal: 12,
-    // backgroundColor: '#F0F0F0', // Light grey background for search bar
-    borderWidth: 1, // Optional: if you prefer a border
-    borderColor: '#D1D1D6', // Optional
+    borderWidth: 1,
   },
   searchIcon: {
     marginRight: 8,
   },
   input: {
     flex: 1,
-    height: 44, // Standard iOS height
+    height: 44,
     fontSize: 16,
   },
   toggleContainer: {
     flexDirection: "row",
-    justifyContent: "space-around", // Or 'center' with margin on buttons
+    justifyContent: "space-around",
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginBottom: 8,
   },
   toggleButton: {
-    flex: 1, // Make buttons take equal width
+    flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 6,
     alignItems: "center",
-    marginHorizontal: 5, // Add some space between buttons
+    marginHorizontal: 5,
   },
-  activeButton: {
-    // backgroundColor: "#007AFF", // Blue for active
-  },
-  inactiveButton: {
-    // backgroundColor: "#E0E0E0", // Grey for inactive
-  },
+  activeButton: {},
+  inactiveButton: {},
   activeButtonText: {
-    color: "#FFFFFF", // White text for active
+    color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "600",
   },
   inactiveButtonText: {
-    // color: "#000000", // Black text for inactive
     fontSize: 15,
     fontWeight: "600",
   },
   listContentContainer: {
-    paddingBottom: 16, // Add some padding at the bottom of the list
+    paddingBottom: 16,
   },
   emptyListContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 50, // Adjust as needed
+    marginTop: 50,
   },
   emptyListText: {
     fontSize: 16,
-    // color: "#8E8E93", // Grey color for empty message
   },
 });
