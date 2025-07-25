@@ -1,11 +1,20 @@
-import React, { createContext, useState, ReactNode } from "react";
+import React, { createContext, useState, ReactNode, useEffect, useContext } from "react";
 import { Appearance, useColorScheme } from "react-native";
+import { useDB } from "../DataBase/DatabaseProvider";
+import { getUserProfile, updateUserProfile } from "../DataBase/userProfileDB";
+import { AuthContext } from "./AuthProvider";
+
 export interface Theme {
   colors: {
     primary: string;
     secondary: string;
     background: string;
     text: string;
+    button: string;
+  };
+  fonts: {
+    fontFamily: string;
+    fontSize: number;
   };
 }
 
@@ -21,28 +30,55 @@ export const ThemeContext = createContext<ThemeContextType>({
       secondary: "#ffc107",
       background: "#fff",
       text: "#000",
+      button: "#007bff",
+    },
+    fonts: {
+      fontFamily: "System",
+      fontSize: 16,
     },
   },
   updateTheme: () => {}, // Function to update the theme
 });
 
 const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // const colorScheme = Appearance.getColorScheme();
-  // const isDarkMode = useColorScheme() === "dark";
-  const [theme, setTheme] = useState<Theme>(() => {
-    const defaultTheme: Theme = {
-      colors: {
-        primary: "#007bff",
-        secondary: "#ffc107",
-        background: "white", // Use black background for dark mode, white for light mode
-        text: "black", // Use white text for dark mode, black for light mode
-      },
-    };
-    return defaultTheme;
+  const { db } = useDB();
+  const { user } = useContext(AuthContext);
+  const [theme, setTheme] = useState<Theme>({
+    colors: {
+      primary: "#007bff",
+      secondary: "#ffc107",
+      background: "white",
+      text: "black",
+      button: "#007bff",
+    },
+    fonts: {
+      fontFamily: "System",
+      fontSize: 16,
+    },
   });
 
-  const updateTheme = (newTheme: Partial<Theme>) => {
-    setTheme({ ...theme, ...newTheme }); // Update specific theme properties
+  useEffect(() => {
+    const loadTheme = async () => {
+      if (user) {
+        const profile = await getUserProfile(db, user.id);
+        if (profile && profile.themeSettings) {
+          setTheme(profile.themeSettings);
+        }
+      }
+    };
+    loadTheme();
+  }, [user, db]);
+
+  const updateTheme = async (newTheme: Partial<Theme>) => {
+    const updatedTheme = { ...theme, ...newTheme };
+    setTheme(updatedTheme);
+    if (user) {
+      const profile = await getUserProfile(db, user.id);
+      await updateUserProfile(db, user.id, {
+        ...profile,
+        themeSettings: updatedTheme,
+      });
+    }
   };
 
   const value = { theme, updateTheme };

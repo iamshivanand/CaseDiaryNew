@@ -22,6 +22,7 @@ const SettingsScreen = () => {
     { title: 'Manage Courts', category: 'Courts', icon: 'scale-balance' },
     { title: 'Manage Districts', category: 'Districts', icon: 'map-marker-outline' },
     { title: 'Manage Police Stations', category: 'PoliceStations', icon: 'shield-home-outline' },
+    { title: 'Theme Settings', category: 'ThemeSettings', icon: 'palette-outline' },
     // Add more settings items here if needed
   ];
 
@@ -35,12 +36,16 @@ const SettingsScreen = () => {
               title={item.title}
               left={(props) => <List.Icon {...props} icon={item.icon} color={theme.colors.primary} />}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() =>
-                navigation.navigate('ManageLookupCategoryScreen', {
-                  categoryName: item.category,
-                  title: item.title
-                })
-              }
+              onPress={() => {
+                if (item.category === 'ThemeSettings') {
+                  navigation.navigate('ThemeSettingsScreen');
+                } else {
+                  navigation.navigate('ManageLookupCategoryScreen', {
+                    categoryName: item.category,
+                    title: item.title,
+                  });
+                }
+              }}
               titleStyle={{ color: theme.colors.onSurface }}
               style={styles.listItem}
             />

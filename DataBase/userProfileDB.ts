@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS LawyerProfiles (
   languages TEXT,
   stats TEXT,
   recentActivity TEXT,
+  themeSettings TEXT,
   FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE
 );`;
 
@@ -41,6 +42,7 @@ export const getUserProfile = async (
       languages: JSON.parse(result.languages || "[]"),
       stats: JSON.parse(result.stats || "{}"),
       recentActivity: JSON.parse(result.recentActivity || "[]"),
+      themeSettings: JSON.parse(result.themeSettings || "{}"),
     };
   }
   return null;
@@ -64,6 +66,7 @@ export const updateUserProfile = async (
     experience,
     license,
     location,
+    themeSettings,
   } = profileData;
 
   const stats = {
@@ -79,8 +82,8 @@ export const updateUserProfile = async (
 
   await db.runAsync(
     `INSERT OR REPLACE INTO LawyerProfiles (
-      user_id, avatarUrl, designation, practiceAreas, aboutMe, contactInfo, languages, stats, name
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      user_id, avatarUrl, designation, practiceAreas, aboutMe, contactInfo, languages, stats, name, themeSettings
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       userId,
       avatarUrl,
@@ -91,6 +94,7 @@ export const updateUserProfile = async (
       JSON.stringify(languages),
       JSON.stringify(stats),
       fullName,
+      JSON.stringify(themeSettings),
     ]
   );
 };

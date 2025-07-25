@@ -10,9 +10,10 @@ import Animated, {
 } from "react-native-reanimated";
 import { emitter } from "./utils/event-emitter";
 
-import { getDb } from "./DataBase";
+import { DatabaseProvider } from "./DataBase/DatabaseProvider";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
 import OnboardingProvider from "./Providers/OnboardingProvider";
+import AuthProvider from "./Providers/AuthProvider";
 import Routes from "./Routes/Routes";
 import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
 import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
@@ -69,8 +70,6 @@ export default function App() {
   useEffect(() => {
     const initialize = async () => {
       try {
-        await getDb();
-        console.log("Database initialized successfully from App.tsx");
         const onboardingStatus = await AsyncStorage.getItem(
           "@onboarding_complete"
         );
@@ -115,10 +114,12 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider>
-      <OnboardingProvider>
-        <NavigationContainer>
-          <SafeAreaView
+    <AuthProvider>
+      <DatabaseProvider>
+        <ThemeProvider>
+          <OnboardingProvider>
+            <NavigationContainer>
+            <SafeAreaView
             style={{
               flex: 1,
               backgroundColor: theme.colors.background,
@@ -141,8 +142,10 @@ export default function App() {
               )}
             </Stack.Navigator>
           </SafeAreaView>
-        </NavigationContainer>
-      </OnboardingProvider>
-    </ThemeProvider>
+            </NavigationContainer>
+          </OnboardingProvider>
+        </ThemeProvider>
+      </DatabaseProvider>
+    </AuthProvider>
   );
 }

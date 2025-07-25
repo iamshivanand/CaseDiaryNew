@@ -40,6 +40,7 @@ export type CalendarStackParamList = {
 export type ProfileStackParamList = {
   ProfileScreen: undefined;
   SettingsScreen: undefined;
+  ThemeSettingsScreen: undefined;
   ManageLookupCategoryScreen: {
     categoryName: 'CaseTypes' | 'Courts' | 'Districts' | 'PoliceStations';
     title: string;
