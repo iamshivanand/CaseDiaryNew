@@ -57,12 +57,12 @@ const OnboardingNavigator = () => (
 
 export default function App() {
   const { theme } = useContext(ThemeContext);
+  const [loading, setLoading] = useState(true);
   const [fontsLoaded] = useFonts({
     "Roboto-Regular": require("./assets/fonts/Roboto-Regular.ttf"),
     "Roboto-Bold": require("./assets/fonts/Roboto-Bold.ttf"),
     "Roboto-Italic": require("./assets/fonts/Roboto-Italic.ttf"),
   });
-  const [loading, setLoading] = useState(true);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isSplashscreenVisible, setSplashscreenVisible] = useState(true);
   const translateY = useSharedValue(1000);
