@@ -46,6 +46,7 @@
     "react-native-auto-size-text": "^1.1.1",
     "react-native-autocomplete-input": "^5.4.0",
     "react-native-calendars": "^1.1304.1",
+    "react-native-color-palette": "^2.2.0",
     "react-native-formik": "^1.7.8",
     "react-native-gesture-handler": "~2.16.1",
     "react-native-get-random-values": "~1.11.0",

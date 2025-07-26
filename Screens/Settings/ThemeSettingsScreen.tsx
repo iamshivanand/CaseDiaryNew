@@ -1,9 +1,10 @@
 import React, { useContext, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { Picker } from "@react-native-picker/picker";
+import ColorPalette from "react-native-color-palette";
 import { useTheme } from "react-native-paper";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import ActionButton from "../../Screens/CommonComponents/ActionButton";
+import ConfirmationPopup from "../../Screens/CommonComponents/Popup";
 
 const ThemeSettingsScreen = () => {
   const { theme, updateTheme } = useContext(ThemeContext);
@@ -18,6 +19,7 @@ const ThemeSettingsScreen = () => {
     theme.fonts?.fontFamily || "System"
   );
   const [fontSize, setFontSize] = useState(theme.fonts?.fontSize || 16);
+  const [isPopupVisible, setIsPopupVisible] = useState(false);
 
   const handleSave = () => {
     updateTheme({
@@ -31,55 +33,57 @@ const ThemeSettingsScreen = () => {
       },
       fonts: { ...theme.fonts, fontFamily, fontSize },
     });
+    setIsPopupVisible(true);
   };
 
   return (
     <View style={styles.container}>
+      <ConfirmationPopup
+        isVisible={isPopupVisible}
+        message="Theme settings saved successfully!"
+        onCancel={() => setIsPopupVisible(false)}
+        onConfirm={() => setIsPopupVisible(false)}
+      />
       <Text style={styles.label}>Primary Color</Text>
-      <Picker
-        selectedValue={primaryColor}
-        onValueChange={(itemValue) => setPrimaryColor(itemValue)}
-      >
-        <Picker.Item label="Blue" value="#007bff" />
-        <Picker.Item label="Green" value="#28a745" />
-        <Picker.Item label="Red" value="#dc3545" />
-      </Picker>
+      <ColorPalette
+        onChange={(color) => setPrimaryColor(color)}
+        value={primaryColor}
+        colors={["#007bff", "#28a745", "#dc3545"]}
+        title={""}
+        icon={<Text>✔</Text>}
+      />
       <Text style={styles.label}>Secondary Color</Text>
-      <Picker
-        selectedValue={secondaryColor}
-        onValueChange={(itemValue) => setSecondaryColor(itemValue)}
-      >
-        <Picker.Item label="Gray" value="#6c757d" />
-        <Picker.Item label="Yellow" value="#ffc107" />
-        <Picker.Item label="Cyan" value="#17a2b8" />
-      </Picker>
+      <ColorPalette
+        onChange={(color) => setSecondaryColor(color)}
+        value={secondaryColor}
+        colors={["#6c757d", "#ffc107", "#17a2b8"]}
+        title={""}
+        icon={<Text>✔</Text>}
+      />
       <Text style={styles.label}>Accent Color</Text>
-      <Picker
-        selectedValue={accentColor}
-        onValueChange={(itemValue) => setAccentColor(itemValue)}
-      >
-        <Picker.Item label="Cyan" value="#17a2b8" />
-        <Picker.Item label="Magenta" value="#e83e8c" />
-        <Picker.Item label="Orange" value="#fd7e14" />
-      </Picker>
+      <ColorPalette
+        onChange={(color) => setAccentColor(color)}
+        value={accentColor}
+        colors={["#17a2b8", "#e83e8c", "#fd7e14"]}
+        title={""}
+        icon={<Text>✔</Text>}
+      />
       <Text style={styles.label}>Text Color</Text>
-      <Picker
-        selectedValue={textColor}
-        onValueChange={(itemValue) => setTextColor(itemValue)}
-      >
-        <Picker.Item label="Black" value="#000" />
-        <Picker.Item label="Dark Gray" value="#343a40" />
-        <Picker.Item label="Gray" value="#6c757d" />
-      </Picker>
+      <ColorPalette
+        onChange={(color) => setTextColor(color)}
+        value={textColor}
+        colors={["#000", "#343a40", "#6c757d"]}
+        title={""}
+        icon={<Text>✔</Text>}
+      />
       <Text style={styles.label}>Background Color</Text>
-      <Picker
-        selectedValue={backgroundColor}
-        onValueChange={(itemValue) => setBackgroundColor(itemValue)}
-      >
-        <Picker.Item label="White" value="#fff" />
-        <Picker.Item label="Light Gray" value="#f8f9fa" />
-        <Picker.Item label="Dark Gray" value="#343a40" />
-      </Picker>
+      <ColorPalette
+        onChange={(color) => setBackgroundColor(color)}
+        value={backgroundColor}
+        colors={["#fff", "#f8f9fa", "#343a40"]}
+        title={""}
+        icon={<Text>✔</Text>}
+      />
       <Text style={styles.label}>Font Family</Text>
       <Picker
         selectedValue={fontFamily}
