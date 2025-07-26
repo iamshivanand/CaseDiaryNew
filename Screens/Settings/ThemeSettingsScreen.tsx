@@ -9,7 +9,9 @@ const ThemeSettingsScreen = () => {
   const { theme, updateTheme } = useContext(ThemeContext);
   const [primaryColor, setPrimaryColor] = useState(theme.colors.primary);
   const [secondaryColor, setSecondaryColor] = useState(theme.colors.secondary);
-  const [fontFamily, setFontFamily] = useState(theme.fonts?.fontFamily || "System");
+  const [fontFamily, setFontFamily] = useState(
+    theme.fonts?.fontFamily || "System"
+  );
   const [fontSize, setFontSize] = useState(theme.fonts?.fontSize || 16);
 
   const handleSave = () => {
@@ -60,6 +62,8 @@ const ThemeSettingsScreen = () => {
         <Picker.Item label="Small" value={12} />
         <Picker.Item label="Medium" value={16} />
         <Picker.Item label="Large" value={20} />
+        <Picker.Item label="X-Large" value={24} />
+        <Picker.Item label="XX-Large" value={32} />
       </Picker>
       <ActionButton title="Save" onPress={handleSave} />
     </View>
