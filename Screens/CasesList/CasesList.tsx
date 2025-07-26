@@ -40,6 +40,7 @@ const CasesList = () => {
   const filterParam = route.params?.Filter;
   const navigation = useNavigation();
   const { theme } = useContext(ThemeContext); // Keep theme for styling
+  const componentStyles = styles(theme);
 
   const [allCases, setAllCases] = useState<CaseDataScreen[]>([]); // Initialize with sample data
   const [filteredCases, setFilteredCases] = useState<CaseDataScreen[]>([]);
@@ -181,54 +182,75 @@ const CasesList = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Cases</Text>
-        <TouchableOpacity onPress={navigateToAddCase} style={styles.addButton}>
-          <Ionicons name="add-circle-outline" size={32} color={theme.colors.primary || "#007AFF"} />
+    <SafeAreaView style={componentStyles.safeArea}>
+      <View style={componentStyles.header}>
+        <Text style={componentStyles.headerTitle}>Cases</Text>
+        <TouchableOpacity
+          onPress={navigateToAddCase}
+          style={componentStyles.addButton}
+        >
+          <Ionicons
+            name="add-circle-outline"
+            size={32}
+            color={theme.colors.primary}
+          />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchContainer}>
-        <View style={[styles.inputWrapper, {backgroundColor: theme.colors.card}]}>
+      <View style={componentStyles.searchContainer}>
+        <View style={componentStyles.inputWrapper}>
           <AntDesign
             name="search1"
             size={20}
-            color={theme.colors.textSecondary || "#8E8E93"}
-            style={styles.searchIcon}
+            color={theme.colors.secondary}
+            style={componentStyles.searchIcon}
           />
           <TextInput
-            style={[styles.input, { color: theme.colors.text }]}
+            style={componentStyles.input}
             placeholder="Search cases..."
-            placeholderTextColor={theme.colors.textSecondary || "#8E8E93"}
+            placeholderTextColor={theme.colors.secondary}
             onChangeText={handleSearchChange}
             value={searchText}
           />
         </View>
       </View>
 
-      <View style={styles.toggleContainer}>
+      <View style={componentStyles.toggleContainer}>
         <TouchableOpacity
           style={[
-            styles.toggleButton,
-            activeFilter === "Active" ? styles.activeButton : styles.inactiveButton,
-            activeFilter === "Active" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.cardDeep ||'#E0E0E0'}
+            componentStyles.toggleButton,
+            activeFilter === "Active"
+              ? componentStyles.activeButton
+              : componentStyles.inactiveButton,
           ]}
           onPress={() => setActiveFilter("Active")}
         >
-          <Text style={activeFilter === "Active" ? styles.activeButtonText : [styles.inactiveButtonText, {color: theme.colors.text}]}>
+          <Text
+            style={
+              activeFilter === "Active"
+                ? componentStyles.activeButtonText
+                : componentStyles.inactiveButtonText
+            }
+          >
             Active
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
-            styles.toggleButton,
-            activeFilter === "Closed" ? styles.activeButton : styles.inactiveButton,
-            activeFilter === "Closed" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.cardDeep ||'#E0E0E0'}
+            componentStyles.toggleButton,
+            activeFilter === "Closed"
+              ? componentStyles.activeButton
+              : componentStyles.inactiveButton,
           ]}
           onPress={() => setActiveFilter("Closed")}
         >
-          <Text style={activeFilter === "Closed" ? styles.activeButtonText : [styles.inactiveButtonText, {color: theme.colors.text}]}>
+          <Text
+            style={
+              activeFilter === "Closed"
+                ? componentStyles.activeButtonText
+                : componentStyles.inactiveButtonText
+            }
+          >
             Closed
           </Text>
         </TouchableOpacity>
@@ -242,13 +264,15 @@ const CasesList = () => {
             onUpdateHearingPress={() => handleUpdateHearing(item)}
           />
         )}
-        keyExtractor={(item) => item.id?.toString() || Math.random().toString()} // Ensure key is a string
+        keyExtractor={(item) =>
+          item.id?.toString() || Math.random().toString()
+        }
         ListEmptyComponent={
-          <View style={styles.emptyListContainer}>
-            <Text style={[styles.emptyListText, {color: theme.colors.textSecondary}]}>No cases found.</Text>
+          <View style={componentStyles.emptyListContainer}>
+            <Text style={componentStyles.emptyListText}>No cases found.</Text>
           </View>
         }
-        contentContainerStyle={styles.listContentContainer}
+        contentContainerStyle={componentStyles.listContentContainer}
       />
       {selectedCase && (
         <UpdateHearingPopup
@@ -265,79 +289,92 @@ const CasesList = () => {
 
 export default CasesList;
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  addButton: {
-    padding: 6,
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    height: 44,
-    fontSize: 16,
-  },
-  toggleContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignItems: "center",
-    marginHorizontal: 5,
-  },
-  activeButton: {},
-  inactiveButton: {},
-  activeButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  inactiveButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  listContentContainer: {
-    paddingBottom: 16,
-  },
-  emptyListContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 50,
-  },
-  emptyListText: {
-    fontSize: 16,
-  },
-});
+const styles = (theme) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    headerTitle: {
+      fontSize: theme.fontSizes.heading,
+      fontFamily: theme.fontStyles.bold,
+      color: theme.colors.text,
+    },
+    addButton: {
+      padding: 6,
+    },
+    searchContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    inputWrapper: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.secondary,
+    },
+    searchIcon: {
+      marginRight: 8,
+    },
+    input: {
+      flex: 1,
+      height: 44,
+      fontSize: theme.fontSizes.body,
+      fontFamily: theme.fontStyles.regular,
+      color: theme.colors.text,
+    },
+    toggleContainer: {
+      flexDirection: "row",
+      justifyContent: "space-around",
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      marginBottom: 8,
+    },
+    toggleButton: {
+      flex: 1,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      alignItems: "center",
+      marginHorizontal: 5,
+    },
+    activeButton: {
+      backgroundColor: theme.colors.primary,
+    },
+    inactiveButton: {
+      backgroundColor: theme.colors.secondary,
+    },
+    activeButtonText: {
+      color: theme.colors.background,
+      fontSize: theme.fontSizes.body,
+      fontFamily: theme.fontStyles.bold,
+    },
+    inactiveButtonText: {
+      color: theme.colors.background,
+      fontSize: theme.fontSizes.body,
+      fontFamily: theme.fontStyles.bold,
+    },
+    listContentContainer: {
+      paddingBottom: 16,
+    },
+    emptyListContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: 50,
+    },
+    emptyListText: {
+      fontSize: theme.fontSizes.body,
+      fontFamily: theme.fontStyles.regular,
+      color: theme.colors.secondary,
+    },
+  });

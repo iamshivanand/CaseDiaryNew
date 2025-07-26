@@ -10,6 +10,7 @@ const ThemeSettingsScreen = () => {
   const [primaryColor, setPrimaryColor] = useState(theme.colors.primary);
   const [secondaryColor, setSecondaryColor] = useState(theme.colors.secondary);
   const [fontFamily, setFontFamily] = useState(theme.fonts.fontFamily);
+  const [fontSize, setFontSize] = useState(theme.fonts.fontSize);
 
   const handleSave = () => {
     updateTheme({
@@ -18,7 +19,7 @@ const ThemeSettingsScreen = () => {
         primary: primaryColor,
         secondary: secondaryColor,
       },
-      fonts: { ...theme.fonts, fontFamily },
+      fonts: { ...theme.fonts, fontFamily, fontSize },
     });
   };
 
@@ -50,6 +51,15 @@ const ThemeSettingsScreen = () => {
         <Picker.Item label="System" value="System" />
         <Picker.Item label="Helvetica" value="Helvetica" />
         <Picker.Item label="Times New Roman" value="Times New Roman" />
+      </Picker>
+      <Text style={styles.label}>Font Size</Text>
+      <Picker
+        selectedValue={fontSize}
+        onValueChange={(itemValue) => setFontSize(itemValue)}
+      >
+        <Picker.Item label="Small" value={12} />
+        <Picker.Item label="Medium" value={16} />
+        <Picker.Item label="Large" value={20} />
       </Picker>
       <ActionButton title="Save" onPress={handleSave} />
     </View>

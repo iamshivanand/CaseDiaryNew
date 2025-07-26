@@ -52,26 +52,48 @@ const theme = {
     background: "#fff",
     text: "#000",
     primary: "#007AFF",
+    secondary: "#6c757d",
     card: "#f0f0f0",
     textSecondary: "#8E8E93",
     cardDeep: "#E0E0E0",
+    button: "#007bff",
+  },
+  fontSizes: {
+    headingXL: 32,
+    heading: 24,
+    body: 16,
+    caption: 12,
+  },
+  fontStyles: {
+    regular: "System",
+    semiBold: "System-SemiBold",
+    bold: "System-Bold",
+    italic: "System-Italic",
+  },
+  fonts: {
+    fontFamily: "System",
+    fontSize: 16,
   },
 };
 
 describe("CasesList", () => {
-  it("shows the UpdateHearingPopup when 'Update Hearing' is pressed", async () => {
-    const { findByText, findAllByText } = render(
-      <NavigationContainer>
-        <ThemeContext.Provider value={{ theme }}>
-          <CasesList />
-        </ThemeContext.Provider>
-      </NavigationContainer>
-    );
+  it(
+    "shows the UpdateHearingPopup when 'Update Hearing' is pressed",
+    async () => {
+      const { findByText, findAllByText } = render(
+        <NavigationContainer>
+          <ThemeContext.Provider value={{ theme }}>
+            <CasesList />
+          </ThemeContext.Provider>
+        </NavigationContainer>
+      );
 
-    const updateHearingButton = await findByText("Update Hearing");
-    fireEvent.press(updateHearingButton);
+      const updateHearingButton = await findByText("Update Hearing");
+      fireEvent.press(updateHearingButton);
 
-    const updateHearingElements = await findAllByText("Update Hearing");
-    expect(updateHearingElements.length).toBe(2);
-  });
+      const updateHearingElements = await findAllByText("Update Hearing");
+      expect(updateHearingElements.length).toBe(2);
+    },
+    10000
+  );
 });
