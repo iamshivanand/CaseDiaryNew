@@ -85,9 +85,21 @@ const ThemeSettingsScreen = () => {
         selectedValue={fontFamily}
         onValueChange={(itemValue) => setFontFamily(itemValue)}
       >
-        <Picker.Item label="System" value="System" />
-        <Picker.Item label="Helvetica" value="Helvetica" />
-        <Picker.Item label="Times New Roman" value="Times New Roman" />
+        <Picker.Item
+          label="Roboto"
+          value="Roboto-Regular"
+          style={{ fontFamily: "Roboto-Regular" }}
+        />
+        <Picker.Item
+          label="Roboto Bold"
+          value="Roboto-Bold"
+          style={{ fontFamily: "Roboto-Bold" }}
+        />
+        <Picker.Item
+          label="Roboto Italic"
+          value="Roboto-Italic"
+          style={{ fontFamily: "Roboto-Italic" }}
+        />
       </Picker>
       <Text style={styles.label}>Font Size</Text>
       <Picker

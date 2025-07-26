@@ -15,6 +15,7 @@ import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
 import OnboardingProvider from "./Providers/OnboardingProvider";
 import AuthProvider from "./Providers/AuthProvider";
 import Routes from "./Routes/Routes";
+import { useFonts } from "expo-font";
 import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
 import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
 import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
@@ -56,6 +57,11 @@ const OnboardingNavigator = () => (
 
 export default function App() {
   const { theme } = useContext(ThemeContext);
+  const [fontsLoaded] = useFonts({
+    "Roboto-Regular": require("./assets/fonts/Roboto-Regular.ttf"),
+    "Roboto-Bold": require("./assets/fonts/Roboto-Bold.ttf"),
+    "Roboto-Italic": require("./assets/fonts/Roboto-Italic.ttf"),
+  });
   const [loading, setLoading] = useState(true);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isSplashscreenVisible, setSplashscreenVisible] = useState(true);
@@ -101,7 +107,7 @@ export default function App() {
     };
   }, []);
 
-  if (isSplashscreenVisible) {
+  if (isSplashscreenVisible || !fontsLoaded) {
     return <SplashScreen />;
   }
 
