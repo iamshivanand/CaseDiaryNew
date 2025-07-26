@@ -112,12 +112,10 @@ describe('AddCase', () => {
   });
 
   it("should not show a duplicate placeholder in the dropdowns", async () => {
-    const { getByTestId } = render(<AddCase route={{ params: {} }} />);
-    await waitFor(() => {
-      const caseTypeDropdown = getByTestId("case_type_id");
-      expect(within(caseTypeDropdown).getByText("Select Case Type...")).toBeTruthy();
-      const courtDropdown = getByTestId("court_id");
-      expect(within(courtDropdown).getByText("Select Court...")).toBeTruthy();
-    });
+    const { findByTestId } = render(<AddCase route={{ params: {} }} />);
+    const caseTypeDropdown = await findByTestId("case_type_id");
+    const courtDropdown = await findByTestId("court_id");
+    expect(within(caseTypeDropdown).getByText("Select Case Type...")).toBeTruthy();
+    expect(within(courtDropdown).getByText("Select Court...")).toBeTruthy();
   });
 });

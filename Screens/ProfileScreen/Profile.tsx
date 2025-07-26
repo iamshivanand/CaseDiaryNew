@@ -27,6 +27,7 @@ import AboutMe from "./components/AboutMe";
 import ContactInfo from "./components/ContactInfo";
 import Languages from "./components/Languages";
 import { LawyerProfileData } from "../../Types/appTypes";
+import SettingsScreen from "../Settings/SettingsScreen";
 
 type EditableSection =
   | "avatar"
@@ -291,7 +292,7 @@ const ProfileScreen: React.FC = () => {
         </>
       );
     } else if (selectedTab === "Settings") {
-      return <Text style={styles.tabContentText}>Settings Content Coming Soon</Text>;
+      return <SettingsScreen />;
     }
     return null;
   };
