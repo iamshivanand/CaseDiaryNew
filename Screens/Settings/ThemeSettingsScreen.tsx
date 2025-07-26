@@ -9,8 +9,8 @@ const ThemeSettingsScreen = () => {
   const { theme, updateTheme } = useContext(ThemeContext);
   const [primaryColor, setPrimaryColor] = useState(theme.colors.primary);
   const [secondaryColor, setSecondaryColor] = useState(theme.colors.secondary);
-  const [fontFamily, setFontFamily] = useState(theme.fonts.fontFamily);
-  const [fontSize, setFontSize] = useState(theme.fonts.fontSize);
+  const [fontFamily, setFontFamily] = useState(theme.fonts?.fontFamily || "System");
+  const [fontSize, setFontSize] = useState(theme.fonts?.fontSize || 16);
 
   const handleSave = () => {
     updateTheme({
