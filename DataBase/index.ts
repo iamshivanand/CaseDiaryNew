@@ -5,10 +5,10 @@ import * as FileSystem from 'expo-file-system';
 import { CaseType, Court, District, PoliceStation, CaseDocument, Case as CaseRow, User } from './schema';
 
 // getDb is now imported from connection.ts
-import { getDb, __TEST_ONLY_resetDbInstance } from './connection';
+import { getDb, closeDb, __TEST_ONLY_resetDbInstance } from "./connection";
 
 // Re-export getDb so it's available when importing from './DataBase'
-export { getDb };
+export { getDb, closeDb };
 
 const DOCUMENTS_DIRECTORY = FileSystem.documentDirectory + "documents/";
 

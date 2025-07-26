@@ -42,3 +42,9 @@ export const getDb = async (): Promise<SQLite.SQLiteDatabase> => {
   }
   return dbInstance;
 };
+
+export const closeDb = async (db: SQLite.SQLiteDatabase) => {
+  if (db) {
+    await db.closeAsync();
+  }
+};
