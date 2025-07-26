@@ -4,7 +4,6 @@ import { useDB } from "../DataBase/DatabaseProvider";
 import { getUserProfile, updateUserProfile } from "../DataBase/userProfileDB";
 import { AuthContext } from "./AuthProvider";
 import { theme as defaultTheme } from "../styles/theme";
-import { useFonts } from "expo-font";
 
 export interface Theme {
   colors: {
@@ -34,11 +33,6 @@ const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { db } = useDB();
   const { user } = useContext(AuthContext);
   const [theme, setTheme] = useState<Theme>(defaultTheme);
-  const [fontsLoaded] = useFonts({
-    "Roboto-Regular": require("../assets/fonts/Roboto-Regular.ttf"),
-    "Roboto-Bold": require("../assets/fonts/Roboto-Bold.ttf"),
-    "Roboto-Italic": require("../assets/fonts/Roboto-Italic.ttf"),
-  });
 
   useEffect(() => {
     const loadTheme = async () => {
@@ -63,10 +57,6 @@ const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
       });
     }
   };
-
-  if (!fontsLoaded) {
-    return null;
-  }
 
   const value = { theme, updateTheme };
 
