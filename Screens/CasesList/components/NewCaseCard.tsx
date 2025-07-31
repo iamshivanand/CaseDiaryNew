@@ -19,6 +19,9 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
   caseDetails,
   onUpdateHearingPress,
 }) => {
+  if (!caseDetails) {
+    return null;
+  }
   const { title, client, status, nextHearing, lastUpdate, previousHearing, id } =
     caseDetails;
   const navigation = useNavigation();
