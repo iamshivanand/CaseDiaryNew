@@ -78,6 +78,9 @@ const QuickActionsGrid = () => {
 };
 
 const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
+  if (!caseDetails) {
+    return null;
+  }
   return (
     <Animated.View entering={FadeInDown.delay(index * 100)}>
       <NewCaseCard
