@@ -4,19 +4,19 @@ import React, { useCallback, useContext, useState, useEffect } from "react";
 import {
   FlatList,
   SafeAreaView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native"; // Removed Dimensions, ScrollView
+} from "react-native";
 import { getCases, addCaseTimelineEvent, updateCase, getCaseById } from "../../DataBase";
 import { Case } from "../../DataBase/schema";
 import { ThemeContext } from "../../Providers/ThemeProvider";
-import { CaseDataScreen } from "../../Types/appTypes"; // Import the new data type
+import { CaseDataScreen } from "../../Types/appTypes";
 import { formatDate, getCurrentUserId } from "../../utils/commonFunctions";
-import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
+import NewCaseCard from "./components/NewCaseCard";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
+import { getCasesListStyles } from "./CasesListStyle";
 
 const transformApiCaseToCaseDataScreen = (apiCase: Case): CaseDataScreen => {
   return {
@@ -39,16 +39,16 @@ const CasesList = () => {
   const route = useRoute<CasesListRouteProp>();
   const filterParam = route.params?.Filter;
   const navigation = useNavigation();
-  const { theme } = useContext(ThemeContext); // Keep theme for styling
+  const { theme } = useContext(ThemeContext);
+  const styles = getCasesListStyles(theme);
 
-  const [allCases, setAllCases] = useState<CaseDataScreen[]>([]); // Initialize with sample data
+  const [allCases, setAllCases] = useState<CaseDataScreen[]>([]);
   const [filteredCases, setFilteredCases] = useState<CaseDataScreen[]>([]);
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterStatus>("Active");
   const [isPopupVisible, setPopupVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
 
-  // Initial data load and filtering
   useFocusEffect(
     useCallback(() => {
       fetchData();
@@ -57,16 +57,14 @@ const CasesList = () => {
 
   useEffect(() => {
     filterAndSearchCases();
-  }, [activeFilter, searchText, allCases]); // Re-filter when filter, search text, or allCases change
+  }, [activeFilter, searchText, allCases]);
 
   const fetchData = async () => {
     try {
-      // Replace with actual DB call if using getCases
-      const results = await getCases(/* userId */);
+      const results = await getCases();
       setAllCases(
         results ? results.map(transformApiCaseToCaseDataScreen) : []
-      ); // Transform if necessary
-      // setAllCases(sampleCases); // Using sample data
+      );
     } catch (error) {
       console.error("Error fetching cases:", error);
       setAllCases([]);
@@ -107,7 +105,6 @@ const CasesList = () => {
         });
       }
     } else {
-      // Filter by status
       if (activeFilter === "Active") {
         tempCases = tempCases.filter((c) => c.status !== "Closed");
       } else if (activeFilter === "Closed") {
@@ -115,7 +112,6 @@ const CasesList = () => {
       }
     }
 
-    // Filter by search text (searches title and client)
     if (searchText.trim() !== "") {
       const lowerSearchText = searchText.toLowerCase();
       tempCases = tempCases.filter(
@@ -154,7 +150,6 @@ const CasesList = () => {
         console.error("Case not found");
         return;
       }
-      // 1. Add timeline event
       if (notes) {
         await addCaseTimelineEvent({
           case_id: caseId,
@@ -162,13 +157,7 @@ const CasesList = () => {
           notes: notes,
         });
       }
-
-      // 2. Update case's next hearing date
-      await updateCase(caseId, {
-        NextDate: nextHearingDate.toISOString(),
-      }, userId);
-
-      // 3. Refresh the list
+      await updateCase(caseId, { NextDate: nextHearingDate.toISOString() }, userId);
       fetchData();
     } catch (error) {
       console.error("Error updating hearing:", error);
@@ -176,31 +165,30 @@ const CasesList = () => {
   };
 
   const navigateToAddCase = () => {
-    // @ts-ignore
-    navigation.navigate("AddCase"); // Assuming 'AddCase' is the name of the route for adding a new case
+    navigation.navigate("AddCase");
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Cases</Text>
+        <Text style={styles.headerTitle}>Cases</Text>
         <TouchableOpacity onPress={navigateToAddCase} style={styles.addButton}>
-          <Ionicons name="add-circle-outline" size={32} color={theme.colors.primary || "#007AFF"} />
+          <Ionicons name="add-circle-outline" size={32} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}>
-        <View style={[styles.inputWrapper, {backgroundColor: theme.colors.card}]}>
+        <View style={styles.inputWrapper}>
           <AntDesign
             name="search1"
             size={20}
-            color={theme.colors.textSecondary || "#8E8E93"}
+            color={theme.colors.textSecondary}
             style={styles.searchIcon}
           />
           <TextInput
-            style={[styles.input, { color: theme.colors.text }]}
+            style={styles.input}
             placeholder="Search cases..."
-            placeholderTextColor={theme.colors.textSecondary || "#8E8E93"}
+            placeholderTextColor={theme.colors.placeholderText}
             onChangeText={handleSearchChange}
             value={searchText}
           />
@@ -212,11 +200,10 @@ const CasesList = () => {
           style={[
             styles.toggleButton,
             activeFilter === "Active" ? styles.activeButton : styles.inactiveButton,
-            activeFilter === "Active" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.cardDeep ||'#E0E0E0'}
           ]}
           onPress={() => setActiveFilter("Active")}
         >
-          <Text style={activeFilter === "Active" ? styles.activeButtonText : [styles.inactiveButtonText, {color: theme.colors.text}]}>
+          <Text style={activeFilter === "Active" ? styles.activeButtonText : styles.inactiveButtonText}>
             Active
           </Text>
         </TouchableOpacity>
@@ -224,11 +211,10 @@ const CasesList = () => {
           style={[
             styles.toggleButton,
             activeFilter === "Closed" ? styles.activeButton : styles.inactiveButton,
-            activeFilter === "Closed" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.cardDeep ||'#E0E0E0'}
           ]}
           onPress={() => setActiveFilter("Closed")}
         >
-          <Text style={activeFilter === "Closed" ? styles.activeButtonText : [styles.inactiveButtonText, {color: theme.colors.text}]}>
+          <Text style={activeFilter === "Closed" ? styles.activeButtonText : styles.inactiveButtonText}>
             Closed
           </Text>
         </TouchableOpacity>
@@ -242,10 +228,10 @@ const CasesList = () => {
             onUpdateHearingPress={() => handleUpdateHearing(item)}
           />
         )}
-        keyExtractor={(item) => item.id?.toString() || Math.random().toString()} // Ensure key is a string
+        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
         ListEmptyComponent={
           <View style={styles.emptyListContainer}>
-            <Text style={[styles.emptyListText, {color: theme.colors.textSecondary}]}>No cases found.</Text>
+            <Text style={styles.emptyListText}>No cases found.</Text>
           </View>
         }
         contentContainerStyle={styles.listContentContainer}
@@ -264,90 +250,3 @@ const CasesList = () => {
 };
 
 export default CasesList;
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    // borderBottomWidth: 1, // Optional: if you want a separator
-    // borderBottomColor: '#E0E0E0', // Optional
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  addButton: {
-    padding: 6, // Make it easier to tap
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    // backgroundColor: '#F0F0F0', // Light grey background for search bar
-    borderWidth: 1, // Optional: if you prefer a border
-    borderColor: '#D1D1D6', // Optional
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    height: 44, // Standard iOS height
-    fontSize: 16,
-  },
-  toggleContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around", // Or 'center' with margin on buttons
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  toggleButton: {
-    flex: 1, // Make buttons take equal width
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignItems: "center",
-    marginHorizontal: 5, // Add some space between buttons
-  },
-  activeButton: {
-    // backgroundColor: "#007AFF", // Blue for active
-  },
-  inactiveButton: {
-    // backgroundColor: "#E0E0E0", // Grey for inactive
-  },
-  activeButtonText: {
-    color: "#FFFFFF", // White text for active
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  inactiveButtonText: {
-    // color: "#000000", // Black text for inactive
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  listContentContainer: {
-    paddingBottom: 16, // Add some padding at the bottom of the list
-  },
-  emptyListContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 50, // Adjust as needed
-  },
-  emptyListText: {
-    fontSize: 16,
-    // color: "#8E8E93", // Grey color for empty message
-  },
-});

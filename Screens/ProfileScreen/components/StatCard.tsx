@@ -1,5 +1,7 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useContext } from "react";
+import { View, Text } from "react-native";
+import { ThemeContext } from "../../../Providers/ThemeProvider";
+import { getStatCardStyles } from "./StatCardStyle";
 
 interface StatCardProps {
   label: string;
@@ -8,6 +10,9 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ label, value, unit }) => {
+  const { theme } = useContext(ThemeContext);
+  const styles = getStatCardStyles(theme);
+
   return (
     <View style={styles.card}>
       <Text style={styles.valueText}>
@@ -18,39 +23,5 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, unit }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-    marginHorizontal: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  valueText: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#3B82F6", // Blue accent
-    marginBottom: 5,
-  },
-  unitText: {
-    fontSize: 12,
-    fontWeight: "normal",
-    color: "#3B82F6", // Blue accent
-  },
-  labelText: {
-    fontSize: 13,
-    color: "#6B7280", // Gray color for label
-    textAlign: "center",
-  },
-});
 
 export default StatCard;

@@ -1,13 +1,15 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from "react-native";
+import React, { useContext } from "react";
+import { View, Text, TouchableOpacity, TextInput } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { ThemeContext } from "../../../Providers/ThemeProvider";
+import { getContactItemStyles } from "./ContactItemStyle";
 
 interface ContactItemProps {
   iconName: string;
-  text: string; // Display text when not editing
-  onPress?: () => void; // For linking (email, phone) when not editing
+  text: string;
+  onPress?: () => void;
   isEditing: boolean;
-  editText?: string; // Value for TextInput when editing
+  editText?: string;
   onEditTextChange?: (newText: string) => void;
   placeholder?: string;
   keyboardType?: "default" | "email-address" | "phone-pad";
@@ -23,15 +25,19 @@ const ContactItem: React.FC<ContactItemProps> = ({
   placeholder,
   keyboardType = "default",
 }) => {
+  const { theme } = useContext(ThemeContext);
+  const styles = getContactItemStyles(theme);
+
   const content = (
     <View style={styles.itemContainer}>
-      <Icon name={iconName} size={22} color="#3B82F6" style={styles.icon} />
+      <Icon name={iconName} size={22} style={styles.icon} />
       {isEditing ? (
         <TextInput
           style={styles.textInput}
           value={editText}
           onChangeText={onEditTextChange}
           placeholder={placeholder}
+          placeholderTextColor={theme.colors.placeholderText}
           keyboardType={keyboardType}
           autoCapitalize="none"
         />
@@ -41,7 +47,7 @@ const ContactItem: React.FC<ContactItemProps> = ({
     </View>
   );
 
-  if (onPress && !isEditing) { // Make item touchable only when not editing
+  if (onPress && !isEditing) {
     return (
       <TouchableOpacity onPress={onPress} style={styles.touchable}>
         {content}
@@ -49,37 +55,7 @@ const ContactItem: React.FC<ContactItemProps> = ({
     );
   }
 
-  return content; // If editing, or no onPress handler
+  return content;
 };
-
-const styles = StyleSheet.create({
-  touchable: {
-    // No specific style needed if itemContainer provides enough padding
-  },
-  itemContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10, // Adjusted padding
-  },
-  icon: {
-    marginRight: 18, // Increased spacing
-    width: 24, // Give icon a fixed width for alignment
-  },
-  text: {
-    fontSize: 15,
-    color: "#374151", // Dark gray
-    flexShrink: 1,
-    lineHeight: 22,
-  },
-  textInput: {
-    flex: 1, // Take remaining space
-    fontSize: 15,
-    color: "#1F2937",
-    borderBottomWidth: 1,
-    borderColor: "#D1D5DB",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-});
 
 export default ContactItem;

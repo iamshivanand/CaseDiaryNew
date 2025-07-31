@@ -2,12 +2,13 @@ import React, { useState, useContext, useEffect } from "react";
 import {
   View,
   ScrollView,
-  StyleSheet,
   Text,
   Alert,
   Platform,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { ThemeContext } from "../../Providers/ThemeProvider";
@@ -19,14 +20,14 @@ import {
   getUpcomingHearings,
 } from "../../DataBase";
 import ProfileHeader from "./components/ProfileHeader";
-import ActionButton from "../CommonComponents/ActionButton";
-import StatCard from "./components/StatCard"; // For non-editable stats
-import EditableStatItem from "./components/EditableStatItem"; // For Years of Practice
+import StatCard from "./components/StatCard";
+import EditableStatItem from "./components/EditableStatItem";
 import TabSelector from "./components/TabSelector";
 import AboutMe from "./components/AboutMe";
 import ContactInfo from "./components/ContactInfo";
 import Languages from "./components/Languages";
 import { LawyerProfileData } from "../../Types/appTypes";
+import { getProfileScreenStyles } from "./ProfileStyle";
 
 type EditableSection =
   | "avatar"
@@ -39,6 +40,9 @@ type EditableSection =
 
 const ProfileScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
+  const styles = getProfileScreenStyles(theme);
+  const navigation = useNavigation();
+
   const [profileData, setProfileData] = useState<LawyerProfileData | null>(
     null
   );
@@ -84,10 +88,8 @@ const ProfileScreen: React.FC = () => {
       }
     };
     fetchProfile();
-  }, [AsyncStorage]);
+  }, []);
 
-  // Effect to reset temp states if actual data changes from elsewhere (e.g. future API refresh)
-  // or when exiting an edit mode.
   useEffect(() => {
     if (profileData && !editingSection) {
       setTempAvatarUri(profileData.avatarUrl);
@@ -107,7 +109,6 @@ const ProfileScreen: React.FC = () => {
 
 
   const handleEditPress = (section: EditableSection) => {
-    // Reset temp fields to current profile data before starting to edit a new section
     setTempAvatarUri(profileData.avatarUrl);
     setTempName(profileData.name);
     setTempDesignation(profileData.designation);
@@ -122,7 +123,7 @@ const ProfileScreen: React.FC = () => {
   };
 
   const handleCancel = () => {
-    setEditingSection(null); // Resets temp fields via useEffect
+    setEditingSection(null);
   };
 
   const handleSave = async (section: EditableSection) => {
@@ -178,7 +179,7 @@ const ProfileScreen: React.FC = () => {
       }
       return true;
     }
-    return true; // Assume granted on web or handle differently
+    return true;
   };
 
   const requestCameraPermissions = async () => {
@@ -234,7 +235,6 @@ const ProfileScreen: React.FC = () => {
     );
   };
 
-  // Calculate displayed years of practice
   const getDisplayedYearsOfPractice = () => {
     if (!profileData) return 0;
     const { yearsOfPractice, yearsOfPracticeLastUpdated } = profileData.stats;
@@ -247,11 +247,7 @@ const ProfileScreen: React.FC = () => {
     return yearsOfPractice + (diff > 0 ? diff : 0);
   };
 
-
   const profileTabs = ["Profile", "Settings"];
-  // Dummy handlers for old buttons - these are now replaced by edit icons
-  // const handleEditProfile = () => console.log("Edit Profile Pressed");
-  // const handleViewSchedule = () => console.log("View Schedule Pressed");
 
   const renderTabContent = () => {
     if (selectedTab === "Profile") {
@@ -291,7 +287,24 @@ const ProfileScreen: React.FC = () => {
         </>
       );
     } else if (selectedTab === "Settings") {
-      return <Text style={styles.tabContentText}>Settings Content Coming Soon</Text>;
+      return (
+        <View>
+          <TouchableOpacity
+            style={{
+              backgroundColor: theme.colors.surface,
+              padding: 15,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}
+            onPress={() => navigation.navigate("ThemeSettingsScreen")}
+          >
+            <Text style={{ color: theme.colors.text, fontSize: 16 }}>
+              Theme Settings
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
     }
     return null;
   };
@@ -299,16 +312,16 @@ const ProfileScreen: React.FC = () => {
   if (!profileData) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      style={styles.container}
       showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled" // Important for inputs within ScrollView
+      keyboardShouldPersistTaps="handled"
     >
       <ProfileHeader
         profileData={profileData}
@@ -329,9 +342,6 @@ const ProfileScreen: React.FC = () => {
         tempPracticeAreas={tempPracticeAreas}
         onTempPracticeAreasChange={setTempPracticeAreas}
       />
-
-      {/* Old Action Buttons - can be removed or repurposed if needed */}
-      {/* <View style={styles.actionButtonsContainer}> ... </View> */}
 
       <View style={styles.statsContainer}>
         <StatCard
@@ -365,44 +375,5 @@ const ProfileScreen: React.FC = () => {
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  // actionButtonsContainer: { // Kept for reference if needed later
-  //   flexDirection: "row",
-  //   justifyContent: "space-around",
-  //   paddingVertical: 15,
-  //   paddingHorizontal: 10,
-  //   backgroundColor: "#fff",
-  // },
-  // actionButton: {
-  //   flex: 1,
-  //   marginHorizontal: 8,
-  //   height: 44,
-  // },
-  statsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    backgroundColor: "#F9FAFB",
-  },
-  tabContentContainer: {
-    padding: 15,
-  },
-  tabContentText: {
-    fontSize: 16,
-    textAlign: "center",
-    paddingVertical: 30,
-    color: "#555",
-  },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-});
 
 export default ProfileScreen;

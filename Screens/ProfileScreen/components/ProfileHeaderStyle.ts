@@ -1,0 +1,141 @@
+import { StyleSheet } from 'react-native';
+import { Theme } from '../../../Providers/ThemeProvider';
+
+export const getProfileHeaderStyles = (theme: Theme) => {
+  return StyleSheet.create({
+    container: {
+      alignItems: "center",
+      paddingVertical: 20,
+      backgroundColor: theme.colors.surface,
+    },
+    avatarSectionContainer: {
+      alignItems: "center",
+      marginBottom: 20,
+      position: 'relative',
+      width: '100%',
+    },
+    avatar: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      marginBottom: 10,
+      borderColor: theme.colors.primary,
+      borderWidth: 2,
+    },
+    avatarChangeButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 8,
+      backgroundColor: theme.colors.primaryLight,
+      borderRadius: 20,
+      marginBottom: 10,
+    },
+    avatarChangeButtonText: {
+      marginLeft: 8,
+      color: theme.colors.primary,
+      fontWeight: '500',
+    },
+    avatarEditControls: {},
+    infoSectionContainer: {
+      alignItems: "center",
+      width: '90%',
+      padding: 15,
+      borderRadius: 8,
+      backgroundColor: theme.colors.background,
+      position: 'relative',
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    name: {
+      fontSize: theme.fontSizes.title,
+      fontWeight: "bold",
+      color: theme.colors.text,
+      marginBottom: 4,
+      textAlign: 'center',
+    },
+    designation: {
+      fontSize: theme.fontSizes.large,
+      color: theme.colors.textSecondary,
+      marginBottom: 6,
+      textAlign: 'center',
+    },
+    practiceAreas: {
+      fontSize: theme.fontSizes.medium,
+      color: theme.colors.textSecondary,
+      textAlign: "center",
+      paddingHorizontal: 10,
+      marginBottom: 10,
+    },
+    inputBase: {
+      width: '100%',
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 6,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      fontSize: 15,
+      marginBottom: 12,
+      color: theme.colors.text,
+    },
+    nameInput: {
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    designationInput: {
+      fontSize: 15,
+    },
+    practiceAreasInput: {
+      fontSize: 14,
+      minHeight: 70,
+      textAlignVertical: 'top',
+    },
+    infoEditControls: {
+      marginTop: 5,
+    },
+    editIconTopRight: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      padding: 6,
+      backgroundColor: 'rgba(255,255,255,0.8)',
+      borderRadius: 15,
+    },
+    editControlsBase: {
+      flexDirection: "row",
+      justifyContent: "space-evenly",
+      alignItems: 'center',
+      marginTop: 15,
+      width: '100%',
+    },
+    editButtonBase: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 25,
+      minWidth: 120,
+      justifyContent: 'center',
+      shadowColor: theme.colors.shadow,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.15,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    saveButton: {
+      backgroundColor: theme.colors.success,
+    },
+    cancelButton: {
+      backgroundColor: theme.colors.error,
+    },
+    editButtonText: {
+      color: '#FFFFFF',
+      marginLeft: 8,
+      fontWeight: '600',
+      fontSize: 15,
+    },
+  });
+};

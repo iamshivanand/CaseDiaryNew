@@ -22,6 +22,7 @@ import SearchScreen from "./Screens/SearchScreen/SearchScreen";
 import CalendarScreen from "./Screens/Calendar/Calendar";
 import ProfileScreen from "./Screens/ProfileScreen/Profile"; // Renamed import for clarity
 import SettingsScreen from "./Screens/Settings/SettingsScreen";
+import ThemeSettingsScreen from "./Screens/Settings/ThemeSettingsScreen";
 import ManageLookupCategoryScreen from "./Screens/Settings/ManageLookupCategoryScreen";
 
 // Import ParamList types
@@ -115,6 +116,7 @@ const ProfileStack = () => (
   <ProfileStackNav.Navigator screenOptions={{ headerShown: false }}>
     <ProfileStackNav.Screen name="ProfileScreen" component={ProfileScreen} />
     <ProfileStackNav.Screen name="SettingsScreen" component={SettingsScreen} options={{ headerShown: true, title: "Settings" }}/>
+    <ProfileStackNav.Screen name="ThemeSettingsScreen" component={ThemeSettingsScreen} options={{ headerShown: true, title: "Theme Settings" }}/>
     <ProfileStackNav.Screen
       name="ManageLookupCategoryScreen"
       component={ManageLookupCategoryScreen}
