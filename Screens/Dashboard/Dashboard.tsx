@@ -121,6 +121,7 @@ const TodaysCasesSection = () => {
         previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
       }));
 
+      console.log('mappedCases', mappedCases);
       setTodaysCases(mappedCases);
     } catch (error) {
       console.error("Error fetching today's cases:", error);
@@ -171,14 +172,17 @@ const TodaysCasesSection = () => {
       {loading ? (
         <ActivityIndicator size="large" color={theme.colors.primary} />
       ) : todaysCases.length > 0 ? (
-        todaysCases.map((caseData, index) => (
-          <AnimatedNewCaseCard
-            key={caseData.id}
-            caseDetails={caseData}
-            onUpdateHearingPress={() => handleUpdateHearing(caseData)}
-            index={index}
-          />
-        ))
+        todaysCases.map((caseData, index) => {
+          console.log('caseData', caseData);
+          return (
+            <AnimatedNewCaseCard
+              key={caseData.id}
+              caseDetails={caseData}
+              onUpdateHearingPress={() => handleUpdateHearing(caseData)}
+              index={index}
+            />
+          );
+        })
       ) : (
         <Text style={styles.emptyMessage}>No cases scheduled for today.</Text>
       )}
