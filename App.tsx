@@ -24,8 +24,6 @@ import GreetingScreen from "./Screens/Onboarding/GreetingScreen";
 const Stack = createNativeStackNavigator();
 const OnboardingStack = createNativeStackNavigator();
 
-import DoneScreen from "./Screens/Onboarding/DoneScreen";
-
 import { CardStyleInterpolators } from '@react-navigation/stack';
 
 const OnboardingNavigator = () => (

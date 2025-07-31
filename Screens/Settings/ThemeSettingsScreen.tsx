@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { ThemeContext, Theme } from '../../Providers/ThemeProvider';
 import ColorPalette from './components/ColorPalette';
 
@@ -10,21 +10,11 @@ const availableColors = {
   text: ['#1F2937', '#000000', '#FFFFFF'],
 };
 
-const fontSizesOptions: { label: string; sizes: Theme['fontSizes'] }[] = [
-  { label: 'Small', sizes: { small: 11, medium: 13, large: 15, title: 22 } },
-  { label: 'Medium', sizes: { small: 12, medium: 14, large: 16, title: 24 } },
-  { label: 'Large', sizes: { small: 14, medium: 16, large: 18, title: 26 } },
-];
-
 const ThemeSettingsScreen = () => {
   const { theme, updateTheme } = useContext(ThemeContext);
 
   const handleColorChange = (key: keyof Theme['colors'], color: string) => {
     updateTheme({ colors: { ...theme.colors, [key]: color } });
-  };
-
-  const handleFontSizeChange = (sizes: Theme['fontSizes']) => {
-    updateTheme({ fontSizes: sizes });
   };
 
   return (
@@ -70,27 +60,6 @@ const ThemeSettingsScreen = () => {
           theme={theme}
         />
       </View>
-
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Font Size</Text>
-        <View style={styles.fontButtonsContainer}>
-          {fontSizesOptions.map((option) => (
-            <TouchableOpacity
-              key={option.label}
-              style={[
-                styles.fontButton,
-                { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-                theme.fontSizes.medium === option.sizes.medium && { backgroundColor: theme.colors.primary },
-              ]}
-              onPress={() => handleFontSizeChange(option.sizes)}
-            >
-              <Text style={[styles.fontButtonText, { color: theme.fontSizes.medium === option.sizes.medium ? theme.colors.surface : theme.colors.text }]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
     </ScrollView>
   );
 };
@@ -112,20 +81,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
-  },
-  fontButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  fontButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  fontButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
 

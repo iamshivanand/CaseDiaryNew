@@ -1,5 +1,4 @@
 import React, { createContext, useState, ReactNode, useEffect } from "react";
-import { Appearance } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export interface Theme {
@@ -25,12 +24,6 @@ export interface Theme {
       pending: string;
       closed: string;
     };
-  };
-  fontSizes: {
-    small: number;
-    medium: number;
-    large: number;
-    title: number;
   };
 }
 
@@ -63,12 +56,6 @@ const defaultTheme: Theme = {
       pending: "#FF9800",
       closed: "#9E9E9E",
     },
-  },
-  fontSizes: {
-    small: 12,
-    medium: 14,
-    large: 16,
-    title: 24,
   },
 };
 
@@ -110,10 +97,6 @@ const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
                 ...currentTheme.colors,
                 ...newThemeSpec.colors,
             },
-            fontSizes: {
-                ...currentTheme.fontSizes,
-                ...newThemeSpec.fontSizes,
-            }
         };
 
         AsyncStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(updated))
