@@ -17,14 +17,14 @@ export const getContactItemStyles = (theme: Theme) => {
       color: theme.colors.primary,
     },
     text: {
-      fontSize: 14,
+      fontSize: theme.fontSizes.medium,
       color: theme.colors.text,
       flexShrink: 1,
       lineHeight: 22,
     },
     textInput: {
       flex: 1,
-      fontSize: 14,
+      fontSize: theme.fontSizes.medium,
       color: theme.colors.text,
       borderBottomWidth: 1,
       borderColor: theme.colors.border,

@@ -30,7 +30,8 @@ import FormInput from '../CommonComponents/FormInput';
 import DropdownPicker from '../CommonComponents/DropdownPicker';
 import DatePickerField from '../CommonComponents/DatePickerField';
 import ActionButton from "../CommonComponents/ActionButton";
-import { styles } from "./AddCaseStyle";
+import { getAddCaseStyles } from "./AddCaseStyle";
+import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 
 interface FieldDefinition {
   name: keyof CaseData;
@@ -88,8 +89,7 @@ const FormFieldRenderer: React.FC<{
   otherValues: { [key: string]: string };
   setOtherValue: (fieldName: string, value: string) => void;
   suggestions: { [key: string]: string[] };
-  setSuggestions: React.Dispatch<React.SetStateAction<{ [key: string]: string[] }>>;
-}> = ({ fieldConfig, formik, otherValues, setOtherValue, suggestions, setSuggestions }) => {
+}> = ({ fieldConfig, formik, otherValues, setOtherValue, suggestions }) => {
   const { values, errors, touched, setFieldValue } = formik;
   const fieldName = fieldConfig.name;
   const commonInputProps = {
@@ -97,10 +97,9 @@ const FormFieldRenderer: React.FC<{
     error: (touched[fieldName] && errors[fieldName]) ? errors[fieldName] : undefined,
   };
 
-
   switch (fieldConfig.type) {
     case "text":
-      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} suggestions={fieldConfig.suggestions ? suggestions[fieldName] : []} />;
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} suggestions={fieldConfig.suggestions ? suggestions[fieldName] : undefined} />;
     case "multiline":
       return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} style={{ minHeight: 80, paddingTop: 10, paddingBottom: 10 }} />;
     case "select":
@@ -116,6 +115,9 @@ const FormFieldRenderer: React.FC<{
 const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const params = route.params;
   const { update = false, initialValues, uniqueId: routeUniqueId } = params ?? {};
+  const { theme } = React.useContext(ThemeContext);
+  const styles = getAddCaseStyles(theme);
+
   const navigation = useNavigation();
   const generatedUniqueId = useMemo(() => uuidv4(), []);
   const uniqueIdToUse = routeUniqueId || initialValues?.uniqueId || generatedUniqueId;
@@ -140,7 +142,6 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
     };
     fetchSuggestions();
   }, []);
-
 
   const prepareFormInitialValues = (): Partial<CaseData> => {
     const defaults: Partial<CaseData> = { uniqueId: uniqueIdToUse };
@@ -346,7 +347,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           {(formikProps) => (
             <View>
               {formFieldsDefinition.map((fieldConfig) => (
-                <FormFieldRenderer key={fieldConfig.name} fieldConfig={fieldConfig} formik={formikProps} otherValues={otherValues} setOtherValue={setOtherValue} suggestions={suggestions} setSuggestions={setSuggestions} />
+                <FormFieldRenderer key={fieldConfig.name} fieldConfig={fieldConfig} formik={formikProps} otherValues={otherValues} setOtherValue={setOtherValue} suggestions={suggestions} />
               ))}
               <View style={styles.actionButtonContainer}>
                 <ActionButton

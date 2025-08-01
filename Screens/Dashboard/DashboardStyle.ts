@@ -1,9 +1,11 @@
 import { StyleSheet, Platform } from 'react-native';
+import { Theme } from '../../Providers/ThemeProvider';
 
-export const styles = StyleSheet.create({
+export const getDashboardStyles = (theme: Theme) => {
+  return StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: '#F9FAFB',
+      backgroundColor: theme.colors.background,
       paddingTop: Platform.OS === 'android' ? 25 : 0,
     },
     container: {
@@ -13,24 +15,24 @@ export const styles = StyleSheet.create({
       padding: 16,
     },
     welcomeCard: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.colors.surface,
       borderRadius: 12,
       padding: 16,
       marginBottom: 24,
-      shadowColor: '#000000',
+      shadowColor: theme.colors.shadow,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 8,
       elevation: 4,
     },
     welcomeTitle: {
-      fontSize: 24,
+      fontSize: theme.fontSizes.title,
       fontWeight: 'bold',
-      color: '#1F2937',
+      color: theme.colors.text,
     },
     welcomeSubtitle: {
-      fontSize: 18,
-      color: '#6B7280',
+      fontSize: theme.fontSizes.large,
+      color: theme.colors.textSecondary,
       marginTop: 4,
     },
     quickActionsContainer: {
@@ -39,13 +41,13 @@ export const styles = StyleSheet.create({
       justifyContent: 'space-between',
     },
     quickAction: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: theme.colors.surface,
       borderRadius: 12,
       padding: 16,
       width: '48%',
       marginBottom: 16,
       alignItems: 'center',
-      shadowColor: '#000000',
+      shadowColor: theme.colors.shadow,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 8,
@@ -53,20 +55,21 @@ export const styles = StyleSheet.create({
     },
     quickActionText: {
       marginTop: 8,
-      fontSize: 14,
+      fontSize: theme.fontSizes.medium,
       fontWeight: '600',
-      color: '#1F2937',
+      color: theme.colors.text,
     },
     sectionTitle: {
-      fontSize: 20,
+      fontSize: theme.fontSizes.large + 2,
       fontWeight: 'bold',
-      color: '#1F2937',
+      color: theme.colors.text,
       marginBottom: 12,
     },
     emptyMessage: {
-      color: '#6B7280',
+      color: theme.colors.textSecondary,
       textAlign: 'center',
       marginTop: 20,
-      fontSize: 14,
+      fontSize: theme.fontSizes.medium,
     }
   });
+};

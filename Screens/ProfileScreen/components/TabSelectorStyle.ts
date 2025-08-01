@@ -29,7 +29,7 @@ export const getTabSelectorStyles = (theme: Theme) => {
       borderColor: theme.colors.primary,
     },
     tabButtonText: {
-      fontSize: 14,
+      fontSize: theme.fontSizes.medium,
       fontWeight: "600",
       color: theme.colors.text,
     },

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
-import { ThemeContext } from '../../Providers/ThemeProvider';
-import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
 import { format } from 'date-fns';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { getDb, getUserProfile } from '../../DataBase';
@@ -8,7 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
-import { styles } from './DashboardStyle';
+import { ThemeContext } from '../../Providers/ThemeProvider';
+import { getDashboardStyles } from './DashboardStyle';
 import SectionHeader from '../CommonComponents/SectionHeader';
 import NewCaseCard from '../CasesList/components/NewCaseCard';
 import * as db from '../../DataBase';
@@ -17,6 +17,8 @@ import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPop
 import { getCurrentUserId, formatDate } from '../../utils/commonFunctions';
 
 const WelcomeCard = () => {
+  const { theme } = useContext(ThemeContext);
+  const styles = getDashboardStyles(theme);
   const [userName, setUserName] = useState("User");
   const today = new Date();
   const formattedDate = format(today, "eeee, MMMM d, yyyy");
@@ -47,56 +49,31 @@ const WelcomeCard = () => {
   );
 };
 
-const QuickActionButton = ({ icon, title, onPress }) => {
+const QuickActionButton = ({ icon, text, onPress, color }) => {
   const { theme } = useContext(ThemeContext);
-
-  const styles = StyleSheet.create({
-    button: {
-      backgroundColor: theme.colors.componentBackground,
-      padding: 16,
-      borderRadius: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flex: 1,
-      margin: 4,
-      minWidth: '45%',
-    },
-    icon: {
-      marginBottom: 8,
-    },
-    title: {
-      color: theme.colors.text,
-      fontSize: 14,
-      fontWeight: '600',
-      textAlign: 'center',
-    },
-  });
-
+  const styles = getDashboardStyles(theme);
   return (
-    <TouchableOpacity style={styles.button} onPress={onPress}>
-      <Ionicons name={icon} size={24} color={theme.colors.primary} style={styles.icon} />
-      <Text style={styles.title}>{title}</Text>
+    <TouchableOpacity style={styles.quickAction} onPress={onPress}>
+      <Ionicons name={icon} size={30} color={color} />
+      <Text style={styles.quickActionText}>{text}</Text>
     </TouchableOpacity>
   );
 };
 
-import ThemeProvider from '../../Providers/ThemeProvider';
-
 const QuickActionsGrid = () => {
   const navigation = useNavigation();
+  const { theme } = useContext(ThemeContext);
 
   return (
-    <ThemeProvider>
-      <View>
-        <SectionHeader title="Quick Actions" />
-        <View style={styles.quickActionsContainer}>
-          <QuickActionButton icon="add-circle" title="Add New Case" onPress={() => navigation.navigate('AddCase')} />
-          <QuickActionButton icon="folder-open" title="View All Cases" onPress={() => navigation.navigate('AllCases')} />
-          <QuickActionButton icon="calendar" title="Yesterday's Cases" onPress={() => navigation.navigate('YesterdaysCases')} />
-          <QuickActionButton icon="alert-circle" title="Undated Cases" onPress={() => navigation.navigate('UndatedCases')} />
-        </View>
+    <View>
+      <SectionHeader title="Quick Actions" />
+      <View style={styles.quickActionsContainer}>
+        <QuickActionButton icon="add-circle" text="Add New Case" onPress={() => navigation.navigate('AddCase')} color={theme.colors.success} />
+        <QuickActionButton icon="folder-open" text="View All Cases" onPress={() => navigation.navigate('AllCases')} color={theme.colors.primary} />
+        <QuickActionButton icon="calendar" text="Yesterday's Cases" onPress={() => navigation.navigate('YesterdaysCases')} color={theme.colors.primary} />
+        <QuickActionButton icon="alert-circle" text="Undated Cases" onPress={() => navigation.navigate('UndatedCases')} color={theme.colors.secondary} />
       </View>
-    </ThemeProvider>
+    </View>
   );
 };
 
@@ -115,6 +92,8 @@ const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
 };
 
 const TodaysCasesSection = () => {
+  const { theme } = useContext(ThemeContext);
+  const styles = getDashboardStyles(theme);
   const [todaysCases, setTodaysCases] = useState<CaseDataScreen[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPopupVisible, setPopupVisible] = useState(false);
@@ -132,15 +111,18 @@ const TodaysCasesSection = () => {
         return nextHearingDate === today;
       });
 
-      const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
-        id: c.id,
-        title: c.CaseTitle || 'No Title',
-        client: c.ClientName || 'Unknown Client',
-        status: c.CaseStatus || 'Pending',
-        nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
-        lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
-        previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
-      }));
+      const mappedCases: CaseDataScreen[] = filteredCases.map(c => {
+        console.log('c.CaseTitle', c.CaseTitle);
+        return {
+          id: c.id,
+          title: c.CaseTitle || 'No Title',
+          client: c.ClientName || 'Unknown Client',
+          status: c.CaseStatus || 'Pending',
+          nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
+          lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
+          previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
+        };
+      });
 
       console.log('mappedCases', mappedCases);
       setTodaysCases(mappedCases);
@@ -191,7 +173,7 @@ const TodaysCasesSection = () => {
     <View>
       <SectionHeader title="Today's Cases" />
       {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       ) : todaysCases.length > 0 ? (
         todaysCases.map((caseData, index) => {
           console.log('caseData', caseData);
@@ -221,6 +203,19 @@ const TodaysCasesSection = () => {
 };
 
 const DashboardScreen = () => {
+  const { theme, isThemeLoading } = useContext(ThemeContext);
+  const styles = getDashboardStyles(theme);
+
+  if (isThemeLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   try {
     return (
       <SafeAreaView style={styles.safeArea}>

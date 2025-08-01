@@ -21,7 +21,7 @@ export const getProfileScreenStyles = (theme: Theme) => {
       padding: 15,
     },
     tabContentText: {
-      fontSize: 18,
+      fontSize: theme.fontSizes.large,
       textAlign: 'center',
       paddingVertical: 30,
       color: theme.colors.textSecondary,

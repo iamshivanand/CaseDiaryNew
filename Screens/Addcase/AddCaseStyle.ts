@@ -1,10 +1,11 @@
 // Screens/Addcase/AddCaseStyle.ts
 import { StyleSheet } from 'react-native';
+import { Theme } from '../../Providers/ThemeProvider';
 
-export const styles = StyleSheet.create({
+export const getAddCaseStyles = (theme: Theme) => StyleSheet.create({
   scrollViewStyle: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.background,
   },
   scrollContentContainerStyle: {
     flexGrow: 1,
@@ -13,7 +14,7 @@ export const styles = StyleSheet.create({
   formScreenContainer: {
     padding: 20,
     margin: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -24,7 +25,7 @@ export const styles = StyleSheet.create({
   screenTitle: {
     fontSize: 26,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: theme.colors.primary,
     marginBottom: 24,
     textAlign: 'center',
   },

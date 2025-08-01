@@ -21,7 +21,7 @@ export const getAboutMeStyles = (theme: Theme) => {
       marginBottom: 10,
     },
     heading: {
-      fontSize: 18,
+      fontSize: theme.fontSizes.large,
       fontWeight: "bold",
       color: theme.colors.text,
     },
@@ -29,12 +29,12 @@ export const getAboutMeStyles = (theme: Theme) => {
       padding: 5,
     },
     descriptionText: {
-      fontSize: 14,
+      fontSize: theme.fontSizes.medium,
       color: theme.colors.textSecondary,
       lineHeight: 22,
     },
     textInput: {
-      fontSize: 14,
+      fontSize: theme.fontSizes.medium,
       color: theme.colors.text,
       lineHeight: 22,
       borderWidth: 1,

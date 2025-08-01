@@ -21,7 +21,7 @@ export const getLanguagesStyles = (theme: Theme) => {
       marginBottom: 10,
     },
     heading: {
-      fontSize: 18,
+      fontSize: theme.fontSizes.large,
       fontWeight: "bold",
       color: theme.colors.text,
     },
@@ -29,12 +29,12 @@ export const getLanguagesStyles = (theme: Theme) => {
       padding: 5,
     },
     languagesText: {
-      fontSize: 14,
+      fontSize: theme.fontSizes.medium,
       color: theme.colors.textSecondary,
       lineHeight: 22,
     },
     textInput: {
-      fontSize: 14,
+      fontSize: theme.fontSizes.medium,
       color: theme.colors.text,
       borderWidth: 1,
       borderColor: theme.colors.border,
