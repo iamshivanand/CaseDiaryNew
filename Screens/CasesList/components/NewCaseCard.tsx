@@ -16,12 +16,17 @@ const statusColors = {
 };
 
 const NewCaseCard: React.FC<NewCaseCardProps> = ({
-  caseDetails,
+  caseDetails = {
+    title: "No Title",
+    client: "Unknown Client",
+    status: "Pending",
+    nextHearing: "N/A",
+    lastUpdate: "N/A",
+    previousHearing: "N/A",
+    id: "0",
+  },
   onUpdateHearingPress,
 }) => {
-  if (!caseDetails) {
-    return null;
-  }
   const { title, client, status, nextHearing, lastUpdate, previousHearing, id } =
     caseDetails;
   const navigation = useNavigation();
