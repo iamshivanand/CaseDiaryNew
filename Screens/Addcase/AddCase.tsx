@@ -30,8 +30,7 @@ import FormInput from '../CommonComponents/FormInput';
 import DropdownPicker from '../CommonComponents/DropdownPicker';
 import DatePickerField from '../CommonComponents/DatePickerField';
 import ActionButton from "../CommonComponents/ActionButton";
-import { getAddCaseStyles } from "./AddCaseStyle";
-import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
+import { styles } from "./AddCaseStyle";
 
 interface FieldDefinition {
   name: keyof CaseData;
@@ -115,9 +114,6 @@ const FormFieldRenderer: React.FC<{
 const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const params = route.params;
   const { update = false, initialValues, uniqueId: routeUniqueId } = params ?? {};
-  const { theme } = React.useContext(ThemeContext);
-  const styles = getAddCaseStyles(theme);
-
   const navigation = useNavigation();
   const generatedUniqueId = useMemo(() => uuidv4(), []);
   const uniqueIdToUse = routeUniqueId || initialValues?.uniqueId || generatedUniqueId;
