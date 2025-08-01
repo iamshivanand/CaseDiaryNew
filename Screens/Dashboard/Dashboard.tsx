@@ -112,13 +112,13 @@ const TodaysCasesSection = () => {
       });
 
       const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
-        id: c.id,
-        title: c.CaseTitle || 'No Title',
-        client: c.ClientName || 'Unknown Client',
-        status: c.CaseStatus || 'Pending',
-        nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
-        lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
-        previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
+        id: c?.id,
+        title: c?.CaseTitle || 'No Title',
+        client: c?.ClientName || 'Unknown Client',
+        status: c?.CaseStatus || 'Pending',
+        nextHearing: c?.NextDate ? formatDate(c.NextDate) : 'N/A',
+        lastUpdate: c?.updated_at ? formatDate(c.updated_at) : 'N/A',
+        previousHearing: c?.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
       }));
 
       console.log('mappedCases', mappedCases);
