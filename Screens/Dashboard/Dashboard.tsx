@@ -213,17 +213,28 @@ const DashboardScreen = () => {
     );
   }
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-        <View style={styles.content}>
-          <WelcomeCard />
-          <QuickActionsGrid />
-          <TodaysCasesSection />
+  try {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView style={styles.container}>
+          <View style={styles.content}>
+            <WelcomeCard />
+            <QuickActionsGrid />
+            <TodaysCasesSection />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  } catch (error) {
+    console.error("Error in DashboardScreen:", error);
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Something went wrong.</Text>
         </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+      </SafeAreaView>
+    );
+  }
 };
 
 export default DashboardScreen;
