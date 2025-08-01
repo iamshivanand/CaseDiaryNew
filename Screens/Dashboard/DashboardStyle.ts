@@ -1,11 +1,11 @@
 import { StyleSheet, Platform } from 'react-native';
-import { Theme } from '../../Providers/ThemeProvider';
+import { colors, fontSizes } from '../../utils/StyleGuide';
 
-export const getDashboardStyles = (theme: Theme) => {
+export const getDashboardStyles = () => {
   return StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: colors.background,
       paddingTop: Platform.OS === 'android' ? 25 : 0,
     },
     container: {
@@ -15,24 +15,24 @@ export const getDashboardStyles = (theme: Theme) => {
       padding: 16,
     },
     welcomeCard: {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: colors.componentBackground,
       borderRadius: 12,
       padding: 16,
       marginBottom: 24,
-      shadowColor: theme.colors.shadow,
+      shadowColor: colors.border,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 8,
       elevation: 4,
     },
     welcomeTitle: {
-      fontSize: theme.fontSizes.title,
+      fontSize: fontSizes.title,
       fontWeight: 'bold',
-      color: theme.colors.text,
+      color: colors.text,
     },
     welcomeSubtitle: {
-      fontSize: theme.fontSizes.large,
-      color: theme.colors.textSecondary,
+      fontSize: fontSizes.subtitle,
+      color: colors.textSecondary,
       marginTop: 4,
     },
     quickActionsContainer: {
@@ -41,13 +41,13 @@ export const getDashboardStyles = (theme: Theme) => {
       justifyContent: 'space-between',
     },
     quickAction: {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: colors.componentBackground,
       borderRadius: 12,
       padding: 16,
       width: '48%',
       marginBottom: 16,
       alignItems: 'center',
-      shadowColor: theme.colors.shadow,
+      shadowColor: colors.border,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 8,
@@ -55,21 +55,21 @@ export const getDashboardStyles = (theme: Theme) => {
     },
     quickActionText: {
       marginTop: 8,
-      fontSize: theme.fontSizes.medium,
+      fontSize: fontSizes.body,
       fontWeight: '600',
-      color: theme.colors.text,
+      color: colors.text,
     },
     sectionTitle: {
-      fontSize: theme.fontSizes.large + 2,
+      fontSize: fontSizes.subtitle,
       fontWeight: 'bold',
-      color: theme.colors.text,
+      color: colors.text,
       marginBottom: 12,
     },
     emptyMessage: {
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
       textAlign: 'center',
       marginTop: 20,
-      fontSize: theme.fontSizes.medium,
+      fontSize: fontSizes.body,
     }
   });
 };

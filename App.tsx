@@ -11,7 +11,6 @@ import Animated, {
 import { emitter } from "./utils/event-emitter";
 
 import { getDb } from "./DataBase";
-import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
 import OnboardingProvider from "./Providers/OnboardingProvider";
 import Routes from "./Routes/Routes";
 import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
@@ -52,7 +51,6 @@ const OnboardingNavigator = () => (
 );
 
 export default function App() {
-  const { theme } = useContext(ThemeContext);
   const [loading, setLoading] = useState(true);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isSplashscreenVisible, setSplashscreenVisible] = useState(true);
@@ -113,34 +111,32 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider>
-      <OnboardingProvider>
-        <NavigationContainer>
-          <SafeAreaView
-            style={{
-              flex: 1,
-              backgroundColor: theme.colors.background,
-            }}
-          >
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
-              {onboardingComplete ? (
-                <Stack.Screen name="App">
-                  {(props) => (
-                    <Animated.View style={[{ flex: 1 }, animatedStyle]}>
-                      <Routes {...props} />
-                    </Animated.View>
-                  )}
-                </Stack.Screen>
-              ) : (
-                <Stack.Screen
-                  name="Onboarding"
-                  component={OnboardingNavigator}
-                />
-              )}
-            </Stack.Navigator>
-          </SafeAreaView>
-        </NavigationContainer>
-      </OnboardingProvider>
-    </ThemeProvider>
+    <OnboardingProvider>
+      <NavigationContainer>
+        <SafeAreaView
+          style={{
+            flex: 1,
+            backgroundColor: '#FFFFFF',
+          }}
+        >
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {onboardingComplete ? (
+              <Stack.Screen name="App">
+                {(props) => (
+                  <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+                    <Routes {...props} />
+                  </Animated.View>
+                )}
+              </Stack.Screen>
+            ) : (
+              <Stack.Screen
+                name="Onboarding"
+                component={OnboardingNavigator}
+              />
+            )}
+          </Stack.Navigator>
+        </SafeAreaView>
+      </NavigationContainer>
+    </OnboardingProvider>
   );
 }

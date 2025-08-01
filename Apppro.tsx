@@ -4,7 +4,7 @@ import React, { useContext } from "react";
 import { View } from "react-native"; // Removed ScrollView, Text
 import Ionicons from "react-native-vector-icons/Ionicons";
 
-import { ThemeContext } from "./Providers/ThemeProvider";
+import { colors } from './utils/StyleGuide';
 
 // Import Screens for Stacks
 import DashboardScreen from "./Screens/Dashboard/Dashboard";
@@ -128,7 +128,6 @@ const ProfileStack = () => (
 
 
 const Appro: React.FC = () => { // Props interface removed as it was empty
-  const { theme } = useContext(ThemeContext);
   return (
     // View style={{ flex: 1 }} is important for the navigator to fill the space
     // Removed the ScrollView that was wrapping Tab.Navigator
@@ -139,8 +138,8 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
           tabBarStyle: {
             paddingBottom: 5, // Consider adjusting for safe areas on some devices
             height: 55,      // Slightly increased height for better touchability
-            backgroundColor: theme.colors.background,
-            borderTopColor: theme.colors.border, // Use theme color for border
+            backgroundColor: colors.background,
+            borderTopColor: colors.border, // Use theme color for border
             borderTopWidth: 0.5, // A subtle top border
           },
           tabBarIcon: ({ color, size, focused }) => {
@@ -160,8 +159,8 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
               <Ionicons name={iconName} size={focused ? size + 2 : size} color={color} />
             );
           },
-          tabBarActiveTintColor: theme.colors.primary || "#020748",
-          tabBarInactiveTintColor: theme.colors.textSecondary || "grey", // Use theme color or a sensible default
+          tabBarActiveTintColor: colors.primary || "#020748",
+          tabBarInactiveTintColor: colors.textSecondary || "grey", // Use theme color or a sensible default
           tabBarLabelStyle: {
             fontSize: 11, // Adjust font size for labels
             marginBottom: 3, // Space between icon and label
