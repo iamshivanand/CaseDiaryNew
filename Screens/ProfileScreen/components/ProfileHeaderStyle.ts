@@ -50,20 +50,20 @@ export const getProfileHeaderStyles = (theme: Theme) => {
       elevation: 1,
     },
     name: {
-      fontSize: theme.fontSizes.title,
+      fontSize: 24,
       fontWeight: "bold",
       color: theme.colors.text,
       marginBottom: 4,
       textAlign: 'center',
     },
     designation: {
-      fontSize: theme.fontSizes.large,
+      fontSize: 18,
       color: theme.colors.textSecondary,
       marginBottom: 6,
       textAlign: 'center',
     },
     practiceAreas: {
-      fontSize: theme.fontSizes.medium,
+      fontSize: 14,
       color: theme.colors.textSecondary,
       textAlign: "center",
       paddingHorizontal: 10,

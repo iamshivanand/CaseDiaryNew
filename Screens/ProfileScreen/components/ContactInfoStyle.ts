@@ -22,7 +22,7 @@ export const getContactInfoStyles = (theme: Theme) => {
       marginBottom: 10,
     },
     heading: {
-      fontSize: theme.fontSizes.large,
+      fontSize: 18,
       fontWeight: "bold",
       color: theme.colors.text,
     },

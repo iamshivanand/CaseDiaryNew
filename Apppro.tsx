@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React, { useContext } from "react";
 import { View } from "react-native"; // Removed ScrollView, Text
+import Ionicons from "react-native-vector-icons/Ionicons";
 
 import { ThemeContext } from "./Providers/ThemeProvider";
 
@@ -141,6 +142,23 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
             backgroundColor: theme.colors.background,
             borderTopColor: theme.colors.border, // Use theme color for border
             borderTopWidth: 0.5, // A subtle top border
+          },
+          tabBarIcon: ({ color, size, focused }) => {
+            let iconName: keyof typeof Ionicons.glyphMap = "home"; // Default, ensure type safety
+
+            if (route.name === "HomeTab") {
+              iconName = focused ? "home" : "home-outline";
+            } else if (route.name === "SearchTab") {
+              iconName = focused ? "search" : "search-outline";
+            } else if (route.name === "CalendarTab") {
+              iconName = focused ? "calendar" : "calendar-outline";
+            } else if (route.name === "ProfileTab") {
+              iconName = focused ? "person-circle" : "person-circle-outline";
+            }
+
+            return (
+              <Ionicons name={iconName} size={focused ? size + 2 : size} color={color} />
+            );
           },
           tabBarActiveTintColor: theme.colors.primary || "#020748",
           tabBarInactiveTintColor: theme.colors.textSecondary || "grey", // Use theme color or a sensible default
