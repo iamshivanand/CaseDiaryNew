@@ -1,11 +1,11 @@
 import { StyleSheet } from 'react-native';
-import { Theme } from '../../Providers/ThemeProvider';
+import { colors, fontSizes } from '../../utils/StyleGuide';
 
-export const getCasesListStyles = (theme: Theme) => {
+export const getCasesListStyles = () => {
   return StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: colors.background,
     },
     header: {
       flexDirection: "row",
@@ -14,12 +14,12 @@ export const getCasesListStyles = (theme: Theme) => {
       paddingHorizontal: 16,
       paddingVertical: 12,
       borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      borderBottomColor: colors.border,
     },
     headerTitle: {
       fontSize: 24,
       fontWeight: "bold",
-      color: theme.colors.text,
+      color: colors.text,
     },
     addButton: {
       padding: 6,
@@ -33,9 +33,9 @@ export const getCasesListStyles = (theme: Theme) => {
       alignItems: "center",
       borderRadius: 8,
       paddingHorizontal: 12,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: colors.componentBackground,
       borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderColor: colors.border,
     },
     searchIcon: {
       marginRight: 8,
@@ -44,7 +44,7 @@ export const getCasesListStyles = (theme: Theme) => {
       flex: 1,
       height: 44,
       fontSize: 16,
-      color: theme.colors.text,
+      color: colors.text,
     },
     toggleContainer: {
       flexDirection: "row",
@@ -62,18 +62,18 @@ export const getCasesListStyles = (theme: Theme) => {
       marginHorizontal: 5,
     },
     activeButton: {
-      backgroundColor: theme.colors.primary,
+      backgroundColor: colors.primary,
     },
     inactiveButton: {
-      backgroundColor: theme.colors.disabledInputBackground,
+      backgroundColor: colors.componentBackground,
     },
     activeButtonText: {
-      color: theme.colors.surface,
+      color: '#FFFFFF',
       fontSize: 15,
       fontWeight: "600",
     },
     inactiveButtonText: {
-      color: theme.colors.text,
+      color: colors.text,
       fontSize: 15,
       fontWeight: "600",
     },
@@ -88,7 +88,7 @@ export const getCasesListStyles = (theme: Theme) => {
     },
     emptyListText: {
       fontSize: 16,
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
     },
   });
 };

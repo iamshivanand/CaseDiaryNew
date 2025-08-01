@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { getCases, addCaseTimelineEvent, updateCase, getCaseById } from "../../DataBase";
 import { Case } from "../../DataBase/schema";
-import { ThemeContext } from "../../Providers/ThemeProvider";
+import { colors } from "../../utils/StyleGuide";
 import { CaseDataScreen } from "../../Types/appTypes";
 import { formatDate, getCurrentUserId } from "../../utils/commonFunctions";
 import NewCaseCard from "./components/NewCaseCard";
@@ -39,8 +39,7 @@ const CasesList = () => {
   const route = useRoute<CasesListRouteProp>();
   const filterParam = route.params?.Filter;
   const navigation = useNavigation();
-  const { theme } = useContext(ThemeContext);
-  const styles = getCasesListStyles(theme);
+  const styles = getCasesListStyles();
 
   const [allCases, setAllCases] = useState<CaseDataScreen[]>([]);
   const [filteredCases, setFilteredCases] = useState<CaseDataScreen[]>([]);
@@ -173,7 +172,7 @@ const CasesList = () => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cases</Text>
         <TouchableOpacity onPress={navigateToAddCase} style={styles.addButton}>
-          <Ionicons name="add-circle-outline" size={32} color={theme.colors.primary} />
+          <Ionicons name="add-circle-outline" size={32} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -182,13 +181,13 @@ const CasesList = () => {
           <AntDesign
             name="search1"
             size={20}
-            color={theme.colors.textSecondary}
+            color={colors.textSecondary}
             style={styles.searchIcon}
           />
           <TextInput
             style={styles.input}
             placeholder="Search cases..."
-            placeholderTextColor={theme.colors.placeholderText}
+            placeholderTextColor={colors.textSecondary}
             onChangeText={handleSearchChange}
             value={searchText}
           />

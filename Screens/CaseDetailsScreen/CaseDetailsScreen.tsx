@@ -20,7 +20,7 @@ import {
 } from "react-native"; // Removed ScrollView
 import * as db from "../../DataBase";
 import { getCaseTimelineEventsByCaseId, getCaseById } from "../../DataBase";
-import { ThemeContext } from "../../Providers/ThemeProvider";
+import { colors } from "../../utils/StyleGuide";
 import { CaseData, CaseDataScreen, Document, TimelineEvent } from "../../Types/appTypes";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import ActionButton from "../CommonComponents/ActionButton";
@@ -52,7 +52,6 @@ type ListItemType =
 const CaseDetailsScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<CaseDetailsScreenRouteProp>();
-  const { theme } = useContext(ThemeContext);
   const { caseId } = route.params;
   const [caseDetails, setCaseDetails] = useState<CaseData | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -327,7 +326,7 @@ const CaseDetailsScreen: React.FC = () => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <FlatList
         data={listData}
         renderItem={renderListItem}
