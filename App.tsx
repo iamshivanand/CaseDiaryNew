@@ -2,8 +2,6 @@ import { NavigationContainer } from "@react-navigation/native";
 import React, { useContext, useEffect, useState } from "react";
 import { SafeAreaView, ActivityIndicator, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFonts } from "expo-font";
-import { Ionicons } from "@expo/vector-icons";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Animated, {
   useSharedValue,
@@ -58,9 +56,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isSplashscreenVisible, setSplashscreenVisible] = useState(true);
-  const [fontsLoaded] = useFonts({
-    ...Ionicons.font,
-  });
   const translateY = useSharedValue(1000);
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -105,11 +100,11 @@ export default function App() {
     };
   }, []);
 
-  if (isSplashscreenVisible || !fontsLoaded) {
+  if (isSplashscreenVisible) {
     return <SplashScreen />;
   }
 
-  if (loading || !fontsLoaded) {
+  if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
