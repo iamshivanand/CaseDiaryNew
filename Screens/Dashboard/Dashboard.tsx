@@ -63,6 +63,7 @@ const QuickActionButton = ({ icon, text, onPress, color }) => {
 const QuickActionsGrid = () => {
   const navigation = useNavigation();
   const { theme } = useContext(ThemeContext);
+  const styles = getDashboardStyles(theme);
 
   return (
     <View>
