@@ -26,12 +26,12 @@ export const getDashboardStyles = (theme: Theme) => {
       elevation: 4,
     },
     welcomeTitle: {
-      fontSize: theme?.fontSizes?.title,
+      fontSize: 24,
       fontWeight: 'bold',
       color: theme?.colors?.text,
     },
     welcomeSubtitle: {
-      fontSize: theme?.fontSizes?.large,
+      fontSize: 18,
       color: theme?.colors?.textSecondary,
       marginTop: 4,
     },
@@ -55,12 +55,12 @@ export const getDashboardStyles = (theme: Theme) => {
     },
     quickActionText: {
       marginTop: 8,
-      fontSize: theme?.fontSizes?.medium,
+      fontSize: 14,
       fontWeight: '600',
       color: theme?.colors?.text,
     },
     sectionTitle: {
-      fontSize: (theme?.fontSizes?.large || 16) + 2,
+      fontSize: 20,
       fontWeight: 'bold',
       color: theme?.colors?.text,
       marginBottom: 12,
@@ -69,7 +69,7 @@ export const getDashboardStyles = (theme: Theme) => {
       color: theme?.colors?.textSecondary,
       textAlign: 'center',
       marginTop: 20,
-      fontSize: theme?.fontSizes?.medium,
+      fontSize: 14,
     }
   });
 };
