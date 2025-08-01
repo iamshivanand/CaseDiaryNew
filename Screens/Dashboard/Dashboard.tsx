@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { ThemeContext } from '../../Providers/ThemeProvider';
-import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform, StyleSheet } from 'react-native';
 import { format } from 'date-fns';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { getDb, getUserProfile } from '../../DataBase';
