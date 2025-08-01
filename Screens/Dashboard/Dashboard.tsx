@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
+import { ThemeContext } from '../../Providers/ThemeProvider';
 import { ScrollView, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
 import { format } from 'date-fns';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -79,19 +80,23 @@ const QuickActionButton = ({ icon, title, onPress }) => {
   );
 };
 
+import ThemeProvider from '../../Providers/ThemeProvider';
+
 const QuickActionsGrid = () => {
   const navigation = useNavigation();
 
   return (
-    <View>
-      <SectionHeader title="Quick Actions" />
-      <View style={styles.quickActionsContainer}>
-        <QuickActionButton icon="add-circle" title="Add New Case" onPress={() => navigation.navigate('AddCase')} />
-        <QuickActionButton icon="folder-open" title="View All Cases" onPress={() => navigation.navigate('AllCases')} />
-        <QuickActionButton icon="calendar" title="Yesterday's Cases" onPress={() => navigation.navigate('YesterdaysCases')} />
-        <QuickActionButton icon="alert-circle" title="Undated Cases" onPress={() => navigation.navigate('UndatedCases')} />
+    <ThemeProvider>
+      <View>
+        <SectionHeader title="Quick Actions" />
+        <View style={styles.quickActionsContainer}>
+          <QuickActionButton icon="add-circle" title="Add New Case" onPress={() => navigation.navigate('AddCase')} />
+          <QuickActionButton icon="folder-open" title="View All Cases" onPress={() => navigation.navigate('AllCases')} />
+          <QuickActionButton icon="calendar" title="Yesterday's Cases" onPress={() => navigation.navigate('YesterdaysCases')} />
+          <QuickActionButton icon="alert-circle" title="Undated Cases" onPress={() => navigation.navigate('UndatedCases')} />
+        </View>
       </View>
-    </View>
+    </ThemeProvider>
   );
 };
 

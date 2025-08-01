@@ -113,8 +113,8 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider>
-      <OnboardingProvider>
+    <OnboardingProvider>
+      <ThemeProvider>
         <NavigationContainer>
           <SafeAreaView
             style={{
@@ -140,7 +140,7 @@ export default function App() {
             </Stack.Navigator>
           </SafeAreaView>
         </NavigationContainer>
-      </OnboardingProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </OnboardingProvider>
   );
 }

@@ -88,7 +88,8 @@ const FormFieldRenderer: React.FC<{
   otherValues: { [key: string]: string };
   setOtherValue: (fieldName: string, value: string) => void;
   suggestions: { [key: string]: string[] };
-}> = ({ fieldConfig, formik, otherValues, setOtherValue, suggestions }) => {
+  setSuggestions: React.Dispatch<React.SetStateAction<{ [key: string]: string[] }>>;
+}> = ({ fieldConfig, formik, otherValues, setOtherValue, suggestions, setSuggestions }) => {
   const { values, errors, touched, setFieldValue } = formik;
   const fieldName = fieldConfig.name;
   const commonInputProps = {
@@ -96,9 +97,10 @@ const FormFieldRenderer: React.FC<{
     error: (touched[fieldName] && errors[fieldName]) ? errors[fieldName] : undefined,
   };
 
+
   switch (fieldConfig.type) {
     case "text":
-      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} suggestions={fieldConfig.suggestions ? suggestions[fieldName] : undefined} />;
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} suggestions={fieldConfig.suggestions ? suggestions[fieldName] : []} />;
     case "multiline":
       return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} style={{ minHeight: 80, paddingTop: 10, paddingBottom: 10 }} />;
     case "select":
@@ -138,6 +140,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
     };
     fetchSuggestions();
   }, []);
+
 
   const prepareFormInitialValues = (): Partial<CaseData> => {
     const defaults: Partial<CaseData> = { uniqueId: uniqueIdToUse };
@@ -343,7 +346,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           {(formikProps) => (
             <View>
               {formFieldsDefinition.map((fieldConfig) => (
-                <FormFieldRenderer key={fieldConfig.name} fieldConfig={fieldConfig} formik={formikProps} otherValues={otherValues} setOtherValue={setOtherValue} suggestions={suggestions} />
+                <FormFieldRenderer key={fieldConfig.name} fieldConfig={fieldConfig} formik={formikProps} otherValues={otherValues} setOtherValue={setOtherValue} suggestions={suggestions} setSuggestions={setSuggestions} />
               ))}
               <View style={styles.actionButtonContainer}>
                 <ActionButton
