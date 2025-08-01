@@ -4,11 +4,9 @@ import { format } from 'date-fns';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { getDb, getUserProfile } from '../../DataBase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Ionicons from "react-native-vector-icons/Ionicons";
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
-import { ThemeContext } from '../../Providers/ThemeProvider';
-import { getDashboardStyles } from './DashboardStyle';
+import { styles } from './DashboardStyle';
 import SectionHeader from '../CommonComponents/SectionHeader';
 import NewCaseCard from '../CasesList/components/NewCaseCard';
 import * as db from '../../DataBase';
@@ -17,8 +15,6 @@ import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPop
 import { getCurrentUserId, formatDate } from '../../utils/commonFunctions';
 
 const WelcomeCard = () => {
-  const { theme } = useContext(ThemeContext);
-  const styles = getDashboardStyles(theme);
   const [userName, setUserName] = useState("User");
   const today = new Date();
   const formattedDate = format(today, "eeee, MMMM d, yyyy");
@@ -49,12 +45,9 @@ const WelcomeCard = () => {
   );
 };
 
-const QuickActionButton = ({ icon, text, onPress, color }) => {
-  const { theme } = useContext(ThemeContext);
-  const styles = getDashboardStyles(theme);
+const QuickActionButton = ({ text, onPress }) => {
   return (
     <TouchableOpacity style={styles.quickAction} onPress={onPress}>
-      <Ionicons name={icon} size={30} color={color} />
       <Text style={styles.quickActionText}>{text}</Text>
     </TouchableOpacity>
   );
@@ -62,17 +55,15 @@ const QuickActionButton = ({ icon, text, onPress, color }) => {
 
 const QuickActionsGrid = () => {
   const navigation = useNavigation();
-  const { theme } = useContext(ThemeContext);
-  const styles = getDashboardStyles(theme);
 
   return (
     <View>
       <SectionHeader title="Quick Actions" />
       <View style={styles.quickActionsContainer}>
-        <QuickActionButton icon="add-circle" text="Add New Case" onPress={() => navigation.navigate('AddCase')} color={theme.colors.success} />
-        <QuickActionButton icon="folder-open" text="View All Cases" onPress={() => navigation.navigate('AllCases')} color={theme.colors.primary} />
-        <QuickActionButton icon="calendar" text="Yesterday's Cases" onPress={() => navigation.navigate('YesterdaysCases')} color={theme.colors.primary} />
-        <QuickActionButton icon="alert-circle" text="Undated Cases" onPress={() => navigation.navigate('UndatedCases')} color={theme.colors.secondary} />
+        <QuickActionButton text="Add New Case" onPress={() => navigation.navigate('AddCase')} />
+        <QuickActionButton text="View All Cases" onPress={() => navigation.navigate('AllCases')} />
+        <QuickActionButton text="Yesterday's Cases" onPress={() => navigation.navigate('YesterdaysCases')} />
+        <QuickActionButton text="Undated Cases" onPress={() => navigation.navigate('UndatedCases')} />
       </View>
     </View>
   );
@@ -93,8 +84,6 @@ const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
 };
 
 const TodaysCasesSection = () => {
-  const { theme } = useContext(ThemeContext);
-  const styles = getDashboardStyles(theme);
   const [todaysCases, setTodaysCases] = useState<CaseDataScreen[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPopupVisible, setPopupVisible] = useState(false);
@@ -201,19 +190,6 @@ const TodaysCasesSection = () => {
 };
 
 const DashboardScreen = () => {
-  const { theme, isThemeLoading } = useContext(ThemeContext);
-  const styles = getDashboardStyles(theme);
-
-  if (isThemeLoading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   try {
     return (
       <SafeAreaView style={styles.safeArea}>
