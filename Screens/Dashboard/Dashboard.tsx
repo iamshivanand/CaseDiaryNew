@@ -6,6 +6,7 @@ import { getDb, getUserProfile } from '../../DataBase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
+import { ThemeContext } from '../../Providers/ThemeProvider';
 import { styles } from './DashboardStyle';
 import SectionHeader from '../CommonComponents/SectionHeader';
 import NewCaseCard from '../CasesList/components/NewCaseCard';
@@ -84,6 +85,7 @@ const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
 };
 
 const TodaysCasesSection = () => {
+  const { theme } = useContext(ThemeContext);
   const [todaysCases, setTodaysCases] = useState<CaseDataScreen[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPopupVisible, setPopupVisible] = useState(false);
