@@ -11,6 +11,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@expo/vector-icons": "^14.1.0",
     "@react-native-community/datetimepicker": "8.0.1",
     "@react-native-picker/picker": "2.7.5",
     "@react-navigation/bottom-tabs": "^6.5.20",
@@ -59,6 +60,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
+    "@testing-library/react-native": "^13.2.2",
     "@types/jest": "^29.5.12",
     "@types/react": "~18.2.79",
     "@types/react-native-autocomplete-input": "^5.1.4",

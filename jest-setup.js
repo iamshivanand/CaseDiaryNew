@@ -49,4 +49,22 @@ jest.mock('expo-intent-launcher', () => ({
 // Note: The __mocks__/expo-sqlite.js will be automatically picked up by Jest.
 // No need to explicitly mock it here unless you want to override that manual mock.
 
+jest.mock('@expo/vector-icons', () => {
+  const { View } = require('react-native');
+  return {
+    Ionicons: View,
+    MaterialIcons: View,
+    MaterialCommunityIcons: View,
+    FontAwesome: View,
+    AntDesign: View,
+  };
+});
+
+jest.mock('expo-font', () => ({
+  useFonts: () => [true],
+  isLoaded: () => true,
+  getLoadedFonts: () => ({}),
+}));
+
+
 // console.log('jest-setup.js loaded'); // Keep this for debugging if tests still fail to find it
