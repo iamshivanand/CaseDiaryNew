@@ -36,7 +36,7 @@ const WelcomeCard = () => {
   );
 };
 
-import Ionicons from "react-native-vector-icons/Ionicons";
+import { Ionicons } from "@expo/vector-icons";
 
 const QuickActionButton = ({ icon, text, onPress, color }) => {
   return (
