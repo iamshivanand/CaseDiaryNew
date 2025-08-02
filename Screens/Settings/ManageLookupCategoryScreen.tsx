@@ -81,6 +81,7 @@ const ManageLookupCategoryScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
+      console.log("ManageLookupCategoryScreen rendered");
       fetchData();
     }, [fetchData])
   );

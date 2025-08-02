@@ -58,6 +58,7 @@ const ProfileScreen: React.FC = () => {
   const [tempYearsOfPractice, setTempYearsOfPractice] = useState("");
 
   useEffect(() => {
+    console.log("ProfileScreen rendered");
     const fetchProfile = async () => {
       console.log("Fetching profile data...");
       const db = await getDb();

@@ -18,6 +18,7 @@ const DoneScreen = ({ navigation }) => {
   });
 
   useEffect(() => {
+    console.log("DoneScreen rendered");
     opacity.value = withDelay(
       2000,
       withTiming(0, { duration: 500 }, () => {

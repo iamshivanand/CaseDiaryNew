@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
 import PrimaryButton from './components/PrimaryButton';
 import InputField from './components/InputField';
@@ -17,6 +17,9 @@ const practiceAreas = [
 ];
 
 const PracticeAreasScreen = ({ navigation }) => {
+  useEffect(() => {
+    console.log("PracticeAreasScreen rendered");
+  }, []);
   const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
   const [otherArea, setOtherArea] = useState('');

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { List, Title, Divider, useTheme } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -14,6 +14,9 @@ type SettingsScreenNavigationProp = StackNavigationProp<
 >;
 
 const SettingsScreen = () => {
+  useEffect(() => {
+    console.log("SettingsScreen rendered");
+  }, []);
   const theme = useTheme();
   const navigation = useNavigation<SettingsScreenNavigationProp>();
 

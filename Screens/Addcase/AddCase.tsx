@@ -130,6 +130,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const [suggestions, setSuggestions] = useState<{ [key: string]: string[] }>({});
 
   useEffect(() => {
+    console.log("AddCase screen rendered");
     const fetchSuggestions = async () => {
       const suggestionsData: { [key: string]: string[] } = {};
       for (const field of formFieldsDefinition) {

@@ -56,6 +56,7 @@ const CasesList = () => {
   );
 
   useEffect(() => {
+    console.log("CasesList screen rendered");
     filterAndSearchCases();
   }, [activeFilter, searchText, allCases]); // Re-filter when filter, search text, or allCases change
 

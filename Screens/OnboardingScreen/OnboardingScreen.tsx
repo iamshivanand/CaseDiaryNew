@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -21,6 +21,9 @@ import { LawyerProfileData } from "../../Types/appTypes";
 import ActionButton from "../CommonComponents/ActionButton";
 
 const OnboardingScreen = () => {
+  useEffect(() => {
+    console.log("OnboardingScreen rendered");
+  }, []);
   const { theme } = useContext(ThemeContext);
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");

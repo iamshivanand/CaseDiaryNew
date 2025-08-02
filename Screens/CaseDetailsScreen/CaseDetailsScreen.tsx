@@ -113,6 +113,7 @@ const CaseDetailsScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    console.log("CaseDetailsScreen rendered");
     if (caseId) {
       const caseIdToLoad = parseInt(caseId.toString(), 10);
       const fetchAllData = async () => {

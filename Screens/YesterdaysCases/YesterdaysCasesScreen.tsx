@@ -64,6 +64,7 @@ const YesterdaysCasesScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
+      console.log("YesterdaysCasesScreen rendered");
       fetchYesterdaysCases();
     }, [])
   );

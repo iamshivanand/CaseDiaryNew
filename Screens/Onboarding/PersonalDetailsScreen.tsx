@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { View, StyleSheet, SafeAreaView, ScrollView, Alert, Text } from 'react-native';
 import InputField from './components/InputField';
 import PrimaryButton from './components/PrimaryButton';
@@ -6,6 +6,9 @@ import { Picker } from '@react-native-picker/picker';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 
 const PersonalDetailsScreen = ({ navigation }) => {
+  useEffect(() => {
+    console.log("PersonalDetailsScreen rendered");
+  }, []);
   const { setOnboardingData } = useContext(OnboardingContext);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');

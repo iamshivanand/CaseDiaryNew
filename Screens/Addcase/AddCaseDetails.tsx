@@ -12,6 +12,7 @@ import AddCase from "./AddCase"; // The actual form component
 // import { getTableColumnsAsync } from "../../DataBase"; // Seems like an old debug/utility call
 import { HomeStackParamList } from "../../Types/navigationtypes"; // Changed from RootStackParamList
 import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen"; // Summary type for initialValues
+import { useEffect } from 'react';
 
 // const Tab = createMaterialTopTabNavigator(); // No longer using Tabs here
 
@@ -27,6 +28,9 @@ interface Props {
 }
 
 const AddCaseDetailsScreen: React.FC<Props> = ({ route }) => { // Renamed component for clarity
+  useEffect(() => {
+    console.log("AddCaseDetailsScreen rendered");
+  }, []);
   // Params for AddCaseDetails screen are 'update', 'initialValues', 'uniqueId'
   const { update, initialValues, uniqueId: routeUniqueId } = route.params ?? {};
 

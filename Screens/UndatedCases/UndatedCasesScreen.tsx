@@ -61,6 +61,7 @@ const UndatedCasesScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
+      console.log("UndatedCasesScreen rendered");
       fetchUndatedCases();
     }, [])
   );

@@ -1,5 +1,5 @@
 import { NavigationProp } from "@react-navigation/native";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -30,6 +30,9 @@ const inputWidth = screenWidth * 0.9;
 //   navigation: NavigationProp<any>;
 // }
 const Login: React.FC<Props> = ({ navigation }) => {
+  useEffect(() => {
+    console.log("Login screen rendered");
+  }, []);
   const [authDetails, setAuthDetails] = useState<authType>({
     email: "",
     password: "",

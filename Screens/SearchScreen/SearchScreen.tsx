@@ -46,6 +46,7 @@ const SearchScreen: React.FC = () => {
   };
 
   useEffect(() => {
+    console.log("SearchScreen rendered");
     if (searchTimeout.current) {
       clearTimeout(searchTimeout.current);
     }

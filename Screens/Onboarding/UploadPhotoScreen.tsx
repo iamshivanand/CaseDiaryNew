@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image } from 'react-native';
 import PrimaryButton from './components/PrimaryButton';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,9 @@ import { OnboardingContext } from '../../Providers/OnboardingProvider';
 import * as ImagePicker from 'expo-image-picker';
 
 const UploadPhotoScreen = ({ navigation }) => {
+  useEffect(() => {
+    console.log("UploadPhotoScreen rendered");
+  }, []);
   const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
 
   const handleChooseImage = async () => {

@@ -155,6 +155,7 @@ const EditCaseScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    console.log("EditCaseScreen rendered");
     const caseIdToLoad = initialCaseIdFromRoute;
     navigation.setOptions({
       title: route.params?.initialCaseData?.CaseTitle

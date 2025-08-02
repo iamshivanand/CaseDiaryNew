@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 
 import { SignUpStyle } from "./signupStyle";
@@ -9,6 +9,9 @@ interface Props {
 }
 
 const SignUp: React.FC<Props> = ({ setIsSignUp }) => {
+  useEffect(() => {
+    console.log("SignUp screen rendered");
+  }, []);
   return (
     <View>
       <Text>Create Your Account</Text>

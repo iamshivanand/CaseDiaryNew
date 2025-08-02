@@ -194,6 +194,9 @@ const TodaysCasesSection = () => {
 };
 
 const DashboardScreen = () => {
+  useEffect(() => {
+    console.log("DashboardScreen rendered");
+  }, []);
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>

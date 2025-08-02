@@ -1,5 +1,5 @@
 import { StackNavigationProp } from "@react-navigation/stack";
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,9 @@ type Props = {
 };
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  useEffect(() => {
+    console.log("HomeScreen rendered");
+  }, []);
   const { theme } = useContext(ThemeContext);
   return (
     <View

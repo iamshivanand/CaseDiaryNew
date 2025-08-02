@@ -73,6 +73,7 @@ const CalendarScreen: React.FC<Props> = () => {
 
   useFocusEffect(
     useCallback(() => {
+      console.log("CalendarScreen focused");
       fetchAllDates();
       getResultFromDate(selected);
     }, [selected])

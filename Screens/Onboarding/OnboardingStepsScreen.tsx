@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, SafeAreaView } from 'react-native';
 import StepperIndicator from './components/StepperIndicator';
 import PrimaryButton from './components/PrimaryButton';
 
 const OnboardingStepsScreen = ({ navigation }) => {
+  useEffect(() => {
+    console.log("OnboardingStepsScreen rendered");
+  }, []);
   const steps = ['Personal Details', 'Upload Photo', 'Setup Profile', 'Practice Areas', 'Done'];
   const currentStep = 1; // This will be dynamic in the real app
 

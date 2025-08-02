@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import PrimaryButton from './components/PrimaryButton';
 
 const GreetingScreen = ({ navigation }) => {
+  useEffect(() => {
+    console.log("GreetingScreen rendered");
+  }, []);
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>

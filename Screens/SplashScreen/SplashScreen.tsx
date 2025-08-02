@@ -18,6 +18,7 @@ const SplashScreen = () => {
   });
 
   useEffect(() => {
+    console.log("SplashScreen rendered");
     scale.value = withRepeat(
       withSequence(
         withTiming(1.1, { duration: 1000 }),
