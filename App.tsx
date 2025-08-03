@@ -9,8 +9,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { emitter } from "./utils/event-emitter";
-import { useFonts } from "expo-font";
-import { Ionicons } from "@expo/vector-icons";
 
 import { getDb } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
@@ -62,11 +60,6 @@ export default function App() {
   const [isSplashscreenVisible, setSplashscreenVisible] = useState(true);
   const translateY = useSharedValue(1000);
 
-  // const [fontsLoaded] = useFonts({
-  //   ...Ionicons.font,
-  // });
-  const fontsLoaded = true;
-
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [{ translateY: translateY.value }],
@@ -88,12 +81,10 @@ export default function App() {
       } catch (error) {
         console.error("Failed to initialize database from App.tsx:", error);
       } finally {
-        if (fontsLoaded) {
-          setTimeout(() => {
-            setSplashscreenVisible(false);
-          }, 3000);
-          setLoading(false);
-        }
+        setTimeout(() => {
+          setSplashscreenVisible(false);
+        }, 3000);
+        setLoading(false);
       }
     };
 
@@ -109,9 +100,9 @@ export default function App() {
     return () => {
       emitter.off("onboardingComplete", onOnboardingComplete);
     };
-  }, [fontsLoaded]);
+  }, []);
 
-  if (isSplashscreenVisible || !fontsLoaded) {
+  if (isSplashscreenVisible) {
     return <SplashScreen />;
   }
 

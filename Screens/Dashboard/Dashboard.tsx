@@ -36,12 +36,10 @@ const WelcomeCard = () => {
   );
 };
 
-import { Ionicons } from "@expo/vector-icons";
-
 const QuickActionButton = ({ icon, text, onPress, color }) => {
   return (
     <TouchableOpacity style={styles.quickAction} onPress={onPress}>
-      <Ionicons name={icon} size={30} color={color} />
+      <Text style={{ fontSize: 30, color: color }}>?</Text>
       <Text style={styles.quickActionText}>{text}</Text>
     </TouchableOpacity>
   );
