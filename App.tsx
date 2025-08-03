@@ -9,6 +9,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { emitter } from "./utils/event-emitter";
+import { useFonts } from "expo-font";
+import { Ionicons } from "@expo/vector-icons";
 
 import { getDb } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
@@ -26,7 +28,7 @@ const OnboardingStack = createNativeStackNavigator();
 
 import DoneScreen from "./Screens/Onboarding/DoneScreen";
 
-import { CardStyleInterpolators } from '@react-navigation/stack';
+import { CardStyleInterpolators } from "@react-navigation/stack";
 
 const OnboardingNavigator = () => (
   <OnboardingStack.Navigator
@@ -59,6 +61,10 @@ export default function App() {
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isSplashscreenVisible, setSplashscreenVisible] = useState(true);
   const translateY = useSharedValue(1000);
+
+  const [fontsLoaded] = useFonts({
+    ...Ionicons.font,
+  });
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -102,7 +108,7 @@ export default function App() {
     };
   }, []);
 
-  if (isSplashscreenVisible) {
+  if (isSplashscreenVisible || !fontsLoaded) {
     return <SplashScreen />;
   }
 
