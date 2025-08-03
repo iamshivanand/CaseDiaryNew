@@ -36,10 +36,12 @@ const WelcomeCard = () => {
   );
 };
 
+import Ionicons from "react-native-vector-icons/Ionicons";
+
 const QuickActionButton = ({ icon, text, onPress, color }) => {
   return (
     <TouchableOpacity style={styles.quickAction} onPress={onPress}>
-      <Text style={{ fontSize: 30, color: color }}>?</Text>
+      <Ionicons name={icon} size={30} color={color} />
       <Text style={styles.quickActionText}>{text}</Text>
     </TouchableOpacity>
   );
@@ -192,9 +194,6 @@ const TodaysCasesSection = () => {
 };
 
 const DashboardScreen = () => {
-  useEffect(() => {
-    console.log("DashboardScreen rendered");
-  }, []);
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
