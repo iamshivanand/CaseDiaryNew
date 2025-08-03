@@ -62,9 +62,10 @@ export default function App() {
   const [isSplashscreenVisible, setSplashscreenVisible] = useState(true);
   const translateY = useSharedValue(1000);
 
-  const [fontsLoaded] = useFonts({
-    ...Ionicons.font,
-  });
+  // const [fontsLoaded] = useFonts({
+  //   ...Ionicons.font,
+  // });
+  const fontsLoaded = true;
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
