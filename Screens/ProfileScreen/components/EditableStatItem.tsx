@@ -1,24 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import React, { useContext } from 'react';
+import { Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-
-interface EditControlsProps {
-  onSave: () => void;
-  onCancel: () => void;
-}
-
-const EditControls: React.FC<EditControlsProps> = ({ onSave, onCancel }) => (
-  <View style={styles.editControlsContainer}>
-    <TouchableOpacity onPress={onSave} style={[styles.button, styles.saveButton]}>
-      <Icon name="check" size={18} color="#fff" />
-      <Text style={styles.buttonText}>Save</Text>
-    </TouchableOpacity>
-    <TouchableOpacity onPress={onCancel} style={[styles.button, styles.cancelButton]}>
-      <Icon name="close" size={18} color="#fff" />
-      <Text style={styles.buttonText}>Cancel</Text>
-    </TouchableOpacity>
-  </View>
-);
+import { LinearGradient } from 'expo-linear-gradient';
+import { ThemeContext } from '../../../Providers/ThemeProvider';
 
 interface EditableStatItemProps {
   label: string;
@@ -27,10 +11,9 @@ interface EditableStatItemProps {
   isEditing: boolean;
   tempValue: string; // Stored as string for TextInput
   onTempValueChange: (text: string) => void;
-  onEditPress: () => void;
-  onSave: () => void;
-  onCancel: () => void;
 }
+
+import { View } from 'react-native';
 
 const EditableStatItem: React.FC<EditableStatItemProps> = ({
   label,
@@ -39,37 +22,46 @@ const EditableStatItem: React.FC<EditableStatItemProps> = ({
   isEditing,
   tempValue,
   onTempValueChange,
-  onEditPress,
-  onSave,
-  onCancel,
 }) => {
+  const { theme } = useContext(ThemeContext);
+  const cardGradient = theme.dark 
+    ? ["#1E293B", "#0F172A"] // Slate-800 to Slate-900 for dark mode
+    : ["#FFFFFF", "#F1F5F9"]; // Slate-50 gradient for light mode
+
   return (
-    <View style={[styles.card, isEditing && styles.editingCard]}>
+    <LinearGradient
+      colors={cardGradient}
+      style={[
+        styles.card,
+        isEditing && styles.editingCard,
+        {
+          borderColor: theme.colors.border,
+          borderWidth: theme.dark ? 1 : 0,
+        }
+      ]}
+    >
       {isEditing ? (
         <>
-          <Text style={styles.labelEditing}>{label}</Text>
+          <Text style={[styles.labelEditing, { color: theme.colors.text }]}>{label}</Text>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
             value={tempValue}
             onChangeText={onTempValueChange}
             placeholder="Years"
+            placeholderTextColor={theme.colors.textSecondary}
             keyboardType="number-pad"
           />
-          <EditControls onSave={onSave} onCancel={onCancel} />
         </>
       ) : (
         <>
-          <TouchableOpacity onPress={onEditPress} style={styles.editIcon}>
-            <Icon name="pencil-outline" size={18} color="#3B82F6" />
-          </TouchableOpacity>
-          <Text style={styles.valueText}>
+          <Text style={[styles.valueText, { color: theme.colors.primary }]}>
             {value}
-            {unit && <Text style={styles.unitText}> {unit}</Text>}
+            {unit && <Text style={[styles.unitText, { color: theme.colors.primary }]}> {unit}</Text>}
           </Text>
-          <Text style={styles.labelText}>{label}</Text>
+          <Text style={[styles.labelText, { color: theme.colors.textSecondary }]}>{label}</Text>
         </>
       )}
-    </View>
+    </LinearGradient>
   );
 };
 

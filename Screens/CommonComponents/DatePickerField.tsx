@@ -71,18 +71,36 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
     modalOverlay: {
         flex: 1,
         justifyContent: 'flex-end',
-        backgroundColor: theme.colors.modalOverlayBg || 'rgba(0,0,0,0.4)',
+        backgroundColor: theme.colors.modalOverlayBg || 'rgba(15, 23, 42, 0.65)',
     },
     modalContainer: {
-        backgroundColor: theme.colors.modalBackground || theme.colors.background,
-        borderTopRightRadius: 20,
-        borderTopLeftRadius: 20,
+        backgroundColor: theme.colors.modalBackground || theme.colors.cardBackground,
+        borderTopRightRadius: 24,
+        borderTopLeftRadius: 24,
         padding: 20,
     },
     buttonContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginTop: 20,
+    },
+    iosButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        minWidth: 100,
+    },
+    cancelButton: {
+        backgroundColor: theme.colors.danger + '1A', // 10% opacity
+    },
+    doneButton: {
+        backgroundColor: theme.colors.primary + '1A', // 10% opacity
+    },
+    iosButtonText: {
+        fontWeight: '600',
+        fontSize: 15,
     }
   });
 
@@ -135,8 +153,18 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
                         // themeVariant={theme.isDarkMode ? "dark" : "light"} // If theme has isDarkMode
                     />
                     <View style={localIosPickerStyles.buttonContainer}>
-                        <Button title="Cancel" onPress={cancelIosDate} color={theme.colors.errorText || "#FF3B30"} />
-                        <Button title="Done" onPress={confirmIosDate} color={theme.colors.primary} />
+                      <TouchableOpacity
+                        onPress={cancelIosDate}
+                        style={[localIosPickerStyles.iosButton, localIosPickerStyles.cancelButton]}
+                      >
+                        <Text style={[localIosPickerStyles.iosButtonText, { color: theme.colors.danger }]}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={confirmIosDate}
+                        style={[localIosPickerStyles.iosButton, localIosPickerStyles.doneButton]}
+                      >
+                        <Text style={[localIosPickerStyles.iosButtonText, { color: theme.colors.primary }]}>Done</Text>
+                      </TouchableOpacity>
                     </View>
                 </View>
             </View>

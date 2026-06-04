@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import ActionButton from "../../CommonComponents/ActionButton";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface UpdateHearingPopupProps {
   visible: boolean;
@@ -22,6 +24,7 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
   onClose,
   onSave,
 }) => {
+  const { theme } = useContext(ThemeContext);
   const [notes, setNotes] = useState("");
   const [nextHearingDate, setNextHearingDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -38,33 +41,61 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalContainer}>
-        <View style={styles.popup}>
-          <Text style={styles.title}>Update Hearing</Text>
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={[styles.popup, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+          <Text style={[styles.title, { color: theme.colors.text }]}>Update Hearing</Text>
+          
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.colors.inputBackground,
+                color: theme.colors.text,
+                borderColor: theme.colors.border,
+              },
+            ]}
             placeholder="Notes for today's hearing"
+            placeholderTextColor={theme.colors.textSecondary}
             value={notes}
             onChangeText={setNotes}
             multiline
           />
-          <TouchableOpacity onPress={() => setShowDatePicker(true)}>
-            <Text style={styles.datePickerText}>
-              Next Hearing Date: {nextHearingDate.toDateString()}
+
+          <TouchableOpacity
+            onPress={() => setShowDatePicker(true)}
+            activeOpacity={0.7}
+            style={[
+              styles.dateTrigger,
+              {
+                backgroundColor: theme.colors.inputBackground,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
+            <Icon name="calendar-month-outline" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+            <Text style={[styles.dateTriggerText, { color: theme.colors.text }]}>
+              Next Date: {nextHearingDate.toDateString()}
             </Text>
           </TouchableOpacity>
+
           {showDatePicker && (
             <DateTimePicker
               value={nextHearingDate}
               mode="date"
               display="default"
               onChange={onDateChange}
+              textColor={theme.colors.text}
             />
           )}
+
           <View style={styles.buttonContainer}>
-            <ActionButton title="Cancel" onPress={onClose} type="secondary" />
-            <ActionButton title="Save" onPress={handleSave} type="primary" />
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <ActionButton title="Cancel" onPress={onClose} type="secondary" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <ActionButton title="Save" onPress={handleSave} type="primary" />
+            </View>
           </View>
         </View>
       </View>
@@ -73,38 +104,53 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(15, 23, 42, 0.75)", // Slate dark overlay
+    paddingHorizontal: 20,
   },
   popup: {
-    width: "80%",
-    backgroundColor: "white",
-    borderRadius: 10,
+    width: "90%",
+    borderRadius: 20,
+    borderWidth: 1,
     padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 20,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
     minHeight: 100,
+    textAlignVertical: "top",
+    fontSize: 14,
   },
-  datePickerText: {
-    fontSize: 16,
+  dateTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
     marginBottom: 20,
+  },
+  dateTriggerText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
   buttonContainer: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
   },
 });
 

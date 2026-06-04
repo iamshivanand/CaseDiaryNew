@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useContext } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { formatDate } from '../../utils/commonFunctions';
 import * as db from '../../DataBase';
@@ -8,6 +8,7 @@ import NewCaseCard from '../CasesList/components/NewCaseCard';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
 import { getCurrentUserId } from '../../utils/commonFunctions';
+import { ThemeContext } from '../../Providers/ThemeProvider';
 
 import { SafeAreaView, Platform } from "react-native";
 
@@ -23,6 +24,7 @@ const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
 };
 
 const UndatedCasesScreen = () => {
+  const { theme } = useContext(ThemeContext);
   const [undatedCases, setUndatedCases] = useState<CaseDataScreen[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
@@ -42,14 +44,15 @@ const UndatedCasesScreen = () => {
       });
 
       const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
-          id: c.id,
-          title: c.CaseTitle || 'No Title',
-          client: c.ClientName || 'Unknown Client',
-          status: c.CaseStatus || 'Pending',
-          nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
-          lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
-          previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
-        }));
+        id: c.id,
+        title: c.CaseTitle || 'No Title',
+        client: c.ClientName || 'Unknown Client',
+        status: c.CaseStatus || 'Pending',
+        nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
+        lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
+        previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
+        priority: c.Priority || 'Low',
+      }));
 
       setUndatedCases(mappedCases);
     } catch (error) {
@@ -104,14 +107,14 @@ const UndatedCasesScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
+      <View style={[styles.centered, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <FlatList
         data={undatedCases}
         keyExtractor={(item) => item.id.toString()}
@@ -122,7 +125,11 @@ const UndatedCasesScreen = () => {
             index={index}
           />
         )}
-        ListEmptyComponent={<Text style={styles.emptyText}>No undated cases found.</Text>}
+        ListEmptyComponent={
+          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+            No undated cases found.
+          </Text>
+        }
         contentContainerStyle={styles.container}
       />
       {selectedCase && (
@@ -141,7 +148,6 @@ const UndatedCasesScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     paddingTop: Platform.OS === 'android' ? 25 : 0,
   },
   container: {

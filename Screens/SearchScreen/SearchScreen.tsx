@@ -1,82 +1,46 @@
 import { AntDesign } from "@expo/vector-icons";
-import React, { useContext, useState, useCallback, useEffect, useRef } from "react";
-import { formatDate } from "../../utils/commonFunctions";
-import { View, Text, TextInput, StyleSheet, Dimensions, FlatList, ActivityIndicator, SafeAreaView, Platform } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
-import * as db from "../../DataBase"; // Import db functions
-import { CaseWithDetails } from "../../DataBase"; // Import the type for results
+import React, { useContext, useState, useCallback } from "react";
+import { View, Text, TextInput, FlatList, ActivityIndicator, SafeAreaView, StyleSheet, Platform } from "react-native";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { CaseDataScreen } from "../../Types/appTypes";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import { getCurrentUserId } from "../../utils/commonFunctions";
-
-const windowWidth = Dimensions.get("window").width;
+import { useSearchCases } from "../../Hooks/useCases";
+import * as db from "../../DataBase";
 
 const SearchScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
   const styles = getSearchScreenStyles(theme);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [results, setResults] = useState<CaseWithDetails[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const {
+    searchQuery,
+    setSearchQuery,
+    results,
+    isLoading,
+    hasSearched,
+    hasMore,
+    refreshSearch,
+    loadMore,
+  } = useSearchCases();
+
   const [isPopupVisible, setPopupVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
 
-  const executeSearch = async (query: string) => {
-    if (!query.trim()) {
-      setResults([]);
-      setHasSearched(false);
-      return;
-    }
-    setIsLoading(true);
-    setHasSearched(true);
-    try {
-      const fetchedCases = await db.searchCases(query.trim());
-      setResults(fetchedCases);
-    } catch (error) {
-      console.error("Error searching cases:", error);
-      setResults([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (searchTimeout.current) {
-      clearTimeout(searchTimeout.current);
-    }
-    searchTimeout.current = setTimeout(() => {
-      executeSearch(searchQuery);
-    }, 500); // 500ms delay
-
-    return () => {
-      if (searchTimeout.current) {
-        clearTimeout(searchTimeout.current);
-      }
-    };
-  }, [searchQuery]);
-
-  const handleCaseDeleted = (deletedCaseId: number | string) => {
-    setResults(prevResults => prevResults.filter(item => item.id !== deletedCaseId));
-  };
-
-  const handleUpdateHearing = (caseDetails: CaseDataScreen) => {
+  const handleUpdateHearing = useCallback((caseDetails: CaseDataScreen) => {
     setSelectedCase(caseDetails);
     setPopupVisible(true);
-  };
+  }, []);
 
-  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number) => {
+  const handleSaveHearing = useCallback(async (notes: string, nextHearingDate: Date, userId: number) => {
     if (!selectedCase || !selectedCase.id) return;
     const caseId = parseInt(selectedCase.id.toString(), 10);
-    if(isNaN(caseId)) return;
+    if (isNaN(caseId)) return;
 
     try {
       const caseExists = await db.getCaseById(caseId);
-      if(!caseExists) {
+      if (!caseExists) {
         console.error("Case not found");
         return;
       }
@@ -94,25 +58,18 @@ const SearchScreen: React.FC = () => {
         NextDate: nextHearingDate.toISOString(),
       }, userId);
 
-      // 3. Refresh the list
-      executeSearch(searchQuery);
+      // 3. Refresh list from page 0
+      refreshSearch();
     } catch (error) {
       console.error("Error updating hearing:", error);
     }
-  };
+  }, [selectedCase, refreshSearch]);
 
-  const renderItem = ({ item }: { item: CaseWithDetails }) => {
-    const caseCardDetails: CaseDataScreen = {
-      id: item.id,
-      title: item.CaseTitle || 'No Title',
-      client: item.ClientName || 'Unknown Client',
-      status: item.CaseStatus || 'Pending',
-      nextHearing: item.NextDate ? formatDate(item.NextDate) : 'N/A',
-      lastUpdate: item.updated_at ? formatDate(item.updated_at) : 'N/A',
-      previousHearing: item.PreviousDate ? formatDate(item.PreviousDate) : 'N/A',
-    };
-    return <NewCaseCard caseDetails={caseCardDetails} onUpdateHearingPress={() => handleUpdateHearing(caseCardDetails)} />;
-  };
+  const renderItem = useCallback(({ item }: { item: CaseDataScreen }) => (
+    <NewCaseCard caseDetails={item} onUpdateHearingPress={() => handleUpdateHearing(item)} />
+  ), [handleUpdateHearing]);
+
+  const keyExtractor = useCallback((item: CaseDataScreen) => item.id.toString(), []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -122,13 +79,13 @@ const SearchScreen: React.FC = () => {
             <AntDesign
               name="search1"
               size={22}
-              color={theme.colors.textSecondary || "#555"}
+              color={theme.colors.textSecondary}
               style={styles.icon}
             />
             <TextInput
               style={[styles.input, { color: theme.colors.text }]}
               placeholder="Search cases..."
-              placeholderTextColor={theme.colors.textSecondary || "#888"}
+              placeholderTextColor={theme.colors.textSecondary}
               onChangeText={setSearchQuery}
               value={searchQuery}
               returnKeyType="search"
@@ -136,26 +93,43 @@ const SearchScreen: React.FC = () => {
           </View>
         </View>
 
-        {isLoading ? (
+        {isLoading && results.length === 0 ? (
           <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.loader}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={{color: theme.colors.text}}>Searching...</Text>
+            <Text style={{ color: theme.colors.text, marginTop: 8 }}>Searching...</Text>
           </Animated.View>
         ) : (
           <FlatList
             data={results}
             renderItem={renderItem}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={keyExtractor}
+            initialNumToRender={6}
+            maxToRenderPerBatch={4}
+            windowSize={3}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            getItemLayout={(data, index) => ({
+              length: 154, // Accurate height of NewCaseCard
+              offset: 154 * index,
+              index,
+            })}
             contentContainerStyle={styles.listContentContainer}
             ListEmptyComponent={() => {
               if (!hasSearched) {
-                return <Text style={[styles.emptyText, {color: theme.colors.text}]}>Enter a query to start searching.</Text>;
+                return <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>Enter a query to start searching.</Text>;
               }
               if (results.length === 0 && !isLoading) {
-                return <Text style={[styles.emptyText, {color: theme.colors.text}]}>No cases found matching your query.</Text>;
+                return <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>No cases found matching your query.</Text>;
               }
               return null;
             }}
+            ListFooterComponent={
+              isLoading && results.length > 0 ? (
+                <View style={{ paddingVertical: 16 }}>
+                  <ActivityIndicator color={theme.colors.primary} />
+                </View>
+              ) : null
+            }
           />
         )}
       </View>
@@ -177,54 +151,56 @@ export default SearchScreen;
 const getSearchScreenStyles = (theme: Theme) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
     paddingTop: Platform.OS === 'android' ? 25 : 0,
   },
   screenContainer: {
     flex: 1,
-    backgroundColor: theme.colors.background, // Added theme background
+    backgroundColor: theme.colors.background,
     paddingHorizontal: 16,
     paddingTop: 16,
   },
   searchSection: {
     paddingBottom: 10,
-    backgroundColor: theme.colors.background, // Ensure section bg matches screen if needed
+    backgroundColor: theme.colors.background,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.inputBackground || '#f0f0f0', // Themeable input bg
+    backgroundColor: theme.colors.inputBackground,
     borderRadius: 8,
     paddingHorizontal: 10,
     height: 48,
     marginBottom: 10,
+    borderWidth: theme.dark ? 1 : 0,
+    borderColor: theme.colors.border,
   },
-  input: { // Text color already applied dynamically in component
+  input: {
     flex: 1,
     height: '100%',
     fontSize: 16,
   },
-  icon: { // Icon color already applied dynamically in component
+  icon: {
     marginRight: 10,
   },
-  searchButton: { // ActionButton will use its own themed styles, this is for layout
+  searchButton: {
     minHeight: 48,
     marginVertical: 0,
   },
-  searchButtonText: { // ActionButton will use its own themed styles
+  searchButtonText: {
     fontSize: 16,
   },
-  loader: { // ActivityIndicator color applied dynamically in component
+  loader: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   listContentContainer: {
     paddingHorizontal: 15,
-    paddingBottom: 20,
+    paddingBottom: 100,
     flexGrow: 1,
   },
-  emptyText: { // Text color already applied dynamically in component
+  emptyText: {
     textAlign: 'center',
     marginTop: 50,
     fontSize: 16,

@@ -2,9 +2,12 @@ import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
-import React, { useState } from "react";
-import { View, Text, TextInput, Button, Modal, StyleSheet } from "react-native";
+import React, { useState, useContext } from "react";
+import { View, Text, TextInput, TouchableOpacity, Modal, StyleSheet } from "react-native";
 import { formatDate } from "../../utils/commonFunctions";
+import { ThemeContext } from "../../Providers/ThemeProvider";
+import ActionButton from "./ActionButton";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 interface FieldConfig {
   name: string;
@@ -27,6 +30,7 @@ const GenericModal: React.FC<GenericModalProps> = ({
   onSubmit,
   fields,
 }) => {
+  const { theme } = useContext(ThemeContext);
   const [formData, setFormData] = useState<{ [key: string]: any }>({});
   const [selectedDateField, setSelectedDateField] = useState<string | null>(
     null
@@ -57,37 +61,76 @@ const GenericModal: React.FC<GenericModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+          <Text style={[styles.title, { color: theme.colors.text }]}>Add Custom Field</Text>
+          
           {fields.map((field) => (
             <View key={field.name} style={styles.fieldContainer}>
-              <Text style={styles.label}>{field.label}</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>{field.label}</Text>
+              
               {field.type === "text" && (
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.inputBackground,
+                      color: theme.colors.text,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
                   placeholder={field.placeholder}
+                  placeholderTextColor={theme.colors.textSecondary}
                   onChangeText={(value) => handleChange(field.name, value)}
                 />
               )}
+              
               {field.type === "select" && (
-                <Picker
-                  selectedValue={formData[field.name]}
-                  onValueChange={(value) => handleChange(field.name, value)}
+                <View
+                  style={[
+                    styles.pickerWrapper,
+                    {
+                      backgroundColor: theme.colors.inputBackground,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
                 >
-                  {field.options?.map((option) => (
-                    <Picker.Item
-                      key={option.value}
-                      label={option.label}
-                      value={option.value}
-                    />
-                  ))}
-                </Picker>
+                  <Picker
+                    selectedValue={formData[field.name]}
+                    style={{ color: theme.colors.text }}
+                    dropdownIconColor={theme.colors.text}
+                    onValueChange={(value) => handleChange(field.name, value)}
+                  >
+                    {field.options?.map((option) => (
+                      <Picker.Item
+                        key={option.value}
+                        label={option.label}
+                        value={option.value}
+                        color={theme.dark ? "#FFFFFF" : "#000000"}
+                        style={{ backgroundColor: theme.colors.cardBackground }}
+                      />
+                    ))}
+                  </Picker>
+                </View>
               )}
+              
               {field.type === "date" && (
                 <>
-                  <Button
-                    title="Select Date"
+                  <TouchableOpacity
                     onPress={() => setSelectedDateField(field.name)}
-                  />
+                    style={[
+                      styles.dateTrigger,
+                      {
+                        backgroundColor: theme.colors.inputBackground,
+                        borderColor: theme.colors.border,
+                      },
+                    ]}
+                  >
+                    <Icon name="calendar" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                    <Text style={{ color: formData[field.name] ? theme.colors.text : theme.colors.textSecondary }}>
+                      {formData[field.name] || "Select Date"}
+                    </Text>
+                  </TouchableOpacity>
+
                   {selectedDateField === field.name && (
                     <DateTimePicker
                       value={new Date()}
@@ -102,8 +145,15 @@ const GenericModal: React.FC<GenericModalProps> = ({
               )}
             </View>
           ))}
-          <Button title="Submit" onPress={handleFormSubmit} />
-          <Button title="Close" onPress={onClose} />
+
+          <View style={styles.buttonContainer}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <ActionButton title="Close" onPress={onClose} type="secondary" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <ActionButton title="Submit" onPress={handleFormSubmit} type="primary" />
+            </View>
+          </View>
         </View>
       </View>
     </Modal>
@@ -115,26 +165,56 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(15, 23, 42, 0.75)",
+    paddingHorizontal: 20,
   },
   modalContent: {
-    width: "80%",
-    backgroundColor: "white",
+    width: "90%",
     padding: 20,
-    borderRadius: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
   },
   fieldContainer: {
-    marginBottom: 15,
+    marginBottom: 16,
   },
   label: {
-    fontSize: 16,
-    marginBottom: 5,
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    borderRadius: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    fontSize: 14,
+  },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  dateTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
   },
 });
 

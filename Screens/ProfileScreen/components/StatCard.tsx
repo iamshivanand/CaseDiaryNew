@@ -1,5 +1,7 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useContext } from "react";
+import { Text, StyleSheet } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface StatCardProps {
   label: string;
@@ -8,21 +10,34 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ label, value, unit }) => {
+  const { theme } = useContext(ThemeContext);
+  const cardGradient = theme.dark 
+    ? ["#1E293B", "#0F172A"] // Slate-800 to Slate-900 for dark mode
+    : ["#FFFFFF", "#F1F5F9"]; // Slate-50 gradient for light mode
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.valueText}>
+    <LinearGradient
+      colors={cardGradient}
+      style={[
+        styles.card,
+        {
+          borderColor: theme.colors.border,
+          borderWidth: theme.dark ? 1 : 0,
+        }
+      ]}
+    >
+      <Text style={[styles.valueText, { color: theme.colors.primary }]}>
         {value}
-        {unit && <Text style={styles.unitText}> {unit}</Text>}
+        {unit && <Text style={[styles.unitText, { color: theme.colors.primary }]}> {unit}</Text>}
       </Text>
-      <Text style={styles.labelText}>{label}</Text>
-    </View>
+      <Text style={[styles.labelText, { color: theme.colors.textSecondary }]}>{label}</Text>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
+    borderRadius: 12,
     paddingVertical: 15,
     paddingHorizontal: 10,
     alignItems: "center",
@@ -38,17 +53,14 @@ const styles = StyleSheet.create({
   valueText: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#3B82F6", // Blue accent
     marginBottom: 5,
   },
   unitText: {
     fontSize: 12,
     fontWeight: "normal",
-    color: "#3B82F6", // Blue accent
   },
   labelText: {
     fontSize: 13,
-    color: "#6B7280", // Gray color for label
     textAlign: "center",
   },
 });

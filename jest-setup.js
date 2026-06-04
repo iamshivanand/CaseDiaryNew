@@ -46,7 +46,154 @@ jest.mock('expo-intent-launcher', () => ({
 //   jest.clearAllMocks();
 // });
 
+// Mock for expo-notifications
+jest.mock('expo-notifications', () => ({
+  setNotificationHandler: jest.fn(),
+  getPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
+  requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
+  scheduleNotificationAsync: jest.fn(() => Promise.resolve('mock-notification-id')),
+  getAllScheduledNotificationsAsync: jest.fn(() => Promise.resolve([])),
+  cancelScheduledNotificationAsync: jest.fn(() => Promise.resolve()),
+}), { virtual: true });
+
+// Mock for expo-print
+jest.mock('expo-print', () => ({
+  printToFileAsync: jest.fn(() => Promise.resolve({ uri: 'file:///mock/print/file.pdf' })),
+}), { virtual: true });
+
+// Mock for expo-sharing
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: jest.fn(() => Promise.resolve(true)),
+  shareAsync: jest.fn(() => Promise.resolve()),
+}), { virtual: true });
+
+// Mock for AsyncStorage
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  setItem: jest.fn(() => Promise.resolve()),
+  getItem: jest.fn(() => Promise.resolve(null)),
+  removeItem: jest.fn(() => Promise.resolve()),
+  clear: jest.fn(() => Promise.resolve()),
+}), { virtual: true });
+
+// Mock for @react-native-picker/picker
+jest.mock('@react-native-picker/picker', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  
+  const Picker = (props) => {
+    return React.createElement(View, { testID: props.testID }, props.children);
+  };
+  
+  Picker.Item = (props) => {
+    const { Text } = require('react-native');
+    return React.createElement(Text, null, props.label);
+  };
+  
+  return { Picker };
+}, { virtual: true });
+
 // Note: The __mocks__/expo-sqlite.js will be automatically picked up by Jest.
 // No need to explicitly mock it here unless you want to override that manual mock.
 
 // console.log('jest-setup.js loaded'); // Keep this for debugging if tests still fail to find it
+
+// Mock for react-native-autocomplete-input
+jest.mock('react-native-autocomplete-input', () => {
+  const React = require('react');
+  const { TextInput, View } = require('react-native');
+  
+  const Autocomplete = (props) => {
+    const { data, renderResultList, onChangeText, defaultValue, placeholder } = props;
+    return React.createElement(
+      View,
+      null,
+      React.createElement(TextInput, {
+        placeholder,
+        value: defaultValue,
+        onChangeText,
+        ...props,
+      }),
+      data && data.length > 0 && typeof renderResultList === 'function'
+        ? renderResultList({ data })
+        : null
+    );
+  };
+  
+  return Autocomplete;
+}, { virtual: true });
+
+// Mock for react-native-google-mobile-ads
+jest.mock('react-native-google-mobile-ads', () => {
+  const React = require('react');
+  const { View, Text } = require('react-native');
+
+  const BannerAd = (props) => {
+    return React.createElement(View, { style: props.style }, React.createElement(Text, null, "BannerAd"));
+  };
+
+  const InterstitialAd = {
+    createForAdRequest: jest.fn(() => ({
+      load: jest.fn(),
+      show: jest.fn(),
+      addAdEventListener: jest.fn(() => jest.fn()),
+    })),
+  };
+
+  const RewardedAd = {
+    createForAdRequest: jest.fn(() => ({
+      load: jest.fn(),
+      show: jest.fn(),
+      addAdEventListener: jest.fn(() => jest.fn()),
+    })),
+  };
+
+  const AppOpenAd = {
+    createForAdRequest: jest.fn(() => ({
+      load: jest.fn(),
+      show: jest.fn(),
+      addAdEventListener: jest.fn(() => jest.fn()),
+    })),
+  };
+
+  const mobileAds = jest.fn(() => ({
+    initialize: jest.fn(() => Promise.resolve({})),
+  }));
+
+  return {
+    __esModule: true,
+    default: mobileAds,
+    BannerAd,
+    BannerAdSize: {
+      ANCHORED_ADAPTIVE_BANNER: 'ANCHORED_ADAPTIVE_BANNER',
+      BANNER: 'BANNER',
+    },
+    TestIds: {
+      BANNER: 'ca-app-pub-3940256099942544/6300978111',
+      INTERSTITIAL: 'ca-app-pub-3940256099942544/1033173712',
+      APP_OPEN: 'ca-app-pub-3940256099942544/9257395921',
+      REWARDED: 'ca-app-pub-3940256099942544/5224354917',
+    },
+    InterstitialAd,
+    RewardedAd,
+    AppOpenAd,
+    AdEventType: {
+      LOADED: 'loaded',
+      CLOSED: 'closed',
+    },
+    RewardedAdEventType: {
+      LOADED: 'loaded',
+      CLOSED: 'closed',
+      EARNED_REWARD: 'earned_reward',
+    },
+  };
+}, { virtual: true });
+
+// Mock for local AdManager utility
+jest.mock('./Screens/CommonComponents/AdManager', () => ({
+  AdProvider: ({ children }) => children,
+  useAdTrigger: () => ({
+    showAdWithPreload: jest.fn((adType, onComplete) => {
+      onComplete(true);
+    }),
+  }),
+}));

@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback, useContext } from "react";
 import { formatDate } from "../../utils/commonFunctions";
 import {
   ScrollView,
@@ -11,26 +11,31 @@ import {
   Platform,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 import * as db from "../../DataBase";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
-import { CaseData, CaseDataScreen } from "../../Types/appTypes";
+import { CaseDataScreen } from "../../Types/appTypes";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import { getCurrentUserId } from "../../utils/commonFunctions";
+import { ThemeContext } from "../../Providers/ThemeProvider";
+import { mapCaseDbToScreen } from "../../utils/caseMapper";
 
 interface Props {
   // Add your prop types here
 }
 
 const CalendarScreen: React.FC<Props> = () => {
+  const { theme } = useContext(ThemeContext);
   const currentDate = new Date();
   const [selected, setSelected] = useState(
     currentDate.toISOString().slice(0, 10)
   );
   const [ResultToshow, setResultToShow] = useState<CaseDataScreen[]>([]);
-  const [markedDates, setMarkedDates] = useState({});
+  const [markedDates, setMarkedDates] = useState<any>({});
   const [isPopupVisible, setPopupVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
+  const [filter, setFilter] = useState<"All" | "High" | "Active" | "Pending">("All");
   const navigation = useNavigation();
 
   const getResultFromDate = async (date: string) => {
@@ -42,15 +47,7 @@ const CalendarScreen: React.FC<Props> = () => {
       return nextHearingDate === selectedDate;
     });
 
-    const mappedCases: CaseDataScreen[] = filteredCases.map((c: CaseData) => ({
-        id: c.id,
-        title: c.CaseTitle || 'No Title',
-        client: c.ClientName || 'Unknown Client',
-        status: c.CaseStatus || 'Pending',
-        nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
-        lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
-        previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
-    }));
+    const mappedCases: CaseDataScreen[] = filteredCases.map(mapCaseDbToScreen);
     setResultToShow(mappedCases);
   };
 
@@ -58,7 +55,7 @@ const CalendarScreen: React.FC<Props> = () => {
     const allCases = await db.getCases();
     const datesArray = allCases.map((item) => item.NextDate).filter(Boolean);
 
-    const formattedDates = datesArray.reduce((acc, date) => {
+    const formattedDates = datesArray.reduce((acc: any, date) => {
       const dateString = new Date(date).toISOString().split('T')[0];
       if (acc[dateString]) {
         acc[dateString].eventsCount += 1;
@@ -116,9 +113,11 @@ const CalendarScreen: React.FC<Props> = () => {
     }
   };
 
-  const renderDay = (day, item) => {
+  const renderDay = (day: any, state: string) => {
     const isSelected = selected === day.dateString;
     const dayMarking = markedDates[day.dateString];
+    const isDisabled = state === 'disabled';
+    const isToday = state === 'today';
 
     return (
       <TouchableOpacity
@@ -127,20 +126,23 @@ const CalendarScreen: React.FC<Props> = () => {
         }}
         style={[
           styles.dayContainer,
-          dayMarking && styles.hasCasesDay,
-          isSelected && styles.selectedDay,
+          dayMarking && { backgroundColor: theme.colors.primary + '20' }, // translucent primary bg
+          isSelected && { backgroundColor: theme.colors.primary },
+          isToday && !isSelected && { borderColor: theme.colors.primary, borderWidth: 1.5 },
         ]}
       >
         <Text
           style={[
             styles.dayText,
+            { color: isDisabled ? theme.colors.textSecondary + '40' : theme.colors.text },
             isSelected && styles.selectedDayText,
+            isToday && !isSelected && { color: theme.colors.primary, fontWeight: 'bold' },
           ]}
         >
           {day.day}
         </Text>
         {dayMarking && (
-          <View style={styles.eventBubble}>
+          <View style={[styles.eventBubble, { backgroundColor: theme.colors.secondary }]}>
             <Text style={styles.eventBubbleText}>
               {dayMarking.eventsCount}
             </Text>
@@ -150,31 +152,129 @@ const CalendarScreen: React.FC<Props> = () => {
     );
   };
 
+  const displayedCases = ResultToshow.filter((c) => {
+    if (filter === "All") return true;
+    if (filter === "High") return c.priority === "High";
+    if (filter === "Active") return c.status === "Active";
+    if (filter === "Pending") return c.status === "Pending";
+    return true;
+  });
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Calendar
-        onDayPress={(day) => {
-          setSelected(day.dateString);
-        }}
-        markedDates={{
-          ...markedDates,
-          [selected]: {
-            selected: true,
-            disableTouchEvent: true,
-            selectedColor: 'blue',
-            selectedTextColor: 'white'
-          },
-        }}
-        dayComponent={({ date, state }) => renderDay(date, markedDates[date.dateString])}
-      />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <ScrollView
         style={styles.container}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
       >
+        <Calendar
+          key={theme.dark ? "dark" : "light"}
+          onDayPress={(day) => {
+            setSelected(day.dateString);
+          }}
+          theme={{
+            calendarBackground: theme.colors.cardBackground,
+            textSectionTitleColor: theme.colors.textSecondary,
+            selectedDayBackgroundColor: theme.colors.primary,
+            selectedDayTextColor: '#ffffff',
+            todayTextColor: theme.colors.primary,
+            dayTextColor: theme.colors.text,
+            textDisabledColor: theme.colors.textSecondary + '40',
+            dotColor: theme.colors.primary,
+            selectedDotColor: '#ffffff',
+            arrowColor: theme.colors.primary,
+            monthTextColor: theme.colors.text,
+            indicatorColor: theme.colors.primary,
+            textDayFontWeight: '300',
+            textMonthFontWeight: 'bold',
+            textDayHeaderFontWeight: '500',
+            textDayFontSize: 15,
+            textMonthFontSize: 16,
+            textDayHeaderFontSize: 12,
+          }}
+          markedDates={{
+            ...markedDates,
+            [selected]: {
+              selected: true,
+              disableTouchEvent: true,
+              selectedColor: theme.colors.primary,
+              selectedTextColor: 'white'
+            },
+          }}
+          dayComponent={({ date, state }) => renderDay(date, state)}
+          renderArrow={(direction) => (
+            <Icon 
+              name={direction === "left" ? "chevron-left" : "chevron-right"} 
+              size={26} 
+              color={theme.colors.primary} 
+            />
+          )}
+        />
+
+        <View style={styles.filterContainer}>
+          {(["All", "High", "Active", "Pending"] as const).map((item) => {
+            const isSelected = filter === item;
+            let label = item;
+            if (item === "High") label = "High Priority";
+            if (item === "Active") label = "Active";
+            if (item === "Pending") label = "Pending";
+            
+            return (
+              <TouchableOpacity
+                key={item}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: isSelected ? theme.colors.primary : theme.colors.cardBackground,
+                    borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                  },
+                ]}
+                onPress={() => setFilter(item)}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    {
+                      color: isSelected ? "#FFFFFF" : theme.colors.textSecondary,
+                    },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         <View style={styles.CardsContainer}>
-          <Text>Selected Date is {selected}</Text>
-          {ResultToshow?.map((each, index) => (
-            <NewCaseCard key={index} caseDetails={each} onUpdateHearingPress={() => handleUpdateHearing(each)} onPress={() => navigation.navigate('CaseDetails', { caseId: each.id })} />
-          ))}
+          <View style={styles.agendaHeader}>
+            <Icon name="calendar-clock" size={22} color={theme.colors.primary} style={{ marginRight: 8 }} />
+            <Text style={[styles.dateSubheading, { color: theme.colors.text }]}>
+              Agenda for {new Date(selected).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </Text>
+          </View>
+          
+          <Text style={[styles.agendaCountText, { color: theme.colors.textSecondary }]}>
+            {displayedCases.length} {displayedCases.length === 1 ? "Hearing" : "Hearings"} Scheduled
+          </Text>
+
+          {displayedCases?.length > 0 ? (
+            displayedCases.map((each, index) => (
+              <NewCaseCard 
+                key={index} 
+                caseDetails={each} 
+                onUpdateHearingPress={() => handleUpdateHearing(each)} 
+                onPress={() => navigation.navigate('CaseDetails', { caseId: each.id })} 
+              />
+            ))
+          ) : (
+            <View style={[styles.emptyContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+              <Icon name="calendar-blank-outline" size={48} color={theme.colors.textSecondary + '40'} />
+              <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+                No hearings scheduled for this date.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
       {selectedCase && (
@@ -195,14 +295,14 @@ export default CalendarScreen;
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     paddingTop: Platform.OS === 'android' ? 25 : 0,
   },
   container: {
     flex: 1,
   },
   CardsContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
   dayContainer: {
     width: 32,
@@ -211,32 +311,75 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 16,
   },
-  selectedDay: {
-    backgroundColor: '#007BFF',
-  },
-  hasCasesDay: {
-    backgroundColor: '#EBF5FF',
-  },
   dayText: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: 14,
+    fontWeight: '400',
   },
   selectedDayText: {
     color: 'white',
+    fontWeight: 'bold',
   },
   eventBubble: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: 'orange',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+    top: -4,
+    right: -4,
+    borderRadius: 8,
+    width: 16,
+    height: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   eventBubbleText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  agendaHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  dateSubheading: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+  },
+  agendaCountText: {
+    fontSize: 13,
+    fontWeight: "500",
+    marginBottom: 16,
+    marginLeft: 30,
+  },
+  emptyContainer: {
+    padding: 32,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 12,
+    fontSize: 15,
+  },
+  filterContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

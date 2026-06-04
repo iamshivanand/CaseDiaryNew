@@ -159,4 +159,5 @@ export interface CaseDataScreen {
   nextHearing: string;
   lastUpdate: string;
   previousHearing: string;
+  priority?: string | null;
 }

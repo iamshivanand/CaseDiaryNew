@@ -1,25 +1,46 @@
-import React from "react";
+import React, { useContext } from "react";
 import { View, Text, StyleSheet, FlatList } from "react-native";
-import ProfileTimelineItem from "./TimelineItem"; // Ensure this path is correct
+import ProfileTimelineItem from "./TimelineItem";
 import { ActivityItem } from "../../../Types/appTypes";
+import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface RecentActivityProps {
   activities: ActivityItem[];
 }
 
 const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) => {
+  const { theme } = useContext(ThemeContext);
+
   if (!activities || activities.length === 0) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.heading}>Recent Activity</Text>
-        <Text style={styles.noActivityText}>No recent activity to display.</Text>
+      <View 
+        style={[
+          styles.container, 
+          { 
+            backgroundColor: theme.colors.cardBackground,
+            borderColor: theme.colors.border,
+            borderWidth: 1,
+          }
+        ]}
+      >
+        <Text style={[styles.heading, { color: theme.colors.text }]}>Recent Activity</Text>
+        <Text style={[styles.noActivityText, { color: theme.colors.textSecondary }]}>No recent activity to display.</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Recent Activity</Text>
+    <View 
+      style={[
+        styles.container, 
+        { 
+          backgroundColor: theme.colors.cardBackground,
+          borderColor: theme.colors.border,
+          borderWidth: 1,
+        }
+      ]}
+    >
+      <Text style={[styles.heading, { color: theme.colors.text }]}>Recent Activity</Text>
       <FlatList
         data={activities}
         renderItem={({ item, index }) => (
@@ -30,7 +51,7 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) => {
         )}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={false} // If this list is inside a ScrollView, disable its own scrolling
+        scrollEnabled={false}
       />
     </View>
   );
@@ -40,19 +61,16 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 15,
     paddingVertical: 10,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
+    borderRadius: 12,
     marginVertical: 10,
   },
   heading: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333",
-    marginBottom: 15, // More space before the list starts
+    marginBottom: 15,
   },
   noActivityText: {
     fontSize: 15,
-    color: "#777",
     textAlign: "center",
     paddingVertical: 20,
   },

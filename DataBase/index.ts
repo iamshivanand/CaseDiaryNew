@@ -6,6 +6,7 @@ import { CaseType, Court, District, PoliceStation, CaseDocument, Case as CaseRow
 
 // getDb is now imported from connection.ts
 import { getDb, __TEST_ONLY_resetDbInstance } from './connection';
+import { scheduleCaseReminder, cancelCaseReminder } from '../utils/notificationScheduler';
 
 // Re-export getDb so it's available when importing from './DataBase'
 export { getDb };
@@ -135,7 +136,19 @@ export const addCase = async (caseData: CaseInsertData): Promise<number | null> 
   try {
     const sql = `INSERT INTO Cases (${fields}) VALUES (${placeholders})`;
     console.log("Executing SQL for addCase:", sql, values);
-    const result = await db.runAsync(sql, values); return result.lastInsertRowId;
+    const result = await db.runAsync(sql, values);
+    const caseId = result.lastInsertRowId;
+    if (caseId) {
+      try {
+        const newCase = await getCaseById(caseId);
+        if (newCase && newCase.NextDate) {
+          await scheduleCaseReminder(newCase);
+        }
+      } catch (e) {
+        console.error("Failed to schedule notification on addCase:", e);
+      }
+    }
+    return caseId;
   } catch (error) { console.error("Error adding case:", error, "SQL:", `INSERT INTO Cases (${fields}) VALUES (${placeholders})`, "Values:", values); throw error; }
 };
 
@@ -143,18 +156,87 @@ export interface CaseWithDetails extends CaseRow {
   districtName?: string | null; policeStationName?: string | null;
 }
 
-export const getCases = async (userId?: number | null, limit: number = 10, offset: number = 0): Promise<CaseWithDetails[]> => {
+export const getCases = async (
+  userId?: number | null,
+  limit: number = -1,
+  offset: number = 0,
+  options?: {
+    status?: 'Active' | 'Closed' | 'All';
+    dateFilter?: 'today' | 'tomorrow' | 'yesterday' | 'undated' | null;
+    searchQuery?: string;
+  }
+): Promise<CaseWithDetails[]> => {
   const db = await getDb();
   let sql = `SELECT c.*, ps.name as policeStationName, d.name as districtName FROM Cases c
              LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
              LEFT JOIN Districts d ON ps.district_id = d.id`;
+  
+  const whereClauses: string[] = [];
   const params: any[] = [];
-  if (userId != null) {
-    sql += " WHERE c.user_id = ?";
+
+  if (userId !== undefined && userId !== null) {
+    whereClauses.push("c.user_id = ?");
     params.push(userId);
   }
-  sql += " ORDER BY c.NextDate DESC LIMIT ? OFFSET ?";
-  params.push(limit, offset);
+
+  if (options) {
+    const { status, dateFilter, searchQuery } = options;
+
+    if (status && status !== 'All') {
+      if (status === 'Active') {
+        whereClauses.push("(c.CaseStatus IS NULL OR c.CaseStatus != 'Closed')");
+      } else if (status === 'Closed') {
+        whereClauses.push("c.CaseStatus = 'Closed'");
+      }
+    }
+
+    if (dateFilter) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (dateFilter === 'today') {
+        whereClauses.push("c.NextDate = ?");
+        params.push(todayStr);
+      } else if (dateFilter === 'tomorrow') {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        whereClauses.push("c.NextDate = ?");
+        params.push(tomorrowStr);
+      } else if (dateFilter === 'yesterday') {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        whereClauses.push("c.NextDate = ?");
+        params.push(yesterdayStr);
+      } else if (dateFilter === 'undated') {
+        whereClauses.push("(c.NextDate IS NULL OR c.NextDate = '' OR c.NextDate = 'N/A')");
+      }
+    }
+
+    if (searchQuery && searchQuery.trim() !== '') {
+      const escapedQuery = `%${searchQuery.trim()}%`;
+      whereClauses.push("(c.CaseTitle LIKE ? OR c.ClientName LIKE ? OR c.case_number LIKE ?)");
+      params.push(escapedQuery, escapedQuery, escapedQuery);
+    }
+  }
+
+  if (whereClauses.length > 0) {
+    sql += " WHERE " + whereClauses.join(" AND ");
+  }
+
+  // Consistent sorting: non-null NextDate ascending first, followed by undated/null cases, then updated_at DESC
+  sql += ` ORDER BY 
+    CASE WHEN c.NextDate IS NULL OR c.NextDate = '' OR c.NextDate = 'N/A' THEN 1 ELSE 0 END ASC, 
+    c.NextDate ASC, 
+    c.updated_at DESC`;
+
+  if (limit !== -1) {
+    sql += " LIMIT ? OFFSET ?";
+    params.push(limit, offset);
+  } else if (offset > 0) {
+    sql += " LIMIT -1 OFFSET ?";
+    params.push(offset);
+  }
+
   return db.getAllAsync<CaseWithDetails>(sql, params);
 };
 
@@ -208,6 +290,18 @@ export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?:
   try {
     const result = await db.runAsync(sql, valuesToUpdate);
     if (result.changes > 0) {
+      try {
+        const updatedCase = await getCaseById(id);
+        if (updatedCase) {
+          if (updatedCase.NextDate) {
+            await scheduleCaseReminder(updatedCase);
+          } else {
+            await cancelCaseReminder(id);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to schedule notification on updateCase:", e);
+      }
       return true;
     }
     return false;
@@ -234,13 +328,23 @@ export const deleteCase = async (id: number, userId?: number | null): Promise<bo
             catch (e) { console.error("Error deleting file for case:", e); }
         }
     }
+    try {
+      await cancelCaseReminder(id);
+    } catch (e) {
+      console.error("Failed to cancel notification on deleteCase:", e);
+    }
     let sql = "DELETE FROM Cases WHERE id = ?"; const params: any[] = [id];
     if (userId != null) { sql += " AND user_id = ?"; params.push(userId); }
     try { const result = await db.runAsync(sql, params); return result.changes > 0; }
     catch (error) { console.error(`Error deleting case ID ${id}:`, error); throw error; }
 };
 
-export const searchCases = async (query: string, userId?: number | null): Promise<CaseWithDetails[]> => {
+export const searchCases = async (
+  query: string,
+  userId?: number | null,
+  limit: number = -1,
+  offset: number = 0
+): Promise<CaseWithDetails[]> => {
     const db = await getDb();
     const searchQuery = `%${query}%`;
     let sql = `
@@ -262,7 +366,21 @@ export const searchCases = async (query: string, userId?: number | null): Promis
     if (userId !== undefined && userId !== null) {
         sql += " AND c.user_id = ?"; params.push(userId);
     }
-    sql += " ORDER BY c.updated_at DESC";
+    
+    // Sort consistently: active dates ascending first, undated at the end, then updated_at DESC
+    sql += ` ORDER BY 
+      CASE WHEN c.NextDate IS NULL OR c.NextDate = '' OR c.NextDate = 'N/A' THEN 1 ELSE 0 END ASC,
+      c.NextDate ASC, 
+      c.updated_at DESC`;
+      
+    if (limit !== -1) {
+        sql += " LIMIT ? OFFSET ?";
+        params.push(limit, offset);
+    } else if (offset > 0) {
+        sql += " LIMIT -1 OFFSET ?";
+        params.push(offset);
+    }
+    
     console.log("Search SQL:", sql);
     return db.getAllAsync<CaseWithDetails>(sql, params);
 };

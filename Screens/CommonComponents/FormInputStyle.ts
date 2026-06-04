@@ -10,7 +10,6 @@ export const getFormInputStyles = (theme: Theme) => StyleSheet.create({
     color: theme.colors.labelText || theme.colors.text, // Assuming labelText or fallback to text
   },
   textInput: {
-    height: 48,
     borderWidth: 1,
     borderColor: theme.colors.border || "#D1D5DB",
     borderRadius: 8,
@@ -20,9 +19,11 @@ export const getFormInputStyles = (theme: Theme) => StyleSheet.create({
     color: theme.colors.inputText || theme.colors.text, // Assuming inputText or text
   },
   textInputMultiline: {
+    height: undefined, // Clear height restriction for multiline
     minHeight: 100,
     textAlignVertical: "top",
     paddingTop: 12,
+    paddingBottom: 12,
   },
   inputContainer: {
     marginBottom: 20,
@@ -31,6 +32,32 @@ export const getFormInputStyles = (theme: Theme) => StyleSheet.create({
     color: theme.colors.errorText || 'red', // Assuming errorText color in theme
     fontSize: 12,
     marginTop: 4,
+  },
+  candidatesContainer: {
+    marginTop: 6,
+    paddingVertical: 4,
+  },
+  candidatesScroll: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  candidateChip: {
+    backgroundColor: theme.colors.border || "#E2E8F0",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  candidateText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: "600",
+  },
+  dictationHintText: {
+    fontSize: 11,
+    color: theme.colors.textSecondary || "#64748B",
+    marginTop: 4,
+    fontStyle: "italic",
   }
 });
 

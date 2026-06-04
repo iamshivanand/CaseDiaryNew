@@ -6,10 +6,14 @@ import {
   View,
   ScrollView,
   Alert,
+  Platform,
 } from "react-native";
 import * as Yup from "yup";
 import { RouteProp, useNavigation } from "@react-navigation/native";
 import { v4 as uuidv4 } from "uuid";
+import { Ionicons } from "@expo/vector-icons";
+import { useAdTrigger } from "../CommonComponents/AdManager";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import {
   addCase,
@@ -79,6 +83,29 @@ const formFieldsDefinition: FieldDefinition[] = [
   { name: "CaseNotes", type: "multiline", placeholder: "Add any private notes...", label: "Internal Notes" },
 ];
 
+const fieldGroups = [
+  {
+    title: "Client & Core Details",
+    icon: "person-outline",
+    fields: ["CaseTitle", "ClientName", "ClientContactNumber", "case_number", "CNRNumber", "case_type_id", "court_id"]
+  },
+  {
+    title: "Parties & Court Details",
+    icon: "scale-outline",
+    fields: ["FirstParty", "OppositeParty", "JudgeName", "OpposingCounsel", "Accussed", "Undersection"]
+  },
+  {
+    title: "Dates & Priorities",
+    icon: "calendar-outline",
+    fields: ["Status", "Priority", "FiledDate", "HearingDate", "StatuteOfLimitations"]
+  },
+  {
+    title: "Description & Notes",
+    icon: "document-text-outline",
+    fields: ["CaseDescription", "CaseNotes"]
+  }
+];
+
 const validationSchema = Yup.object().shape({
   CaseTitle: Yup.string().required("Case Title is required"),
 });
@@ -99,9 +126,9 @@ const FormFieldRenderer: React.FC<{
 
   switch (fieldConfig.type) {
     case "text":
-      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} suggestions={fieldConfig.suggestions ? suggestions[fieldName] : undefined} />;
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} suggestions={fieldConfig.suggestions ? (suggestions[fieldName] || []) : undefined} />;
     case "multiline":
-      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} style={{ minHeight: 80, paddingTop: 10, paddingBottom: 10 }} />;
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} />;
     case "select":
       return <DropdownPicker {...commonInputProps} selectedValue={values[fieldName] as string | number | undefined} onValueChange={(itemValue) => setFieldValue(fieldName, itemValue)} options={fieldConfig.options || []} placeholder={fieldConfig.placeholder || `Select ${fieldConfig.label}...`} onOtherValueChange={(text) => setOtherValue(fieldName, text)} testID={fieldConfig.testID} />;
     case "date":
@@ -117,6 +144,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const { update = false, initialValues, uniqueId: routeUniqueId } = params ?? {};
   const { theme } = React.useContext(ThemeContext);
   const styles = getAddCaseStyles(theme);
+  const { showAdWithPreload } = useAdTrigger();
 
   const navigation = useNavigation();
   const generatedUniqueId = useMemo(() => uuidv4(), []);
@@ -128,6 +156,27 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   };
 
   const [suggestions, setSuggestions] = useState<{ [key: string]: string[] }>({});
+
+  const triggerAdAndNavigate = async (onNavigate: () => void) => {
+    try {
+      const now = Date.now();
+      const lastShown = await AsyncStorage.getItem("@last_ad_shown_time");
+      const lastShownTime = lastShown ? parseInt(lastShown, 10) : 0;
+
+      // 5 minutes cooldown (300,000 ms)
+      if (now - lastShownTime > 300000) {
+        await AsyncStorage.setItem("@last_ad_shown_time", now.toString());
+        await showAdWithPreload("rewarded", () => {
+          onNavigate();
+        });
+      } else {
+        onNavigate();
+      }
+    } catch (e) {
+      console.error("Error in triggerAdAndNavigate:", e);
+      onNavigate();
+    }
+  };
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -271,8 +320,10 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const success = await updateCase(caseIdToUpdate, updatePayload);
         if (success) {
           Alert.alert("Success", "Case updated successfully.");
-          navigation.navigate("CaseDetails", {
-            caseId: caseIdToUpdate,
+          triggerAdAndNavigate(() => {
+            navigation.navigate("CaseDetails", {
+              caseId: caseIdToUpdate,
+            });
           });
         } else { Alert.alert("Error", "Failed to update case."); }
       } catch (e) { console.error("Error updating case:", e); Alert.alert("Error", "An error occurred while updating.");}
@@ -317,8 +368,10 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const newCaseId = await addCase(insertPayload);
         if (newCaseId) {
           Alert.alert("Success", "Case added successfully.");
-          navigation.navigate("CaseDetails", {
-            caseId: newCaseId,
+          triggerAdAndNavigate(() => {
+            navigation.navigate("CaseDetails", {
+              caseId: newCaseId,
+            });
           });
         } else {
           Alert.alert("Error", "Failed to add case.");
@@ -337,7 +390,6 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.formScreenContainer}>
-        <Text style={styles.screenTitle}>{update ? "Update Case Details" : "Add New Case"}</Text>
         <Formik
           initialValues={prepareFormInitialValues()}
           validationSchema={validationSchema}
@@ -346,8 +398,25 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         >
           {(formikProps) => (
             <View>
-              {formFieldsDefinition.map((fieldConfig) => (
-                <FormFieldRenderer key={fieldConfig.name} fieldConfig={fieldConfig} formik={formikProps} otherValues={otherValues} setOtherValue={setOtherValue} suggestions={suggestions} />
+              {fieldGroups.map((group, groupIdx) => (
+                <View key={groupIdx} style={[styles.groupCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border, borderWidth: 1 }]}>
+                  <View style={[styles.groupHeader, { borderBottomWidth: 1, borderBottomColor: theme.colors.border }]}>
+                    <Ionicons name={group.icon as any} size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                    <Text style={[styles.groupTitle, { color: theme.colors.text }]}>{group.title}</Text>
+                  </View>
+                  {formFieldsDefinition
+                    .filter(f => group.fields.includes(f.name))
+                    .map((fieldConfig) => (
+                      <FormFieldRenderer
+                        key={fieldConfig.name}
+                        fieldConfig={fieldConfig}
+                        formik={formikProps}
+                        otherValues={otherValues}
+                        setOtherValue={setOtherValue}
+                        suggestions={suggestions}
+                      />
+                    ))}
+                </View>
               ))}
               <View style={styles.actionButtonContainer}>
                 <ActionButton

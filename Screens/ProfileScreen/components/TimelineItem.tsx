@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useContext } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { ActivityItem } from "../../../Types/appTypes";
+import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface TimelineItemProps {
   item: ActivityItem;
@@ -8,15 +9,17 @@ interface TimelineItemProps {
 }
 
 const ProfileTimelineItem: React.FC<TimelineItemProps> = ({ item, isLastItem }) => {
+  const { theme } = useContext(ThemeContext);
+
   return (
     <View style={styles.container}>
       <View style={styles.lineAndDotContainer}>
-        <View style={styles.dot} />
-        {!isLastItem && <View style={styles.line} />}
+        <View style={[styles.dot, { backgroundColor: theme.colors.primary }]} />
+        {!isLastItem && <View style={[styles.line, { backgroundColor: theme.colors.border }]} />}
       </View>
       <View style={styles.contentContainer}>
-        <Text style={styles.dateText}>{item.date}</Text>
-        <Text style={styles.descriptionText}>{item.description}</Text>
+        <Text style={[styles.dateText, { color: theme.colors.text }]}>{item.date}</Text>
+        <Text style={[styles.descriptionText, { color: theme.colors.textSecondary }]}>{item.description}</Text>
       </View>
     </View>
   );
@@ -25,8 +28,8 @@ const ProfileTimelineItem: React.FC<TimelineItemProps> = ({ item, isLastItem }) 
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    paddingLeft: 10, // Give some space for the timeline elements
-    paddingRight: 15, // General padding for content
+    paddingLeft: 10,
+    paddingRight: 15,
     paddingVertical: 10,
   },
   lineAndDotContainer: {
@@ -37,29 +40,25 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#3B82F6", // Blue accent color
-    zIndex: 1, // Ensure dot is above the line
+    zIndex: 1,
   },
   line: {
     flex: 1,
     width: 2,
-    backgroundColor: "#E0E0E0", // Light gray for the line
-    marginTop: -2, // Connect line to the dot smoothly
-    marginBottom: -2, // Connect line to the next dot smoothly
+    marginTop: -2,
+    marginBottom: -2,
   },
   contentContainer: {
     flex: 1,
-    paddingBottom: 10, // Space before the next item starts visually
+    paddingBottom: 10,
   },
   dateText: {
     fontSize: 14,
     fontWeight: "bold",
-    color: "#333",
     marginBottom: 4,
   },
   descriptionText: {
     fontSize: 15,
-    color: "#555",
     lineHeight: 20,
   },
 });

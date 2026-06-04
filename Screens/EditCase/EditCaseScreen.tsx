@@ -681,7 +681,6 @@ const EditCaseScreen: React.FC = () => {
             onChangeText={(text) => handleInputChange("CaseDescription", text)}
             multiline
             numberOfLines={4}
-            style={{ minHeight: 80 }}
           />
           <FormInput
             label="Internal Notes"
@@ -689,7 +688,6 @@ const EditCaseScreen: React.FC = () => {
             onChangeText={(text) => handleInputChange("CaseNotes", text)}
             multiline
             numberOfLines={4}
-            style={{ minHeight: 80 }}
           />
 
           <SectionHeader title="Case Documents" />
@@ -761,23 +759,5 @@ const EditCaseScreen: React.FC = () => {
     </KeyboardAvoidingView>
   );
 };
-
-const styles = StyleSheet.create({
-  // Renamed to RNStyleSheet to avoid conflict with imported styles
-  scrollView: { flex: 1 },
-  scrollContentContainer: { flexGrow: 1 },
-  emptyListText: {
-    textAlign: "center",
-    color: "#6B7280",
-    fontSize: 14,
-    paddingVertical: 20,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  }, // Added centered style
-});
 
 export default EditCaseScreen;

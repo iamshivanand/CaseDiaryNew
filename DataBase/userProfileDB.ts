@@ -51,24 +51,24 @@ export const updateUserProfile = async (
   userId: number,
   profileData: any
 ): Promise<void> => {
-  const {
-    avatarUrl,
-    fullName,
-    designation,
-    practiceAreas,
-    aboutMe,
-    email,
-    phone,
-    address,
-    languages,
-    experience,
-    license,
-    location,
-  } = profileData;
+  const avatarUrl = profileData.avatarUrl;
+  const designation = profileData.designation;
+  const practiceAreas = profileData.practiceAreas;
+  const aboutMe = profileData.aboutMe;
+  const languages = profileData.languages;
+
+  const fullName = profileData.fullName || profileData.name;
+  const email = profileData.email || (profileData.contactInfo ? profileData.contactInfo.email : "");
+  const phone = profileData.phone || (profileData.contactInfo ? profileData.contactInfo.phone : "");
+  const address = profileData.address || (profileData.contactInfo ? profileData.contactInfo.address : "");
+  const experience = profileData.experience !== undefined 
+    ? profileData.experience 
+    : (profileData.stats && profileData.stats.yearsOfPractice !== undefined ? profileData.stats.yearsOfPractice : 0);
 
   const stats = {
-    yearsOfPractice: experience || 0,
-    yearsOfPracticeLastUpdated: new Date().toISOString(),
+    yearsOfPractice: typeof experience === 'string' ? parseInt(experience, 10) : (experience || 0),
+    yearsOfPracticeLastUpdated: (profileData.stats && profileData.stats.yearsOfPracticeLastUpdated) 
+      || new Date().toISOString(),
   };
 
   const contactInfo = {

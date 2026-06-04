@@ -1,26 +1,9 @@
-import React from "react";
+import React, { useContext } from "react";
 import { View, Text, StyleSheet, Linking, TouchableOpacity } from "react-native";
 import ContactItem from "./ContactItem";
 import { LawyerProfileData } from "../../../Types/appTypes";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-
-interface EditControlsProps {
-  onSave: () => void;
-  onCancel: () => void;
-}
-
-const EditControls: React.FC<EditControlsProps> = ({ onSave, onCancel }) => (
-  <View style={styles.editControlsContainer}>
-    <TouchableOpacity onPress={onSave} style={[styles.button, styles.saveButton]}>
-      <Icon name="check" size={20} color="#fff" />
-      <Text style={styles.buttonText}>Save</Text>
-    </TouchableOpacity>
-    <TouchableOpacity onPress={onCancel} style={[styles.button, styles.cancelButton]}>
-      <Icon name="close" size={20} color="#fff" />
-      <Text style={styles.buttonText}>Cancel</Text>
-    </TouchableOpacity>
-  </View>
-);
+import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface ContactInfoProps {
   contactDetails: LawyerProfileData["contactInfo"];
@@ -31,9 +14,6 @@ interface ContactInfoProps {
   onTempPhoneChange: (text: string) => void;
   tempAddress: string;
   onTempAddressChange: (text: string) => void;
-  onEditPress: () => void;
-  onSave: () => void;
-  onCancel: () => void;
 }
 
 const ContactInfo: React.FC<ContactInfoProps> = ({
@@ -42,21 +22,24 @@ const ContactInfo: React.FC<ContactInfoProps> = ({
   tempEmail, onTempEmailChange,
   tempPhone, onTempPhoneChange,
   tempAddress, onTempAddressChange,
-  onEditPress, onSave, onCancel,
 }) => {
+  const { theme } = useContext(ThemeContext);
   const handleEmailPress = () => Linking.openURL(`mailto:${contactDetails.email}`);
   const handlePhonePress = () => Linking.openURL(`tel:${contactDetails.phone}`);
-  // const handleAddressPress = () => Linking.openURL(`geo:0,0?q=${contactDetails.address}`);
 
   return (
-    <View style={styles.container}>
+    <View 
+      style={[
+        styles.container, 
+        { 
+          backgroundColor: theme.colors.cardBackground,
+          borderColor: theme.colors.border,
+          borderWidth: 1,
+        }
+      ]}
+    >
       <View style={styles.headerContainer}>
-        <Text style={styles.heading}>Contact Information</Text>
-        {!isEditing && (
-          <TouchableOpacity onPress={onEditPress} style={styles.editIcon}>
-            <Icon name="pencil-outline" size={22} color="#3B82F6" />
-          </TouchableOpacity>
-        )}
+        <Text style={[styles.heading, { color: theme.colors.text }]}>Contact Information</Text>
       </View>
 
       <ContactItem
@@ -82,14 +65,11 @@ const ContactInfo: React.FC<ContactInfoProps> = ({
       <ContactItem
         iconName="map-marker-outline"
         text={contactDetails.address}
-        // onPress={handleAddressPress} // No press action for address when not editing for now
         isEditing={isEditing}
         editText={tempAddress}
         onEditTextChange={onTempAddressChange}
         placeholder="Office Address"
       />
-
-      {isEditing && <EditControls onSave={onSave} onCancel={onCancel} />}
     </View>
   );
 };
@@ -98,8 +78,7 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 15,
     paddingVertical: 10,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
+    borderRadius: 12,
     marginVertical: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -116,7 +95,6 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#1F2937",
   },
   editIcon: {
     padding: 5,
@@ -124,8 +102,8 @@ const styles = StyleSheet.create({
   editControlsContainer: {
     flexDirection: "row",
     justifyContent: "space-evenly",
-    marginTop: 20, // Add more space before controls in this component
-    paddingBottom: 5, // Ensure controls don't touch bottom edge if container has padding
+    marginTop: 20,
+    paddingBottom: 5,
   },
   button: {
     flexDirection: 'row',

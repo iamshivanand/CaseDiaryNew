@@ -106,9 +106,8 @@ describe('AddCase', () => {
     const { getByPlaceholderText, findByText } = render(<AddCase route={{ params: {} }} />);
     const judgeNameInput = getByPlaceholderText("Enter Judge's Name");
     fireEvent.changeText(judgeNameInput, 'Test');
-    await waitFor(() => {
-      expect(findByText('Test Judge')).toBeTruthy();
-    });
+    const suggestion = await findByText('Test Judge');
+    expect(suggestion).toBeTruthy();
   });
 
   it('should not show a duplicate placeholder in the dropdowns', async () => {

@@ -6,10 +6,11 @@ import { CaseData, Document, TimelineEvent } from "./appTypes"; // Comprehensive
 export type HomeStackParamList = {
   HomeScreen: undefined;
   AllCases: undefined;
-  CaseDetails: { caseDetails: CaseDataScreen };
+  CaseDetails: { caseId: number };
   CaseDetail: { caseId: number; caseTitleHeader?: string }; // Updated params for the now-new CaseDetail screen
   // CaseDetailsV2 route removed
   EditCase: {
+    caseId?: number;
     initialCaseData?: Partial<CaseData> & {
       documents?: Document[],
       timelineEvents?: TimelineEvent[]
@@ -20,6 +21,8 @@ export type HomeStackParamList = {
   AddDocument: { caseId: string | number };
   UndatedCases: undefined;
   YesterdaysCases: undefined;
+  GenerateDocument: { caseId?: number };
+  DraftsHub: undefined;
 };
 
 // Stack for the "Search" Tab

@@ -27,15 +27,8 @@ import AboutMe from "./components/AboutMe";
 import ContactInfo from "./components/ContactInfo";
 import Languages from "./components/Languages";
 import { LawyerProfileData } from "../../Types/appTypes";
-
-type EditableSection =
-  | "avatar"
-  | "info"
-  | "about"
-  | "contact"
-  | "languages"
-  | "yearsOfPractice"
-  | null;
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import SettingsScreen from "../Settings/SettingsScreen";
 
 const ProfileScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
@@ -43,7 +36,7 @@ const ProfileScreen: React.FC = () => {
     null
   );
   const [selectedTab, setSelectedTab] = useState<string>("Profile");
-  const [editingSection, setEditingSection] = useState<EditableSection>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Temporary state for editable fields
   const [tempAvatarUri, setTempAvatarUri] = useState<string | null>(null);
@@ -89,7 +82,7 @@ const ProfileScreen: React.FC = () => {
   // Effect to reset temp states if actual data changes from elsewhere (e.g. future API refresh)
   // or when exiting an edit mode.
   useEffect(() => {
-    if (profileData && !editingSection) {
+    if (profileData && !isEditing) {
       setTempAvatarUri(profileData.avatarUrl);
       setTempName(profileData.name);
       setTempDesignation(profileData.designation);
@@ -99,15 +92,15 @@ const ProfileScreen: React.FC = () => {
       setTempPhone(profileData.contactInfo.phone);
       setTempAddress(profileData.contactInfo.address);
       setTempLanguages(profileData.languages.join(", "));
-      if (profileData.stats && profileData.stats.yearsOfPractice) {
-        setTempYearsOfPractice(profileData.stats.yearsOfPractice.toString());
+      if (profileData.stats && profileData.stats.yearsOfPractice !== undefined) {
+        setTempYearsOfPractice(Number(profileData.stats.yearsOfPractice).toString());
       }
     }
-  }, [profileData, editingSection]);
+  }, [profileData, isEditing]);
 
 
-  const handleEditPress = (section: EditableSection) => {
-    // Reset temp fields to current profile data before starting to edit a new section
+  const handleStartEdit = () => {
+    if (!profileData) return;
     setTempAvatarUri(profileData.avatarUrl);
     setTempName(profileData.name);
     setTempDesignation(profileData.designation);
@@ -117,56 +110,61 @@ const ProfileScreen: React.FC = () => {
     setTempPhone(profileData.contactInfo.phone);
     setTempAddress(profileData.contactInfo.address);
     setTempLanguages(profileData.languages.join(", "));
-    setTempYearsOfPractice(profileData.stats.yearsOfPractice.toString());
-    setEditingSection(section);
+    setTempYearsOfPractice(profileData.stats.yearsOfPractice !== undefined ? Number(profileData.stats.yearsOfPractice).toString() : "0");
+    setIsEditing(true);
   };
 
-  const handleCancel = () => {
-    setEditingSection(null); // Resets temp fields via useEffect
+  const handleCancelAll = () => {
+    setIsEditing(false);
   };
 
-  const handleSave = async (section: EditableSection) => {
+  const handleSaveAll = async () => {
     if (!profileData) return;
 
-    const updatedProfile = { ...profileData };
-
-    if (section === "info") {
-      updatedProfile.name = tempName;
-      updatedProfile.designation = tempDesignation;
-      updatedProfile.practiceAreas = tempPracticeAreas
+    const updatedProfile = {
+      ...profileData,
+      avatarUrl: tempAvatarUri,
+      name: tempName,
+      designation: tempDesignation,
+      practiceAreas: tempPracticeAreas
         .split(",")
         .map((s) => s.trim())
-        .filter((s) => s);
-    } else if (section === "about") {
-      updatedProfile.aboutMe = tempAboutMe;
-    } else if (section === "contact") {
-      updatedProfile.contactInfo = {
+        .filter((s) => s),
+      aboutMe: tempAboutMe,
+      contactInfo: {
         email: tempEmail,
         phone: tempPhone,
         address: tempAddress,
-      };
-    } else if (section === "languages") {
-      updatedProfile.languages = tempLanguages
+      },
+      languages: tempLanguages
         .split(",")
         .map((s) => s.trim())
-        .filter((s) => s);
-    } else if (section === "yearsOfPractice") {
-      const parsedYears = parseInt(tempYearsOfPractice, 10);
-      if (!isNaN(parsedYears)) {
-        updatedProfile.stats.yearsOfPractice = parsedYears;
-        updatedProfile.stats.yearsOfPracticeLastUpdated = new Date().toISOString();
+        .filter((s) => s),
+      stats: {
+        ...profileData.stats,
       }
-    } else if (section === "avatar") {
-      updatedProfile.avatarUrl = tempAvatarUri;
+    };
+
+    const parsedYears = parseInt(tempYearsOfPractice, 10);
+    if (!isNaN(parsedYears)) {
+      updatedProfile.stats.yearsOfPractice = parsedYears;
+      updatedProfile.stats.yearsOfPracticeLastUpdated = new Date().toISOString();
     }
 
     setProfileData(updatedProfile);
-    const db = await getDb();
-    const userId = await AsyncStorage.getItem("@user_id");
-    if (userId) {
-      await updateUserProfile(db, parseInt(userId, 10), updatedProfile);
+    
+    try {
+      const dbInstance = await getDb();
+      const userId = await AsyncStorage.getItem("@user_id");
+      if (userId) {
+        await updateUserProfile(dbInstance, parseInt(userId, 10), updatedProfile);
+      }
+      setIsEditing(false);
+      Alert.alert("Success", "Profile updated successfully.");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      Alert.alert("Error", "Failed to update profile.");
     }
-    setEditingSection(null);
   };
 
   const requestMediaLibraryPermissions = async () => {
@@ -238,20 +236,37 @@ const ProfileScreen: React.FC = () => {
   const getDisplayedYearsOfPractice = () => {
     if (!profileData) return 0;
     const { yearsOfPractice, yearsOfPracticeLastUpdated } = profileData.stats;
+    const baseYears = Number(yearsOfPractice) || 0;
     if (!yearsOfPracticeLastUpdated) {
-      return yearsOfPractice;
+      return baseYears;
     }
     const lastUpdatedYear = new Date(yearsOfPracticeLastUpdated).getFullYear();
     const currentYear = new Date().getFullYear();
     const diff = currentYear - lastUpdatedYear;
-    return yearsOfPractice + (diff > 0 ? diff : 0);
+    return baseYears + (diff > 0 ? diff : 0);
   };
 
+  const getProfileCompleteness = () => {
+    if (!profileData) return 0;
+    let fields = [
+      profileData.name,
+      profileData.designation,
+      profileData.aboutMe,
+      profileData.contactInfo?.email,
+      profileData.contactInfo?.phone,
+      profileData.contactInfo?.address,
+      profileData.avatarUrl,
+    ];
+    let filled = fields.filter(f => f && f.trim() !== "").length;
+    if (profileData.practiceAreas && profileData.practiceAreas.length > 0) filled += 1;
+    if (profileData.languages && profileData.languages.length > 0) filled += 1;
+    if (profileData.stats && profileData.stats.yearsOfPractice > 0) filled += 1;
+    
+    const totalFields = fields.length + 3; // 7 + 3 = 10
+    return Math.round((filled / totalFields) * 100);
+  };
 
   const profileTabs = ["Profile", "Settings"];
-  // Dummy handlers for old buttons - these are now replaced by edit icons
-  // const handleEditProfile = () => console.log("Edit Profile Pressed");
-  // const handleViewSchedule = () => console.log("View Schedule Pressed");
 
   const renderTabContent = () => {
     if (selectedTab === "Profile") {
@@ -259,39 +274,30 @@ const ProfileScreen: React.FC = () => {
         <>
           <AboutMe
             description={profileData.aboutMe}
-            isEditing={editingSection === "about"}
+            isEditing={isEditing}
             tempDescription={tempAboutMe}
             onTempDescriptionChange={setTempAboutMe}
-            onEditPress={() => handleEditPress("about")}
-            onSave={() => handleSave("about")}
-            onCancel={handleCancel}
           />
           <ContactInfo
             contactDetails={profileData.contactInfo}
-            isEditing={editingSection === "contact"}
+            isEditing={isEditing}
             tempEmail={tempEmail}
             onTempEmailChange={setTempEmail}
             tempPhone={tempPhone}
             onTempPhoneChange={setTempPhone}
             tempAddress={tempAddress}
             onTempAddressChange={setTempAddress}
-            onEditPress={() => handleEditPress("contact")}
-            onSave={() => handleSave("contact")}
-            onCancel={handleCancel}
           />
           <Languages
             languages={profileData.languages}
-            isEditing={editingSection === "languages"}
+            isEditing={isEditing}
             tempLanguages={tempLanguages}
             onTempLanguagesChange={setTempLanguages}
-            onEditPress={() => handleEditPress("languages")}
-            onSave={() => handleSave("languages")}
-            onCancel={handleCancel}
           />
         </>
       );
     } else if (selectedTab === "Settings") {
-      return <Text style={styles.tabContentText}>Settings Content Coming Soon</Text>;
+      return <SettingsScreen />;
     }
     return null;
   };
@@ -304,36 +310,35 @@ const ProfileScreen: React.FC = () => {
     );
   }
 
+  const completeness = getProfileCompleteness();
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
+      contentContainerStyle={{ paddingBottom: 100 }}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled" // Important for inputs within ScrollView
     >
       <ProfileHeader
         profileData={profileData}
-        isEditingAvatar={editingSection === "avatar"}
-        onEditAvatarPress={() => handleEditPress("avatar")}
-        onSaveAvatar={() => handleSave("avatar")}
-        onCancelAvatar={handleCancel}
+        isEditing={isEditing}
         onChooseImage={handleChooseImage}
         tempAvatarUri={tempAvatarUri}
-        isEditingInfo={editingSection === "info"}
-        onEditInfoPress={() => handleEditPress("info")}
-        onSaveInfo={() => handleSave("info")}
-        onCancelInfo={handleCancel}
         tempName={tempName}
         onTempNameChange={setTempName}
         tempDesignation={tempDesignation}
         onTempDesignationChange={setTempDesignation}
         tempPracticeAreas={tempPracticeAreas}
         onTempPracticeAreasChange={setTempPracticeAreas}
+        onEditPress={handleStartEdit}
+        onSavePress={handleSaveAll}
+        onCancelPress={handleCancelAll}
       />
 
       {/* Old Action Buttons - can be removed or repurposed if needed */}
       {/* <View style={styles.actionButtonsContainer}> ... </View> */}
 
-      <View style={styles.statsContainer}>
+      <View style={[styles.statsContainer, { backgroundColor: theme.colors.background }]}>
         <StatCard
           label="Total Cases"
           value={profileData.stats.totalCases}
@@ -346,14 +351,24 @@ const ProfileScreen: React.FC = () => {
           label="Years of Practice"
           value={getDisplayedYearsOfPractice()}
           unit="yrs"
-          isEditing={editingSection === "yearsOfPractice"}
+          isEditing={isEditing}
           tempValue={tempYearsOfPractice}
           onTempValueChange={setTempYearsOfPractice}
-          onEditPress={() => handleEditPress("yearsOfPractice")}
-          onSave={() => handleSave("yearsOfPractice")}
-          onCancel={handleCancel}
         />
       </View>
+
+      {selectedTab === "Profile" && (
+        <View style={{ paddingHorizontal: 16, marginVertical: 12 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+            <Text style={{ fontSize: 14, fontWeight: "600", color: theme.colors.text }}>Profile Completeness</Text>
+            <Text style={{ fontSize: 14, fontWeight: "bold", color: theme.colors.primary }}>{completeness}%</Text>
+          </View>
+          <View style={{ height: 8, backgroundColor: theme.colors.border || "#E5E7EB", borderRadius: 4, overflow: "hidden" }}>
+            <View style={{ width: `${completeness}%`, height: "100%", backgroundColor: theme.colors.primary }} />
+          </View>
+
+        </View>
+      )}
 
       <TabSelector
         tabs={profileTabs}

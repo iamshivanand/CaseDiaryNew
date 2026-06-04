@@ -1,55 +1,118 @@
-import React, { createContext, useState, ReactNode } from "react";
-import { Appearance, useColorScheme } from "react-native";
+import React, { createContext, useState, useEffect, ReactNode } from "react";
+import { useColorScheme } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 export interface Theme {
+  dark: boolean;
   colors: {
     primary: string;
     secondary: string;
     background: string;
+    cardBackground: string;
+    inputBackground: string;
+    border: string;
     text: string;
+    textSecondary: string;
+    success: string;
+    warning: string;
+    danger: string;
   };
 }
+
+export type ThemeMode = "system" | "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
-  updateTheme: (newTheme: Partial<Theme>) => void;
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => Promise<void>;
 }
 
-export const ThemeContext = createContext<ThemeContextType>({
-  theme: {
-    colors: {
-      primary: "#007bff",
-      secondary: "#ffc107",
-      background: "#fff",
-      text: "#000",
-    },
+const lightTheme: Theme = {
+  dark: false,
+  colors: {
+    primary: "#6366F1", // Indigo
+    secondary: "#EC4899", // Pink
+    background: "#F8FAFC", // Slate-50
+    cardBackground: "#FFFFFF",
+    inputBackground: "#F1F5F9", // Slate-100
+    border: "#E2E8F0", // Slate-200
+    text: "#0F172A", // Slate-900
+    textSecondary: "#64748B", // Slate-500
+    success: "#10B981",
+    warning: "#F59E0B",
+    danger: "#EF4444",
   },
-  updateTheme: () => {}, // Function to update the theme
+};
+
+const darkTheme: Theme = {
+  dark: true,
+  colors: {
+    primary: "#818CF8", // Indigo-400
+    secondary: "#F472B6", // Pink-400
+    background: "#0F172A", // Slate-900
+    cardBackground: "#1E293B", // Slate-800
+    inputBackground: "#334155", // Slate-700
+    border: "#334155", // Slate-700
+    text: "#F8FAFC", // Slate-50
+    textSecondary: "#94A3B8", // Slate-400
+    success: "#34D399",
+    warning: "#FBBF24",
+    danger: "#F87171",
+  },
+};
+
+export const ThemeContext = createContext<ThemeContextType>({
+  theme: lightTheme,
+  themeMode: "system",
+  setThemeMode: async () => {},
 });
 
 const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // const colorScheme = Appearance.getColorScheme();
-  // const isDarkMode = useColorScheme() === "dark";
-  const [theme, setTheme] = useState<Theme>(() => {
-    const defaultTheme: Theme = {
-      colors: {
-        primary: "#007bff",
-        secondary: "#ffc107",
-        background: "white", // Use black background for dark mode, white for light mode
-        text: "black", // Use white text for dark mode, black for light mode
-      },
-    };
-    return defaultTheme;
-  });
+  const systemColorScheme = useColorScheme();
+  const [themeMode, setThemeModeState] = useState<ThemeMode>("system");
 
-  const updateTheme = (newTheme: Partial<Theme>) => {
-    setTheme({ ...theme, ...newTheme }); // Update specific theme properties
+  useEffect(() => {
+    const loadSavedThemeMode = async () => {
+      try {
+        const savedMode = await AsyncStorage.getItem("@theme_mode");
+        if (savedMode) {
+          setThemeModeState(savedMode as ThemeMode);
+        }
+      } catch (error) {
+        console.error("Failed to load theme mode:", error);
+      }
+    };
+    loadSavedThemeMode();
+  }, []);
+
+  const setThemeMode = async (mode: ThemeMode) => {
+    try {
+      setThemeModeState(mode);
+      await AsyncStorage.setItem("@theme_mode", mode);
+    } catch (error) {
+      console.error("Failed to save theme mode:", error);
+    }
   };
 
-  const value = { theme, updateTheme };
+  const getActiveTheme = (): Theme => {
+    if (themeMode === "light") {
+      return lightTheme;
+    }
+    if (themeMode === "dark") {
+      return darkTheme;
+    }
+    // Follow system settings
+    return systemColorScheme === "dark" ? darkTheme : lightTheme;
+  };
+
+  const activeTheme = getActiveTheme();
 
   return (
-    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+    <ThemeContext.Provider value={{ theme: activeTheme, themeMode, setThemeMode }}>
+      {children}
+    </ThemeContext.Provider>
   );
 };
 
 export default ThemeProvider;
+

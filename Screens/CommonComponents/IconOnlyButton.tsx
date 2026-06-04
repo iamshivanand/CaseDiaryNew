@@ -33,7 +33,7 @@ const IconOnlyButton: React.FC<IconOnlyButtonProps> = ({
       ]}
       onPress={onPress}
       disabled={disabled}
-      activeOpacity={0.6}
+      activeOpacity={0.85}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       hitSlop={hitSlop}

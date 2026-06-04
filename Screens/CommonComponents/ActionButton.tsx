@@ -4,6 +4,8 @@ import { TouchableOpacity, Text, ActivityIndicator, View, ViewStyle, TextStyle }
 import { getActionButtonStyles } from "./ActionButtonStyle";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider"; // Adjust path
 
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
+
 interface ActionButtonProps {
   title: string;
   onPress: () => void;
@@ -27,6 +29,24 @@ const ActionButton: React.FC<ActionButtonProps> = ({
 }) => {
   const { theme } = useContext(ThemeContext);
   const styles = getActionButtonStyles(theme); // Generate styles with theme
+
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
+
+  const handlePressIn = () => {
+    if (!disabled && !loading) {
+      scale.value = withSpring(0.96, { damping: 10, stiffness: 200 });
+    }
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1.0, { damping: 10, stiffness: 200 });
+  };
 
   let buttonStyleConfig;
   let textStyleConfig;
@@ -56,26 +76,33 @@ const ActionButton: React.FC<ActionButtonProps> = ({
 
   return (
     <TouchableOpacity
-      style={[
-        styles.button,
-        buttonStyleConfig,
-        (disabled || loading) && styles.disabledButton,
-        style,
-      ]}
       onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       disabled={disabled || loading}
-      activeOpacity={0.8}
+      activeOpacity={0.9}
+      style={style ? { width: style.width, flex: style.flex } : undefined}
     >
-      {loading ? (
-        <ActivityIndicator color={finalActivityIndicatorColor} />
-      ) : (
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {leftIcon && <View style={styles.iconWrapper}>{leftIcon}</View>}
-          <Text style={[styles.buttonText, textStyleConfig, textStyle]}>
-            {title}
-          </Text>
-        </View>
-      )}
+      <Animated.View
+        style={[
+          styles.button,
+          buttonStyleConfig,
+          (disabled || loading) && styles.disabledButton,
+          style,
+          animatedStyle,
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator color={finalActivityIndicatorColor} />
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {leftIcon && <View style={styles.iconWrapper}>{leftIcon}</View>}
+            <Text style={[styles.buttonText, textStyleConfig, textStyle]}>
+              {title}
+            </Text>
+          </View>
+        )}
+      </Animated.View>
     </TouchableOpacity>
   );
 };

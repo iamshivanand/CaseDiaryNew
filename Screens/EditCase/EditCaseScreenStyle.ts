@@ -8,21 +8,22 @@ export const getEditCaseScreenStyles = (theme: Theme) =>
   StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: theme.colors.screenBackground || theme.colors.background, // Use a specific screenBg or fallback
+      backgroundColor: theme.colors.screenBackground || theme.colors.background,
     },
-    scrollContainer: {
-      // This style is for the ScrollView component itself
+    scrollView: {
+      flex: 1,
+    },
+    scrollContentContainer: {
       flexGrow: 1,
+      paddingBottom: 60, // Padding at bottom to prevent floating tab bar overlaps
     },
-    // If you need styles for the contentContainer of ScrollView, define it separately
-    // e.g., scrollContentContainer: { paddingBottom: 20 }
     formContainer: {
       paddingHorizontal: 16,
       paddingTop: 20,
       paddingBottom: 20,
     },
     listContainer: {
-      // No specific styles needed here if items handle their own background/padding
+      marginBottom: 20,
     },
     addNewButtonContainer: {
       marginTop: 8,
@@ -44,10 +45,8 @@ export const getEditCaseScreenStyles = (theme: Theme) =>
       flex: 1,
       marginHorizontal: 6,
     },
-    // Styles for empty list text and centered loader, if used directly in EditCaseScreen
     centeredMessageContainer: {
-      // For centering "No documents/timeline" text or loader
-      flex: 1, // If it needs to fill space
+      flex: 1,
       justifyContent: "center",
       alignItems: "center",
       paddingVertical: 20,
@@ -56,9 +55,15 @@ export const getEditCaseScreenStyles = (theme: Theme) =>
       textAlign: "center",
       color: theme.colors.textSecondary || "#6B7280",
       fontSize: 14,
+      paddingVertical: 20,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
     },
     loader: {
-      // For ActivityIndicator
       marginVertical: 20,
     },
   });

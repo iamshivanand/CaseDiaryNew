@@ -345,6 +345,13 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   // Cases table must be created before CaseDocuments and CaseHistoryLog if they have FKs to it
   await db.execAsync(CREATE_CASES_TABLE);
   await db.execAsync(CREATE_CASES_UPDATED_AT_TRIGGER); // Trigger for Cases
+  
+  // Create indexes on Cases table for O(log N) query lookup speed
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_user_id ON Cases(user_id);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_next_date ON Cases(NextDate);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_case_status ON Cases(CaseStatus);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_updated_at ON Cases(updated_at);`);
+
   await db.execAsync(CREATE_CASE_DOCUMENTS_TABLE);
   await db.execAsync(CREATE_CASE_DOCUMENTS_CASE_ID_INDEX);
   await db.execAsync(CREATE_CASE_TIMELINE_TABLE);
@@ -401,7 +408,395 @@ export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> 
     // Decide if you want to throw, or just log and continue
   }
 
-  // Add other predefined data seeding here if necessary (e.g., Courts, PoliceStations if they have global entries)
+  // Seed Mock Cases for manual testing
+  try {
+    const casesCount = await db.getFirstAsync<{ count: number }>("SELECT count(*) as count FROM Cases;");
+    if (casesCount && casesCount.count === 0) {
+      console.log("Seeding mock cases for manual user verification...");
+      const mockCases = [
+        {
+          uniqueId: "mock-case-1",
+          CaseTitle: "Aman Gupta vs. State of Delhi",
+          ClientName: "Aman Gupta",
+          CNRNumber: "DLDH010001232026",
+          case_number: "Crl.A./450/2026",
+          court_name: "High Court of Delhi - Room 12",
+          case_type_name: "Criminal Appeal",
+          CaseStatus: "Active",
+          Priority: "High",
+          NextDate: new Date().toISOString().split('T')[0], // Today
+          ClientContactNumber: "+919876543210",
+          FirstParty: "Aman Gupta",
+          OppositeParty: "State of Delhi",
+          JudgeName: "Justice S. K. Kaul",
+          Undersection: "Section 302 IPC",
+          CaseDescription: "Appeal against conviction under section 302 IPC."
+        },
+        {
+          uniqueId: "mock-case-2",
+          CaseTitle: "Priya Sharma vs. Amit Sharma",
+          ClientName: "Priya Sharma",
+          CNRNumber: "DLDH010001242026",
+          case_number: "H.M.P./89/2026",
+          court_name: "Family Court - Dwarka",
+          case_type_name: "Family Matter",
+          CaseStatus: "Active",
+          Priority: "Medium",
+          NextDate: new Date().toISOString().split('T')[0], // Today
+          ClientContactNumber: "+919812345678",
+          FirstParty: "Priya Sharma",
+          OppositeParty: "Amit Sharma",
+          JudgeName: "Judge Anita Singh",
+          Undersection: "Section 13 Hindu Marriage Act",
+          CaseDescription: "Petition for dissolution of marriage by mutual consent."
+        },
+        {
+          uniqueId: "mock-case-3",
+          CaseTitle: "Tech Solutions Pvt Ltd vs. BuildCorp India",
+          ClientName: "Tech Solutions Pvt Ltd",
+          CNRNumber: "MHCB010098762025",
+          case_number: "O.S./1240/2025",
+          court_name: "City Civil Court - Mumbai",
+          case_type_name: "Civil Suit",
+          CaseStatus: "Active",
+          Priority: "High",
+          NextDate: new Date().toISOString().split('T')[0], // Today
+          ClientContactNumber: "+919900887766",
+          FirstParty: "Tech Solutions Pvt Ltd",
+          OppositeParty: "BuildCorp India",
+          JudgeName: "Judge R. V. Patel",
+          Undersection: "Section 37 Arbitration Act",
+          CaseDescription: "Commercial dispute regarding non-payment of software licensing fees."
+        },
+        {
+          uniqueId: "mock-case-4",
+          CaseTitle: "State of UP vs. Vikram Singh",
+          ClientName: "State of UP",
+          CNRNumber: "UPBR010022332024",
+          case_number: "Sessions Trial/45/2024",
+          court_name: "District & Sessions Court - Bareilly",
+          case_type_name: "Criminal Trial",
+          CaseStatus: "Active",
+          Priority: "Low",
+          NextDate: new Date().toISOString().split('T')[0], // Today
+          ClientContactNumber: "+918877665544",
+          FirstParty: "State of UP",
+          OppositeParty: "Vikram Singh",
+          JudgeName: "Judge M. C. Gupta",
+          Undersection: "Section 307 IPC",
+          CaseDescription: "Attempt to murder trial."
+        },
+        {
+          uniqueId: "mock-case-5",
+          CaseTitle: "Rakesh Verma vs. Municipal Corporation",
+          ClientName: "Rakesh Verma",
+          CNRNumber: "DLCT010055442026",
+          case_number: "W.P.(C)/5672/2026",
+          court_name: "High Court of Delhi - Room 5",
+          case_type_name: "Writ Petition",
+          CaseStatus: "Active",
+          Priority: "Medium",
+          NextDate: new Date().toISOString().split('T')[0], // Today
+          ClientContactNumber: "+917766554433",
+          FirstParty: "Rakesh Verma",
+          OppositeParty: "Municipal Corporation of Delhi",
+          JudgeName: "Justice Manmohan",
+          Undersection: "Article 226 Constitution of India",
+          CaseDescription: "Writ petition against illegal demolition notice."
+        },
+        {
+          uniqueId: "mock-case-6",
+          CaseTitle: "Suresh Kumar vs. Union of India",
+          ClientName: "Suresh Kumar",
+          CNRNumber: "DLDH010099882025",
+          case_number: "W.P.(C)/9988/2025",
+          court_name: "High Court of Delhi",
+          case_type_name: "Service Matter",
+          CaseStatus: "Active",
+          Priority: "Low",
+          NextDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
+          ClientContactNumber: "+919876543211",
+          FirstParty: "Suresh Kumar",
+          OppositeParty: "Union of India",
+          JudgeName: "Justice Sanjeev Sachdeva",
+          Undersection: "Article 14 Constitution of India",
+          CaseDescription: "Service promotion dispute."
+        },
+        {
+          uniqueId: "mock-case-7",
+          CaseTitle: "Anjali Rao vs. ICICI Bank",
+          ClientName: "Anjali Rao",
+          CNRNumber: "MHCB010088772026",
+          case_number: "C.C./405/2026",
+          court_name: "Consumer Forum - Bandra",
+          case_type_name: "Consumer Complaint",
+          CaseStatus: "Active",
+          Priority: "High",
+          NextDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
+          ClientContactNumber: "+919998887776",
+          FirstParty: "Anjali Rao",
+          OppositeParty: "ICICI Bank Ltd",
+          JudgeName: "President K. S. Chaudhari",
+          Undersection: "Section 12 Consumer Protection Act",
+          CaseDescription: "Unfair trade practices regarding credit card charges."
+        },
+        {
+          uniqueId: "mock-case-8",
+          CaseTitle: "Karan Johar vs. Dharma Productions Employees",
+          ClientName: "Karan Johar",
+          CNRNumber: "MHCB010011222026",
+          case_number: "L.C./78/2026",
+          court_name: "Labour Court - Mumbai",
+          case_type_name: "Labour Matter",
+          CaseStatus: "Active",
+          Priority: "Medium",
+          NextDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
+          ClientContactNumber: "+919888877777",
+          FirstParty: "Karan Johar",
+          OppositeParty: "Dharma Productions Employees Union",
+          JudgeName: "Judge S. B. Shinde",
+          Undersection: "Industrial Disputes Act Section 10",
+          CaseDescription: "Wages settlement dispute."
+        },
+        {
+          uniqueId: "mock-case-9",
+          CaseTitle: "State of Maharashtra vs. Sanjay Dutt",
+          ClientName: "State of Maharashtra",
+          CNRNumber: "MHCB010077881993",
+          case_number: "TADA Case/1/1993",
+          court_name: "Special TADA Court - Mumbai",
+          case_type_name: "Criminal Trial",
+          CaseStatus: "Closed",
+          Priority: "High",
+          NextDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
+          ClientContactNumber: "+919999999999",
+          FirstParty: "State of Maharashtra",
+          OppositeParty: "Sanjay Dutt",
+          JudgeName: "Judge P. D. Kode",
+          Undersection: "TADA Act Section 3",
+          CaseDescription: "Closed trial under TADA provisions."
+        },
+        {
+          uniqueId: "mock-case-10",
+          CaseTitle: "Deepak Chawla vs. Income Tax Department",
+          ClientName: "Deepak Chawla",
+          CNRNumber: "DLDH010066772025",
+          case_number: "ITA/890/2025",
+          court_name: "ITAT - Delhi Bench",
+          case_type_name: "Revenue Matter",
+          CaseStatus: "Active",
+          Priority: "Low",
+          NextDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], // Yesterday
+          ClientContactNumber: "+919555444332",
+          FirstParty: "Deepak Chawla",
+          OppositeParty: "Income Tax Department",
+          JudgeName: "Member R. S. Syal",
+          Undersection: "Section 254 Income Tax Act",
+          CaseDescription: "Tax assessment appeal."
+        },
+        {
+          uniqueId: "mock-case-11",
+          CaseTitle: "Neeraj Chopra vs. Javelin Sports India",
+          ClientName: "Neeraj Chopra",
+          CNRNumber: "UPBR010044552026",
+          case_number: "O.S./23/2026",
+          court_name: "High Court of Allahabad",
+          case_type_name: "Arbitration",
+          CaseStatus: "Active",
+          Priority: "High",
+          NextDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
+          ClientContactNumber: "+919877777777",
+          FirstParty: "Neeraj Chopra",
+          OppositeParty: "Javelin Sports India",
+          JudgeName: "Justice Pritinker Diwaker",
+          Undersection: "Section 9 Arbitration Act",
+          CaseDescription: "Interim measures in sports contract arbitration."
+        },
+        {
+          uniqueId: "mock-case-12",
+          CaseTitle: "Sunil Gavaskar vs. Rohan Gavaskar",
+          ClientName: "Sunil Gavaskar",
+          CNRNumber: "MHCB010055662026",
+          case_number: "Partition Suit/12/2026",
+          court_name: "High Court of Bombay",
+          case_type_name: "Civil Suit",
+          CaseStatus: "Active",
+          Priority: "Medium",
+          NextDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
+          ClientContactNumber: "+919111222333",
+          FirstParty: "Sunil Gavaskar",
+          OppositeParty: "Rohan Gavaskar",
+          JudgeName: "Justice G. S. Patel",
+          Undersection: "Section 54 CPC",
+          CaseDescription: "Amicable family property partition suit."
+        },
+        {
+          uniqueId: "mock-case-13",
+          CaseTitle: "State of Karnataka vs. Veerappan Associates",
+          ClientName: "State of Karnataka",
+          CNRNumber: "KABU010033442026",
+          case_number: "Spl.CC/456/2026",
+          court_name: "Special Forest Court - Bangalore",
+          case_type_name: "Criminal Trial",
+          CaseStatus: "Active",
+          Priority: "High",
+          NextDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
+          ClientContactNumber: "+919000000000",
+          FirstParty: "State of Karnataka",
+          OppositeParty: "Veerappan Associates",
+          JudgeName: "Judge V. G. Bopaiah",
+          Undersection: "Forest Act Section 104",
+          CaseDescription: "Illegal smuggling of sandalwood."
+        },
+        {
+          uniqueId: "mock-case-14",
+          CaseTitle: "Shalini Sharma vs. CBSE",
+          ClientName: "Shalini Sharma",
+          CNRNumber: "DLDH010044882026",
+          case_number: "W.P.(C)/7890/2026",
+          court_name: "High Court of Delhi - Room 2",
+          case_type_name: "Writ Petition",
+          CaseStatus: "Active",
+          Priority: "Low",
+          NextDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
+          ClientContactNumber: "+919666777888",
+          FirstParty: "Shalini Sharma",
+          OppositeParty: "CBSE",
+          JudgeName: "Justice Rekha Palli",
+          Undersection: "Article 226 Constitution of India",
+          CaseDescription: "Petition seeking correction of spelling in Marksheet."
+        },
+        {
+          uniqueId: "mock-case-15",
+          CaseTitle: "Reliance Industries vs. Future Retail",
+          ClientName: "Reliance Industries",
+          CNRNumber: "MHCB010022992025",
+          case_number: "Com.A.S./40/2025",
+          court_name: "Commercial Court - Mumbai",
+          case_type_name: "Corporate",
+          CaseStatus: "Active",
+          Priority: "High",
+          NextDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
+          ClientContactNumber: "+919222222222",
+          FirstParty: "Reliance Industries Ltd",
+          OppositeParty: "Future Retail Ltd",
+          JudgeName: "Judge B. P. Colabawalla",
+          Undersection: "Insolvency and Bankruptcy Code Section 7",
+          CaseDescription: "Corporate insolvency resolution process."
+        },
+        {
+          uniqueId: "mock-case-16",
+          CaseTitle: "Vijay Mallya vs. SBI Consortium",
+          ClientName: "Vijay Mallya",
+          CNRNumber: "KABU010011992022",
+          case_number: "O.A./555/2022",
+          court_name: "DRT - Bangalore",
+          case_type_name: "Revenue Matter",
+          CaseStatus: "Active",
+          Priority: "High",
+          NextDate: null,
+          ClientContactNumber: "+447700900077",
+          FirstParty: "Vijay Mallya",
+          OppositeParty: "SBI Consortium",
+          JudgeName: "Presiding Officer DRT",
+          Undersection: "SARFAESI Act Section 13",
+          CaseDescription: "Recovery of dues from Kingfisher Airlines."
+        },
+        {
+          uniqueId: "mock-case-17",
+          CaseTitle: "Arnab Goswami vs. State of Maharashtra",
+          ClientName: "Arnab Goswami",
+          CNRNumber: "MHCB010088992023",
+          case_number: "Crl.W.P./890/2023",
+          court_name: "High Court of Bombay",
+          case_type_name: "Writ Petition",
+          CaseStatus: "Active",
+          Priority: "Medium",
+          NextDate: null,
+          ClientContactNumber: "+919111111111",
+          FirstParty: "Arnab Goswami",
+          OppositeParty: "State of Maharashtra",
+          JudgeName: "Justice S. S. Shinde",
+          Undersection: "Section 482 CrPC",
+          CaseDescription: "Petition for quashing FIR in abetment to suicide case."
+        },
+        {
+          uniqueId: "mock-case-18",
+          CaseTitle: "Mukesh Ambani vs. Anil Ambani (Gas Dispute)",
+          ClientName: "Mukesh Ambani",
+          CNRNumber: "MHCB010000002010",
+          case_number: "Civil Appeal/123/2010",
+          court_name: "Supreme Court of India",
+          case_type_name: "Civil Suit",
+          CaseStatus: "Closed",
+          Priority: "High",
+          NextDate: null,
+          ClientContactNumber: "+919822012345",
+          FirstParty: "Mukesh Ambani",
+          OppositeParty: "Anil Ambani",
+          JudgeName: "CJI K. G. Balakrishnan",
+          Undersection: "Companies Act Section 397",
+          CaseDescription: "Gas supply and pricing family dispute."
+        },
+        {
+          uniqueId: "mock-case-19",
+          CaseTitle: "Ajay Devgn vs. Income Tax Appellate",
+          ClientName: "Ajay Devgn",
+          CNRNumber: "MHCB010011442024",
+          case_number: "ITA/560/2024",
+          court_name: "ITAT - Mumbai",
+          case_type_name: "Revenue Matter",
+          CaseStatus: "Active",
+          Priority: "Low",
+          NextDate: null,
+          ClientContactNumber: "+919000100020",
+          FirstParty: "Ajay Devgn",
+          OppositeParty: "Income Tax Appellate Tribunal",
+          JudgeName: "Vice President ITAT",
+          Undersection: "Section 143(3) Income Tax Act",
+          CaseDescription: "Disallowance of business promotional expenses."
+        },
+        {
+          uniqueId: "mock-case-20",
+          CaseTitle: "Gautam Adani vs. Hindenburg Research",
+          ClientName: "Gautam Adani",
+          CNRNumber: "GJAH010099002026",
+          case_number: "Defamation Suit/120/2026",
+          court_name: "High Court of Gujarat",
+          case_type_name: "Civil Suit",
+          CaseStatus: "Active",
+          Priority: "High",
+          NextDate: null,
+          ClientContactNumber: "+919000000001",
+          FirstParty: "Gautam Adani",
+          OppositeParty: "Hindenburg Research LLC",
+          JudgeName: "Justice Sunita Agarwal",
+          Undersection: "Section 499 IPC / Defamation CPC",
+          CaseDescription: "Suit for damages and permanent injunction."
+        }
+      ];
+
+      for (const mc of mockCases) {
+        await db.runAsync(
+          `INSERT INTO Cases (
+            uniqueId, CaseTitle, ClientName, CNRNumber, case_number, 
+            court_name, case_type_name, CaseStatus, Priority, NextDate, 
+            ClientContactNumber, FirstParty, OppositeParty, JudgeName, 
+            Undersection, CaseDescription, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+          [
+            mc.uniqueId, mc.CaseTitle, mc.ClientName, mc.CNRNumber, mc.case_number,
+            mc.court_name, mc.case_type_name, mc.CaseStatus, mc.Priority, mc.NextDate,
+            mc.ClientContactNumber, mc.FirstParty, mc.OppositeParty, mc.JudgeName,
+            mc.Undersection, mc.CaseDescription
+          ]
+        );
+      }
+      console.log("Mock cases seeded successfully.");
+    }
+  } catch (error) {
+    console.error("Error seeding mock cases:", error);
+  }
 
   console.log("Initial data seeding process complete.");
 };

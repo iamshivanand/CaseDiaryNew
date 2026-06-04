@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useContext } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { formatDate } from '../../utils/commonFunctions';
 import * as db from '../../DataBase';
@@ -8,6 +8,7 @@ import NewCaseCard from '../CasesList/components/NewCaseCard';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
 import { getCurrentUserId } from '../../utils/commonFunctions';
+import { ThemeContext } from '../../Providers/ThemeProvider';
 
 import { SafeAreaView, Platform } from "react-native";
 
@@ -23,6 +24,7 @@ const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
 };
 
 const YesterdaysCasesScreen = () => {
+  const { theme } = useContext(ThemeContext);
   const [yesterdaysCases, setYesterdaysCases] = useState<CaseDataScreen[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
@@ -45,14 +47,15 @@ const YesterdaysCasesScreen = () => {
       });
 
       const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
-          id: c.id,
-          title: c.CaseTitle || 'No Title',
-          client: c.ClientName || 'Unknown Client',
-          status: c.CaseStatus || 'Pending',
-          nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
-          lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
-          previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
-          }));
+        id: c.id,
+        title: c.CaseTitle || 'No Title',
+        client: c.ClientName || 'Unknown Client',
+        status: c.CaseStatus || 'Pending',
+        nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
+        lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
+        previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
+        priority: c.Priority || 'Low',
+      }));
 
       setYesterdaysCases(mappedCases);
     } catch (error) {
@@ -100,20 +103,21 @@ const YesterdaysCasesScreen = () => {
 
       // 3. Refresh the list
       fetchYesterdaysCases();
-    } catch (error)      {console.error("Error updating hearing:", error);
+    } catch (error) {
+      console.error("Error updating hearing:", error);
     }
   };
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
+      <View style={[styles.centered, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <FlatList
         data={yesterdaysCases}
         keyExtractor={(item) => item.id.toString()}
@@ -124,7 +128,11 @@ const YesterdaysCasesScreen = () => {
             index={index}
           />
         )}
-        ListEmptyComponent={<Text style={styles.emptyText}>No cases found for yesterday.</Text>}
+        ListEmptyComponent={
+          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+            No cases found for yesterday.
+          </Text>
+        }
         contentContainerStyle={styles.container}
       />
       {selectedCase && (
@@ -143,7 +151,6 @@ const YesterdaysCasesScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     paddingTop: Platform.OS === 'android' ? 25 : 0,
   },
   container: {

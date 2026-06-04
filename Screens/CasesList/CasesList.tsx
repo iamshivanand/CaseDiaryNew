@@ -9,6 +9,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native"; // Removed Dimensions, ScrollView
 import { getCases, addCaseTimelineEvent, updateCase, getCaseById } from "../../DataBase";
 import { Case } from "../../DataBase/schema";
@@ -17,6 +18,7 @@ import { CaseDataScreen } from "../../Types/appTypes"; // Import the new data ty
 import { formatDate, getCurrentUserId } from "../../utils/commonFunctions";
 import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
+import AdBanner from "../CommonComponents/AdBanner";
 
 const transformApiCaseToCaseDataScreen = (apiCase: Case): CaseDataScreen => {
   return {
@@ -29,128 +31,120 @@ const transformApiCaseToCaseDataScreen = (apiCase: Case): CaseDataScreen => {
     previousHearing: apiCase.PreviousDate
       ? formatDate(apiCase.PreviousDate)
       : "N/A",
+    priority: apiCase.Priority || "Low",
   };
 };
 type FilterStatus = "Active" | "Closed";
 
 type CasesListRouteProp = RouteProp<{ params: { Filter?: string } }, 'params'>;
 
+const LIMIT = 20;
+
 const CasesList = () => {
   const route = useRoute<CasesListRouteProp>();
   const filterParam = route.params?.Filter;
   const navigation = useNavigation();
-  const { theme } = useContext(ThemeContext); // Keep theme for styling
+  const { theme } = useContext(ThemeContext);
 
-  const [allCases, setAllCases] = useState<CaseDataScreen[]>([]); // Initialize with sample data
-  const [filteredCases, setFilteredCases] = useState<CaseDataScreen[]>([]);
+  const [cases, setCases] = useState<CaseDataScreen[]>([]);
   const [searchText, setSearchText] = useState("");
+  const [debouncedSearchText, setDebouncedSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterStatus>("Active");
   const [isPopupVisible, setPopupVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Initial data load and filtering
+  // Debounce search text input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchText]);
+
+  // Fetch paginated cases from the database
+  const fetchCasesList = useCallback(async (offset: number, queryText: string, currentFilter: string, currentActiveFilter: FilterStatus) => {
+    setIsLoading(true);
+    try {
+      let dateFilter: 'today' | 'tomorrow' | 'yesterday' | 'undated' | null = null;
+      let status: 'Active' | 'Closed' | 'All' = currentActiveFilter;
+
+      if (currentFilter === 'todaysCases') {
+        dateFilter = 'today';
+        status = 'All';
+      } else if (currentFilter === 'tomorrowCases') {
+        dateFilter = 'tomorrow';
+        status = 'All';
+      } else if (currentFilter === 'yesterdayCases') {
+        dateFilter = 'yesterday';
+        status = 'All';
+      }
+
+      const results = await getCases(
+        null, // Global case retrieval or pass specific user if needed
+        LIMIT,
+        offset,
+        {
+          status,
+          dateFilter,
+          searchQuery: queryText,
+        }
+      );
+
+      const mapped = results ? results.map(transformApiCaseToCaseDataScreen) : [];
+
+      if (offset === 0) {
+        setCases(mapped);
+      } else {
+        setCases((prev) => [...prev, ...mapped]);
+      }
+      setHasMore(mapped.length === LIMIT);
+    } catch (error) {
+      console.error("Error fetching cases list:", error);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  // Fetch initial page on tab focus, filter change, or query change
   useFocusEffect(
     useCallback(() => {
-      fetchData();
-    }, [])
+      fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
+    }, [debouncedSearchText, filterParam, activeFilter, fetchCasesList])
   );
 
-  useEffect(() => {
-    filterAndSearchCases();
-  }, [activeFilter, searchText, allCases]); // Re-filter when filter, search text, or allCases change
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
+  }, [debouncedSearchText, filterParam, activeFilter, fetchCasesList]);
 
-  const fetchData = async () => {
-    try {
-      // Replace with actual DB call if using getCases
-      const results = await getCases(/* userId */);
-      setAllCases(
-        results ? results.map(transformApiCaseToCaseDataScreen) : []
-      ); // Transform if necessary
-      // setAllCases(sampleCases); // Using sample data
-    } catch (error) {
-      console.error("Error fetching cases:", error);
-      setAllCases([]);
+  const loadMore = useCallback(() => {
+    if (!isLoading && hasMore) {
+      fetchCasesList(cases.length, debouncedSearchText, filterParam || "", activeFilter);
     }
-  };
+  }, [isLoading, hasMore, cases.length, debouncedSearchText, filterParam, activeFilter, fetchCasesList]);
 
-  const filterAndSearchCases = () => {
-    let tempCases = allCases;
-
-    if (filterParam) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (filterParam === 'todaysCases') {
-        tempCases = tempCases.filter(c => {
-          if (c.nextHearing === 'N/A') return false;
-          const hearingDate = new Date(c.nextHearing);
-          hearingDate.setHours(0, 0, 0, 0);
-          return hearingDate.getTime() === today.getTime();
-        });
-      } else if (filterParam === 'tomorrowCases') {
-        const tomorrow = new Date(today);
-        tomorrow.setDate(today.getDate() + 1);
-        tempCases = tempCases.filter(c => {
-          if (c.nextHearing === 'N/A') return false;
-          const hearingDate = new Date(c.nextHearing);
-          hearingDate.setHours(0, 0, 0, 0);
-          return hearingDate.getTime() === tomorrow.getTime();
-        });
-      } else if (filterParam === 'yesterdayCases') {
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
-        tempCases = tempCases.filter(c => {
-          if (c.nextHearing === 'N/A') return false;
-          const hearingDate = new Date(c.nextHearing);
-          hearingDate.setHours(0, 0, 0, 0);
-          return hearingDate.getTime() === yesterday.getTime();
-        });
-      }
-    } else {
-      // Filter by status
-      if (activeFilter === "Active") {
-        tempCases = tempCases.filter((c) => c.status !== "Closed");
-      } else if (activeFilter === "Closed") {
-        tempCases = tempCases.filter((c) => c.status === "Closed");
-      }
-    }
-
-    // Filter by search text (searches title and client)
-    if (searchText.trim() !== "") {
-      const lowerSearchText = searchText.toLowerCase();
-      tempCases = tempCases.filter(
-        (c) =>
-          c.title.toLowerCase().includes(lowerSearchText) ||
-          c.client.toLowerCase().includes(lowerSearchText)
-      );
-    }
-    tempCases.sort((a, b) => {
-      const aDate = new Date(a.nextHearing);
-      const bDate = new Date(b.nextHearing);
-      if (a.nextHearing === 'N/A') return 1;
-      if (b.nextHearing === 'N/A') return -1;
-      return aDate.getTime() - bDate.getTime();
-    });
-    setFilteredCases(tempCases);
-  };
-
-  const handleSearchChange = (text: string) => {
+  const handleSearchChange = useCallback((text: string) => {
     setSearchText(text);
-  };
+  }, []);
 
-  const handleUpdateHearing = (caseDetails: CaseDataScreen) => {
+  const handleUpdateHearing = useCallback((caseDetails: CaseDataScreen) => {
     setSelectedCase(caseDetails);
     setPopupVisible(true);
-  };
+  }, []);
 
-  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number) => {
+  const handleSaveHearing = useCallback(async (notes: string, nextHearingDate: Date, userId: number) => {
     if (!selectedCase || !selectedCase.id) return;
     const caseId = parseInt(selectedCase.id.toString(), 10);
-    if(isNaN(caseId)) return;
+    if (isNaN(caseId)) return;
 
     try {
       const caseExists = await getCaseById(caseId);
-      if(!caseExists) {
+      if (!caseExists) {
         console.error("Case not found");
         return;
       }
@@ -168,17 +162,26 @@ const CasesList = () => {
         NextDate: nextHearingDate.toISOString(),
       }, userId);
 
-      // 3. Refresh the list
-      fetchData();
+      // 3. Refresh list from page 0
+      fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
     } catch (error) {
       console.error("Error updating hearing:", error);
     }
-  };
+  }, [selectedCase, debouncedSearchText, filterParam, activeFilter, fetchCasesList]);
 
-  const navigateToAddCase = () => {
+  const navigateToAddCase = useCallback(() => {
     // @ts-ignore
-    navigation.navigate("AddCase"); // Assuming 'AddCase' is the name of the route for adding a new case
-  };
+    navigation.navigate("AddCase");
+  }, [navigation]);
+
+  const renderItem = useCallback(({ item }: { item: CaseDataScreen }) => (
+    <NewCaseCard
+      caseDetails={item}
+      onUpdateHearingPress={() => handleUpdateHearing(item)}
+    />
+  ), [handleUpdateHearing]);
+
+  const keyExtractor = useCallback((item: CaseDataScreen) => item.id.toString(), []);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -190,7 +193,7 @@ const CasesList = () => {
       </View>
 
       <View style={styles.searchContainer}>
-        <View style={[styles.inputWrapper, {backgroundColor: theme.colors.card}]}>
+        <View style={[styles.inputWrapper, { backgroundColor: theme.colors.cardBackground || theme.colors.card }]}>
           <AntDesign
             name="search1"
             size={20}
@@ -207,46 +210,64 @@ const CasesList = () => {
         </View>
       </View>
 
-      <View style={styles.toggleContainer}>
-        <TouchableOpacity
-          style={[
-            styles.toggleButton,
-            activeFilter === "Active" ? styles.activeButton : styles.inactiveButton,
-            activeFilter === "Active" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.cardDeep ||'#E0E0E0'}
-          ]}
-          onPress={() => setActiveFilter("Active")}
-        >
-          <Text style={activeFilter === "Active" ? styles.activeButtonText : [styles.inactiveButtonText, {color: theme.colors.text}]}>
-            Active
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.toggleButton,
-            activeFilter === "Closed" ? styles.activeButton : styles.inactiveButton,
-            activeFilter === "Closed" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.cardDeep ||'#E0E0E0'}
-          ]}
-          onPress={() => setActiveFilter("Closed")}
-        >
-          <Text style={activeFilter === "Closed" ? styles.activeButtonText : [styles.inactiveButtonText, {color: theme.colors.text}]}>
-            Closed
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {!filterParam && (
+        <View style={styles.toggleContainer}>
+          <TouchableOpacity
+            style={[
+              styles.toggleButton,
+              activeFilter === "Active" ? styles.activeButton : styles.inactiveButton,
+              activeFilter === "Active" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.border || '#E0E0E0' }
+            ]}
+            onPress={() => setActiveFilter("Active")}
+          >
+            <Text style={activeFilter === "Active" ? styles.activeButtonText : [styles.inactiveButtonText, { color: theme.colors.text }]}>
+              Active
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.toggleButton,
+              activeFilter === "Closed" ? styles.activeButton : styles.inactiveButton,
+              activeFilter === "Closed" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.border || '#E0E0E0' }
+            ]}
+            onPress={() => setActiveFilter("Closed")}
+          >
+            <Text style={activeFilter === "Closed" ? styles.activeButtonText : [styles.inactiveButtonText, { color: theme.colors.text }]}>
+              Closed
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <FlatList
-        data={filteredCases}
-        renderItem={({ item }) => (
-          <NewCaseCard
-            caseDetails={item}
-            onUpdateHearingPress={() => handleUpdateHearing(item)}
-          />
-        )}
-        keyExtractor={(item) => item.id?.toString() || Math.random().toString()} // Ensure key is a string
+        data={cases}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        initialNumToRender={6}
+        maxToRenderPerBatch={4}
+        windowSize={3}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        refreshing={isRefreshing}
+        onRefresh={handleRefresh}
+        getItemLayout={(data, index) => ({
+          length: 154, // Accurate height of memoized NewCaseCard (padding + margins + buttons)
+          offset: 154 * index,
+          index,
+        })}
         ListEmptyComponent={
-          <View style={styles.emptyListContainer}>
-            <Text style={[styles.emptyListText, {color: theme.colors.textSecondary}]}>No cases found.</Text>
-          </View>
+          !isLoading ? (
+            <View style={styles.emptyListContainer}>
+              <Text style={[styles.emptyListText, { color: theme.colors.textSecondary }]}>No cases found.</Text>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          isLoading && cases.length > 0 ? (
+            <View style={{ paddingVertical: 16 }}>
+              <ActivityIndicator color={theme.colors.primary} />
+            </View>
+          ) : null
         }
         contentContainerStyle={styles.listContentContainer}
       />
@@ -259,6 +280,7 @@ const CasesList = () => {
           }
         />
       )}
+      <AdBanner />
     </SafeAreaView>
   );
 };
@@ -338,7 +360,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   listContentContainer: {
-    paddingBottom: 16, // Add some padding at the bottom of the list
+    paddingBottom: 100, // Add some padding at the bottom of the list
   },
   emptyListContainer: {
     flex: 1,

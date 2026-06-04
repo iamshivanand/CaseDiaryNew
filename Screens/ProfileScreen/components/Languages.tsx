@@ -1,33 +1,13 @@
-import React from "react";
+import React, { useContext } from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-
-interface EditControlsProps {
-  onSave: () => void;
-  onCancel: () => void;
-}
-
-const EditControls: React.FC<EditControlsProps> = ({ onSave, onCancel }) => (
-  <View style={styles.editControlsContainer}>
-    <TouchableOpacity onPress={onSave} style={[styles.button, styles.saveButton]}>
-      <Icon name="check" size={20} color="#fff" />
-      <Text style={styles.buttonText}>Save</Text>
-    </TouchableOpacity>
-    <TouchableOpacity onPress={onCancel} style={[styles.button, styles.cancelButton]}>
-      <Icon name="close" size={20} color="#fff" />
-      <Text style={styles.buttonText}>Cancel</Text>
-    </TouchableOpacity>
-  </View>
-);
+import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface LanguagesProps {
   languages: string[];
   isEditing: boolean;
-  tempLanguages: string; // Storing as comma-separated string for TextInput
+  tempLanguages: string;
   onTempLanguagesChange: (text: string) => void;
-  onEditPress: () => void;
-  onSave: () => void;
-  onCancel: () => void;
 }
 
 const Languages: React.FC<LanguagesProps> = ({
@@ -35,33 +15,41 @@ const Languages: React.FC<LanguagesProps> = ({
   isEditing,
   tempLanguages,
   onTempLanguagesChange,
-  onEditPress,
-  onSave,
-  onCancel,
 }) => {
+  const { theme } = useContext(ThemeContext);
+
   return (
-    <View style={styles.container}>
+    <View 
+      style={[
+        styles.container, 
+        { 
+          backgroundColor: theme.colors.cardBackground,
+          borderColor: theme.colors.border,
+          borderWidth: 1,
+        }
+      ]}
+    >
       <View style={styles.headerContainer}>
-        <Text style={styles.heading}>Languages</Text>
-        {!isEditing && (
-          <TouchableOpacity onPress={onEditPress} style={styles.editIcon}>
-            <Icon name="pencil-outline" size={22} color="#3B82F6" />
-          </TouchableOpacity>
-        )}
+        <Text style={[styles.heading, { color: theme.colors.text }]}>Languages</Text>
       </View>
       {isEditing ? (
-        <>
-          <TextInput
-            style={styles.textInput}
-            value={tempLanguages}
-            onChangeText={onTempLanguagesChange}
-            placeholder="e.g., English, Spanish, French"
-            multiline // Allows for more space if needed, though typically single line
-          />
-          <EditControls onSave={onSave} onCancel={onCancel} />
-        </>
+        <TextInput
+          style={[
+            styles.textInput, 
+            { 
+              backgroundColor: theme.colors.inputBackground, 
+              color: theme.colors.text, 
+              borderColor: theme.colors.border 
+            }
+          ]}
+          value={tempLanguages}
+          onChangeText={onTempLanguagesChange}
+          placeholder="e.g., English, Spanish, French"
+          placeholderTextColor={theme.colors.textSecondary}
+          multiline
+        />
       ) : (
-        <Text style={styles.languagesText}>
+        <Text style={[styles.languagesText, { color: theme.colors.textSecondary }]}>
           {languages && languages.length > 0 ? languages.join(", ") : "Not specified."}
         </Text>
       )}
@@ -71,9 +59,8 @@ const Languages: React.FC<LanguagesProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    padding: 15,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     marginVertical: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -90,25 +77,21 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#1F2937",
   },
   editIcon: {
     padding: 5,
   },
   languagesText: {
     fontSize: 15,
-    color: "#4B5563",
     lineHeight: 22,
   },
   textInput: {
     fontSize: 15,
-    color: "#1F2937",
     borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 6,
+    borderRadius: 8,
     padding: 10,
     marginBottom: 15,
-    textAlignVertical: 'top', // For Android if multiline is truly used
+    textAlignVertical: 'top',
   },
   editControlsContainer: {
     flexDirection: "row",

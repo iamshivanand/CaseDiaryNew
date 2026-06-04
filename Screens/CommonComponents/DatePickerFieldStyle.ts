@@ -38,12 +38,12 @@ export const getDatePickerFieldStyles = (theme: Theme) => StyleSheet.create({
   modalOverlay: {
       flex: 1,
       justifyContent: 'flex-end',
-      backgroundColor: theme.colors.modalOverlayBg || 'rgba(0,0,0,0.4)',
+      backgroundColor: theme.colors.modalOverlayBg || 'rgba(15, 23, 42, 0.65)',
   },
   modalContainer: {
       backgroundColor: theme.colors.modalBackground || theme.colors.background,
-      borderTopRightRadius: 20,
-      borderTopLeftRadius: 20,
+      borderTopRightRadius: 24,
+      borderTopLeftRadius: 24,
       padding: 20,
   },
   buttonContainer: { // For Done/Cancel buttons in iOS modal

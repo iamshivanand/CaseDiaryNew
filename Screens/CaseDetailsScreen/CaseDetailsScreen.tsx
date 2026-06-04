@@ -17,14 +17,18 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Linking,
 } from "react-native"; // Removed ScrollView
+import { Ionicons } from "@expo/vector-icons";
 import * as db from "../../DataBase";
 import { getCaseTimelineEventsByCaseId, getCaseById } from "../../DataBase";
-import { ThemeContext } from "../../Providers/ThemeProvider";
+import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 import { CaseData, CaseDataScreen, Document, TimelineEvent } from "../../Types/appTypes";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import ActionButton from "../CommonComponents/ActionButton";
 import SectionHeader from "../CommonComponents/SectionHeader";
+import { exportCaseToPdf } from "../../utils/pdfExporter";
+import { useAdTrigger } from "../CommonComponents/AdManager";
 import DateRow from "./components/DateRow";
 import DocumentCard from "./components/DocumentCard";
 import StatusBadge from "./components/StatusBadge";
@@ -53,6 +57,8 @@ const CaseDetailsScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<CaseDetailsScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
+  const styles = getStyles(theme);
+  const { showAdWithPreload } = useAdTrigger();
   const { caseId } = route.params;
   const [caseDetails, setCaseDetails] = useState<CaseData | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -113,29 +119,38 @@ const CaseDetailsScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (caseId) {
-      const caseIdToLoad = parseInt(caseId.toString(), 10);
-      const fetchAllData = async () => {
-        if (!caseIdToLoad || isNaN(caseIdToLoad)) {
-          Alert.alert("Error", "No valid Case ID provided.");
-          setIsLoading(false);
-          if (navigation.canGoBack()) navigation.goBack();
-          return;
-        }
-        setIsLoading(true);
-        try {
-          await loadCaseDetails(caseIdToLoad);
-          await loadDocumentsAndTimeline(caseIdToLoad);
-        } catch (error) {
-          console.error("Error fetching case details:", error);
-          Alert.alert("Error", "Could not load case details.");
-          if (navigation.canGoBack()) navigation.goBack();
-        } finally {
-          setIsLoading(false);
-        }
-      };
+    if (!caseId) return;
+    const caseIdToLoad = parseInt(caseId.toString(), 10);
+
+    const fetchAllData = async () => {
+      if (!caseIdToLoad || isNaN(caseIdToLoad)) {
+        Alert.alert("Error", "No valid Case ID provided.");
+        setIsLoading(false);
+        if (navigation.canGoBack()) navigation.goBack();
+        return;
+      }
+      setIsLoading(true);
+      try {
+        await loadCaseDetails(caseIdToLoad);
+        await loadDocumentsAndTimeline(caseIdToLoad);
+      } catch (error) {
+        console.error("Error fetching case details:", error);
+        Alert.alert("Error", "Could not load case details.");
+        if (navigation.canGoBack()) navigation.goBack();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Load data initially on mount
+    fetchAllData();
+
+    // Reload data when the screen is focused (e.g., when returning from Edit Case)
+    const unsubscribe = navigation.addListener("focus", () => {
       fetchAllData();
-    }
+    });
+
+    return unsubscribe;
   }, [caseId, navigation, loadDocumentsAndTimeline, loadCaseDetails]);
 
   const handleEditCase = () => {
@@ -148,6 +163,40 @@ const CaseDetailsScreen: React.FC = () => {
     // Navigate to a screen for adding documents
     // @ts-ignore
     navigation.navigate("AddDocument", { caseId: caseDetails.id });
+  };
+
+  const handleExportPdf = async () => {
+    if (!caseDetails) return;
+    await showAdWithPreload("rewarded", async () => {
+      try {
+        await exportCaseToPdf(caseDetails);
+      } catch (error) {
+        Alert.alert("Export Failed", "Could not compile case details PDF.");
+      }
+    });
+  };
+
+  const handleGenerateDocument = () => {
+    if (!caseDetails) return;
+    // @ts-ignore
+    navigation.navigate("GenerateDocument", { caseId: parseInt(caseDetails.id, 10) });
+  };
+
+  const handlePhoneCall = () => {
+    if (caseDetails?.ClientContactNumber) {
+      Linking.openURL(`tel:${caseDetails.ClientContactNumber}`);
+    } else {
+      Alert.alert("No Contact Number", "No client contact number is available for this case.");
+    }
+  };
+
+  const handleWhatsAppChat = () => {
+    if (caseDetails?.ClientContactNumber) {
+      const cleanNumber = caseDetails.ClientContactNumber.replace(/\D/g, "");
+      Linking.openURL(`https://wa.me/${cleanNumber}`);
+    } else {
+      Alert.alert("No Contact Number", "No client contact number is available for this case.");
+    }
   };
 
   const handleDocumentInteraction = async (doc: Document) => {
@@ -230,7 +279,19 @@ const CaseDetailsScreen: React.FC = () => {
         return (
           <View style={styles.summarySection}>
             <Text style={styles.mainCaseTitle}>{caseDetails.CaseTitle}</Text>
-            <Text style={styles.clientName}>Client: {caseDetails.ClientName}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text style={[styles.clientName, { marginBottom: 0 }]}>Client: {caseDetails.ClientName}</Text>
+              {caseDetails.ClientContactNumber ? (
+                <View style={{ flexDirection: 'row' }}>
+                  <TouchableOpacity onPress={handlePhoneCall} activeOpacity={0.85} style={{ padding: 8, backgroundColor: '#E0F2FE', borderRadius: 20, marginRight: 8 }}>
+                    <Ionicons name="call" size={20} color="#0284C7" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleWhatsAppChat} activeOpacity={0.85} style={{ padding: 8, backgroundColor: '#DCFCE7', borderRadius: 20 }}>
+                    <Ionicons name="logo-whatsapp" size={20} color="#15803D" />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </View>
             <StatusBadge status={caseDetails.CaseStatus} />
             <DateRow
               label="Next Hearing"
@@ -293,11 +354,29 @@ const CaseDetailsScreen: React.FC = () => {
             <Text style={styles.detailValue}>{caseDetails.CaseDescription || 'N/A'}</Text>
             <Text style={styles.detailLabel}>Case Notes:</Text>
             <Text style={styles.detailValue}>{caseDetails.CaseNotes || 'N/A'}</Text>
-            <ActionButton
-              title="Edit Case"
-              onPress={handleEditCase}
-              type="primary"
-            />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+              <View style={{ width: '48%' }}>
+                <ActionButton
+                  title="Edit Case"
+                  onPress={handleEditCase}
+                  type="primary"
+                />
+              </View>
+              <View style={{ width: '48%' }}>
+                <ActionButton
+                  title="Export PDF"
+                  onPress={handleExportPdf}
+                  type="secondary"
+                />
+              </View>
+            </View>
+            <View style={{ marginTop: 12 }}>
+              <ActionButton
+                title="Generate Court Document"
+                onPress={handleGenerateDocument}
+                type="dashed"
+              />
+            </View>
           </View>
         );
       case "documentsHeader":
@@ -339,7 +418,7 @@ const CaseDetailsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -348,18 +427,20 @@ const styles = StyleSheet.create({
   },
   summarySection: {
     padding: 16,
-    backgroundColor: "white",
+    backgroundColor: theme.colors.cardBackground,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: theme.colors.border,
   },
   mainCaseTitle: {
     fontSize: 22,
     fontWeight: "bold",
     marginBottom: 8,
+    color: theme.colors.text,
   },
   clientName: {
     fontSize: 16,
     marginBottom: 12,
+    color: theme.colors.text,
   },
   detailsContainer: {
     flexDirection: 'row',
@@ -374,9 +455,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     marginBottom: 4,
+    color: theme.colors.text,
   },
   detailValue: {
     fontSize: 14,
+    color: theme.colors.textSecondary,
+  },
+  noItemsText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    padding: 16,
+  },
+  documentsSection: {
+    backgroundColor: theme.colors.background,
+  },
+  timelineSection: {
+    backgroundColor: theme.colors.background,
   },
 });
 

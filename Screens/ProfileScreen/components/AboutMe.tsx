@@ -1,33 +1,13 @@
-import React from "react";
+import React, { useContext } from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-
-interface EditControlsProps {
-  onSave: () => void;
-  onCancel: () => void;
-}
-
-const EditControls: React.FC<EditControlsProps> = ({ onSave, onCancel }) => (
-  <View style={styles.editControlsContainer}>
-    <TouchableOpacity onPress={onSave} style={[styles.button, styles.saveButton]}>
-      <Icon name="check" size={20} color="#fff" />
-      <Text style={styles.buttonText}>Save</Text>
-    </TouchableOpacity>
-    <TouchableOpacity onPress={onCancel} style={[styles.button, styles.cancelButton]}>
-      <Icon name="close" size={20} color="#fff" />
-      <Text style={styles.buttonText}>Cancel</Text>
-    </TouchableOpacity>
-  </View>
-);
+import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface AboutMeProps {
   description: string;
   isEditing: boolean;
   tempDescription: string;
   onTempDescriptionChange: (text: string) => void;
-  onEditPress: () => void;
-  onSave: () => void;
-  onCancel: () => void;
 }
 
 const AboutMe: React.FC<AboutMeProps> = ({
@@ -35,34 +15,44 @@ const AboutMe: React.FC<AboutMeProps> = ({
   isEditing,
   tempDescription,
   onTempDescriptionChange,
-  onEditPress,
-  onSave,
-  onCancel,
 }) => {
+  const { theme } = useContext(ThemeContext);
+
   return (
-    <View style={styles.container}>
+    <View 
+      style={[
+        styles.container, 
+        { 
+          backgroundColor: theme.colors.cardBackground,
+          borderColor: theme.colors.border,
+          borderWidth: 1,
+        }
+      ]}
+    >
       <View style={styles.headerContainer}>
-        <Text style={styles.heading}>About Me</Text>
-        {!isEditing && (
-          <TouchableOpacity onPress={onEditPress} style={styles.editIcon}>
-            <Icon name="pencil-outline" size={22} color="#3B82F6" />
-          </TouchableOpacity>
-        )}
+        <Text style={[styles.heading, { color: theme.colors.text }]}>About Me</Text>
       </View>
       {isEditing ? (
-        <>
-          <TextInput
-            style={styles.textInput}
-            value={tempDescription}
-            onChangeText={onTempDescriptionChange}
-            placeholder="Tell us about yourself..."
-            multiline
-            numberOfLines={5} // Suggests a good initial height
-          />
-          <EditControls onSave={onSave} onCancel={onCancel} />
-        </>
+        <TextInput
+          style={[
+            styles.textInput, 
+            { 
+              backgroundColor: theme.colors.inputBackground, 
+              color: theme.colors.text, 
+              borderColor: theme.colors.border 
+            }
+          ]}
+          value={tempDescription}
+          onChangeText={onTempDescriptionChange}
+          placeholder="Tell us about yourself..."
+          placeholderTextColor={theme.colors.textSecondary}
+          multiline
+          numberOfLines={5}
+        />
       ) : (
-        <Text style={styles.descriptionText}>{description || "Not specified."}</Text>
+        <Text style={[styles.descriptionText, { color: theme.colors.textSecondary }]}>
+          {description || "Not specified."}
+        </Text>
       )}
     </View>
   );
@@ -70,9 +60,8 @@ const AboutMe: React.FC<AboutMeProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    padding: 15,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     marginVertical: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -89,26 +78,22 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#1F2937", // Darker gray
   },
   editIcon: {
-    padding: 5, // Easier to tap
+    padding: 5,
   },
   descriptionText: {
     fontSize: 15,
-    color: "#4B5563", // Medium gray
     lineHeight: 22,
   },
   textInput: {
     fontSize: 15,
-    color: "#1F2937",
     lineHeight: 22,
     borderWidth: 1,
-    borderColor: "#D1D5DB", // Gray border
-    borderRadius: 6,
+    borderRadius: 8,
     padding: 10,
-    minHeight: 100, // Good minimum height for multiline
-    textAlignVertical: 'top', // For Android
+    minHeight: 100,
+    textAlignVertical: 'top',
     marginBottom: 15,
   },
   editControlsContainer: {
@@ -131,10 +116,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   saveButton: {
-    backgroundColor: "#22C55E", // Green
+    backgroundColor: "#22C55E",
   },
   cancelButton: {
-    backgroundColor: "#EF4444", // Red
+    backgroundColor: "#EF4444",
   },
   buttonText: {
     color: "#fff",
