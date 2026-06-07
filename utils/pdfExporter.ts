@@ -223,7 +223,7 @@ export const exportDailyCauseListToPdf = async (cases: any[], titleDate: string)
               ${c.CaseStatus || 'N/A'}<br/>
               <span style="font-size: 10px; color: #555;">${c.Undersection || ''}</span>
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; width: 180px; height: 50px; background-color: #fafafa;">
+            <td style="padding: 8px; border: 1px solid #aaa; width: 220px; height: 50px; background-color: #fafafa;">
               <!-- Blank column for hand-written notes -->
             </td>
           </tr>
@@ -245,6 +245,10 @@ export const exportDailyCauseListToPdf = async (cases: any[], titleDate: string)
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <style>
+            @page {
+              size: landscape;
+              margin: 10mm;
+            }
             body {
               font-family: Arial, sans-serif;
               color: #222;
@@ -259,12 +263,12 @@ export const exportDailyCauseListToPdf = async (cases: any[], titleDate: string)
             }
             .header h1 {
               margin: 0;
-              font-size: 20px;
+              font-size: 22px;
               text-transform: uppercase;
             }
             .header h2 {
               margin: 5px 0 0 0;
-              font-size: 14px;
+              font-size: 15px;
               color: #444;
             }
             table {
@@ -275,7 +279,7 @@ export const exportDailyCauseListToPdf = async (cases: any[], titleDate: string)
             th {
               background-color: #eaeaea;
               color: #111;
-              font-size: 11px;
+              font-size: 12px;
               text-align: left;
               padding: 8px;
               font-weight: bold;
@@ -293,11 +297,11 @@ export const exportDailyCauseListToPdf = async (cases: any[], titleDate: string)
             <thead>
               <tr>
                 <th style="width: 5%; text-align: center;">S.No</th>
-                <th style="width: 30%;">Case Details</th>
+                <th style="width: 25%;">Case Details</th>
                 <th style="width: 20%;">Court & Judge</th>
-                <th style="width: 12%; text-align: center;">Prev. Date</th>
-                <th style="width: 13%;">Status / Sec</th>
-                <th style="width: 20%;">Courtroom Notes</th>
+                <th style="width: 10%; text-align: center;">Prev. Date</th>
+                <th style="width: 15%;">Status / Sec</th>
+                <th style="width: 25%;">Courtroom Notes</th>
               </tr>
             </thead>
             <tbody>
@@ -321,6 +325,163 @@ export const exportDailyCauseListToPdf = async (cases: any[], titleDate: string)
     }
   } catch (error) {
     console.error("Failed to export cause list to PDF:", error);
+    throw error;
+  }
+};
+
+/**
+ * Generates a clean Case History PDF containing only all the previous dates, hearing logs, and records.
+ */
+export const exportCaseHistoryToPdf = async (caseDetails: CaseWithDetails): Promise<void> => {
+  try {
+    const timelineEvents = await getCaseTimelineEventsByCaseId(caseDetails.id);
+    
+    let timelineHtml = '';
+    if (timelineEvents.length > 0) {
+      timelineEvents.forEach((event, index) => {
+        timelineHtml += `
+          <tr>
+            <td style="padding: 10px; border: 1px solid #ccc; text-align: center; font-weight: bold; width: 60px;">
+              ${index + 1}
+            </td>
+            <td style="padding: 10px; border: 1px solid #ccc; font-weight: bold; width: 120px; color: #1E3A8A;">
+              ${formatDate(event.hearing_date)}
+            </td>
+            <td style="padding: 10px; border: 1px solid #ccc; font-size: 14px;">
+              ${event.notes || 'No notes/records logged for this date.'}
+            </td>
+          </tr>
+        `;
+      });
+    } else {
+      timelineHtml = `
+        <tr>
+          <td colspan="3" style="padding: 30px; text-align: center; color: #666; font-style: italic; border: 1px solid #ccc;">
+            No hearing history dates or records logged yet.
+          </td>
+        </tr>
+      `;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <style>
+            body {
+              font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+              color: #333;
+              line-height: 1.5;
+              padding: 20px;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #1E3A8A;
+              padding-bottom: 12px;
+              margin-bottom: 20px;
+            }
+            .header h1 {
+              margin: 0;
+              color: #1E3A8A;
+              font-size: 24px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .header p {
+              margin: 5px 0 0 0;
+              color: #666;
+              font-size: 14px;
+            }
+            .meta-section {
+              background-color: #F3F4F6;
+              border: 1px solid #E5E7EB;
+              border-radius: 6px;
+              padding: 15px;
+              margin-bottom: 25px;
+            }
+            .meta-title {
+              font-weight: bold;
+              font-size: 16px;
+              color: #1E3A8A;
+              margin-bottom: 10px;
+              text-transform: uppercase;
+            }
+            .meta-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 10px;
+              font-size: 14px;
+            }
+            .meta-item span {
+              font-weight: bold;
+              color: #555;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 15px;
+            }
+            th {
+              background-color: #1E3A8A;
+              color: #ffffff;
+              text-align: left;
+              padding: 10px;
+              font-weight: bold;
+              border: 1px solid #1E3A8A;
+              font-size: 12px;
+              text-transform: uppercase;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>CASE HEARING HISTORY & RECORDS</h1>
+            <p>Generated by CaseDiary Application</p>
+          </div>
+          
+          <div class="meta-section">
+            <div class="meta-title">Case details</div>
+            <div class="meta-grid">
+              <div class="meta-item"><span>Case Title:</span> ${caseDetails.CaseTitle || 'N/A'}</div>
+              <div class="meta-item"><span>Client Name:</span> ${caseDetails.ClientName || 'N/A'}</div>
+              <div class="meta-item"><span>Case Number:</span> ${caseDetails.case_number || 'N/A'}</div>
+              <div class="meta-item"><span>CNR Number:</span> ${caseDetails.CNRNumber || 'N/A'}</div>
+              <div class="meta-item"><span>Court Name:</span> ${caseDetails.court_name || 'N/A'}</div>
+              <div class="meta-item"><span>Case Type:</span> ${caseDetails.case_type_name || 'N/A'}</div>
+            </div>
+          </div>
+
+          <div style="font-size: 16px; font-weight: bold; color: #1E3A8A; margin-bottom: 8px;">Previous Dates & Records Timeline</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: center; width: 60px;">S.No</th>
+                <th style="width: 120px;">Hearing Date</th>
+                <th>Case Record / Court Proceedings Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${timelineHtml}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const { uri } = await Print.printToFileAsync({ html: htmlContent });
+    
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `History_${caseDetails.CaseTitle || 'Case'}`,
+        UTI: 'com.adobe.pdf',
+      });
+    } else {
+      console.warn("PDF sharing is not available on this platform.");
+    }
+  } catch (error) {
+    console.error("Failed to export case history to PDF:", error);
     throw error;
   }
 };

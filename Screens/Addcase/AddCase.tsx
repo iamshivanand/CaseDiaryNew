@@ -7,6 +7,9 @@ import {
   ScrollView,
   Alert,
   Platform,
+  Modal,
+  ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import * as Yup from "yup";
 import { RouteProp, useNavigation } from "@react-navigation/native";
@@ -23,6 +26,8 @@ import {
   addCaseType,
   addCourt,
   getSuggestionsForField,
+  getPoliceStations,
+  addPoliceStation,
 } from "../../DataBase";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { CaseDataScreen } from "../../Types/appTypes";
@@ -36,6 +41,7 @@ import DatePickerField from '../CommonComponents/DatePickerField';
 import ActionButton from "../CommonComponents/ActionButton";
 import { getAddCaseStyles } from "./AddCaseStyle";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
+import { useTranslation } from "../../Providers/LanguageProvider";
 
 interface FieldDefinition {
   name: keyof CaseData;
@@ -63,10 +69,15 @@ const dummyCourtOptionsForAdd: AppDropdownOption[] = [
 const formFieldsDefinition: FieldDefinition[] = [
   { name: "CaseTitle", type: "text", placeholder: "e.g., State vs. John Doe", label: "Case Title*", suggestions: true },
   { name: "ClientName", type: "text", placeholder: "Enter Client's Full Name", label: "Client Name", suggestions: true },
-  { name: "case_number", type: "text", placeholder: "e.g., CS/123/2023", label: "Case Number" },
+  { name: "ClientContactNumber", type: "text", placeholder: "Enter Client's Contact Number", label: "Client Contact No." },
   { name: "CNRNumber", type: "text", placeholder: "Enter CNR Number", label: "CNR Number"},
+  { name: "case_number", type: "text", placeholder: "e.g., CS/123/2023", label: "Case Number" },
+  { name: "crime_number", type: "text", placeholder: "e.g., FIR/Crime No. 123", label: "Crime Number" },
+  { name: "crime_year", type: "text", placeholder: "e.g., 2026", label: "Crime Year" },
   { name: "case_type_id", type: "select", label: "Case Type", options: dummyCaseTypeOptionsForAdd, placeholder: "Select Case Type...", testID: "case_type_id" },
   { name: "court_id", type: "select", label: "Court", options: dummyCourtOptionsForAdd, placeholder: "Select Court...", testID: "court_id" },
+  { name: "Undersection", type: "text", placeholder: "e.g., Section 302 IPC", label: "Under Section(s)", suggestions: true },
+  { name: "police_station_id", type: "select", label: "Police Station", options: [], placeholder: "Select Police Station...", testID: "police_station_id" },
   { name: "FiledDate", type: "date", label: "Date Filed", placeholder: "Select date case was filed" },
   { name: "JudgeName", type: "text", placeholder: "Enter Judge's Name", label: "Presiding Judge", suggestions: true },
   { name: "OpposingCounsel", type: "text", placeholder: "Enter Opposing Counsel's Name", label: "Opposing Counsel", suggestions: true },
@@ -76,9 +87,7 @@ const formFieldsDefinition: FieldDefinition[] = [
   { name: "StatuteOfLimitations", type: "date", label: "Statute of Limitations", placeholder: "Select SOL date" },
   { name: "FirstParty", type: "text", placeholder: "Enter First Party Name", label: "First Party", suggestions: true },
   { name: "OppositeParty", type: "text", placeholder: "Enter Opposite Party Name", label: "Opposite Party", suggestions: true },
-  { name: "ClientContactNumber", type: "text", placeholder: "Enter Client's Contact Number", label: "Client Contact No." },
   { name: "Accussed", type: "text", placeholder: "Enter Accused Name(s)", label: "Accused", suggestions: true },
-  { name: "Undersection", type: "text", placeholder: "e.g., Section 302 IPC", label: "Under Section(s)", suggestions: true },
   { name: "CaseDescription", type: "multiline", placeholder: "Provide a brief summary...", label: "Case Description" },
   { name: "CaseNotes", type: "multiline", placeholder: "Add any private notes...", label: "Internal Notes" },
 ];
@@ -87,12 +96,12 @@ const fieldGroups = [
   {
     title: "Client & Core Details",
     icon: "person-outline",
-    fields: ["CaseTitle", "ClientName", "ClientContactNumber", "case_number", "CNRNumber", "case_type_id", "court_id"]
+    fields: ["CaseTitle", "ClientName", "ClientContactNumber", "CNRNumber", "case_number", "crime_number", "crime_year", "case_type_id", "court_id", "Undersection", "police_station_id"]
   },
   {
     title: "Parties & Court Details",
     icon: "scale-outline",
-    fields: ["FirstParty", "OppositeParty", "JudgeName", "OpposingCounsel", "Accussed", "Undersection"]
+    fields: ["FirstParty", "OppositeParty", "JudgeName", "OpposingCounsel", "Accussed"]
   },
   {
     title: "Dates & Priorities",
@@ -110,29 +119,135 @@ const validationSchema = Yup.object().shape({
   CaseTitle: Yup.string().required("Case Title is required"),
 });
 
+const getFieldLabelKey = (fieldName: string): string => {
+  switch (fieldName) {
+    case "CaseTitle": return "field_case_title";
+    case "ClientName": return "field_client_name";
+    case "case_number": return "field_case_number";
+    case "crime_number": return "field_crime_number";
+    case "crime_year": return "field_crime_year";
+    case "CNRNumber": return "field_cnr_number";
+    case "case_type_id": return "field_case_type";
+    case "court_id": return "field_court";
+    case "police_station_id": return "field_police_station";
+    case "FiledDate": return "field_filed_date";
+    case "JudgeName": return "field_judge_name";
+    case "OpposingCounsel": return "field_opposing_counsel";
+    case "Status": return "field_status";
+    case "Priority": return "field_priority";
+    case "HearingDate": return "field_hearing_date";
+    case "StatuteOfLimitations": return "field_statute_of_limitations";
+    case "FirstParty": return "field_first_party";
+    case "OppositeParty": return "field_opposite_party";
+    case "ClientContactNumber": return "field_client_contact";
+    case "Accussed": return "field_accused";
+    case "Undersection": return "field_under_section";
+    case "CaseDescription": return "field_case_description";
+    case "CaseNotes": return "field_case_notes";
+    default: return "";
+  }
+};
+
+const getFieldPlaceholderKey = (fieldName: string): string => {
+  switch (fieldName) {
+    case "CaseTitle": return "placeholder_case_title";
+    case "ClientName": return "placeholder_client_name";
+    case "case_number": return "placeholder_case_number";
+    case "crime_number": return "placeholder_crime_number";
+    case "crime_year": return "placeholder_crime_year";
+    case "CNRNumber": return "placeholder_cnr_number";
+    case "case_type_id": return "placeholder_case_type";
+    case "court_id": return "placeholder_court";
+    case "police_station_id": return "placeholder_police_station";
+    case "FiledDate": return "placeholder_filed_date";
+    case "JudgeName": return "placeholder_judge_name";
+    case "OpposingCounsel": return "placeholder_opposing_counsel";
+    case "Status": return "placeholder_status";
+    case "Priority": return "placeholder_priority";
+    case "HearingDate": return "placeholder_hearing_date";
+    case "StatuteOfLimitations": return "placeholder_statute_of_limitations";
+    case "FirstParty": return "placeholder_first_party";
+    case "OppositeParty": return "placeholder_opposite_party";
+    case "ClientContactNumber": return "placeholder_client_contact";
+    case "Accussed": return "placeholder_accused";
+    case "Undersection": return "placeholder_under_section";
+    case "CaseDescription": return "placeholder_case_description";
+    case "CaseNotes": return "placeholder_case_notes";
+    default: return "";
+  }
+};
+
+const getOptionLabelKey = (label: string): string => {
+  switch (label) {
+    case "Open": return "option_status_open";
+    case "In Progress": return "option_status_in_progress";
+    case "Closed": return "option_status_closed";
+    case "On Hold": return "option_status_on_hold";
+    case "Appealed": return "option_status_appealed";
+    case "High": return "option_priority_high";
+    case "Medium": return "option_priority_medium";
+    case "Low": return "option_priority_low";
+    case "Civil Suit": return "practice_civil";
+    case "Criminal Defense": return "practice_criminal";
+    case "Family Law": return "practice_family";
+    case "Corporate": return "practice_corporate";
+    default: return "";
+  }
+};
+
+const getTranslatedOptions = (options: AppDropdownOption[], t: any) => {
+  return options.map(opt => {
+    const key = getOptionLabelKey(opt.label.toString());
+    return {
+      ...opt,
+      label: key ? t(key as any) : opt.label
+    };
+  });
+};
+
+const getGroupTitleKey = (title: string): string => {
+  switch (title) {
+    case "Client & Core Details": return "addcase_group_client_core";
+    case "Parties & Court Details": return "addcase_group_parties_court";
+    case "Dates & Priorities": return "addcase_group_dates_priorities";
+    case "Description & Notes": return "addcase_group_desc_notes";
+    default: return "";
+  }
+};
+
 const FormFieldRenderer: React.FC<{
   fieldConfig: FieldDefinition;
   formik: FormikProps<Partial<CaseData>>;
   otherValues: { [key: string]: string };
   setOtherValue: (fieldName: string, value: string) => void;
   suggestions: { [key: string]: string[] };
-}> = ({ fieldConfig, formik, otherValues, setOtherValue, suggestions }) => {
+  policeStationOptions?: AppDropdownOption[];
+}> = ({ fieldConfig, formik, otherValues, setOtherValue, suggestions, policeStationOptions }) => {
   const { values, errors, touched, setFieldValue } = formik;
+  const { t } = useTranslation();
   const fieldName = fieldConfig.name;
+
+  const labelKey = getFieldLabelKey(fieldName);
+  const placeholderKey = getFieldPlaceholderKey(fieldName);
+
+  const translatedLabel = labelKey ? t(labelKey as any) : fieldConfig.label;
+  const translatedPlaceholder = placeholderKey ? t(placeholderKey as any) : fieldConfig.placeholder;
+
   const commonInputProps = {
-    label: fieldConfig.label,
+    label: translatedLabel,
     error: (touched[fieldName] && errors[fieldName]) ? errors[fieldName] : undefined,
   };
 
   switch (fieldConfig.type) {
     case "text":
-      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} suggestions={fieldConfig.suggestions ? (suggestions[fieldName] || []) : undefined} />;
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={translatedPlaceholder} onChangeText={(text) => setFieldValue(fieldName, text)} suggestions={fieldConfig.suggestions ? (suggestions[fieldName] || []) : undefined} />;
     case "multiline":
-      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={fieldConfig.placeholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} />;
+      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={translatedPlaceholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} />;
     case "select":
-      return <DropdownPicker {...commonInputProps} selectedValue={values[fieldName] as string | number | undefined} onValueChange={(itemValue) => setFieldValue(fieldName, itemValue)} options={fieldConfig.options || []} placeholder={fieldConfig.placeholder || `Select ${fieldConfig.label}...`} onOtherValueChange={(text) => setOtherValue(fieldName, text)} testID={fieldConfig.testID} />;
+      const selectOpts = fieldConfig.name === "police_station_id" ? (policeStationOptions || []) : (fieldConfig.options || []);
+      return <DropdownPicker {...commonInputProps} selectedValue={values[fieldName] as string | number | undefined} onValueChange={(itemValue) => setFieldValue(fieldName, itemValue)} options={getTranslatedOptions(selectOpts, t)} placeholder={translatedPlaceholder || `${t("alert_cancel")}...`} onOtherValueChange={(text) => setOtherValue(fieldName, text)} testID={fieldConfig.testID} />;
     case "date":
-      return <DatePickerField {...commonInputProps} value={values[fieldName] ? new Date(values[fieldName] as string) : null} onChange={(date) => setFieldValue(fieldName, date ? date.toISOString() : null)} placeholder={fieldConfig.placeholder || "Select date"} />;
+      return <DatePickerField {...commonInputProps} value={values[fieldName] ? new Date(values[fieldName] as string) : null} onChange={(date) => setFieldValue(fieldName, date ? date.toISOString() : null)} placeholder={translatedPlaceholder || "Select date"} />;
     default:
       console.warn("Unsupported field type:", fieldConfig.type);
       return null;
@@ -143,6 +258,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const params = route.params;
   const { update = false, initialValues, uniqueId: routeUniqueId } = params ?? {};
   const { theme } = React.useContext(ThemeContext);
+  const { t } = useTranslation();
   const styles = getAddCaseStyles(theme);
   const { showAdWithPreload } = useAdTrigger();
 
@@ -156,25 +272,71 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   };
 
   const [suggestions, setSuggestions] = useState<{ [key: string]: string[] }>({});
+  const [policeStationOptions, setPoliceStationOptions] = useState<AppDropdownOption[]>([]);
 
-  const triggerAdAndNavigate = async (onNavigate: () => void) => {
-    try {
-      const now = Date.now();
-      const lastShown = await AsyncStorage.getItem("@last_ad_shown_time");
-      const lastShownTime = lastShown ? parseInt(lastShown, 10) : 0;
+  const [isLocked, setIsLocked] = useState(false);
+  const [checkingLock, setCheckingLock] = useState(true);
 
-      // 5 minutes cooldown (300,000 ms)
-      if (now - lastShownTime > 300000) {
-        await AsyncStorage.setItem("@last_ad_shown_time", now.toString());
-        await showAdWithPreload("rewarded", () => {
-          onNavigate();
-        });
-      } else {
-        onNavigate();
+  useEffect(() => {
+    const checkLockStatus = async () => {
+      try {
+        const isPremiumVal = await AsyncStorage.getItem("@user_is_premium");
+        if (isPremiumVal === "true") {
+          setIsLocked(false);
+          setCheckingLock(false);
+          return;
+        }
+        const currentCountVal = await AsyncStorage.getItem("@cases_edit_add_count");
+        const currentCount = currentCountVal ? parseInt(currentCountVal, 10) : 0;
+        if (currentCount >= 10) {
+          setIsLocked(true);
+        } else {
+          setIsLocked(false);
+        }
+      } catch (e) {
+        console.error("Error checking lock status:", e);
+      } finally {
+        setCheckingLock(false);
       }
+    };
+
+    checkLockStatus();
+    if (navigation && typeof navigation.addListener === "function") {
+      const unsubscribe = navigation.addListener("focus", checkLockStatus);
+      return unsubscribe;
+    }
+  }, [navigation]);
+
+  const handleUnlock = async () => {
+    try {
+      await showAdWithPreload("rewarded", async (success) => {
+        if (success) {
+          await AsyncStorage.setItem("@cases_edit_add_count", "0");
+          setIsLocked(false);
+          Alert.alert(t("alert_success"), t("lock_success_msg"));
+        } else {
+          Alert.alert(t("alert_warning"), t("lock_warn_msg"));
+        }
+      });
     } catch (e) {
-      console.error("Error in triggerAdAndNavigate:", e);
-      onNavigate();
+      console.error("Failed to show ad for unlock:", e);
+      await AsyncStorage.setItem("@cases_edit_add_count", "0");
+      setIsLocked(false);
+    }
+  };
+
+  const incrementCaseActionCount = async () => {
+    try {
+      const isPremiumVal = await AsyncStorage.getItem("@user_is_premium");
+      if (isPremiumVal === "true") {
+        return;
+      }
+      const currentCountVal = await AsyncStorage.getItem("@cases_edit_add_count");
+      const currentCount = currentCountVal ? parseInt(currentCountVal, 10) : 0;
+      await AsyncStorage.setItem("@cases_edit_add_count", (currentCount + 1).toString());
+      console.log("Incremented case edit/add count to:", currentCount + 1);
+    } catch (e) {
+      console.error("Error incrementing case action count:", e);
     }
   };
 
@@ -189,7 +351,23 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       }
       setSuggestions(suggestionsData);
     };
+
+    const fetchPoliceStations = async () => {
+      try {
+        const psList = await getPoliceStations(null, null);
+        const formatted = psList.map(ps => ({
+          label: ps.name,
+          value: ps.id
+        }));
+        formatted.push({ label: 'Other', value: 'Other' });
+        setPoliceStationOptions(formatted);
+      } catch (error) {
+        console.error("Error fetching police stations:", error);
+      }
+    };
+
     fetchSuggestions();
+    fetchPoliceStations();
   }, []);
 
   const prepareFormInitialValues = (): Partial<CaseData> => {
@@ -202,6 +380,15 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
 
     if (update && initialValues) {
       const mappedInitialValues: Partial<CaseData> = { ...defaults };
+      
+      // Copy over other existing fields from initialValues
+      Object.keys(initialValues).forEach(key => {
+        const val = (initialValues as any)[key];
+        if (val !== undefined && val !== null) {
+          (mappedInitialValues as any)[key] = val;
+        }
+      });
+
       if (initialValues.uniqueId) mappedInitialValues.uniqueId = initialValues.uniqueId;
       if (initialValues.id) mappedInitialValues.id = initialValues.id;
       if (initialValues.caseNumber) mappedInitialValues.CaseTitle = initialValues.caseNumber;
@@ -212,6 +399,11 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
 
       const initialCaseType = dummyCaseTypeOptionsForAdd.find(opt => opt.label === initialValues.caseType);
       if (initialCaseType) mappedInitialValues.case_type_id = initialCaseType.value;
+
+      if (initialValues.crime_number) mappedInitialValues.crime_number = initialValues.crime_number;
+      if (initialValues.crime_year) mappedInitialValues.crime_year = initialValues.crime_year.toString();
+      if (initialValues.police_station_id) mappedInitialValues.police_station_id = initialValues.police_station_id;
+      if (initialValues.Undersection) mappedInitialValues.Undersection = initialValues.Undersection;
 
       return mappedInitialValues;
     }
@@ -262,6 +454,18 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       caseTypeNameString = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : null;
     }
 
+    let policeStationId = formValues.police_station_id || null;
+    if (policeStationId === 'Other') {
+      const psName = otherValues['police_station_id'];
+      if (psName) {
+        const newPsId = await addPoliceStation(psName);
+        policeStationId = newPsId;
+      } else {
+        policeStationId = null;
+      }
+    } else {
+      policeStationId = policeStationId ? Number(policeStationId) : null;
+    }
 
     if (update && initialValues?.id) {
       const caseIdToUpdate = initialValues.id;
@@ -295,7 +499,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         ...(changedFields.ClientContactNumber && { ClientContactNumber: changedFields.ClientContactNumber }),
         ...(changedFields.Accussed && { Accussed: changedFields.Accussed }),
         ...(changedFields.Undersection && { Undersection: changedFields.Undersection }),
-        ...(changedFields.police_station_id && { police_station_id: typeof changedFields.police_station_id === 'number' ? changedFields.police_station_id : null }),
+        police_station_id: policeStationId,
         ...(changedFields.StatuteOfLimitations && { StatuteOfLimitations: changedFields.StatuteOfLimitations }),
         ...(changedFields.OpposingCounsel && { OpposingCounsel: changedFields.OpposingCounsel }),
         ...(changedFields.OppositeAdvocate && { OppositeAdvocate: changedFields.OppositeAdvocate }),
@@ -319,14 +523,13 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       try {
         const success = await updateCase(caseIdToUpdate, updatePayload);
         if (success) {
-          Alert.alert("Success", "Case updated successfully.");
-          triggerAdAndNavigate(() => {
-            navigation.navigate("CaseDetails", {
-              caseId: caseIdToUpdate,
-            });
+          Alert.alert(t("alert_success"), t("editcase_success_updated"));
+          await incrementCaseActionCount();
+          navigation.navigate("CaseDetails", {
+            caseId: caseIdToUpdate,
           });
-        } else { Alert.alert("Error", "Failed to update case."); }
-      } catch (e) { console.error("Error updating case:", e); Alert.alert("Error", "An error occurred while updating.");}
+        } else { Alert.alert(t("alert_error"), t("editcase_err_save_details")); }
+      } catch (e) { console.error("Error updating case:", e); Alert.alert(t("alert_error"), t("editcase_err_general"));}
     } else {
       const insertPayload: CaseInsertData = {
         uniqueId: formValues.uniqueId || uniqueIdToUse,
@@ -350,7 +553,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         ClientContactNumber: formValues.ClientContactNumber || null,
         Accussed: formValues.Accussed || null,
         Undersection: formValues.Undersection || null,
-        police_station_id: typeof formValues.police_station_id === 'number' ? formValues.police_station_id : null,
+        police_station_id: policeStationId,
         StatuteOfLimitations: formValues.StatuteOfLimitations || null,
         OpposingCounsel: formValues.OpposingCounsel || null,
         OppositeAdvocate: formValues.OppositeAdvocate || null,
@@ -367,74 +570,110 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       try {
         const newCaseId = await addCase(insertPayload);
         if (newCaseId) {
-          Alert.alert("Success", "Case added successfully.");
-          triggerAdAndNavigate(() => {
-            navigation.navigate("CaseDetails", {
-              caseId: newCaseId,
-            });
+          Alert.alert(t("alert_success"), t("editcase_success_saved"));
+          await incrementCaseActionCount();
+          navigation.navigate("CaseDetails", {
+            caseId: newCaseId,
           });
         } else {
-          Alert.alert("Error", "Failed to add case.");
+          Alert.alert(t("alert_error"), t("editcase_err_save_details"));
         }
       } catch (e) {
         console.error("Error adding case:", e);
-        Alert.alert("Error", "An error occurred while adding case.");
+        Alert.alert(t("alert_error"), t("editcase_err_general"));
       }
     }
   };
 
   return (
-    <ScrollView
-      style={styles.scrollViewStyle}
-      contentContainerStyle={styles.scrollContentContainerStyle}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.formScreenContainer}>
-        <Formik
-          initialValues={prepareFormInitialValues()}
-          validationSchema={validationSchema}
-          onSubmit={handleSubmitForm}
-          enableReinitialize
-        >
-          {(formikProps) => (
-            <View>
-              {fieldGroups.map((group, groupIdx) => (
-                <View key={groupIdx} style={[styles.groupCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border, borderWidth: 1 }]}>
-                  <View style={[styles.groupHeader, { borderBottomWidth: 1, borderBottomColor: theme.colors.border }]}>
-                    <Ionicons name={group.icon as any} size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
-                    <Text style={[styles.groupTitle, { color: theme.colors.text }]}>{group.title}</Text>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <ScrollView
+        style={styles.scrollViewStyle}
+        contentContainerStyle={styles.scrollContentContainerStyle}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.formScreenContainer}>
+          <Formik
+            initialValues={prepareFormInitialValues()}
+            validationSchema={validationSchema}
+            onSubmit={handleSubmitForm}
+            enableReinitialize
+          >
+            {(formikProps) => (
+              <View>
+                {fieldGroups.map((group, groupIdx) => (
+                  <View key={groupIdx} style={[styles.groupCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border, borderWidth: 1 }]}>
+                     <View style={[styles.groupHeader, { borderBottomWidth: 1, borderBottomColor: theme.colors.border }]}>
+                      <Ionicons name={group.icon as any} size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                      <Text style={[styles.groupTitle, { color: theme.colors.text }]}>
+                        {t(getGroupTitleKey(group.title) as any) || group.title}
+                      </Text>
+                    </View>
+                    {formFieldsDefinition
+                      .filter(f => group.fields.includes(f.name))
+                      .map((fieldConfig) => (
+                        <FormFieldRenderer
+                          key={fieldConfig.name}
+                          fieldConfig={fieldConfig}
+                          formik={formikProps}
+                          otherValues={otherValues}
+                          setOtherValue={setOtherValue}
+                          suggestions={suggestions}
+                          policeStationOptions={policeStationOptions}
+                        />
+                      ))}
                   </View>
-                  {formFieldsDefinition
-                    .filter(f => group.fields.includes(f.name))
-                    .map((fieldConfig) => (
-                      <FormFieldRenderer
-                        key={fieldConfig.name}
-                        fieldConfig={fieldConfig}
-                        formik={formikProps}
-                        otherValues={otherValues}
-                        setOtherValue={setOtherValue}
-                        suggestions={suggestions}
-                      />
-                    ))}
+                ))}
+                <View style={styles.actionButtonContainer}>
+                  <ActionButton
+                    title={update ? t("btn_save_changes") : t("btn_save_case")}
+                    onPress={() => formikProps.handleSubmit()}
+                    type="primary"
+                  />
+                  <ActionButton
+                    title={t("alert_cancel")}
+                    onPress={() => navigation.goBack()}
+                    type="secondary"
+                  />
                 </View>
-              ))}
-              <View style={styles.actionButtonContainer}>
-                <ActionButton
-                  title={update ? "Save Changes" : "Save Case"}
-                  onPress={() => formikProps.handleSubmit()}
-                  type="primary"
-                />
-                <ActionButton
-                  title="Cancel"
-                  onPress={() => navigation.goBack()}
-                  type="secondary"
-                />
               </View>
+            )}
+          </Formik>
+        </View>
+      </ScrollView>
+
+      {isLocked && (
+        <Modal visible={isLocked} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.card, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+              <View style={[styles.iconContainer, { backgroundColor: `${theme.colors.primary}12` }]}>
+                <Ionicons name="lock-closed" size={32} color={theme.colors.primary} />
+              </View>
+              <Text style={[styles.lockTitle, { color: theme.colors.text }]}>
+                {t("lock_title")}
+              </Text>
+              <Text style={[styles.lockDescription, { color: theme.colors.textSecondary }]}>
+                {t("lock_description")}
+              </Text>
+
+              <ActionButton
+                title={t("lock_btn_watch")}
+                onPress={handleUnlock}
+                type="primary"
+                style={{ width: "100%", marginTop: 8, marginBottom: 12 }}
+              />
+
+              <ActionButton
+                title={t("lock_btn_back")}
+                onPress={() => navigation.goBack()}
+                type="secondary"
+                style={{ width: "100%", marginVertical: 0 }}
+              />
             </View>
-          )}
-        </Formik>
-      </View>
-    </ScrollView>
+          </View>
+        </Modal>
+      )}
+    </View>
   );
 };
 

@@ -1,5 +1,5 @@
 // Screens/CaseDetailsScreen/GenerateDocumentScreen.tsx
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useLayoutEffect, useState } from "react";
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { v4 as uuidv4 } from "uuid";
 
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
+import { useTranslation } from "../../Providers/LanguageProvider";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { getCaseById } from "../../DataBase";
@@ -109,6 +110,7 @@ const GenerateDocumentScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<GenerateDocumentScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
+  const { t } = useTranslation();
   const styles = getStyles(theme);
   const { showAdWithPreload } = useAdTrigger();
 
@@ -122,6 +124,53 @@ const GenerateDocumentScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [documentType, setDocumentType] = useState<string>("vakalatnama");
   const [outputLanguage, setOutputLanguage] = useState<"en" | "hi">("en");
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: t("docgen_header_title") });
+  }, [navigation, t]);
+
+  const getTranslatedCategories = () => {
+    return categories.map(cat => {
+      let label = cat.label;
+      switch (cat.value) {
+        case "all": label = t("docgen_cat_all"); break;
+        case "civil": label = t("docgen_cat_civil"); break;
+        case "criminal": label = t("docgen_cat_criminal"); break;
+        case "commercial": label = t("docgen_cat_commercial"); break;
+        case "common": label = t("docgen_cat_common"); break;
+      }
+      return { ...cat, label };
+    });
+  };
+
+  const getTranslatedDocTypes = () => {
+    return documentTypeOptions.map(opt => {
+      let label = opt.label;
+      switch (opt.value) {
+        case "plaint": label = t("docgen_opt_plaint"); break;
+        case "written_statement": label = t("docgen_opt_written_statement"); break;
+        case "rejoinder": label = t("docgen_opt_rejoinder"); break;
+        case "injunction": label = t("docgen_opt_injunction"); break;
+        case "execution": label = t("docgen_opt_execution"); break;
+        case "caveat": label = t("docgen_opt_caveat"); break;
+        case "adjournment": label = t("docgen_opt_adjournment"); break;
+        case "bail": label = t("docgen_opt_bail"); break;
+        case "anticipatory_bail": label = t("docgen_opt_anticipatory_bail"); break;
+        case "private_complaint": label = t("docgen_opt_private_complaint"); break;
+        case "fir_quashing": label = t("docgen_opt_fir_quashing"); break;
+        case "exemption": label = t("docgen_opt_exemption"); break;
+        case "cheque_bounce": label = t("docgen_opt_cheque_bounce"); break;
+        case "arbitration_sec9": label = t("docgen_opt_arbitration_sec9"); break;
+        case "consumer_complaint": label = t("docgen_opt_consumer_complaint"); break;
+        case "vakalatnama": label = t("docgen_opt_vakalatnama"); break;
+        case "affidavit": label = t("docgen_opt_affidavit"); break;
+        case "legal_notice": label = t("docgen_opt_legal_notice"); break;
+        case "rent_agreement": label = t("docgen_opt_rent_agreement"); break;
+        case "power_of_attorney": label = t("docgen_opt_power_of_attorney"); break;
+      }
+      return { ...opt, label };
+    });
+  };
 
   // Shared Case/Client details (Editable if no caseId is provided)
   const [caseTitle, setCaseTitle] = useState("");
@@ -551,76 +600,78 @@ const GenerateDocumentScreen: React.FC = () => {
   };
 
   const handleGeneratePdf = async () => {
-    await showAdWithPreload("rewarded", async () => {
-      setIsGenerating(true);
-      await cacheAdvocateProfile();
+    await showAdWithPreload("rewarded", async (success) => {
+      if (success) {
+        setIsGenerating(true);
+        await cacheAdvocateProfile();
 
-      try {
-        const htmlContent = getInterpolatedHtml();
-        const { uri } = await Print.printToFileAsync({ html: htmlContent });
+        try {
+          const htmlContent = getInterpolatedHtml();
+          const { uri } = await Print.printToFileAsync({ html: htmlContent });
 
-        if (caseId) {
-          // Case-associated document sharing
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(uri, {
-              mimeType: "application/pdf",
-              dialogTitle: `Export_${documentType.toUpperCase()}`,
-              UTI: "com.adobe.pdf",
-            });
-          }
-        } else {
-          // Stand-alone Document Mode: save to drafts directory and cache metadata in AsyncStorage
-          const dirInfo = await FileSystem.getInfoAsync(DRAFTS_DIRECTORY);
-          if (!dirInfo.exists) {
-            await FileSystem.makeDirectoryAsync(DRAFTS_DIRECTORY, { intermediates: true });
-          }
+          if (caseId) {
+            // Case-associated document sharing
+            if (await Sharing.isAvailableAsync()) {
+              await Sharing.shareAsync(uri, {
+                mimeType: "application/pdf",
+                dialogTitle: `Export_${documentType.toUpperCase()}`,
+                UTI: "com.adobe.pdf",
+              });
+            }
+          } else {
+            // Stand-alone Document Mode: save to drafts directory and cache metadata in AsyncStorage
+            const dirInfo = await FileSystem.getInfoAsync(DRAFTS_DIRECTORY);
+            if (!dirInfo.exists) {
+              await FileSystem.makeDirectoryAsync(DRAFTS_DIRECTORY, { intermediates: true });
+            }
 
-          const draftId = uuidv4();
-          const storedFilename = `${draftId}.pdf`;
-          const destinationUri = DRAFTS_DIRECTORY + storedFilename;
+            const draftId = uuidv4();
+            const storedFilename = `${draftId}.pdf`;
+            const destinationUri = DRAFTS_DIRECTORY + storedFilename;
 
-          await FileSystem.copyAsync({ from: uri, to: destinationUri });
+            await FileSystem.copyAsync({ from: uri, to: destinationUri });
 
-          // Retrieve existing unassociated drafts
-          const existingRaw = await AsyncStorage.getItem("@unassociated_documents");
-          const existingDrafts = existingRaw ? JSON.parse(existingRaw) : [];
+            // Retrieve existing unassociated drafts
+            const existingRaw = await AsyncStorage.getItem("@unassociated_documents");
+            const existingDrafts = existingRaw ? JSON.parse(existingRaw) : [];
 
-          const newDraft = {
-            id: draftId,
-            title: `${documentTypeOptions.find((o) => o.value === documentType)?.label || "Draft"} - ${
-              clientName || "Unassociated"
-            }`,
-            templateType: documentType,
-            filePath: destinationUri,
-            createdAt: new Date().toISOString(),
-          };
+            const newDraft = {
+              id: draftId,
+              title: `${documentTypeOptions.find((o) => o.value === documentType)?.label || "Draft"} - ${
+                clientName || "Unassociated"
+              }`,
+              templateType: documentType,
+              filePath: destinationUri,
+              createdAt: new Date().toISOString(),
+            };
 
-          existingDrafts.push(newDraft);
-          await AsyncStorage.setItem("@unassociated_documents", JSON.stringify(existingDrafts));
+            existingDrafts.push(newDraft);
+            await AsyncStorage.setItem("@unassociated_documents", JSON.stringify(existingDrafts));
 
-          Alert.alert(
-            "Draft Saved",
-            "This document has been saved to your Drafts Hub. You can view, share, or attach it to a case later.",
-            [
-              {
-                text: "Go to Drafts Hub",
-                onPress: () => {
-                  // @ts-ignore
-                  navigation.navigate("DraftsHub");
+            Alert.alert(
+              t("docgen_alert_saved_title"),
+              t("docgen_alert_saved_desc"),
+              [
+                {
+                  text: t("docgen_alert_go_drafts"),
+                  onPress: () => {
+                    // @ts-ignore
+                    navigation.navigate("DraftsHub");
+                  },
                 },
-              },
-              {
-                text: "Close",
-                onPress: () => navigation.goBack(),
-              },
-            ]
-          );
+                {
+                  text: t("docgen_alert_close"),
+                  onPress: () => navigation.goBack(),
+                },
+              ]
+            );
+          }
+        } catch (error) {
+          console.error("Error generating PDF template:", error);
+          Alert.alert(t("alert_error"), t("doc_err_upload_general"));
+        } finally {
+          setIsGenerating(false);
         }
-      } catch (error) {
-        console.error("Error generating PDF template:", error);
-        Alert.alert("Error", "An error occurred while compiling PDF document.");
-      } finally {
-        setIsGenerating(false);
       }
     });
   };
@@ -630,7 +681,7 @@ const GenerateDocumentScreen: React.FC = () => {
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#3B82F6" />
         <Text style={{ marginTop: 12, color: theme.colors.textSecondary }}>
-          Preparing document metadata...
+          {t("docgen_preparing")}
         </Text>
       </View>
     );
@@ -653,7 +704,7 @@ const GenerateDocumentScreen: React.FC = () => {
             size={18}
             color={activeTab === "fields" ? theme.colors.primary : theme.colors.textSecondary}
           />
-          <Text style={[styles.tabText, activeTab === "fields" && styles.activeTabText]}>Drafting Fields</Text>
+          <Text style={[styles.tabText, activeTab === "fields" && styles.activeTabText]}>{t("docgen_tab_fields")}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === "preview" && styles.activeTabButton]}
@@ -664,7 +715,7 @@ const GenerateDocumentScreen: React.FC = () => {
             size={18}
             color={activeTab === "preview" ? theme.colors.primary : theme.colors.textSecondary}
           />
-          <Text style={[styles.tabText, activeTab === "preview" && styles.activeTabText]}>Live Preview</Text>
+          <Text style={[styles.tabText, activeTab === "preview" && styles.activeTabText]}>{t("docgen_tab_preview")}</Text>
         </TouchableOpacity>
       </View>
 
@@ -675,9 +726,9 @@ const GenerateDocumentScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.formContainer}>
-            <SectionHeader title="Document Selection" />
+            <SectionHeader title={t("docgen_sec_selection")} />
             <DropdownPicker
-              label="Template Category"
+              label={t("docgen_sec_selection")}
               selectedValue={selectedCategory}
               onValueChange={(val) => {
                 const newCat = val as string;
@@ -695,20 +746,20 @@ const GenerateDocumentScreen: React.FC = () => {
                   }
                 }
               }}
-              options={categories}
+              options={getTranslatedCategories()}
             />
 
             <DropdownPicker
-              label="Draft Template"
+              label={t("docgen_opt_vakalatnama")}
               selectedValue={documentType}
               onValueChange={(val) => setDocumentType(val as string)}
-              options={documentTypeOptions.filter(
+              options={getTranslatedDocTypes().filter(
                 (opt) => selectedCategory === "all" || opt.category === selectedCategory
               )}
-              placeholder="Select a template..."
+              placeholder={t("docgen_opt_vakalatnama")}
             />
 
-            <SectionHeader title="Output Language" />
+            <SectionHeader title={t("docgen_sec_lang")} />
             <View style={{ flexDirection: "row", marginBottom: 16 }}>
               <TouchableOpacity
                 style={[
@@ -746,77 +797,77 @@ const GenerateDocumentScreen: React.FC = () => {
 
             {!caseId && (
               <View>
-                <SectionHeader title="Case/Client Details" />
+                <SectionHeader title={t("docgen_sec_case_details")} />
                 <FormInput
-                  label="Client Name / Deponent / Notice Sender / Plaintiff*"
+                  label={t("docgen_field_client_label")}
                   value={clientName}
                   onChangeText={setClientName}
-                  placeholder="Enter Client Name"
+                  placeholder={t("docgen_placeholder_client")}
                 />
                 <FormInput
-                  label="Opposite Party Name / Defendant / Respondent"
+                  label={t("docgen_field_opposite_label")}
                   value={oppositePartyName}
                   onChangeText={setOppositePartyName}
-                  placeholder="Enter Opposite Party Name"
+                  placeholder={t("docgen_placeholder_opposite")}
                 />
                 <FormInput
-                  label="Full Case Parties Title (or Client vs Defendant)"
+                  label={t("docgen_field_parties_label")}
                   value={caseTitle}
                   onChangeText={setCaseTitle}
-                  placeholder="e.g. Ramesh Kumar vs Suresh Kumar"
+                  placeholder={t("docgen_placeholder_parties")}
                 />
                 <FormInput
-                  label="Court / Forum Name*"
+                  label={t("docgen_field_court_label")}
                   value={courtName}
                   onChangeText={setCourtName}
-                  placeholder="e.g. Court of Civil Judge Junior Division"
+                  placeholder={t("docgen_placeholder_court")}
                 />
                 <FormInput
-                  label="Case/Suit Number"
+                  label={t("docgen_field_case_num_label")}
                   value={caseNumber}
                   onChangeText={setCaseNumber}
-                  placeholder="e.g. CS/345/2026"
+                  placeholder={t("docgen_placeholder_case_num")}
                 />
                 <FormInput
-                  label="Case Year"
+                  label={t("docgen_field_case_year_label")}
                   value={caseYear}
                   onChangeText={setCaseYear}
-                  placeholder="e.g. 2026"
+                  placeholder={t("docgen_placeholder_case_year")}
                   keyboardType="numeric"
                 />
               </View>
             )}
 
-            <SectionHeader title="Advocate Profile (Auto-Saved)" />
+            <SectionHeader title={t("docgen_sec_advocate")} />
             <FormInput
-              label="Advocate Name*"
+              label={t("docgen_field_adv_name_label")}
               value={advocateName}
               onChangeText={setAdvocateName}
-              placeholder="Enter Advocate Name"
+              placeholder={t("docgen_placeholder_adv_name")}
             />
             <FormInput
-              label="Bar Council Enrollment No."
+              label={t("docgen_field_bar_label")}
               value={advocateEnrollment}
               onChangeText={setAdvocateEnrollment}
-              placeholder="e.g. MAH/1234/2020"
+              placeholder={t("docgen_placeholder_bar")}
             />
             <FormInput
-              label="Advocate Office Address"
+              label={t("docgen_field_addr_label")}
               value={advocateAddress}
               onChangeText={setAdvocateAddress}
-              placeholder="Enter Advocate Office/chamber address"
+              placeholder={t("docgen_placeholder_addr")}
             />
 
-            <SectionHeader title="Template Customization Fields" />
+            <SectionHeader title={t("docgen_sec_customization")} />
 
             {/* Custom Inputs per template */}
             {documentType === "adjournment" && (
               <View>
                 <FormInput
-                  label="Reason for Adjournment*"
+                  label={t("docgen_field_adjournment_reason")}
                   value={adjournmentReason}
                   onChangeText={setAdjournmentReason}
-                  placeholder="e.g. Advocate is indisposed / out of town"
+                  placeholder={t("docgen_placeholder_adjournment_reason")}
                   multiline
                   numberOfLines={3}
                 />
@@ -826,44 +877,44 @@ const GenerateDocumentScreen: React.FC = () => {
             {(documentType === "bail" || documentType === "anticipatory_bail" || documentType === "fir_quashing" || documentType === "private_complaint" || documentType === "cheque_bounce") && (
               <View>
                 <FormInput
-                  label={documentType === "cheque_bounce" ? "Drawer Bank Name*" : "Police Station*"}
+                  label={documentType === "cheque_bounce" ? t("docgen_field_bank_name") : t("docgen_field_police_station")}
                   value={policeStation}
                   onChangeText={setPoliceStation}
-                  placeholder={documentType === "cheque_bounce" ? "e.g. State Bank of India" : "e.g. Connaught Place Police Station"}
+                  placeholder={documentType === "cheque_bounce" ? t("docgen_placeholder_bank_name") : t("docgen_placeholder_police_station")}
                 />
                 {documentType !== "cheque_bounce" && documentType !== "private_complaint" && (
                   <View>
                     <FormInput
-                      label="FIR Number"
+                      label={t("docgen_field_fir_number")}
                       value={firNumber}
                       onChangeText={setFirNumber}
-                      placeholder="e.g. 104/2026"
+                      placeholder={t("docgen_placeholder_fir_number")}
                     />
                     <FormInput
-                      label="FIR Year"
+                      label={t("docgen_field_fir_year")}
                       value={firYear}
                       onChangeText={setFirYear}
-                      placeholder="e.g. 2026"
+                      placeholder={t("docgen_placeholder_fir_year")}
                       keyboardType="numeric"
                     />
                   </View>
                 )}
                 {(documentType === "bail" || documentType === "anticipatory_bail" || documentType === "fir_quashing") && (
                   <FormInput
-                    label={documentType === "fir_quashing" ? "Grounds of FIR Quashing*" : "Grounds for Bail"}
+                    label={documentType === "fir_quashing" ? t("docgen_field_quashing_grounds") : t("docgen_field_bail_grounds")}
                     value={groundOfBail}
                     onChangeText={setGroundOfBail}
-                    placeholder="e.g. False accusation, no evidence connecting applicant"
+                    placeholder={t("docgen_placeholder_bail_grounds")}
                     multiline
                     numberOfLines={4}
                   />
                 )}
                 {documentType === "anticipatory_bail" && (
                   <FormInput
-                    label="Reason for Apprehension of Arrest*"
+                    label={t("docgen_field_apprehension_reason")}
                     value={adjournmentReason}
                     onChangeText={setAdjournmentReason}
-                    placeholder="e.g. Threats from opposite party, political motives"
+                    placeholder={t("docgen_placeholder_apprehension_reason")}
                     multiline
                     numberOfLines={3}
                   />
@@ -875,48 +926,48 @@ const GenerateDocumentScreen: React.FC = () => {
               <View>
                 {caseId && (documentType === "affidavit") && (
                   <FormInput
-                    label="Deponent Name*"
+                    label={t("docgen_field_deponent_name")}
                     value={clientName}
                     onChangeText={setClientName}
-                    placeholder="Enter Deponent's Full Name"
+                    placeholder={t("docgen_placeholder_deponent_name")}
                   />
                 )}
                 {documentType === "affidavit" && (
                   <FormInput
-                    label="Deponent Age"
+                    label={t("docgen_field_deponent_age")}
                     value={deponentAge}
                     onChangeText={setDeponentAge}
-                    placeholder="e.g. 45"
+                    placeholder={t("docgen_placeholder_deponent_age")}
                     keyboardType="numeric"
                   />
                 )}
                 <FormInput
                   label={
                     documentType === "rent_agreement"
-                      ? "Landlord/Property Address*"
+                      ? t("docgen_field_landlord_addr")
                       : documentType === "power_of_attorney"
-                      ? "Principal Address*"
+                      ? t("docgen_field_principal_addr")
                       : documentType === "cheque_bounce"
-                      ? "Payee Address*"
-                      : "Client/Sender/Deponent Address*"
+                      ? t("docgen_field_payee_addr")
+                      : t("docgen_field_deponent_addr")
                   }
                   value={deponentAddress}
                   onChangeText={setDeponentAddress}
-                  placeholder="Enter Residence/chamber address"
+                  placeholder={t("docgen_placeholder_deponent_addr")}
                 />
                 <FormInput
                   label={
                     documentType === "rent_agreement"
-                      ? "Tenant Residence Address*"
+                      ? t("docgen_field_tenant_addr")
                       : documentType === "power_of_attorney"
-                      ? "Attorney Residence Address*"
+                      ? t("docgen_field_attorney_addr")
                       : documentType === "cheque_bounce"
-                      ? "Drawer Residence Address*"
-                      : "Receiver/Opposite Party Address*"
+                      ? t("docgen_field_drawer_addr")
+                      : t("docgen_field_receiver_addr")
                   }
                   value={receiverAddress}
                   onChangeText={setReceiverAddress}
-                  placeholder="Enter full address"
+                  placeholder={t("docgen_placeholder_receiver_addr")}
                 />
               </View>
             )}
@@ -925,14 +976,14 @@ const GenerateDocumentScreen: React.FC = () => {
               <FormInput
                 label={
                   documentType === "plaint"
-                    ? "Suit Facts Statements (One per line)*"
+                    ? t("docgen_field_suit_facts")
                     : documentType === "private_complaint"
-                    ? "Incident Facts Statements (One per line)*"
-                    : "Facts / Statements (One per line)*"
+                    ? t("docgen_field_incident_facts")
+                    : t("docgen_field_facts")
                 }
                 value={affidavitFacts}
                 onChangeText={setAffidavitFacts}
-                placeholder="Enter facts or statements, one statement per line."
+                placeholder={t("docgen_placeholder_facts")}
                 multiline
                 numberOfLines={5}
               />
@@ -941,18 +992,18 @@ const GenerateDocumentScreen: React.FC = () => {
             {documentType === "written_statement" && (
               <View>
                 <FormInput
-                  label="Preliminary Objections (One per line)"
+                  label={t("docgen_field_prelim_objections")}
                   value={preliminaryObjections}
                   onChangeText={setPreliminaryObjections}
-                  placeholder="Objection 1: The suit is barred by limitation..."
+                  placeholder={t("docgen_placeholder_prelim_objections")}
                   multiline
                   numberOfLines={4}
                 />
                 <FormInput
-                  label="Reply on Merits (One per line)"
+                  label={t("docgen_field_reply_merits")}
                   value={replyOnMerits}
                   onChangeText={setReplyOnMerits}
-                  placeholder="Reply 1: The contents of paragraph 1 are false..."
+                  placeholder={t("docgen_placeholder_reply_merits")}
                   multiline
                   numberOfLines={4}
                 />
@@ -961,10 +1012,10 @@ const GenerateDocumentScreen: React.FC = () => {
 
             {(documentType === "legal_notice" || documentType === "cheque_bounce") && (
               <FormInput
-                label="Final Demand Instructions / Claims*"
+                label={t("docgen_field_demand_text")}
                 value={demandText}
                 onChangeText={setDemandText}
-                placeholder="e.g. pay the outstanding dues / return cheque amount of Rs. 1,50,000"
+                placeholder={t("docgen_placeholder_demand_text")}
               />
             )}
 
@@ -972,20 +1023,20 @@ const GenerateDocumentScreen: React.FC = () => {
               <FormInput
                 label={
                   documentType === "plaint"
-                    ? "Specific Relief/Prayer*"
+                    ? t("docgen_field_suit_relief")
                     : documentType === "execution"
-                    ? "Relief Sought / Mode of Execution*"
+                    ? t("docgen_field_exec_relief")
                     : documentType === "arbitration_sec9"
-                    ? "Interim Protection Relief*"
+                    ? t("docgen_field_interim_relief")
                     : documentType === "consumer_complaint"
-                    ? "Compensation & Refund Claim*"
+                    ? t("docgen_field_consumer_relief")
                     : documentType === "power_of_attorney"
-                    ? "Powers & Duties Granted*"
-                    : "Injunction Stay Prayer*"
+                    ? t("docgen_field_poa_powers")
+                    : t("docgen_field_injunction_prayer")
                 }
                 value={restraintPrayer}
                 onChangeText={setRestraintPrayer}
-                placeholder="Specify the prayer, powers, or relief sought."
+                placeholder={t("docgen_placeholder_relief")}
                 multiline
                 numberOfLines={4}
               />
@@ -995,28 +1046,28 @@ const GenerateDocumentScreen: React.FC = () => {
               <FormInput
                 label={
                   documentType === "plaint"
-                    ? "Suit Valuation Amount*"
+                    ? t("docgen_field_suit_valuation")
                     : documentType === "execution"
-                    ? "Decreetal Amount*"
+                    ? t("docgen_field_exec_decree_amount")
                     : documentType === "cheque_bounce"
-                    ? "Cheque Amount*"
+                    ? t("docgen_field_cheque_amount")
                     : documentType === "consumer_complaint"
-                    ? "Product Cost / Value of Service*"
-                    : "Monthly Rent Amount*"
+                    ? t("docgen_field_consumer_cost")
+                    : t("docgen_field_monthly_rent")
                 }
                 value={valuation}
                 onChangeText={setValuation}
-                placeholder="e.g. 5,00,000"
+                placeholder={t("docgen_placeholder_valuation")}
                 keyboardType="numeric"
               />
             )}
 
             {documentType === "rejoinder" && (
               <FormInput
-                label="Rejoinder Reply Points (One per line)*"
+                label={t("docgen_field_rejoinder_reply")}
                 value={replyPoints}
                 onChangeText={setReplyPoints}
-                placeholder="Point 1: The defendant's plea of oral partition is false..."
+                placeholder={t("docgen_placeholder_rejoinder_reply")}
                 multiline
                 numberOfLines={5}
               />
@@ -1026,18 +1077,18 @@ const GenerateDocumentScreen: React.FC = () => {
               <FormInput
                 label={
                   documentType === "execution"
-                    ? "Date of Decree*"
+                    ? t("docgen_field_exec_decree_date")
                     : documentType === "cheque_bounce"
-                    ? "Date of Cheque*"
+                    ? t("docgen_field_cheque_date")
                     : documentType === "private_complaint"
-                    ? "Date of Incident*"
+                    ? t("docgen_field_incident_date")
                     : documentType === "arbitration_sec9"
-                    ? "Date of Arbitration Agreement*"
-                    : "Date of Lease/Agreement*"
+                    ? t("docgen_field_arbitration_date")
+                    : t("docgen_field_rent_date")
                 }
                 value={decreeDate}
                 onChangeText={setDecreeDate}
-                placeholder="e.g. 15-04-2026"
+                placeholder={t("docgen_placeholder_date")}
               />
             )}
 
@@ -1045,38 +1096,38 @@ const GenerateDocumentScreen: React.FC = () => {
               <FormInput
                 label={
                   documentType === "execution"
-                    ? "Payment Satisfaction / Recovery details*"
-                    : "Security Deposit Amount*"
+                    ? t("docgen_field_exec_recovery")
+                    : t("docgen_field_rent_deposit")
                 }
                 value={satisfactionDetails}
                 onChangeText={setSatisfactionDetails}
-                placeholder={documentType === "execution" ? "e.g. no payment received so far" : "e.g. 15,000"}
+                placeholder={documentType === "execution" ? t("docgen_placeholder_exec_recovery") : t("docgen_placeholder_rent_deposit")}
               />
             )}
 
             {documentType === "cheque_bounce" && (
               <View>
                 <FormInput
-                  label="Cheque Number*"
+                  label={t("docgen_field_cheque_number")}
                   value={chequeNumber}
                   onChangeText={setChequeNumber}
-                  placeholder="e.g. 345123"
+                  placeholder={t("docgen_placeholder_cheque_number")}
                 />
                 <FormInput
-                  label="Date of Dishonor*"
+                  label={t("docgen_field_dishonor_date")}
                   value={dishonorDate}
                   onChangeText={setDishonorDate}
-                  placeholder="e.g. 20-05-2026"
+                  placeholder={t("docgen_placeholder_dishonor_date")}
                 />
               </View>
             )}
 
             {documentType === "rent_agreement" && (
               <FormInput
-                label="Lease Duration Term (in Months)*"
+                label={t("docgen_field_rent_term")}
                 value={termMonths}
                 onChangeText={setTermMonths}
-                placeholder="e.g. 11"
+                placeholder={t("docgen_placeholder_rent_term")}
                 keyboardType="numeric"
               />
             )}
@@ -1084,16 +1135,16 @@ const GenerateDocumentScreen: React.FC = () => {
             {(documentType === "rent_agreement" || documentType === "power_of_attorney") && (
               <View>
                 <FormInput
-                  label="Witness 1 Details (Name & Address)"
+                  label={t("docgen_field_witness1")}
                   value={witness1}
                   onChangeText={setWitness1}
-                  placeholder="e.g. Suresh Kumar, Delhi"
+                  placeholder={t("docgen_placeholder_witness")}
                 />
                 <FormInput
-                  label="Witness 2 Details (Name & Address)"
+                  label={t("docgen_field_witness2")}
                   value={witness2}
                   onChangeText={setWitness2}
-                  placeholder="e.g. Ramesh Kumar, Delhi"
+                  placeholder={t("docgen_placeholder_witness")}
                 />
               </View>
             )}
@@ -1101,10 +1152,10 @@ const GenerateDocumentScreen: React.FC = () => {
             {/* General Exemption & Consumer Complaint Info */}
             {documentType === "exemption" && (
               <FormInput
-                label="Reason for Exemption Application*"
+                label={t("docgen_field_exemption_reason")}
                 value={groundOfBail}
                 onChangeText={setGroundOfBail}
-                placeholder="e.g. Accused is hospitalized / currently out of country"
+                placeholder={t("docgen_placeholder_exemption_reason")}
                 multiline
                 numberOfLines={3}
               />
@@ -1113,10 +1164,10 @@ const GenerateDocumentScreen: React.FC = () => {
             {documentType === "consumer_complaint" && (
               <View>
                 <FormInput
-                  label="Deficiency of Service / Product Defects details*"
+                  label={t("docgen_field_deficiency_details")}
                   value={groundOfBail}
                   onChangeText={setGroundOfBail}
-                  placeholder="e.g. Product screen was broken on delivery and replacement was refused"
+                  placeholder={t("docgen_placeholder_deficiency_details")}
                   multiline
                   numberOfLines={4}
                 />
@@ -1125,7 +1176,7 @@ const GenerateDocumentScreen: React.FC = () => {
 
             <View style={{ marginTop: 24 }}>
               <ActionButton
-                title={isGenerating ? "Compiling PDF..." : caseId ? "Export Legal PDF & Share" : "Draft & Save Legal Notice"}
+                title={isGenerating ? t("docgen_preparing") : caseId ? t("docgen_btn_export_share") : t("docgen_btn_save_draft")}
                 onPress={handleGeneratePdf}
                 type="primary"
                 disabled={isGenerating || !advocateName}
@@ -1144,7 +1195,7 @@ const GenerateDocumentScreen: React.FC = () => {
           </ScrollView>
           <View style={styles.floatingPreviewButton}>
             <ActionButton
-              title={isGenerating ? "Generating..." : caseId ? "Export & Share PDF" : "Save Draft"}
+              title={isGenerating ? t("docgen_preparing") : caseId ? t("docgen_btn_export_share_short") : t("docgen_btn_save_draft_short")}
               onPress={handleGeneratePdf}
               type="primary"
               disabled={isGenerating || !advocateName}

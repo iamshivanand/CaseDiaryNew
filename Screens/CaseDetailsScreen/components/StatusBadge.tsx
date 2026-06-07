@@ -3,6 +3,7 @@ import React, { useContext } from 'react'; // Added useContext
 import { View, Text } from 'react-native';
 import { getStatusBadgeStyles } from './StatusBadgeStyle'; // Import function
 import { ThemeContext } from '../../../Providers/ThemeProvider'; // Adjust path
+import { useTranslation } from '../../../Providers/LanguageProvider';
 
 interface StatusBadgeProps {
   status: string | null | undefined;
@@ -10,6 +11,7 @@ interface StatusBadgeProps {
 
 const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   const { theme } = useContext(ThemeContext); // Get theme
+  const { t } = useTranslation();
   const styles = getStatusBadgeStyles(theme); // Generate styles
 
   const normalizedStatus = (status || 'unknown').toLowerCase().replace(/\s+/g, '');
@@ -34,9 +36,22 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
     textStyle = styles.appealedText;
   }
 
+  const getTranslatedStatus = (st: string | null | undefined) => {
+    if (!st) return 'N/A';
+    const clean = st.toLowerCase().replace(/\s+/g, '');
+    switch (clean) {
+      case 'open': return t('option_status_open');
+      case 'inprogress': return t('option_status_in_progress');
+      case 'closed': return t('option_status_closed');
+      case 'onhold': return t('option_status_on_hold');
+      case 'appealed': return t('option_status_appealed');
+      default: return st;
+    }
+  };
+
   return (
     <View style={[styles.badge, badgeStyle]}>
-      <Text style={[styles.badgeText, textStyle]}>{status || 'N/A'}</Text>
+      <Text style={[styles.badgeText, textStyle]}>{getTranslatedStatus(status)}</Text>
     </View>
   );
 };

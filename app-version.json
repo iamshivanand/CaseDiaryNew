@@ -1,0 +1,9 @@
+{
+  "latestAndroidVersion": "1.0.0",
+  "latestIosVersion": "1.0.0",
+  "minAndroidVersion": "1.0.0",
+  "minIosVersion": "1.0.0",
+  "playStoreUrl": "https://play.google.com/store/apps/details?id=com.iamshiv.CaseDiary",
+  "appStoreUrl": "https://apps.apple.com/app/your-app-id",
+  "releaseNotes": "Compatibility updates for latest Android OS version and performance enhancements."
+}

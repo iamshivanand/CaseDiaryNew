@@ -19,6 +19,7 @@ import { formatDate, getCurrentUserId } from "../../utils/commonFunctions";
 import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import AdBanner from "../CommonComponents/AdBanner";
+import { useTranslation } from "../../Providers/LanguageProvider";
 
 const transformApiCaseToCaseDataScreen = (apiCase: Case): CaseDataScreen => {
   return {
@@ -45,6 +46,7 @@ const CasesList = () => {
   const filterParam = route.params?.Filter;
   const navigation = useNavigation();
   const { theme } = useContext(ThemeContext);
+  const { t } = useTranslation();
 
   const [cases, setCases] = useState<CaseDataScreen[]>([]);
   const [searchText, setSearchText] = useState("");
@@ -186,7 +188,7 @@ const CasesList = () => {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Cases</Text>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{t("cases_header_title")}</Text>
         <TouchableOpacity onPress={navigateToAddCase} style={styles.addButton}>
           <Ionicons name="add-circle-outline" size={32} color={theme.colors.primary || "#007AFF"} />
         </TouchableOpacity>
@@ -202,7 +204,7 @@ const CasesList = () => {
           />
           <TextInput
             style={[styles.input, { color: theme.colors.text }]}
-            placeholder="Search cases..."
+            placeholder={t("cases_search_placeholder")}
             placeholderTextColor={theme.colors.textSecondary || "#8E8E93"}
             onChangeText={handleSearchChange}
             value={searchText}
@@ -221,7 +223,7 @@ const CasesList = () => {
             onPress={() => setActiveFilter("Active")}
           >
             <Text style={activeFilter === "Active" ? styles.activeButtonText : [styles.inactiveButtonText, { color: theme.colors.text }]}>
-              Active
+              {t("cases_filter_active")}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -233,7 +235,7 @@ const CasesList = () => {
             onPress={() => setActiveFilter("Closed")}
           >
             <Text style={activeFilter === "Closed" ? styles.activeButtonText : [styles.inactiveButtonText, { color: theme.colors.text }]}>
-              Closed
+              {t("cases_filter_closed")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -258,7 +260,7 @@ const CasesList = () => {
         ListEmptyComponent={
           !isLoading ? (
             <View style={styles.emptyListContainer}>
-              <Text style={[styles.emptyListText, { color: theme.colors.textSecondary }]}>No cases found.</Text>
+              <Text style={[styles.emptyListText, { color: theme.colors.textSecondary }]}>{t("cases_no_cases")}</Text>
             </View>
           ) : null
         }

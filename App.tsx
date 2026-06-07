@@ -1,11 +1,14 @@
 import { NavigationContainer } from "@react-navigation/native";
 import React, { useContext, useEffect, useState } from "react";
-import { SafeAreaView, ActivityIndicator, View, Platform } from "react-native";
+import { SafeAreaView, ActivityIndicator, View, Platform, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import mobileAds, { AppOpenAd, TestIds, AdEventType } from "react-native-google-mobile-ads";
-import { AdProvider } from "./Screens/CommonComponents/AdManager";
+import { AdProvider, preloadAds } from "./Screens/CommonComponents/AdManager";
 import { initializeAlertInterceptor } from "./utils/AlertManager";
 import CustomAlertModal from "./Screens/CommonComponents/CustomAlertModal";
+import { useFonts, Inter_400Regular, Inter_500Medium, Inter_700Bold } from "@expo-google-fonts/inter";
+import * as Application from "expo-application";
+import UpdateCheckModal from "./Screens/CommonComponents/UpdateCheckModal";
 
 // Initialize the global alert interceptor
 initializeAlertInterceptor();
@@ -21,6 +24,7 @@ import { emitter } from "./utils/event-emitter";
 import { getDb } from "./DataBase";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
 import OnboardingProvider from "./Providers/OnboardingProvider";
+import LanguageProvider from "./Providers/LanguageProvider";
 import Routes from "./Routes/Routes";
 import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
 import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
@@ -28,6 +32,8 @@ import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
 import PracticeAreasScreen from "./Screens/Onboarding/PracticeAreasScreen";
 import SplashScreen from "./Screens/SplashScreen/SplashScreen";
 import GreetingScreen from "./Screens/Onboarding/GreetingScreen";
+import ImportMigrationScreen from "./Screens/Onboarding/ImportMigrationScreen";
+import DuplicateReviewScreen from "./Screens/Onboarding/DuplicateReviewScreen";
 
 const Stack = createNativeStackNavigator();
 const OnboardingStack = createNativeStackNavigator();
@@ -58,25 +64,57 @@ const OnboardingNavigator = () => (
       name="PracticeAreas"
       component={PracticeAreasScreen}
     />
+    <OnboardingStack.Screen
+      name="ImportMigration"
+      component={ImportMigrationScreen}
+    />
+    <OnboardingStack.Screen
+      name="DuplicateReview"
+      component={DuplicateReviewScreen}
+    />
   </OnboardingStack.Navigator>
 );
 
-const appOpenAdUnitId = __DEV__
-  ? TestIds.APP_OPEN
-  : Platform.OS === "ios"
-  ? "ca-app-pub-3940256099942544/5575469517"
-  : "ca-app-pub-3940256099942544/9257395921";
+// Production Android ID: ca-app-pub-6084954144919761/6781969722
+// Production iOS ID: ca-app-pub-3940256099942544/5575469517
+const appOpenAdUnitId = TestIds.APP_OPEN;
 
 const appOpenAd = AppOpenAd.createForAdRequest(appOpenAdUnitId, {
   requestNonPersonalizedAdsOnly: true,
 });
 
+const isVersionOlder = (local: string, remote: string) => {
+  if (!local || !remote) return false;
+  const localParts = local.split(".").map(Number);
+  const remoteParts = remote.split(".").map(Number);
+  for (let i = 0; i < Math.max(localParts.length, remoteParts.length); i++) {
+    const l = localParts[i] || 0;
+    const r = remoteParts[i] || 0;
+    if (l < r) return true;
+    if (l > r) return false;
+  }
+  return false;
+};
+
 export default function App() {
   const { theme } = useContext(ThemeContext);
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_700Bold,
+  });
   const [loading, setLoading] = useState(true);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isSplashscreenVisible, setSplashscreenVisible] = useState(true);
   const translateY = useSharedValue(1000);
+
+  // Update check state variables
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(false);
+  const [playStoreUrl, setPlayStoreUrl] = useState("https://play.google.com/store/apps/details?id=com.iamshiv.CaseDiary");
+  const [appStoreUrl, setAppStoreUrl] = useState("");
+  const [latestVersion, setLatestVersion] = useState("1.0.0");
+  const [releaseNotes, setReleaseNotes] = useState("");
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -90,8 +128,45 @@ export default function App() {
         await getDb();
         console.log("Database initialized successfully from App.tsx");
 
+        // Check for updates (Option 2 - Remote Version Check)
+        let isUpdateForced = false;
+        try {
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout")), 3000)
+          );
+          const response = (await Promise.race([
+            fetch("https://gangwar-shiv.github.io/app-version.json"),
+            timeoutPromise,
+          ])) as Response;
+
+          if (response.ok) {
+            const data = await response.json();
+            const localVersion = Application.nativeApplicationVersion || "1.0.0";
+
+            const minRequired = Platform.OS === "ios" ? data.minIosVersion : data.minAndroidVersion;
+            const latestAvailable = Platform.OS === "ios" ? data.latestIosVersion : data.latestAndroidVersion;
+
+            if (data.playStoreUrl) setPlayStoreUrl(data.playStoreUrl);
+            if (data.appStoreUrl) setAppStoreUrl(data.appStoreUrl);
+            if (data.releaseNotes) setReleaseNotes(data.releaseNotes);
+            setLatestVersion(latestAvailable);
+
+            if (isVersionOlder(localVersion, minRequired)) {
+              setForceUpdate(true);
+              setUpdateModalVisible(true);
+              isUpdateForced = true;
+            } else if (isVersionOlder(localVersion, latestAvailable)) {
+              setForceUpdate(false);
+              setUpdateModalVisible(true);
+            }
+          }
+        } catch (fetchErr) {
+          console.warn("Failed to fetch remote app version data:", fetchErr);
+        }
+
         // Initialize Ads SDK
         await mobileAds().initialize();
+        preloadAds();
 
         const isPremiumVal = await AsyncStorage.getItem("@user_is_premium");
         const isPremium = isPremiumVal === "true";
@@ -109,6 +184,18 @@ export default function App() {
         if (!isPremium && isOnboarded) {
           let adShownOrFailed = false;
 
+          const cleanup = () => {
+            try {
+              unsubLoaded();
+            } catch (e) {}
+            try {
+              unsubError();
+            } catch (e) {}
+            try {
+              unsubClosed();
+            } catch (e) {}
+          };
+
           const showOpenAd = () => {
             if (adShownOrFailed) return;
             adShownOrFailed = true;
@@ -116,6 +203,7 @@ export default function App() {
               appOpenAd.show();
             } catch (err) {
               console.warn("Failed to show AppOpenAd:", err);
+              cleanup();
               proceedToApp();
             }
           };
@@ -129,6 +217,7 @@ export default function App() {
             if (!adShownOrFailed) {
               console.log("AppOpenAd preload timeout reached. Proceeding to app.");
               adShownOrFailed = true;
+              cleanup();
               proceedToApp();
             }
           }, 3000);
@@ -141,13 +230,12 @@ export default function App() {
           const unsubError = appOpenAd.addAdEventListener(AdEventType.ERROR, (error) => {
             clearTimeout(timeoutId);
             console.warn("AppOpenAd failed to load:", error);
+            cleanup();
             proceedToApp();
           });
 
           const unsubClosed = appOpenAd.addAdEventListener(AdEventType.CLOSED, () => {
-            unsubClosed();
-            unsubLoaded();
-            unsubError();
+            cleanup();
             proceedToApp();
           });
 
@@ -177,7 +265,7 @@ export default function App() {
     };
   }, []);
 
-  if (isSplashscreenVisible) {
+  if (isSplashscreenVisible || !fontsLoaded) {
     return <SplashScreen />;
   }
 
@@ -191,9 +279,10 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <OnboardingProvider>
-        <AdProvider>
-          <NavigationContainer>
+      <LanguageProvider>
+        <OnboardingProvider>
+          <AdProvider>
+            <NavigationContainer>
             <SafeAreaView
               style={{
                 flex: 1,
@@ -219,8 +308,18 @@ export default function App() {
             </SafeAreaView>
           </NavigationContainer>
           <CustomAlertModal />
+          <UpdateCheckModal
+            visible={updateModalVisible}
+            onClose={() => setUpdateModalVisible(false)}
+            forceUpdate={forceUpdate}
+            playStoreUrl={playStoreUrl}
+            appStoreUrl={appStoreUrl}
+            releaseNotes={releaseNotes}
+            latestVersion={latestVersion}
+          />
         </AdProvider>
       </OnboardingProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
 }

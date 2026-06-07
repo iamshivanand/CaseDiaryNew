@@ -18,16 +18,21 @@ import {
   TouchableOpacity,
   View,
   Linking,
+  Clipboard,
+  Modal,
+  TextInput,
 } from "react-native"; // Removed ScrollView
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import * as db from "../../DataBase";
 import { getCaseTimelineEventsByCaseId, getCaseById } from "../../DataBase";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
+import { useTranslation } from "../../Providers/LanguageProvider";
 import { CaseData, CaseDataScreen, Document, TimelineEvent } from "../../Types/appTypes";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import ActionButton from "../CommonComponents/ActionButton";
 import SectionHeader from "../CommonComponents/SectionHeader";
-import { exportCaseToPdf } from "../../utils/pdfExporter";
+import { exportCaseToPdf, exportCaseHistoryToPdf } from "../../utils/pdfExporter";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 import DateRow from "./components/DateRow";
 import DocumentCard from "./components/DocumentCard";
@@ -57,6 +62,7 @@ const CaseDetailsScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<CaseDetailsScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
+  const { t } = useTranslation();
   const styles = getStyles(theme);
   const { showAdWithPreload } = useAdTrigger();
   const { caseId } = route.params;
@@ -65,10 +71,12 @@ const CaseDetailsScreen: React.FC = () => {
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [customReminderText, setCustomReminderText] = useState("");
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: caseDetails?.CaseTitle || "Case Details" });
-  }, [navigation, caseDetails]);
+    navigation.setOptions({ title: caseDetails?.CaseTitle || t("casedetails_header_title") });
+  }, [navigation, caseDetails, t]);
 
   const loadCaseDetails = useCallback(async (caseId: number) => {
     console.log("Loading case details for caseId:", caseId);
@@ -112,7 +120,7 @@ const CaseDetailsScreen: React.FC = () => {
         "Error loading associated data (documents/timeline) for case:",
         error
       );
-      Alert.alert("Error", "Could not load associated case data.");
+      Alert.alert(t("alert_error"), t("casedetails_err_associated"));
     } finally {
       setIsLoadingDocuments(false);
     }
@@ -124,7 +132,7 @@ const CaseDetailsScreen: React.FC = () => {
 
     const fetchAllData = async () => {
       if (!caseIdToLoad || isNaN(caseIdToLoad)) {
-        Alert.alert("Error", "No valid Case ID provided.");
+        Alert.alert(t("alert_error"), t("casedetails_err_no_id"));
         setIsLoading(false);
         if (navigation.canGoBack()) navigation.goBack();
         return;
@@ -135,7 +143,7 @@ const CaseDetailsScreen: React.FC = () => {
         await loadDocumentsAndTimeline(caseIdToLoad);
       } catch (error) {
         console.error("Error fetching case details:", error);
-        Alert.alert("Error", "Could not load case details.");
+        Alert.alert(t("alert_error"), t("casedetails_err_load"));
         if (navigation.canGoBack()) navigation.goBack();
       } finally {
         setIsLoading(false);
@@ -167,13 +175,101 @@ const CaseDetailsScreen: React.FC = () => {
 
   const handleExportPdf = async () => {
     if (!caseDetails) return;
-    await showAdWithPreload("rewarded", async () => {
-      try {
-        await exportCaseToPdf(caseDetails);
-      } catch (error) {
-        Alert.alert("Export Failed", "Could not compile case details PDF.");
+    await showAdWithPreload("rewarded", async (success) => {
+      if (success) {
+        try {
+          await exportCaseToPdf(caseDetails);
+        } catch (error) {
+          Alert.alert(t("casedetails_export_failed"), t("casedetails_export_failed_desc"));
+        }
       }
     });
+  };
+
+  const handleShareHistory = async () => {
+    if (!caseDetails) return;
+    await showAdWithPreload("rewarded", async (success) => {
+      if (success) {
+        try {
+          await exportCaseHistoryToPdf(caseDetails as any);
+        } catch (error) {
+          Alert.alert(t("casedetails_export_failed"), t("casedetails_export_failed_desc"));
+        }
+      }
+    });
+  };
+
+  const generateReminderText = async () => {
+    if (!caseDetails) return "";
+    let advocateName = "";
+    try {
+      const userId = await AsyncStorage.getItem("@user_id");
+      if (userId) {
+        const dbInstance = await db.getDb();
+        const profile = await db.getUserProfile(dbInstance, parseInt(userId, 10));
+        if (profile?.name) {
+          advocateName = profile.name;
+        }
+      }
+      if (!advocateName) {
+        advocateName = (await AsyncStorage.getItem("@advocate_name")) || "";
+      }
+    } catch (e) {
+      console.warn("Failed to load advocate details for reminder:", e);
+    }
+
+    if (!advocateName) {
+      advocateName = "Advocate";
+    }
+
+    const template = t("reminder_template");
+    return template
+      .replace(/{clientName}/g, caseDetails.ClientName || "")
+      .replace(/{caseTitle}/g, caseDetails.CaseTitle || "")
+      .replace(/{caseNumber}/g, caseDetails.case_number || "N/A")
+      .replace(/{nextDate}/g, formatDate(caseDetails.NextDate) || "N/A")
+      .replace(/{courtName}/g, caseDetails.court_name || "N/A")
+      .replace(/{advocateName}/g, advocateName);
+  };
+
+  const handleOpenReminderModal = async () => {
+    const text = await generateReminderText();
+    setCustomReminderText(text);
+    setShowReminderModal(true);
+  };
+
+  const handleSendReminderWhatsApp = () => {
+    if (caseDetails?.ClientContactNumber) {
+      const cleanNumber = caseDetails.ClientContactNumber.replace(/\D/g, "");
+      const url = `whatsapp://send?text=${encodeURIComponent(customReminderText)}&phone=${cleanNumber}`;
+      Linking.canOpenURL(url).then((supported) => {
+        if (supported) {
+          Linking.openURL(url);
+        } else {
+          Linking.openURL(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(customReminderText)}`);
+        }
+      });
+      setShowReminderModal(false);
+    } else {
+      Alert.alert(t("casedetails_no_contact"), t("casedetails_no_contact_desc"));
+    }
+  };
+
+  const handleSendReminderSMS = () => {
+    if (caseDetails?.ClientContactNumber) {
+      const cleanNumber = caseDetails.ClientContactNumber.replace(/\D/g, "");
+      const separator = Platform.OS === "ios" ? "&" : "?";
+      Linking.openURL(`sms:${cleanNumber}${separator}body=${encodeURIComponent(customReminderText)}`);
+      setShowReminderModal(false);
+    } else {
+      Alert.alert(t("casedetails_no_contact"), t("casedetails_no_contact_desc"));
+    }
+  };
+
+  const handleCopyReminderToClipboard = () => {
+    Clipboard.setString(customReminderText);
+    Alert.alert(t("alert_success"), t("reminder_copy_success") || "Reminder text copied to clipboard!");
+    setShowReminderModal(false);
   };
 
   const handleGenerateDocument = () => {
@@ -186,7 +282,7 @@ const CaseDetailsScreen: React.FC = () => {
     if (caseDetails?.ClientContactNumber) {
       Linking.openURL(`tel:${caseDetails.ClientContactNumber}`);
     } else {
-      Alert.alert("No Contact Number", "No client contact number is available for this case.");
+      Alert.alert(t("casedetails_no_contact"), t("casedetails_no_contact_desc"));
     }
   };
 
@@ -195,24 +291,24 @@ const CaseDetailsScreen: React.FC = () => {
       const cleanNumber = caseDetails.ClientContactNumber.replace(/\D/g, "");
       Linking.openURL(`https://wa.me/${cleanNumber}`);
     } else {
-      Alert.alert("No Contact Number", "No client contact number is available for this case.");
+      Alert.alert(t("casedetails_no_contact"), t("casedetails_no_contact_desc"));
     }
   };
 
   const handleDocumentInteraction = async (doc: Document) => {
     if (!doc.stored_filename) {
-      Alert.alert("Not Available", "Document path not found.");
+      Alert.alert(t("alert_error"), t("doc_err_path"));
       return;
     }
     const localDocumentPath = db.getFullDocumentPath(doc.stored_filename);
     if (!localDocumentPath) {
-      Alert.alert("Error", "Could not construct document path.");
+      Alert.alert(t("alert_error"), t("doc_err_construct_path"));
       return;
     }
     try {
       const fileInfo = await FileSystem.getInfoAsync(localDocumentPath);
       if (!fileInfo.exists) {
-        Alert.alert("Error", "File not found at: " + localDocumentPath);
+        Alert.alert(t("alert_error"), t("casedetails_file_not_found") + localDocumentPath);
         return;
       }
       if (Platform.OS === "android") {
@@ -226,18 +322,18 @@ const CaseDetailsScreen: React.FC = () => {
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(localDocumentPath, {
             mimeType: doc.fileType || undefined,
-            dialogTitle: `Open ${doc.fileName}`,
+            dialogTitle: `${t("casedetails_open_doc")} ${doc.fileName}`,
             UTI: doc.fileType || undefined,
           });
         } else {
-          Alert.alert("Unavailable", "Sharing is not available.");
+          Alert.alert(t("alert_warning"), t("casedetails_sharing_unavailable"));
         }
       } else {
-        Alert.alert("Open Document", `File at: ${localDocumentPath}. Open manually.`);
+        Alert.alert(t("casedetails_open_doc"), `${t("casedetails_open_manually")}${localDocumentPath}`);
       }
     } catch (error: any) {
       console.error("Error opening document:", error);
-      Alert.alert("Error Opening File", error.message || "Could not open document.");
+      Alert.alert(t("casedetails_err_open_file"), error.message || t("alert_error"));
     }
   };
 
@@ -266,6 +362,16 @@ const CaseDetailsScreen: React.FC = () => {
     listData.push({ type: "noTimelineEvents" });
   }
 
+  const getTranslatedPriority = (priority?: string) => {
+    if (!priority) return 'N/A';
+    switch (priority.toLowerCase()) {
+      case 'high': return t('option_priority_high');
+      case 'medium': return t('option_priority_medium');
+      case 'low': return t('option_priority_low');
+      default: return priority;
+    }
+  };
+
   const renderListItem = ({ item }: { item: ListItemType }) => {
     switch (item.type) {
       case "summary":
@@ -280,116 +386,128 @@ const CaseDetailsScreen: React.FC = () => {
           <View style={styles.summarySection}>
             <Text style={styles.mainCaseTitle}>{caseDetails.CaseTitle}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <Text style={[styles.clientName, { marginBottom: 0 }]}>Client: {caseDetails.ClientName}</Text>
+              <Text style={[styles.clientName, { marginBottom: 0 }]}>{t("casedetails_client_prefix")}{caseDetails.ClientName}</Text>
               {caseDetails.ClientContactNumber ? (
                 <View style={{ flexDirection: 'row' }}>
                   <TouchableOpacity onPress={handlePhoneCall} activeOpacity={0.85} style={{ padding: 8, backgroundColor: '#E0F2FE', borderRadius: 20, marginRight: 8 }}>
                     <Ionicons name="call" size={20} color="#0284C7" />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={handleWhatsAppChat} activeOpacity={0.85} style={{ padding: 8, backgroundColor: '#DCFCE7', borderRadius: 20 }}>
+                  <TouchableOpacity onPress={handleWhatsAppChat} activeOpacity={0.85} style={{ padding: 8, backgroundColor: '#DCFCE7', borderRadius: 20, marginRight: 8 }}>
                     <Ionicons name="logo-whatsapp" size={20} color="#15803D" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleOpenReminderModal} activeOpacity={0.85} style={{ padding: 8, backgroundColor: '#FEF3C7', borderRadius: 20 }}>
+                    <Ionicons name="chatbubble-ellipses" size={20} color="#D97706" />
                   </TouchableOpacity>
                 </View>
               ) : null}
             </View>
             <StatusBadge status={caseDetails.CaseStatus} />
             <DateRow
-              label="Next Hearing"
+              label={t("field_hearing_date")}
               dateString={formatDate(caseDetails.NextDate)}
               iconName="gavel"
             />
             <DateRow
-              label="Previous Hearing"
+              label={t("casedetails_prev_hearing")}
               dateString={formatDate(caseDetails.PreviousDate)}
               iconName="history"
             />
             <DateRow
-              label="Last Update"
+              label={t("casedetails_last_update")}
               dateString={formatDate(caseDetails.updated_at)}
               iconName="update"
             />
             <View style={styles.detailsContainer}>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Case Number:</Text>
+                <Text style={styles.detailLabel}>{t("field_case_number")}:</Text>
                 <Text style={styles.detailValue}>{caseDetails.case_number || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Case Year:</Text>
+                <Text style={styles.detailLabel}>{t("field_case_year")}:</Text>
                 <Text style={styles.detailValue}>{caseDetails.case_year || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Court Name:</Text>
+                <Text style={styles.detailLabel}>{t("field_court_name")}:</Text>
                 <Text style={styles.detailValue}>{caseDetails.court_name || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Case Type:</Text>
+                <Text style={styles.detailLabel}>{t("field_case_type")}:</Text>
                 <Text style={styles.detailValue}>{caseDetails.case_type_name || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>On Behalf Of:</Text>
+                <Text style={styles.detailLabel}>{t("field_on_behalf_of")}:</Text>
                 <Text style={styles.detailValue}>{caseDetails.OnBehalfOf || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>First Party:</Text>
+                <Text style={styles.detailLabel}>{t("field_first_party")}:</Text>
                 <Text style={styles.detailValue}>{caseDetails.FirstParty || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Opposite Party:</Text>
+                <Text style={styles.detailLabel}>{t("field_opposite_party")}:</Text>
                 <Text style={styles.detailValue}>{caseDetails.OppositeParty || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Accused:</Text>
+                <Text style={styles.detailLabel}>{t("field_accused")}:</Text>
                 <Text style={styles.detailValue}>{caseDetails.Accussed || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Under Section:</Text>
+                <Text style={styles.detailLabel}>{t("field_under_section")}:</Text>
                 <Text style={styles.detailValue}>{caseDetails.Undersection || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Priority:</Text>
-                <Text style={styles.detailValue}>{caseDetails.Priority || 'N/A'}</Text>
+                <Text style={styles.detailLabel}>{t("field_priority")}:</Text>
+                <Text style={styles.detailValue}>{getTranslatedPriority(caseDetails.Priority)}</Text>
               </View>
             </View>
-            <Text style={styles.detailLabel}>Case Description:</Text>
+            <Text style={styles.detailLabel}>{t("field_case_description")}:</Text>
             <Text style={styles.detailValue}>{caseDetails.CaseDescription || 'N/A'}</Text>
-            <Text style={styles.detailLabel}>Case Notes:</Text>
+            <Text style={styles.detailLabel}>{t("field_case_notes")}:</Text>
             <Text style={styles.detailValue}>{caseDetails.CaseNotes || 'N/A'}</Text>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
               <View style={{ width: '48%' }}>
                 <ActionButton
-                  title="Edit Case"
+                  title={t("btn_edit_case")}
                   onPress={handleEditCase}
                   type="primary"
                 />
               </View>
               <View style={{ width: '48%' }}>
                 <ActionButton
-                  title="Export PDF"
+                  title={t("btn_export_pdf")}
                   onPress={handleExportPdf}
                   type="secondary"
                 />
               </View>
             </View>
-            <View style={{ marginTop: 12 }}>
-              <ActionButton
-                title="Generate Court Document"
-                onPress={handleGenerateDocument}
-                type="dashed"
-              />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+              <View style={{ width: '48%' }}>
+                <ActionButton
+                  title={t("btn_share_history")}
+                  onPress={handleShareHistory}
+                  type="secondary"
+                />
+              </View>
+              <View style={{ width: '48%' }}>
+                <ActionButton
+                  title={t("btn_generate_document")}
+                  onPress={handleGenerateDocument}
+                  type="dashed"
+                />
+              </View>
             </View>
           </View>
         );
       case "documentsHeader":
         return (
           <View style={styles.documentsSection}>
-            <SectionHeader title="Documents" />
+            <SectionHeader title={t("casedetails_sec_documents")} />
             <DocumentUpload caseId={caseId} />
           </View>
         );
       case "timelineHeader":
         return (
           <View style={styles.timelineSection}>
-            <SectionHeader title="Case Timeline" />
+            <SectionHeader title={t("casedetails_sec_timeline")} />
           </View>
         );
       case "timelineEvent":
@@ -397,7 +515,7 @@ const CaseDetailsScreen: React.FC = () => {
       case "noTimelineEvents":
         return (
           <View style={styles.timelineSection}>
-            <Text style={styles.noItemsText}>No timeline events available.</Text>
+            <Text style={styles.noItemsText}>{t("casedetails_no_timeline")}</Text>
           </View>
         );
       default:
@@ -414,6 +532,57 @@ const CaseDetailsScreen: React.FC = () => {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
       />
+      <Modal
+        visible={showReminderModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowReminderModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{t("reminder_modal_title")}</Text>
+            <TextInput
+              style={styles.reminderInput}
+              multiline
+              numberOfLines={6}
+              value={customReminderText}
+              onChangeText={setCustomReminderText}
+            />
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: '#25D366' }]}
+                onPress={handleSendReminderWhatsApp}
+              >
+                <Ionicons name="logo-whatsapp" size={18} color="#FFF" style={{ marginRight: 6 }} />
+                <Text style={styles.modalButtonText}>{t("reminder_send_whatsapp")}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: '#3B82F6' }]}
+                onPress={handleSendReminderSMS}
+              >
+                <Ionicons name="chatbubble-ellipses" size={18} color="#FFF" style={{ marginRight: 6 }} />
+                <Text style={styles.modalButtonText}>{t("reminder_send_sms")}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: '#6B7280' }]}
+                onPress={handleCopyReminderToClipboard}
+              >
+                <Ionicons name="copy" size={18} color="#FFF" style={{ marginRight: 6 }} />
+                <Text style={styles.modalButtonText}>{t("reminder_copy_clipboard")}</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowReminderModal(false)}
+            >
+              <Text style={styles.modalCloseButtonText}>{t("alert_cancel")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -472,6 +641,72 @@ const getStyles = (theme: Theme) => StyleSheet.create({
   },
   timelineSection: {
     backgroundColor: theme.colors.background,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: theme.colors.cardBackground,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  reminderInput: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.background,
+    height: 120,
+    textAlignVertical: 'top',
+    marginBottom: 16,
+  },
+  modalButtonContainer: {
+    flexDirection: 'column',
+    gap: 10,
+    marginBottom: 16,
+  },
+  modalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    width: '100%',
+  },
+  modalButtonText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  modalCloseButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
+  modalCloseButtonText: {
+    color: theme.colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '500',
   },
 });
 

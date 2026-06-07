@@ -23,6 +23,8 @@ export type HomeStackParamList = {
   YesterdaysCases: undefined;
   GenerateDocument: { caseId?: number };
   DraftsHub: undefined;
+  ImportMigration: { isFromOnboarding?: boolean };
+  DuplicateReview: undefined;
 };
 
 // Stack for the "Search" Tab
@@ -47,6 +49,8 @@ export type ProfileStackParamList = {
     categoryName: 'CaseTypes' | 'Courts' | 'Districts' | 'PoliceStations';
     title: string;
   };
+  ImportMigration: { isFromOnboarding?: boolean };
+  DuplicateReview: undefined;
   // Example: AccountDetails: undefined;
 };
 

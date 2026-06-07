@@ -20,6 +20,7 @@ import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPop
 import { getCurrentUserId } from "../../utils/commonFunctions";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { mapCaseDbToScreen } from "../../utils/caseMapper";
+import { useTranslation } from "../../Providers/LanguageProvider";
 
 interface Props {
   // Add your prop types here
@@ -27,6 +28,7 @@ interface Props {
 
 const CalendarScreen: React.FC<Props> = () => {
   const { theme } = useContext(ThemeContext);
+  const { t, locale } = useTranslation();
   const currentDate = new Date();
   const [selected, setSelected] = useState(
     currentDate.toISOString().slice(0, 10)
@@ -214,10 +216,11 @@ const CalendarScreen: React.FC<Props> = () => {
         <View style={styles.filterContainer}>
           {(["All", "High", "Active", "Pending"] as const).map((item) => {
             const isSelected = filter === item;
-            let label = item;
-            if (item === "High") label = "High Priority";
-            if (item === "Active") label = "Active";
-            if (item === "Pending") label = "Pending";
+            let label = item as string;
+            if (item === "All") label = t("cal_filter_all");
+            if (item === "High") label = t("cal_filter_high");
+            if (item === "Active") label = t("cal_filter_active");
+            if (item === "Pending") label = t("cal_filter_pending");
             
             return (
               <TouchableOpacity
@@ -250,12 +253,12 @@ const CalendarScreen: React.FC<Props> = () => {
           <View style={styles.agendaHeader}>
             <Icon name="calendar-clock" size={22} color={theme.colors.primary} style={{ marginRight: 8 }} />
             <Text style={[styles.dateSubheading, { color: theme.colors.text }]}>
-              Agenda for {new Date(selected).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {t("cal_agenda_for")} {new Date(selected).toLocaleDateString(locale === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </Text>
           </View>
           
           <Text style={[styles.agendaCountText, { color: theme.colors.textSecondary }]}>
-            {displayedCases.length} {displayedCases.length === 1 ? "Hearing" : "Hearings"} Scheduled
+            {displayedCases.length} {displayedCases.length === 1 ? t("cal_hearing_scheduled") : t("cal_hearings_scheduled")}
           </Text>
 
           {displayedCases?.length > 0 ? (
@@ -271,7 +274,7 @@ const CalendarScreen: React.FC<Props> = () => {
             <View style={[styles.emptyContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
               <Icon name="calendar-blank-outline" size={48} color={theme.colors.textSecondary + '40'} />
               <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                No hearings scheduled for this date.
+                {t("cal_no_hearings")}
               </Text>
             </View>
           )}

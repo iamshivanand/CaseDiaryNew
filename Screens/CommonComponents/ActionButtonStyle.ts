@@ -17,6 +17,7 @@ export const getActionButtonStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     textAlign: 'center',
+    fontFamily: theme.fonts ? theme.fonts.bold : undefined,
   },
   iconWrapper: {
     marginRight: 8,

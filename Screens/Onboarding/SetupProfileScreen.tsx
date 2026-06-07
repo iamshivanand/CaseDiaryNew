@@ -3,9 +3,11 @@ import { View, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Text, Ale
 import InputField from './components/InputField';
 import PrimaryButton from './components/PrimaryButton';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
+import { useTranslation } from '../../Providers/LanguageProvider';
 
 const SetupProfileScreen = ({ navigation }) => {
   const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
+  const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [experience, setExperience] = useState('');
   const [license, setLicense] = useState('');
@@ -13,42 +15,42 @@ const SetupProfileScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.stepText}>Step 3 of 4</Text>
+      <Text style={styles.stepText}>{t('onboarding_step_3_of_4')}</Text>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <InputField
-          label="Professional Title"
-          placeholder="e.g. Senior Lawyer"
+          label={t('onboarding_prof_title')}
+          placeholder={t('onboarding_prof_title_placeholder')}
           value={title}
           onChangeText={setTitle}
         />
         <InputField
-          label="Years of Experience"
-          placeholder="Enter number of years"
+          label={t('onboarding_experience')}
+          placeholder={t('onboarding_experience_placeholder')}
           value={experience}
           onChangeText={setExperience}
           keyboardType="number-pad"
         />
         <InputField
-          label="License Number"
-          placeholder="Enter your license number"
+          label={t('onboarding_license')}
+          placeholder={t('onboarding_license_placeholder')}
           value={license}
           onChangeText={setLicense}
         />
         <InputField
-          label="Location"
-          placeholder="Enter your city and state"
+          label={t('onboarding_location')}
+          placeholder={t('onboarding_location_placeholder')}
           value={location}
           onChangeText={setLocation}
         />
         <View style={styles.buttonContainer}>
           <PrimaryButton
-            title="Continue"
+            title={t('btn_continue')}
             onPress={() => {
               console.log('Continue button pressed on SetupProfileScreen');
               if (!title || !experience) {
                 Alert.alert(
-                  'Error',
-                  'Please enter your professional title and years of experience.'
+                  t('alert_error'),
+                  t('onboarding_err_prof_title')
                 );
                 return;
               }
@@ -59,7 +61,7 @@ const SetupProfileScreen = ({ navigation }) => {
             }}
           />
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.skipText}>Previous</Text>
+            <Text style={styles.skipText}>{t('btn_previous')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

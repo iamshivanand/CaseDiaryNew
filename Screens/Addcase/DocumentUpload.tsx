@@ -2,16 +2,15 @@ import React, { useState, useCallback } from 'react';
 import { View, StyleSheet, FlatList, Alert, Platform } from 'react-native';
 import { Button, List, Text, useTheme, IconButton, ActivityIndicator, Divider } from 'react-native-paper';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
+import { useTranslation } from '../../Providers/LanguageProvider';
 
 import * as db from '../../DataBase'; // Corrected import
 import { CaseDocument } from '../../DataBase/schema';
-// Assuming RootStackParamList is correctly defined in your types
-// For AddCaseDetails flow, uniqueId is passed. We need caseId for existing cases.
-// The screen should ideally receive caseId if the case exists, or uniqueId if it's a new case.
-// Let's adjust props to reflect this possibility.
+
 export type DocumentUploadRouteParams = {
   caseId?: number; // For existing cases
 };
@@ -20,6 +19,7 @@ type DocumentUploadScreenRouteProp = RouteProp<{ Documents: DocumentUploadRouteP
 
 const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const [documents, setDocuments] = useState<CaseDocument[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,11 +40,11 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
       setDocuments(docs);
     } catch (error) {
       console.error("Error loading documents:", error);
-      Alert.alert("Error", "Could not load documents.");
+      Alert.alert(t("alert_error"), t("doc_err_load"));
     } finally {
       setLoading(false);
     }
-  }, [caseId]);
+  }, [caseId, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,7 +65,7 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
 
       const asset = result.assets[0];
       if (!asset.uri) {
-        Alert.alert("Error", "Could not get document URI.");
+        Alert.alert(t("alert_error"), t("doc_err_uri"));
         return;
       }
 
@@ -84,14 +84,67 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
       });
 
       if (uploadedDocId) {
-        Alert.alert("Success", "Document uploaded.");
+        Alert.alert(t("alert_success"), t("doc_success_upload"));
         loadDocuments(); // Refresh list
       } else {
-        Alert.alert("Error", "Failed to upload document.");
+        Alert.alert(t("alert_error"), t("doc_err_upload"));
       }
     } catch (error) {
       console.error("Error picking or uploading document:", error);
-      Alert.alert("Error", "An error occurred during document upload.");
+      Alert.alert(t("alert_error"), t("doc_err_upload_general"));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleCameraCapture = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(t("alert_error"), "Permission to access camera was denied.");
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.9,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (!asset.uri) {
+        Alert.alert(t("alert_error"), t("doc_err_uri"));
+        return;
+      }
+
+      setIsUploading(true);
+
+      const timestamp = Date.now();
+      const fileName = asset.fileName || `photo_${timestamp}.jpg`;
+      const fileType = asset.mimeType || 'image/jpeg';
+
+      const uploadedDocId = await db.uploadCaseDocument({
+        originalFileName: fileName,
+        fileType: fileType,
+        fileUri: asset.uri,
+        caseId: caseId,
+        userId: MOCK_CURRENT_USER_ID,
+        fileSize: asset.fileSize || null,
+      });
+
+      if (uploadedDocId) {
+        Alert.alert(t("alert_success"), t("doc_success_upload"));
+        loadDocuments();
+      } else {
+        Alert.alert(t("alert_error"), t("doc_err_upload"));
+      }
+    } catch (error) {
+      console.error("Error capturing image:", error);
+      Alert.alert(t("alert_error"), "Failed to capture or upload image.");
     } finally {
       setIsUploading(false);
     }
@@ -99,36 +152,36 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
 
   const handleDownloadDocument = async (doc: CaseDocument) => {
     if (!doc.stored_filename) {
-      Alert.alert("Error", "Document path not found.");
+      Alert.alert(t("alert_error"), t("doc_err_path"));
       return;
     }
     const localUri = db.getFullDocumentPath(doc.stored_filename);
     if (!localUri) {
-      Alert.alert("Error", "Could not construct document path.");
+      Alert.alert(t("alert_error"), t("doc_err_construct_path"));
       return;
     }
 
     try {
       const fileInfo = await FileSystem.getInfoAsync(localUri);
       if (!fileInfo.exists) {
-        Alert.alert("Error", "File does not exist at the specified path. It might have been moved or deleted.");
+        Alert.alert(t("alert_error"), t("doc_err_not_exist"));
         return;
       }
 
       await Sharing.shareAsync(localUri, {
         mimeType: doc.file_type || '*/*',
-        dialogTitle: 'Download Document',
+        dialogTitle: t("doc_dialog_title"),
       });
     } catch (error) {
       console.error("Error downloading document:", error);
-      Alert.alert("Error", "Could not download document. Please try again.");
+      Alert.alert(t("alert_error"), t("doc_err_download"));
     }
   };
 
   const renderItem = ({ item }: { item: CaseDocument }) => (
     <List.Item
       title={item.original_display_name}
-      description={`Type: ${item.file_type || 'N/A'}, Size: ${item.file_size ? (item.file_size / 1024).toFixed(2) + ' KB' : 'N/A'}`}
+      description={`${t("doc_info_type")}: ${item.file_type || 'N/A'}, ${t("doc_info_size")}: ${item.file_size ? (item.file_size / 1024).toFixed(2) + ' KB' : 'N/A'}`}
       titleStyle={{ color: theme.colors.onSurface }}
       descriptionStyle={{ color: theme.colors.onSurfaceVariant }}
       left={props => <List.Icon {...props} icon={ item.file_type?.startsWith('image') ? "file-image-outline" : "file-document-outline"} />}
@@ -144,16 +197,30 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Button
-        mode="contained"
-        onPress={handlePickAndUploadDocument}
-        style={styles.addButton}
-        icon="plus"
-        loading={isUploading}
-        disabled={isUploading}
-      >
-        Add Document
-      </Button>
+      <View style={{ flexDirection: 'row', paddingHorizontal: 4, marginVertical: 4 }}>
+        <Button
+          mode="contained"
+          onPress={handlePickAndUploadDocument}
+          style={{ flex: 1, marginRight: 4, justifyContent: 'center' }}
+          icon="file-document-outline"
+          loading={isUploading}
+          disabled={isUploading}
+          labelStyle={{ fontSize: 12 }}
+        >
+          {t("doc_btn_add")}
+        </Button>
+        <Button
+          mode="contained"
+          onPress={handleCameraCapture}
+          style={{ flex: 1, marginLeft: 4, backgroundColor: '#8B5CF6', justifyContent: 'center' }}
+          icon="camera"
+          loading={isUploading}
+          disabled={isUploading}
+          labelStyle={{ fontSize: 12 }}
+        >
+          {t("doc_btn_capture")}
+        </Button>
+      </View>
       {loading && documents.length === 0 ? (
         <ActivityIndicator animating={true} size="large" style={styles.loader} />
       ) : (
@@ -163,7 +230,7 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
           keyExtractor={(item) => item.id.toString()}
           ItemSeparatorComponent={() => <Divider />}
           ListEmptyComponent={
-            !loading ? <Text style={styles.emptyText}>No Documents Yet</Text> : null
+            !loading ? <Text style={styles.emptyText}>{t("doc_no_documents")}</Text> : null
           }
           contentContainerStyle={styles.listContentContainer}
         />

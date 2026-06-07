@@ -1,19 +1,29 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
 import PrimaryButton from './components/PrimaryButton';
+import { useTranslation } from '../../Providers/LanguageProvider';
 
 const GreetingScreen = ({ navigation }) => {
+  const { t } = useTranslation();
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Welcome to Case Diary!</Text>
+        <Text style={styles.title}>{t('onboarding_welcome_title')}</Text>
         <Text style={styles.subtitle}>
-          Let's get you set up for a seamless case management experience.
+          {t('onboarding_welcome_desc')}
         </Text>
         <PrimaryButton
-          title="Let's Get Started"
+          title={t('onboarding_start_btn')}
           onPress={() => navigation.navigate('PersonalDetails')}
         />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('ImportMigration', { isFromOnboarding: true })}
+          style={{ marginTop: 24, padding: 8 }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.importLink}>{t('onboarding_import_link')}</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -41,6 +51,13 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     marginBottom: 40,
+  },
+  importLink: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '500',
+    textDecorationLine: 'underline',
+    textAlign: 'center',
   },
 });
 

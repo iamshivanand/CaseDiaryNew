@@ -197,3 +197,10 @@ jest.mock('./Screens/CommonComponents/AdManager', () => ({
     }),
   }),
 }));
+
+
+// Mock for expo-application
+jest.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.0',
+  nativeBuildVersion: '1',
+}));

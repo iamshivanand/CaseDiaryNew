@@ -7,8 +7,10 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
+import { useTranslation } from '../../Providers/LanguageProvider';
 
 const DoneScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const opacity = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -30,9 +32,9 @@ const DoneScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <Animated.View style={[styles.content, animatedStyle]}>
         <Ionicons name="checkmark-circle-outline" size={100} color="#2D60FF" />
-        <Text style={styles.title}>You're All Set!</Text>
+        <Text style={styles.title}>{t('onboarding_done_title')}</Text>
         <Text style={styles.subtitle}>
-          Your profile has been created successfully.
+          {t('onboarding_done_desc')}
         </Text>
       </Animated.View>
     </SafeAreaView>

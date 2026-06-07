@@ -4,11 +4,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BannerAd, BannerAdSize, TestIds } from "react-native-google-mobile-ads";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 
-const adUnitId = __DEV__
-  ? TestIds.BANNER
-  : Platform.OS === "ios"
-  ? "ca-app-pub-3940256099942544/2934735716"
-  : "ca-app-pub-3940256099942544/6300978111";
+// Production Android ID: ca-app-pub-6084954144919761/2767388859
+// Production iOS ID: ca-app-pub-3940256099942544/2934735716
+const adUnitId = TestIds.BANNER;
 
 interface AdBannerProps {
   containerStyle?: StyleProp<ViewStyle>;

@@ -4,9 +4,11 @@ import PrimaryButton from './components/PrimaryButton';
 import { Ionicons } from '@expo/vector-icons';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 import * as ImagePicker from 'expo-image-picker';
+import { useTranslation } from '../../Providers/LanguageProvider';
 
 const UploadPhotoScreen = ({ navigation }) => {
   const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
+  const { t } = useTranslation();
 
   const handleChooseImage = async () => {
     console.log('handleChooseImage called');
@@ -25,7 +27,7 @@ const UploadPhotoScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.stepText}>Step 2 of 4</Text>
+      <Text style={styles.stepText}>{t('onboarding_step_2_of_4')}</Text>
       <View style={styles.content}>
         <TouchableOpacity style={styles.uploadBox} onPress={handleChooseImage}>
           {onboardingData.avatarUrl ? (
@@ -33,21 +35,21 @@ const UploadPhotoScreen = ({ navigation }) => {
           ) : (
             <>
               <Ionicons name="cloud-upload-outline" size={48} color="#6B7280" />
-              <Text style={styles.uploadText}>Tap to upload your photo</Text>
+              <Text style={styles.uploadText}>{t('onboarding_tap_upload_photo')}</Text>
             </>
           )}
         </TouchableOpacity>
         <View style={styles.buttonContainer}>
           <PrimaryButton
-            title="Continue"
+            title={t('btn_continue')}
             onPress={() => navigation.navigate('SetupProfile')}
           />
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.skipText}>Previous</Text>
+            <Text style={styles.skipText}>{t('btn_previous')}</Text>
           </TouchableOpacity>
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('SetupProfile')}>
-          <Text style={styles.skipText}>Skip for now</Text>
+          <Text style={styles.skipText}>{t('btn_skip')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

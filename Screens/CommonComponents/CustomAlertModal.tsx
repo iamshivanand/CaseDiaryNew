@@ -281,12 +281,12 @@ export const CustomAlertModal: React.FC = () => {
                   <Ionicons name={statusIconName as any} size={36} color={statusColor} />
                 </View>
 
-                {/* Title */}
-                <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
+                 {/* Title */}
+                <Text style={[styles.title, { fontFamily: theme.fonts.bold, color: theme.colors.text }]}>{title}</Text>
 
                 {/* Message */}
                 {message ? (
-                  <Text style={[styles.message, { color: theme.colors.textSecondary }]}>
+                  <Text style={[styles.message, { fontFamily: theme.fonts.regular, color: theme.colors.textSecondary }]}>
                     {message}
                   </Text>
                 ) : null}
@@ -297,6 +297,7 @@ export const CustomAlertModal: React.FC = () => {
                     style={[
                       styles.input,
                       {
+                        fontFamily: theme.fonts.regular,
                         color: theme.colors.text,
                         backgroundColor: theme.colors.inputBackground,
                         borderColor: theme.colors.border,

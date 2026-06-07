@@ -8,6 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
 import { ThemeContext } from "./Providers/ThemeProvider";
+import { useTranslation } from "./Providers/LanguageProvider";
 
 // Import Screens for Stacks
 import DashboardScreen from "./Screens/Dashboard/Dashboard";
@@ -28,6 +29,8 @@ import CalendarScreen from "./Screens/Calendar/Calendar";
 import ProfileScreen from "./Screens/ProfileScreen/Profile"; // Renamed import for clarity
 import SettingsScreen from "./Screens/Settings/SettingsScreen";
 import ManageLookupCategoryScreen from "./Screens/Settings/ManageLookupCategoryScreen";
+import ImportMigrationScreen from "./Screens/Onboarding/ImportMigrationScreen";
+import DuplicateReviewScreen from "./Screens/Onboarding/DuplicateReviewScreen";
 
 // Import ParamList types
 import {
@@ -118,6 +121,16 @@ const HomeStack = () => (
       component={DraftsHubScreen}
       options={{ title: "Drafts Hub" }}
     />
+    <HomeStackNav.Screen
+      name="ImportMigration"
+      component={ImportMigrationScreen}
+      options={{ title: "Import Data" }}
+    />
+    <HomeStackNav.Screen
+      name="DuplicateReview"
+      component={DuplicateReviewScreen}
+      options={{ title: "Resolve Duplicates" }}
+    />
   </HomeStackNav.Navigator>
 );
 
@@ -176,6 +189,16 @@ const ProfileStack = () => (
       component={ManageLookupCategoryScreen}
       options={({ route }) => ({ title: route.params.title || "Manage Category", headerShown: true })}
     />
+    <ProfileStackNav.Screen
+      name="ImportMigration"
+      component={ImportMigrationScreen}
+      options={{ headerShown: true, title: "Import Data" }}
+    />
+    <ProfileStackNav.Screen
+      name="DuplicateReview"
+      component={DuplicateReviewScreen}
+      options={{ headerShown: true, title: "Resolve Duplicates" }}
+    />
     {/* Add AccountDetails screens here */}
   </ProfileStackNav.Navigator>
 );
@@ -205,6 +228,7 @@ const TabIcon = ({ name, color, size, focused }: { name: string; color: string; 
 
 const Appro: React.FC = () => { // Props interface removed as it was empty
   const { theme } = useContext(ThemeContext);
+  const { t } = useTranslation();
   return (
     // View style={{ flex: 1 }} is important for the navigator to fill the space
     // Removed the ScrollView that was wrapping Tab.Navigator
@@ -278,10 +302,10 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
       }}
       >
         {/* Tab.Screen names now refer to routes in MainAppTabParamList */}
-        <Tab.Screen name="HomeTab" component={HomeStack} options={{ tabBarLabel: "Home" }} />
-        <Tab.Screen name="SearchTab" component={SearchStack} options={{ tabBarLabel: "Search" }} />
-        <Tab.Screen name="CalendarTab" component={CalendarStack} options={{ tabBarLabel: "Calendar" }} />
-        <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: "Profile" }} />
+        <Tab.Screen name="HomeTab" component={HomeStack} options={{ tabBarLabel: t("nav_home") }} />
+        <Tab.Screen name="SearchTab" component={SearchStack} options={{ tabBarLabel: t("nav_search") }} />
+        <Tab.Screen name="CalendarTab" component={CalendarStack} options={{ tabBarLabel: t("nav_calendar") }} />
+        <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t("nav_profile") }} />
       </Tab.Navigator>
     </View>
   );

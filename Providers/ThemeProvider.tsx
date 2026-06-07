@@ -17,6 +17,11 @@ export interface Theme {
     warning: string;
     danger: string;
   };
+  fonts: {
+    regular: string;
+    medium: string;
+    bold: string;
+  };
 }
 
 export type ThemeMode = "system" | "light" | "dark";
@@ -30,8 +35,8 @@ interface ThemeContextType {
 const lightTheme: Theme = {
   dark: false,
   colors: {
-    primary: "#6366F1", // Indigo
-    secondary: "#EC4899", // Pink
+    primary: "#1E3A8A", // Royal Sapphire Blue
+    secondary: "#D97706", // Champagne Gold
     background: "#F8FAFC", // Slate-50
     cardBackground: "#FFFFFF",
     inputBackground: "#F1F5F9", // Slate-100
@@ -42,13 +47,18 @@ const lightTheme: Theme = {
     warning: "#F59E0B",
     danger: "#EF4444",
   },
+  fonts: {
+    regular: "Inter_400Regular",
+    medium: "Inter_500Medium",
+    bold: "Inter_700Bold",
+  },
 };
 
 const darkTheme: Theme = {
   dark: true,
   colors: {
-    primary: "#818CF8", // Indigo-400
-    secondary: "#F472B6", // Pink-400
+    primary: "#3B82F6", // Electric Sapphire Blue
+    secondary: "#FBBF24", // Champagne Gold
     background: "#0F172A", // Slate-900
     cardBackground: "#1E293B", // Slate-800
     inputBackground: "#334155", // Slate-700
@@ -58,6 +68,11 @@ const darkTheme: Theme = {
     success: "#34D399",
     warning: "#FBBF24",
     danger: "#F87171",
+  },
+  fonts: {
+    regular: "Inter_400Regular",
+    medium: "Inter_500Medium",
+    bold: "Inter_700Bold",
   },
 };
 

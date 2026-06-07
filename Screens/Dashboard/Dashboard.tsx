@@ -5,11 +5,13 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { getDb, getUserProfile } from '../../DataBase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeContext } from '../../Providers/ThemeProvider';
+import { useTranslation } from '../../Providers/LanguageProvider';
 import { mapCaseDbToScreen } from '../../utils/caseMapper';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const WelcomeCard = () => {
   const { theme } = useContext(ThemeContext);
+  const { t } = useTranslation();
   const [userName, setUserName] = useState("User");
   const today = new Date();
   const formattedDate = format(today, "eeee, MMMM d, yyyy");
@@ -35,13 +37,13 @@ const WelcomeCard = () => {
   const getGreeting = () => {
     const hours = new Date().getHours();
     if (hours >= 5 && hours < 12) {
-      return { text: "Good morning", emoji: "☀️" };
+      return { text: t("dash_greeting_morning"), emoji: "☀️" };
     } else if (hours >= 12 && hours < 17) {
-      return { text: "Good afternoon", emoji: "🌤️" };
+      return { text: t("dash_greeting_afternoon"), emoji: "🌤️" };
     } else if (hours >= 17 && hours < 21) {
-      return { text: "Good evening", emoji: "🌆" };
+      return { text: t("dash_greeting_evening"), emoji: "🌆" };
     } else {
-      return { text: "Good night", emoji: "🌙" };
+      return { text: t("dash_greeting_evening"), emoji: "🌙" };
     }
   };
 
@@ -124,17 +126,18 @@ import SectionHeader from '../CommonComponents/SectionHeader';
 
 const QuickActionsGrid = () => {
   const navigation = useNavigation();
+  const { t } = useTranslation();
 
   return (
     <View>
-      <SectionHeader title="Quick Actions" />
+      <SectionHeader title={t("dash_quick_actions")} />
       <View style={styles.quickActionsContainer}>
-        <QuickActionButton icon="add-circle" text="Add New Case" onPress={() => navigation.navigate('AddCase' as any)} color="#00CC44" />
-        <QuickActionButton icon="folder-open" text="View All Cases" onPress={() => navigation.navigate('AllCases' as any)} color="#007BFF" />
-        <QuickActionButton icon="document-text" text="Draft Legal Doc" onPress={() => navigation.navigate('GenerateDocument' as any)} color="#8B5CF6" />
-        <QuickActionButton icon="briefcase" text="Drafts Hub" onPress={() => navigation.navigate('DraftsHub' as any)} color="#EC4899" />
-        <QuickActionButton icon="calendar" text="Yesterday's Cases" onPress={() => navigation.navigate('YesterdaysCases' as any)} color="#007BFF" />
-        <QuickActionButton icon="alert-circle" text="Undated Cases" onPress={() => navigation.navigate('UndatedCases' as any)} color="#FF6B00" />
+        <QuickActionButton icon="add-circle" text={t("dash_add_case")} onPress={() => navigation.navigate('AddCase' as any)} color="#00CC44" />
+        <QuickActionButton icon="folder-open" text={t("dash_view_all_cases")} onPress={() => navigation.navigate('AllCases' as any)} color="#007BFF" />
+        <QuickActionButton icon="document-text" text={t("dash_draft_docs")} onPress={() => navigation.navigate('GenerateDocument' as any)} color="#8B5CF6" />
+        <QuickActionButton icon="briefcase" text={t("dash_drafts_hub")} onPress={() => navigation.navigate('DraftsHub' as any)} color="#EC4899" />
+        <QuickActionButton icon="calendar" text={t("dash_yesterdays_cases")} onPress={() => navigation.navigate('YesterdaysCases' as any)} color="#007BFF" />
+        <QuickActionButton icon="alert-circle" text={t("dash_undated_cases")} onPress={() => navigation.navigate('UndatedCases' as any)} color="#FF6B00" />
       </View>
     </View>
   );
@@ -149,6 +152,7 @@ import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPop
 import { getCurrentUserId, formatDate } from '../../utils/commonFunctions';
 import { exportDailyCauseListToPdf } from '../../utils/pdfExporter';
 import { Alert } from 'react-native';
+import { useAdTrigger } from '../CommonComponents/AdManager';
 
 const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
   return (
@@ -163,9 +167,11 @@ const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
 
 const TodaysCasesSection = () => {
   const { theme } = useContext(ThemeContext);
+  const { t } = useTranslation();
   const [todaysCases, setTodaysCases] = useState<CaseDataScreen[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
+  const { showAdWithPreload } = useAdTrigger();
   const [isPopupVisible, setPopupVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
 
@@ -239,25 +245,33 @@ const TodaysCasesSection = () => {
       return;
     }
     try {
-      const todayStr = format(new Date(), "eeee, MMMM d, yyyy");
-      const allDbCases = await db.getCases();
-      const today = new Date().toISOString().split('T')[0];
-      const filteredDbCases = allDbCases.filter(c => {
-        if (!c.NextDate) return false;
-        const nextHearingDate = new Date(c.NextDate).toISOString().split('T')[0];
-        return nextHearingDate === today;
-      });
+      await showAdWithPreload("rewarded", async (success) => {
+        if (success) {
+          try {
+            const todayStr = format(new Date(), "eeee, MMMM d, yyyy");
+            const allDbCases = await db.getCases();
+            const today = new Date().toISOString().split('T')[0];
+            const filteredDbCases = allDbCases.filter(c => {
+              if (!c.NextDate) return false;
+              const nextHearingDate = new Date(c.NextDate).toISOString().split('T')[0];
+              return nextHearingDate === today;
+            });
 
-      await exportDailyCauseListToPdf(filteredDbCases, todayStr);
-    } catch (error) {
-      Alert.alert("Export Failed", "Could not compile the daily cause list PDF.");
+            await exportDailyCauseListToPdf(filteredDbCases, todayStr);
+          } catch (error) {
+            Alert.alert("Export Failed", "Could not compile the daily cause list PDF.");
+          }
+        }
+      });
+    } catch (adError) {
+      console.warn("Ad preloading or display encountered an error:", adError);
     }
   };
 
   return (
     <View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 8 }}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 0, marginBottom: 0 }]}>Today's Cases</Text>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 0, marginBottom: 0 }]}>{t("dash_todays_cases")}</Text>
         {todaysCases.length > 0 && (
           <TouchableOpacity 
             onPress={handleShareCauseList}
@@ -277,7 +291,7 @@ const TodaysCasesSection = () => {
             }}
           >
             <Ionicons name="share-social" size={16} color="#FFF" style={{ marginRight: 4 }} />
-            <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>Share List</Text>
+            <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>{t("dash_share_list")}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -304,7 +318,7 @@ const TodaysCasesSection = () => {
         }}>
           <Ionicons name="calendar-outline" size={40} color={theme.colors.textSecondary} style={{ marginBottom: 8, opacity: 0.6 }} />
           <Text style={{ color: theme.colors.textSecondary, textAlign: 'center', fontSize: 15, fontWeight: '500' }}>
-            No cases scheduled for today.
+            {t("dash_no_cases")}
           </Text>
         </View>
       )}

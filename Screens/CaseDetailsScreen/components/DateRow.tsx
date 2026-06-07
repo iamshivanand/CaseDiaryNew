@@ -4,7 +4,8 @@ import { View, Text } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { getDateRowStyles } from './DateRowStyle'; // Import function
 import { ThemeContext } from '../../../Providers/ThemeProvider'; // Adjust path
-import { format, parseISO, isValid } from 'date-fns';
+import { parseISO, isValid } from 'date-fns';
+import { useTranslation } from '../../../Providers/LanguageProvider';
 
 interface DateRowProps {
   label: string;
@@ -14,6 +15,7 @@ interface DateRowProps {
 
 const DateRow: React.FC<DateRowProps> = ({ label, dateString, iconName }) => {
   const { theme } = useContext(ThemeContext); // Get theme
+  const { locale } = useTranslation();
   const styles = getDateRowStyles(theme); // Generate styles
 
   let displayDate = 'N/A';
@@ -23,7 +25,11 @@ const DateRow: React.FC<DateRowProps> = ({ label, dateString, iconName }) => {
     try {
       const dateObj = parseISO(dateString);
       if (isValid(dateObj)) {
-        displayDate = format(dateObj, 'MMMM dd, yyyy');
+        displayDate = dateObj.toLocaleDateString(locale === 'hi' ? 'hi-IN' : 'en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
         valueStyle = styles.value;
       } else {
         displayDate = dateString;

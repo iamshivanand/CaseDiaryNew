@@ -4,7 +4,8 @@ import { View, Text } from 'react-native';
 import { getTimelineEventItemStyles } from './TimelineEventItemStyle'; // Import function
 import { ThemeContext } from '../../../Providers/ThemeProvider'; // Adjust path
 import { TimelineEvent } from '../../../Types/appTypes';
-import { format, parseISO, isValid } from 'date-fns';
+import { parseISO, isValid } from 'date-fns';
+import { useTranslation } from '../../../Providers/LanguageProvider';
 
 interface TimelineEventItemProps {
   event: TimelineEvent;
@@ -13,14 +14,21 @@ interface TimelineEventItemProps {
 
 const TimelineEventItem: React.FC<TimelineEventItemProps> = ({ event, isLastItem = false }) => {
   const { theme } = useContext(ThemeContext); // Get theme
+  const { t, locale } = useTranslation();
   const styles = getTimelineEventItemStyles(theme); // Generate styles
   const formattedDate = () => {
     if (typeof event.date !== 'string' || !event.date) {
-      return 'Date N/A';
+      return t('timeline_date_na');
     }
     try {
       const dateObj = parseISO(event.date);
-      return isValid(dateObj) ? format(dateObj, "MMMM dd, yyyy") : event.date;
+      return isValid(dateObj)
+        ? dateObj.toLocaleDateString(locale === 'hi' ? 'hi-IN' : 'en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })
+        : event.date;
     } catch (e) {
       return event.date;
     }
@@ -34,7 +42,7 @@ const TimelineEventItem: React.FC<TimelineEventItemProps> = ({ event, isLastItem
       </View>
       <View style={styles.contentBox}>
         <Text style={styles.dateText}>{formattedDate()}</Text>
-        <Text style={styles.descriptionText}>{event.description || 'No description provided.'}</Text>
+        <Text style={styles.descriptionText}>{event.description || t('timeline_no_desc')}</Text>
       </View>
     </View>
   );

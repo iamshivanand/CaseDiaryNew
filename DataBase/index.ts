@@ -444,7 +444,52 @@ export const addUser = async (name: string, email: string): Promise<number | nul
     }
 };
 
-// Ensure other specific lookup CRUDs like getDistricts, getPoliceStations are also defined or imported if used by getSuggestionsForField
-// Placeholder for getDistricts and getPoliceStations if they were removed and are needed by getSuggestionsForField
-export const getDistricts = async (userId?: number | null): Promise<District[]> => { /* ... implementation ... */ return []; };
-export const getPoliceStations = async (districtId?: number | null, userId?: number | null): Promise<PoliceStation[]> => { /* ... implementation ... */ return []; };
+export const addDistrict = async (name: string, state?: string, userId?: number | null): Promise<number | null> => {
+  const db = await getDb();
+  if (!name || name.trim() === "") throw new Error("District name cannot be empty.");
+  const result = await db.runAsync(
+    "INSERT OR IGNORE INTO Districts (name, state, user_id) VALUES (?, ?, ?)",
+    [name.trim(), state ?? null, userId ?? null]
+  );
+  return result.lastInsertRowId;
+};
+
+export const getDistricts = async (userId?: number | null): Promise<District[]> => {
+  const db = await getDb();
+  let query = "SELECT * FROM Districts WHERE user_id IS NULL";
+  const params: any[] = [];
+  if (userId != null) {
+    query += " OR user_id = ?";
+    params.push(userId);
+  }
+  query += " ORDER BY name ASC";
+  return db.getAllAsync<District>(query, params);
+};
+
+export const addPoliceStation = async (name: string, districtId?: number | null, userId?: number | null): Promise<number | null> => {
+  const db = await getDb();
+  if (!name || name.trim() === "") throw new Error("Police station name cannot be empty.");
+  const result = await db.runAsync(
+    "INSERT OR IGNORE INTO PoliceStations (name, district_id, user_id) VALUES (?, ?, ?)",
+    [name.trim(), districtId ?? null, userId ?? null]
+  );
+  return result.lastInsertRowId;
+};
+
+export const getPoliceStations = async (districtId?: number | null, userId?: number | null): Promise<PoliceStation[]> => {
+  const db = await getDb();
+  let query = "SELECT * FROM PoliceStations WHERE (user_id IS NULL";
+  const params: any[] = [];
+  if (userId != null) {
+    query += " OR user_id = ?";
+    params.push(userId);
+  }
+  query += ")";
+  if (districtId != null) {
+    query += " AND district_id = ?";
+    params.push(districtId);
+  }
+  query += " ORDER BY name ASC";
+  return db.getAllAsync<PoliceStation>(query, params);
+};
+

@@ -2,6 +2,7 @@ import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import AddCase from '../AddCase';
 import * as db from '../../../DataBase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 jest.mock('../../../DataBase', () => ({
   ...jest.requireActual('../../../DataBase'),
@@ -116,5 +117,16 @@ describe('AddCase', () => {
       expect((await findAllByText('Select Case Type...')).length).toBe(1);
       expect((await findAllByText('Select Court...')).length).toBe(1);
     });
+  });
+
+  it('should show the lock modal when case action count reaches 10', async () => {
+    const getItemSpy = jest.spyOn(AsyncStorage, 'getItem').mockImplementation((key) => {
+      if (key === '@cases_edit_add_count') return Promise.resolve('10');
+      return Promise.resolve(null);
+    });
+    const { findByText } = render(<AddCase route={{ params: {} }} />);
+    const lockTitle = await findByText('Case Action Limit Reached');
+    expect(lockTitle).toBeTruthy();
+    getItemSpy.mockRestore();
   });
 });
