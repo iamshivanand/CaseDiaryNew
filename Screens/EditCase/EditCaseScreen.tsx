@@ -102,23 +102,32 @@ const EditCaseScreen: React.FC = () => {
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
   const [policeStationOptions, setPoliceStationOptions] = useState<DropdownOption[]>([]);
+  const [districtOptions, setDistrictOptions] = useState<DropdownOption[]>([]);
+  const [otherDistrict, setOtherDistrict] = useState("");
+  const [otherPoliceStation, setOtherPoliceStation] = useState("");
 
-  useEffect(() => {
-    const fetchPoliceStations = async () => {
-      try {
-        const psList = await db.getPoliceStations(null, null);
-        const formatted = psList.map(ps => ({
-          label: ps.name,
-          value: ps.id
-        }));
-        formatted.push({ label: "Other", value: "Other" });
-        setPoliceStationOptions(formatted);
-      } catch (error) {
-        console.error("Error fetching police stations:", error);
+  const handleDistrictChange = async (districtId: any) => {
+    try {
+      if (!districtId) {
+        setPoliceStationOptions([{ label: "Other", value: "Other" }]);
+        return;
       }
-    };
-    fetchPoliceStations();
-  }, []);
+      let psList = [];
+      if (districtId === 'Other') {
+        psList = await db.getPoliceStations(null, null);
+      } else {
+        psList = await db.getPoliceStations(Number(districtId), null);
+      }
+      const formatted = psList.map(ps => ({
+        label: ps.name,
+        value: ps.id
+      }));
+      formatted.push({ label: "Other", value: "Other" });
+      setPoliceStationOptions(formatted);
+    } catch (error) {
+      console.error("Error fetching filtered police stations:", error);
+    }
+  };
 
   const mapDbCaseToFormState = (dbCase: CaseWithDetails): Partial<CaseData> => {
     return {
@@ -222,7 +231,42 @@ const EditCaseScreen: React.FC = () => {
       try {
         const fetchedCase = await db.getCaseById(caseIdToLoad);
         if (fetchedCase) {
-          setCaseData(mapDbCaseToFormState(fetchedCase));
+          // Fetch districts
+          try {
+            const districtsList = await db.getDistricts(null);
+            const formattedDistricts = districtsList.map(d => ({
+              label: d.name,
+              value: d.id
+            }));
+            formattedDistricts.push({ label: "Other", value: "Other" });
+            setDistrictOptions(formattedDistricts);
+          } catch (error) {
+            console.error("Error fetching districts:", error);
+          }
+
+          // Resolve initial district of the case's police station
+          let initialDistrictId = null;
+          if (fetchedCase.police_station_id) {
+            try {
+              const dbInstance = await db.getDb();
+              const psRow = await dbInstance.getFirstAsync<{ district_id: number | null }>(
+                "SELECT district_id FROM PoliceStations WHERE id = ?",
+                [fetchedCase.police_station_id]
+              );
+              if (psRow && psRow.district_id) {
+                initialDistrictId = psRow.district_id;
+              }
+            } catch (e) {
+              console.error("Error resolving initial district:", e);
+            }
+          }
+
+          const mappedState = mapDbCaseToFormState(fetchedCase);
+          mappedState.district_id = initialDistrictId || "";
+          setCaseData(mappedState);
+
+          await handleDistrictChange(initialDistrictId);
+
           navigation.setOptions({
             title: `${t("editcase_header_edit")}: ${fetchedCase.CaseTitle || "Case"}`,
           });
@@ -272,6 +316,30 @@ const EditCaseScreen: React.FC = () => {
       const caseTypeNameForDb =
         selectedCaseTypeOption?.label || caseData.case_type_name || null;
 
+      let districtId = caseData.district_id || null;
+      if (districtId === "Other") {
+        if (otherDistrict.trim()) {
+          const newId = await db.addDistrict(otherDistrict.trim());
+          districtId = newId;
+        } else {
+          districtId = null;
+        }
+      } else {
+        districtId = districtId ? Number(districtId) : null;
+      }
+
+      let policeStationId = caseData.police_station_id || null;
+      if (policeStationId === "Other") {
+        if (otherPoliceStation.trim()) {
+          const newId = await db.addPoliceStation(otherPoliceStation.trim(), districtId);
+          policeStationId = newId;
+        } else {
+          policeStationId = null;
+        }
+      } else {
+        policeStationId = policeStationId ? Number(policeStationId) : null;
+      }
+
       const updatePayload: db.CaseUpdateData = {
         /* ... (map all caseData fields to CaseUpdateData as before, including new ones) ... */
         CaseTitle: caseData.CaseTitle,
@@ -297,7 +365,7 @@ const EditCaseScreen: React.FC = () => {
         ClientContactNumber: caseData.ClientContactNumber,
         Accussed: caseData.Accussed,
         Undersection: caseData.Undersection,
-        police_station_id: caseData.police_station_id || null,
+        police_station_id: policeStationId,
         OppAdvocateContactNumber: caseData.OppAdvocateContactNumber,
         PreviousDate: caseData.PreviousDate,
         CaseDescription: caseData.CaseDescription,
@@ -708,12 +776,24 @@ const EditCaseScreen: React.FC = () => {
             onChangeText={(text) => handleInputChange("Undersection", text)}
           />
           <DropdownPicker
+            label={t("field_district")}
+            selectedValue={caseData.district_id || ""}
+            onValueChange={async (val) => {
+              handleInputChange("district_id", val);
+              handleInputChange("police_station_id", "");
+              await handleDistrictChange(val);
+            }}
+            options={getTranslatedOptions(districtOptions)}
+            onOtherValueChange={(text) => setOtherDistrict(text)}
+          />
+          <DropdownPicker
             label={t("field_police_station")}
             selectedValue={caseData.police_station_id || ""}
             onValueChange={(val) =>
-              handleInputChange("police_station_id", val as number)
+              handleInputChange("police_station_id", val)
             }
             options={getTranslatedOptions(policeStationOptions)}
+            onOtherValueChange={(text) => setOtherPoliceStation(text)}
           />
           <DatePickerField
             label={t("field_filed_date")}

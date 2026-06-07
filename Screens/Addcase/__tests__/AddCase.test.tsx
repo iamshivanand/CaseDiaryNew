@@ -8,6 +8,9 @@ jest.mock('../../../DataBase', () => ({
   ...jest.requireActual('../../../DataBase'),
   addCase: jest.fn(() => Promise.resolve(1)),
   addCaseType: jest.fn(() => Promise.resolve(1)),
+  addDistrict: jest.fn(() => Promise.resolve(1)),
+  getDistricts: jest.fn(() => Promise.resolve([{ id: 1, name: 'Test District', state: 'Test State' }])),
+  getPoliceStations: jest.fn(() => Promise.resolve([{ id: 1, name: 'Test Police Station', district_id: 1 }])),
   getSuggestionsForField: jest.fn((field) => {
     if (field === 'JudgeName') {
       return Promise.resolve([{ id: 1, name: 'Test Judge' }]);
@@ -53,6 +56,7 @@ describe('AddCase', () => {
     expect(getByText('Client Contact No.')).toBeTruthy();
     expect(getByText('Accused')).toBeTruthy();
     expect(getByText('Under Section(s)')).toBeTruthy();
+    expect(getByText('District')).toBeTruthy();
     expect(getByText('Case Description')).toBeTruthy();
     expect(getByText('Internal Notes')).toBeTruthy();
   });

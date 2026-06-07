@@ -37,6 +37,7 @@ export interface CaseData {
 
   // Legal Details from schema.ts or common requirements
   Undersection?: string | null;
+  district_id?: number | string | null; // UI helper field to select District
   police_station_id?: number | null; // FK to PoliceStations
 
   // Opposition Details from schema.ts or common requirements
