@@ -68,6 +68,8 @@ export interface CaseData {
   // Fields for denormalized data / display purposes (populated from lookups or joins)
   court_name?: string | null; // Mapped from CaseDetails.court
   case_type_name?: string | null; // Mapped from CaseDetails.caseType
+  districtName?: string | null;
+  policeStationName?: string | null;
 
   // To hold actual Document and TimelineEvent arrays for EditCaseScreen
   documents?: Document[];

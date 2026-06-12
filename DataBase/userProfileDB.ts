@@ -60,7 +60,7 @@ export const updateUserProfile = async (
   const fullName = profileData.fullName || profileData.name;
   const email = profileData.email || (profileData.contactInfo ? profileData.contactInfo.email : "");
   const phone = profileData.phone || (profileData.contactInfo ? profileData.contactInfo.phone : "");
-  const address = profileData.address || (profileData.contactInfo ? profileData.contactInfo.address : "");
+  const address = profileData.address || profileData.location || (profileData.contactInfo ? profileData.contactInfo.address : "");
   const experience = profileData.experience !== undefined 
     ? profileData.experience 
     : (profileData.stats && profileData.stats.yearsOfPractice !== undefined ? profileData.stats.yearsOfPractice : 0);

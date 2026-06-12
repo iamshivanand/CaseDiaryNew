@@ -435,6 +435,34 @@ const CaseDetailsScreen: React.FC = () => {
                 <Text style={styles.detailValue}>{caseDetails.case_type_name || 'N/A'}</Text>
               </View>
               <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t("field_cnr_number")}:</Text>
+                <Text style={styles.detailValue}>{caseDetails.CNRNumber || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t("field_crime_number")}:</Text>
+                <Text style={styles.detailValue}>{caseDetails.crime_number || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t("field_crime_year")}:</Text>
+                <Text style={styles.detailValue}>{caseDetails.crime_year || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t("field_district")}:</Text>
+                <Text style={styles.detailValue}>{caseDetails.districtName || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t("field_police_station")}:</Text>
+                <Text style={styles.detailValue}>{caseDetails.policeStationName || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t("field_filed_date")}:</Text>
+                <Text style={styles.detailValue}>{caseDetails.dateFiled ? formatDate(new Date(caseDetails.dateFiled)) : 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t("field_judge_name")}:</Text>
+                <Text style={styles.detailValue}>{caseDetails.JudgeName || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>{t("field_on_behalf_of")}:</Text>
                 <Text style={styles.detailValue}>{caseDetails.OnBehalfOf || 'N/A'}</Text>
               </View>
@@ -454,6 +482,24 @@ const CaseDetailsScreen: React.FC = () => {
                 <Text style={styles.detailLabel}>{t("field_under_section")}:</Text>
                 <Text style={styles.detailValue}>{caseDetails.Undersection || 'N/A'}</Text>
               </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t("field_opposing_counsel")}:</Text>
+                <Text style={styles.detailValue}>{caseDetails.OpposingCounsel || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t("field_client_contact")}:</Text>
+                <Text style={styles.detailValue}>{caseDetails.ClientContactNumber || 'N/A'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t("field_statute_of_limitations")}:</Text>
+                <Text style={styles.detailValue}>{caseDetails.StatuteOfLimitations ? formatDate(new Date(caseDetails.StatuteOfLimitations)) : 'N/A'}</Text>
+              </View>
+              {caseDetails.CaseStatus === "Closed" && caseDetails.ClosedDate && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>{t("field_date_closed")}:</Text>
+                  <Text style={styles.detailValue}>{formatDate(new Date(caseDetails.ClosedDate))}</Text>
+                </View>
+              )}
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>{t("field_priority")}:</Text>
                 <Text style={styles.detailValue}>{getTranslatedPriority(caseDetails.Priority)}</Text>

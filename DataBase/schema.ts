@@ -1,22 +1,8 @@
 // DataBase/schema.ts
 
 import * as SQLite from 'expo-sqlite';
-
-// --- Seeding Initial Data Constants ---
-// Moved here from DataBase/index.ts to be co-located with seedInitialData function
-const PREDEFINED_DISTRICTS: Array<Omit<District, 'id' | 'user_id'>> = [
-  { name: 'Bareilly', state: 'Uttar Pradesh' },
-  { name: 'Lucknow', state: 'Uttar Pradesh' },
-  { name: 'Mumbai City', state: 'Maharashtra' },
-  { name: 'South Delhi', state: 'Delhi' },
-  { name: 'North Goa', state: 'Goa' },
-  { name: 'Jaipur', state: 'Rajasthan' },
-  { name: 'Patna', state: 'Bihar' },
-  { name: 'Kolkata', state: 'West Bengal' },
-  { name: 'Chennai', state: 'Tamil Nadu' },
-  { name: 'Bangalore Urban', state: 'Karnataka' },
-  // Add more as needed
-];
+import statesAndDistrictsData from '../assets/states-and-districts.json';
+import policeStationsData from '../assets/police-stations.json';
 
 const PREDEFINED_CASE_TYPES: Array<Omit<CaseType, 'id' | 'user_id'>> = [
   { name: 'Civil' },
@@ -378,19 +364,58 @@ export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> 
 
   // Seed Districts
   try {
-    for (const district of PREDEFINED_DISTRICTS) {
-      // Using INSERT OR IGNORE to avoid errors if data already exists.
-      // Adjust unique constraints in table DDL if simple name uniqueness is desired for global items.
-      // Current DDL has UNIQUE (name, state, user_id), so user_id NULL means unique by name+state.
-      await db.runAsync(
-        "INSERT OR IGNORE INTO Districts (name, state, user_id) VALUES (?, ?, NULL)",
-        [district.name, district.state]
-      );
-    }
+    await db.withTransactionAsync(async () => {
+      for (const stateObj of statesAndDistrictsData.states) {
+        for (const distName of stateObj.districts) {
+          await db.runAsync(
+            "INSERT OR IGNORE INTO Districts (name, state, user_id) VALUES (?, ?, NULL)",
+            [distName.trim(), stateObj.state.trim()]
+          );
+        }
+      }
+    });
     console.log("Predefined districts seeded or already exist.");
   } catch (error) {
     console.error("Error seeding predefined districts:", error);
     // Decide if you want to throw, or just log and continue
+  }
+
+  // Seed Police Stations for Delhi, Maharashtra, and Uttar Pradesh
+  try {
+    const targetStates = ["Delhi (NCT)", "Maharashtra", "Uttar Pradesh"];
+    await db.withTransactionAsync(async () => {
+      const districts = await db.getAllAsync<{ id: number; name: string; state: string }>(
+        "SELECT id, name, state FROM Districts WHERE state IN (?, ?, ?)",
+        targetStates
+      );
+
+      const mappings = (policeStationsData.mappings || {}) as Record<string, string[]>;
+
+      for (const dist of districts) {
+        let stations: string[] = [];
+        if (mappings[dist.name]) {
+          stations = mappings[dist.name];
+        } else {
+          const isMaharashtra = dist.state === "Maharashtra";
+          const cityOrKotwali = isMaharashtra ? "City" : "Kotwali";
+          stations = [
+            `${dist.name} Sadar Police Station`,
+            `${dist.name} ${cityOrKotwali} Police Station`,
+            `${dist.name} Mahila Police Station`
+          ];
+        }
+
+        for (const psName of stations) {
+          await db.runAsync(
+            "INSERT OR IGNORE INTO PoliceStations (name, district_id, user_id) VALUES (?, ?, NULL)",
+            [psName.trim(), dist.id]
+          );
+        }
+      }
+    });
+    console.log("Predefined police stations seeded or already exist.");
+  } catch (error) {
+    console.error("Error seeding predefined police stations:", error);
   }
 
   // Seed Case Types

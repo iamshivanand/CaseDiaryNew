@@ -103,7 +103,7 @@ describe('AddCase', () => {
     fireEvent.changeText(caseTitleInput, 'Test Case');
     fireEvent.press(saveButton);
     await waitFor(() => {
-      expect(db.addCaseType).toHaveBeenCalledWith('New Case Type');
+      expect(db.addCaseType).toHaveBeenCalledWith('New Case Type', null);
     });
   });
 

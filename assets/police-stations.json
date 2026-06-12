@@ -1,0 +1,151 @@
+{
+  "mappings": {
+    "Mumbai City": [
+      "Colaba Police Station",
+      "Marine Drive Police Station",
+      "CST Police Station",
+      "Malabar Hill Police Station",
+      "Byculla Police Station",
+      "Worli Police Station",
+      "Dadar Police Station"
+    ],
+    "Mumbai Suburban": [
+      "Bandra Police Station",
+      "Andheri Police Station",
+      "Juhu Police Station",
+      "Borivali Police Station",
+      "Ghatkopar Police Station",
+      "Kurla Police Station",
+      "Chembur Police Station"
+    ],
+    "Pune": [
+      "Shivaji Nagar Police Station",
+      "Deccan Gymkhana Police Station",
+      "Koregaon Park Police Station",
+      "Bund Garden Police Station",
+      "Yerwada Police Station",
+      "Kothrud Police Station",
+      "Hadapsar Police Station",
+      "Hinjewadi Police Station",
+      "Pimpri Police Station",
+      "Chinchwad Police Station"
+    ],
+    "Thane": [
+      "Thane Nagar Police Station",
+      "Naupada Police Station",
+      "Kopri Police Station",
+      "Kalwa Police Station",
+      "Wagle Estate Police Station",
+      "Rabodi Police Station",
+      "Mumbra Police Station"
+    ],
+    "Nagpur": [
+      "Sitabuldi Police Station",
+      "Sadar Police Station",
+      "Gittikhadan Police Station",
+      "Dhantoli Police Station",
+      "Ambazari Police Station",
+      "Sonegaon Police Station",
+      "Pratap Nagar Police Station"
+    ],
+    "New Delhi": [
+      "Connaught Place Police Station",
+      "Parliament Street Police Station",
+      "Chanakyapuri Police Station",
+      "Tughlak Road Police Station",
+      "Mandir Marg Police Station"
+    ],
+    "Central Delhi": [
+      "Daryaganj Police Station",
+      "Chandni Chowk Police Station",
+      "Karol Bagh Police Station",
+      "Pahar Ganj Police Station",
+      "Nabi Karim Police Station"
+    ],
+    "South Delhi": [
+      "Hauz Khas Police Station",
+      "Saket Police Station",
+      "Malviya Nagar Police Station",
+      "Mehrauli Police Station",
+      "Safdarjung Enclave Police Station",
+      "Vasant Vihar Police Station"
+    ],
+    "West Delhi": [
+      "Rajouri Garden Police Station",
+      "Janakpuri Police Station",
+      "Tilak Nagar Police Station",
+      "Hari Nagar Police Station",
+      "Kirti Nagar Police Station"
+    ],
+    "Lucknow": [
+      "Hazratganj Police Station",
+      "Aliganj Police Station",
+      "Gomti Nagar Police Station",
+      "Aminabad Police Station",
+      "Kaiserbagh Police Station",
+      "Chowk Police Station",
+      "Mahanagar Police Station",
+      "Indiranagar Police Station"
+    ],
+    "Bareilly": [
+      "Kotwali Police Station",
+      "Cantonment Police Station",
+      "Baradari Police Station",
+      "Prem Nagar Police Station",
+      "Subhash Nagar Police Station",
+      "Qila Police Station",
+      "Izzatnagar Police Station"
+    ],
+    "Gautam Buddha Nagar": [
+      "Sector 20 Police Station",
+      "Sector 39 Police Station",
+      "Sector 58 Police Station",
+      "Sector 49 Police Station",
+      "Sector 24 Police Station",
+      "Sector 126 Police Station",
+      "Expressway Police Station"
+    ],
+    "Ghaziabad": [
+      "Kavi Nagar Police Station",
+      "Indirapuram Police Station",
+      "Sahibabad Police Station",
+      "Link Road Police Station",
+      "Kotwali Police Station",
+      "Sihani Gate Police Station"
+    ],
+    "Kanpur Nagar": [
+      "Kotwali Police Station",
+      "Kalyanpur Police Station",
+      "Swaroop Nagar Police Station",
+      "Govind Nagar Police Station",
+      "Cantonment Police Station",
+      "Chakeri Police Station",
+      "Barra Police Station"
+    ],
+    "Agra": [
+      "Hariparwat Police Station",
+      "Sadar Bazar Police Station",
+      "Tajganj Police Station",
+      "Lohamandi Police Station",
+      "Rakabganj Police Station",
+      "Shahganj Police Station",
+      "Kamla Nagar Police Station"
+    ],
+    "Varanasi": [
+      "Cantonment Police Station",
+      "Sigra Police Station",
+      "Bhelupur Police Station",
+      "Kotwali Police Station",
+      "Dashashwamedh Police Station",
+      "Chetganj Police Station",
+      "Lanka Police Station"
+    ],
+    "Allahabad": [
+      "Civil Lines Police Station",
+      "Cantonment Police Station",
+      "George Town Police Station",
+      "Kotwali Police Station",
+      "Colonelganj Police Station"
+    ]
+  }
+}

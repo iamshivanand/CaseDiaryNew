@@ -15,9 +15,11 @@ import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as db from "../../DataBase";
+import { getUserState } from "../../utils/locationService";
 import { v4 as uuidv4 } from "uuid";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider"; // Import ThemeContext and Theme type
 import { useTranslation } from "../../Providers/LanguageProvider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { getEditCaseScreenStyles } from "./EditCaseScreenStyle"; // Import the function
 import FormInput from "../CommonComponents/FormInput";
@@ -105,18 +107,24 @@ const EditCaseScreen: React.FC = () => {
   const [districtOptions, setDistrictOptions] = useState<DropdownOption[]>([]);
   const [otherDistrict, setOtherDistrict] = useState("");
   const [otherPoliceStation, setOtherPoliceStation] = useState("");
+  const [courtOptions, setCourtOptions] = useState<DropdownOption[]>([]);
+  const [caseTypeOptions, setCaseTypeOptions] = useState<DropdownOption[]>([]);
+  const [otherCourt, setOtherCourt] = useState("");
+  const [otherCaseType, setOtherCaseType] = useState("");
+  const [userId, setUserId] = useState<number | null>(null);
 
-  const handleDistrictChange = async (districtId: any) => {
+  const handleDistrictChange = async (districtId: any, activeUserId?: number | null) => {
     try {
       if (!districtId) {
         setPoliceStationOptions([{ label: "Other", value: "Other" }]);
         return;
       }
+      const uId = activeUserId !== undefined ? activeUserId : userId;
       let psList = [];
       if (districtId === 'Other') {
-        psList = await db.getPoliceStations(null, null);
+        psList = await db.getPoliceStations(null, uId);
       } else {
-        psList = await db.getPoliceStations(Number(districtId), null);
+        psList = await db.getPoliceStations(Number(districtId), uId);
       }
       const formatted = psList.map(ps => ({
         label: ps.name,
@@ -164,6 +172,8 @@ const EditCaseScreen: React.FC = () => {
       PreviousDate: dbCase.PreviousDate,
       CaseDescription: dbCase.CaseDescription,
       CaseNotes: dbCase.CaseNotes,
+      crime_number: dbCase.crime_number || "",
+      crime_year: dbCase.crime_year !== undefined && dbCase.crime_year !== null ? dbCase.crime_year.toString() : "",
     };
   };
 
@@ -231,9 +241,51 @@ const EditCaseScreen: React.FC = () => {
       try {
         const fetchedCase = await db.getCaseById(caseIdToLoad);
         if (fetchedCase) {
+          // Retrieve userId
+          let activeUserId = null;
+          try {
+            const userIdVal = await AsyncStorage.getItem('@user_id');
+            activeUserId = userIdVal ? parseInt(userIdVal, 10) : null;
+            setUserId(activeUserId);
+          } catch (e) {
+            console.error("Error retrieving userId:", e);
+          }
+
+          // Fetch Case Types
+          try {
+            const caseTypesList = await db.getCaseTypes(activeUserId);
+            const formattedCaseTypes = caseTypesList.map(ct => ({ label: ct.name, value: ct.id }));
+            formattedCaseTypes.push({ label: "Other", value: "Other" });
+            setCaseTypeOptions(formattedCaseTypes);
+          } catch (error) {
+            console.error("Error fetching case types:", error);
+            const formattedFallback = dummyCaseTypeOptions.filter(o => o.value !== "");
+            setCaseTypeOptions(formattedFallback);
+          }
+
+          // Fetch Courts
+          try {
+            const courtsList = await db.getCourts(activeUserId);
+            const formattedCourts = courtsList.map(c => ({ label: c.name, value: c.id }));
+            formattedCourts.push({ label: "Other", value: "Other" });
+            setCourtOptions(formattedCourts);
+          } catch (error) {
+            console.error("Error fetching courts:", error);
+            const formattedFallback = dummyCourtOptions.filter(o => o.value !== "");
+            setCourtOptions(formattedFallback);
+          }
+
           // Fetch districts
           try {
-            const districtsList = await db.getDistricts(null);
+            const userState = await getUserState();
+            console.log("Detected user state for EditCase:", userState);
+            let districtsList = [];
+            if (userState) {
+              districtsList = await db.getDistricts(activeUserId, userState);
+            }
+            if (districtsList.length === 0) {
+              districtsList = await db.getDistricts(activeUserId);
+            }
             const formattedDistricts = districtsList.map(d => ({
               label: d.name,
               value: d.id
@@ -265,7 +317,7 @@ const EditCaseScreen: React.FC = () => {
           mappedState.district_id = initialDistrictId || "";
           setCaseData(mappedState);
 
-          await handleDistrictChange(initialDistrictId);
+          await handleDistrictChange(initialDistrictId, activeUserId);
 
           navigation.setOptions({
             title: `${t("editcase_header_edit")}: ${fetchedCase.CaseTitle || "Case"}`,
@@ -304,22 +356,49 @@ const EditCaseScreen: React.FC = () => {
     }
     setIsSaving(true);
     let overallSuccess = true;
+    const crimeNo = caseData.crime_number && caseData.crime_number.trim() ? caseData.crime_number.trim() : null;
+    const crimeYr = caseData.crime_year && caseData.crime_year.toString().trim() ? parseInt(caseData.crime_year.toString().trim(), 10) : null;
     try {
-      const selectedCourtOption = dummyCourtOptions.find(
-        (opt) => opt.value === caseData.court_id
-      );
-      const courtNameForDb =
-        selectedCourtOption?.label || caseData.court_name || null;
-      const selectedCaseTypeOption = dummyCaseTypeOptions.find(
-        (opt) => opt.value === caseData.case_type_id
-      );
-      const caseTypeNameForDb =
-        selectedCaseTypeOption?.label || caseData.case_type_name || null;
+      let courtId = caseData.court_id || null;
+      let courtNameForDb = caseData.court_name || null;
+      if (courtId === "Other") {
+        if (otherCourt.trim()) {
+          const newId = await db.addCourt(otherCourt.trim(), userId);
+          courtId = newId;
+          courtNameForDb = otherCourt.trim();
+        } else {
+          courtId = null;
+        }
+      } else {
+        courtId = courtId ? Number(courtId) : null;
+        const selectedCourtOption = courtOptions.find(
+          (opt) => opt.value === courtId
+        );
+        courtNameForDb = selectedCourtOption?.label || caseData.court_name || null;
+      }
+
+      let caseTypeId = caseData.case_type_id || null;
+      let caseTypeNameForDb = caseData.case_type_name || null;
+      if (caseTypeId === "Other") {
+        if (otherCaseType.trim()) {
+          const newId = await db.addCaseType(otherCaseType.trim(), userId);
+          caseTypeId = newId;
+          caseTypeNameForDb = otherCaseType.trim();
+        } else {
+          caseTypeId = null;
+        }
+      } else {
+        caseTypeId = caseTypeId ? Number(caseTypeId) : null;
+        const selectedCaseTypeOption = caseTypeOptions.find(
+          (opt) => opt.value === caseTypeId
+        );
+        caseTypeNameForDb = selectedCaseTypeOption?.label || caseData.case_type_name || null;
+      }
 
       let districtId = caseData.district_id || null;
       if (districtId === "Other") {
         if (otherDistrict.trim()) {
-          const newId = await db.addDistrict(otherDistrict.trim());
+          const newId = await db.addDistrict(otherDistrict.trim(), null, userId);
           districtId = newId;
         } else {
           districtId = null;
@@ -331,7 +410,7 @@ const EditCaseScreen: React.FC = () => {
       let policeStationId = caseData.police_station_id || null;
       if (policeStationId === "Other") {
         if (otherPoliceStation.trim()) {
-          const newId = await db.addPoliceStation(otherPoliceStation.trim(), districtId);
+          const newId = await db.addPoliceStation(otherPoliceStation.trim(), districtId, userId);
           policeStationId = newId;
         } else {
           policeStationId = null;
@@ -341,15 +420,14 @@ const EditCaseScreen: React.FC = () => {
       }
 
       const updatePayload: db.CaseUpdateData = {
-        /* ... (map all caseData fields to CaseUpdateData as before, including new ones) ... */
         CaseTitle: caseData.CaseTitle,
         ClientName: caseData.ClientName,
         OnBehalfOf: caseData.OnBehalfOf,
         CNRNumber: caseData.CNRNumber,
         case_number: caseData.case_number,
-        court_id: caseData.court_id || null,
+        court_id: courtId,
         court_name: courtNameForDb,
-        case_type_id: caseData.case_type_id || null,
+        case_type_id: caseTypeId,
         case_type_name: caseTypeNameForDb,
         dateFiled: caseData.FiledDate || caseData.dateFiled,
         JudgeName: caseData.JudgeName,
@@ -371,8 +449,8 @@ const EditCaseScreen: React.FC = () => {
         CaseDescription: caseData.CaseDescription,
         CaseNotes: caseData.CaseNotes,
         case_year: caseData.case_year ? Number(caseData.case_year) : null,
-        crime_number: caseData.crime_number,
-        crime_year: caseData.crime_year ? Number(caseData.crime_year) : null,
+        crime_number: crimeNo,
+        crime_year: crimeYr,
       };
       Object.keys(updatePayload).forEach((key) => {
         if (updatePayload[key as keyof db.CaseUpdateData] === undefined)
@@ -398,7 +476,7 @@ const EditCaseScreen: React.FC = () => {
               fileType: newDoc.fileType || "application/octet-stream",
               fileUri: newDoc.uri as string,
               fileSize: newDoc.fileSize,
-              userId: null,
+              userId: userId,
             });
             if (!uploadedDocId) overallSuccess = false;
           } catch (e) {
@@ -415,7 +493,7 @@ const EditCaseScreen: React.FC = () => {
                 case_id: caseData.id,
                 event_date: event.date,
                 description: event.description,
-                user_id: null /* TODO */,
+                user_id: userId,
               };
               await db.addTimelineEvent(newEventData);
             } catch (e) {
@@ -721,6 +799,44 @@ const EditCaseScreen: React.FC = () => {
             onChangeText={(text) => handleInputChange("CaseTitle", text)}
           />
           <FormInput
+            label={t("field_cnr_number")}
+            value={caseData.CNRNumber || ""}
+            onChangeText={(text) => handleInputChange("CNRNumber", text)}
+          />
+          <FormInput
+            label={t("field_case_number")}
+            value={caseData.case_number || ""}
+            onChangeText={(text) => handleInputChange("case_number", text)}
+          />
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 2 }}>
+              <FormInput
+                label={t("field_crime_number")}
+                value={caseData.crime_number || ""}
+                onChangeText={(text) => handleInputChange("crime_number", text)}
+                placeholder={t("placeholder_crime_number")}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <FormInput
+                label={t("field_crime_year")}
+                value={caseData.crime_year !== undefined && caseData.crime_year !== null ? caseData.crime_year.toString() : ""}
+                onChangeText={(text) => {
+                  const sanitized = text.replace(/[^0-9]/g, '').slice(0, 4);
+                  handleInputChange("crime_year", sanitized);
+                }}
+                placeholder={new Date().getFullYear().toString()}
+                maxLength={4}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+          <FormInput
+            label={t("field_under_section")}
+            value={caseData.Undersection || ""}
+            onChangeText={(text) => handleInputChange("Undersection", text)}
+          />
+          <FormInput
             label={t("field_client_name")}
             value={caseData.ClientName || ""}
             onChangeText={(text) => handleInputChange("ClientName", text)}
@@ -733,47 +849,23 @@ const EditCaseScreen: React.FC = () => {
             }
             keyboardType="phone-pad"
           />
-          <FormInput
-            label={t("field_cnr_number")}
-            value={caseData.CNRNumber || ""}
-            onChangeText={(text) => handleInputChange("CNRNumber", text)}
-          />
-          <FormInput
-            label={t("field_case_number")}
-            value={caseData.case_number || ""}
-            onChangeText={(text) => handleInputChange("case_number", text)}
-          />
-          <FormInput
-            label={t("field_crime_number")}
-            value={caseData.crime_number || ""}
-            onChangeText={(text) => handleInputChange("crime_number", text)}
-          />
-          <FormInput
-            label={t("field_crime_year")}
-            value={caseData.crime_year ? caseData.crime_year.toString() : ""}
-            onChangeText={(text) => handleInputChange("crime_year", text)}
-            keyboardType="numeric"
-          />
           <DropdownPicker
             label={t("field_case_type")}
             selectedValue={caseData.case_type_id || ""}
             onValueChange={(val) =>
-              handleInputChange("case_type_id", val as number)
+              handleInputChange("case_type_id", val)
             }
-            options={getTranslatedOptions(dummyCaseTypeOptions)}
+            options={getTranslatedOptions(caseTypeOptions)}
+            onOtherValueChange={(text) => setOtherCaseType(text)}
           />
           <DropdownPicker
             label={t("field_court")}
             selectedValue={caseData.court_id || ""}
             onValueChange={(val) =>
-              handleInputChange("court_id", val as number)
+              handleInputChange("court_id", val)
             }
-            options={getTranslatedOptions(dummyCourtOptions)}
-          />
-          <FormInput
-            label={t("field_under_section")}
-            value={caseData.Undersection || ""}
-            onChangeText={(text) => handleInputChange("Undersection", text)}
+            options={getTranslatedOptions(courtOptions)}
+            onOtherValueChange={(text) => setOtherCourt(text)}
           />
           <DropdownPicker
             label={t("field_district")}
@@ -781,7 +873,7 @@ const EditCaseScreen: React.FC = () => {
             onValueChange={async (val) => {
               handleInputChange("district_id", val);
               handleInputChange("police_station_id", "");
-              await handleDistrictChange(val);
+              await handleDistrictChange(val, userId);
             }}
             options={getTranslatedOptions(districtOptions)}
             onOtherValueChange={(text) => setOtherDistrict(text)}

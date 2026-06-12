@@ -454,13 +454,18 @@ export const addDistrict = async (name: string, state?: string, userId?: number 
   return result.lastInsertRowId;
 };
 
-export const getDistricts = async (userId?: number | null): Promise<District[]> => {
+export const getDistricts = async (userId?: number | null, state?: string | null): Promise<District[]> => {
   const db = await getDb();
-  let query = "SELECT * FROM Districts WHERE user_id IS NULL";
+  let query = "SELECT * FROM Districts WHERE (user_id IS NULL";
   const params: any[] = [];
   if (userId != null) {
     query += " OR user_id = ?";
     params.push(userId);
+  }
+  query += ")";
+  if (state != null) {
+    query += " AND LOWER(state) = LOWER(?)";
+    params.push(state);
   }
   query += " ORDER BY name ASC";
   return db.getAllAsync<District>(query, params);

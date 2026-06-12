@@ -211,6 +211,9 @@ const mockSQLiteAPI = {
         return { changes, lastInsertRowId };
       }),
       closeAsync: jest.fn(async () => {}),
+      withTransactionAsync: jest.fn(async (callback) => {
+        return callback();
+      }),
       deleteAsync: jest.fn(async () => {
         delete mockDatabases[currentDbName];
       }),

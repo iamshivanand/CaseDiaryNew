@@ -1,0 +1,412 @@
+﻿diff --git a/Screens/Addcase/AddCase.tsx b/Screens/Addcase/AddCase.tsx
+index 84fc6d3..6238711 100644
+--- a/Screens/Addcase/AddCase.tsx
++++ b/Screens/Addcase/AddCase.tsx
+@@ -31,7 +31,10 @@ import {
+   getDistricts,
+   addDistrict,
+   getDb,
++  getCourts,
++  getCaseTypes,
+ } from "../../DataBase";
++import { getUserState } from "../../utils/locationService";
+ import { HomeStackParamList } from "../../Types/navigationtypes";
+ import { CaseDataScreen } from "../../Types/appTypes";
+ import { formatDate } from "../../utils/commonFunctions";
+@@ -54,6 +57,8 @@ interface FieldDefinition {
+   options?: AppDropdownOption[];
+   suggestions?: boolean;
+   testID?: string;
++  maxLength?: number;
++  keyboardType?: string;
+ }
+ 
+ type AddCaseScreenRouteProp = RouteProp<HomeStackParamList, "AddCaseDetails">;
+@@ -71,15 +76,15 @@ const dummyCourtOptionsForAdd: AppDropdownOption[] = [
+ 
+ const formFieldsDefinition: FieldDefinition[] = [
+   { name: "CaseTitle", type: "text", placeholder: "e.g., State vs. John Doe", label: "Case Title*", suggestions: true },
+-  { name: "ClientName", type: "text", placeholder: "Enter Client's Full Name", label: "Client Name", suggestions: true },
+-  { name: "ClientContactNumber", type: "text", placeholder: "Enter Client's Contact Number", label: "Client Contact No." },
+   { name: "CNRNumber", type: "text", placeholder: "Enter CNR Number", label: "CNR Number"},
+   { name: "case_number", type: "text", placeholder: "e.g., CS/123/2023", label: "Case Number" },
+-  { name: "crime_number", type: "text", placeholder: "e.g., FIR/Crime No. 123", label: "Crime Number" },
+-  { name: "crime_year", type: "text", placeholder: "e.g., 2026", label: "Crime Year" },
++  { name: "crime_number", type: "text", placeholder: "e.g., 123", label: "Crime/FIR No." },
++  { name: "crime_year", type: "text", placeholder: new Date().getFullYear().toString(), label: "Year", maxLength: 4, keyboardType: "numeric" },
++  { name: "Undersection", type: "text", placeholder: "e.g., Section 302 IPC", label: "Under Section(s)", suggestions: true },
++  { name: "ClientName", type: "text", placeholder: "Enter Client's Full Name", label: "Client Name", suggestions: true },
++  { name: "ClientContactNumber", type: "text", placeholder: "Enter Client's Contact Number", label: "Client Contact No." },
+   { name: "case_type_id", type: "select", label: "Case Type", options: dummyCaseTypeOptionsForAdd, placeholder: "Select Case Type...", testID: "case_type_id" },
+   { name: "court_id", type: "select", label: "Court", options: dummyCourtOptionsForAdd, placeholder: "Select Court...", testID: "court_id" },
+-  { name: "Undersection", type: "text", placeholder: "e.g., Section 302 IPC", label: "Under Section(s)", suggestions: true },
+   { name: "district_id", type: "select", label: "District", options: [], placeholder: "Select District...", testID: "district_id" },
+   { name: "police_station_id", type: "select", label: "Police Station", options: [], placeholder: "Select Police Station...", testID: "police_station_id" },
+   { name: "FiledDate", type: "date", label: "Date Filed", placeholder: "Select date case was filed" },
+@@ -100,7 +105,7 @@ const fieldGroups = [
+   {
+     title: "Client & Core Details",
+     icon: "person-outline",
+-    fields: ["CaseTitle", "ClientName", "ClientContactNumber", "CNRNumber", "case_number", "crime_number", "crime_year", "case_type_id", "court_id", "Undersection", "district_id", "police_station_id"]
++    fields: ["CaseTitle", "CNRNumber", "case_number", "crime_number", "crime_year", "Undersection", "ClientName", "ClientContactNumber", "case_type_id", "court_id", "district_id", "police_station_id"]
+   },
+   {
+     title: "Parties & Court Details",
+@@ -159,7 +164,6 @@ const getFieldPlaceholderKey = (fieldName: string): string => {
+     case "ClientName": return "placeholder_client_name";
+     case "case_number": return "placeholder_case_number";
+     case "crime_number": return "placeholder_crime_number";
+-    case "crime_year": return "placeholder_crime_year";
+     case "CNRNumber": return "placeholder_cnr_number";
+     case "case_type_id": return "placeholder_case_type";
+     case "court_id": return "placeholder_court";
+@@ -230,7 +234,9 @@ const FormFieldRenderer: React.FC<{
+   policeStationOptions?: AppDropdownOption[];
+   districtOptions?: AppDropdownOption[];
+   onDistrictChange?: (districtId: any) => void;
+-}> = ({ fieldConfig, formik, otherValues, setOtherValue, suggestions, policeStationOptions, districtOptions, onDistrictChange }) => {
++  courtOptions?: AppDropdownOption[];
++  caseTypeOptions?: AppDropdownOption[];
++}> = ({ fieldConfig, formik, otherValues, setOtherValue, suggestions, policeStationOptions, districtOptions, onDistrictChange, courtOptions, caseTypeOptions }) => {
+   const { values, errors, touched, setFieldValue } = formik;
+   const { t } = useTranslation();
+   const fieldName = fieldConfig.name;
+@@ -248,15 +254,39 @@ const FormFieldRenderer: React.FC<{
+ 
+   switch (fieldConfig.type) {
+     case "text":
+-      return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={translatedPlaceholder} onChangeText={(text) => setFieldValue(fieldName, text)} suggestions={fieldConfig.suggestions ? (suggestions[fieldName] || []) : undefined} />;
++      return (
++        <FormInput
++          {...commonInputProps}
++          value={values[fieldName] || ''}
++          placeholder={translatedPlaceholder}
++          onChangeText={(text) => {
++            if (fieldName === "crime_year") {
++              const sanitized = text.replace(/[^0-9]/g, '');
++              setFieldValue(fieldName, sanitized);
++            } else {
++              setFieldValue(fieldName, text);
++            }
++          }}
++          suggestions={fieldConfig.suggestions ? (suggestions[fieldName] || []) : undefined}
++          maxLength={fieldConfig.maxLength}
++          keyboardType={fieldConfig.keyboardType as any}
++        />
++      );
+     case "multiline":
+       return <FormInput {...commonInputProps} value={values[fieldName] as string || ''} placeholder={translatedPlaceholder} onChangeText={(text) => setFieldValue(fieldName, text)} multiline numberOfLines={4} />;
+     case "select":
+-      const selectOpts = fieldConfig.name === "police_station_id"
+-        ? (policeStationOptions || [])
+-        : (fieldConfig.name === "district_id"
+-           ? (districtOptions || [])
+-           : (fieldConfig.options || []));
++      let selectOpts = [];
++      if (fieldConfig.name === "police_station_id") {
++        selectOpts = policeStationOptions || [];
++      } else if (fieldConfig.name === "district_id") {
++        selectOpts = districtOptions || [];
++      } else if (fieldConfig.name === "court_id") {
++        selectOpts = courtOptions || [];
++      } else if (fieldConfig.name === "case_type_id") {
++        selectOpts = caseTypeOptions || [];
++      } else {
++        selectOpts = fieldConfig.options || [];
++      }
+       return (
+         <DropdownPicker
+           {...commonInputProps}
+@@ -305,6 +335,9 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+   const [policeStationOptions, setPoliceStationOptions] = useState<AppDropdownOption[]>([]);
+   const [districtOptions, setDistrictOptions] = useState<AppDropdownOption[]>([]);
+   const [resolvedDistrictId, setResolvedDistrictId] = useState<number | string | null>("");
++  const [courtOptions, setCourtOptions] = useState<AppDropdownOption[]>([]);
++  const [caseTypeOptions, setCaseTypeOptions] = useState<AppDropdownOption[]>([]);
++  const [userId, setUserId] = useState<number | null>(null);
+ 
+   const [isLocked, setIsLocked] = useState(false);
+   const [checkingLock, setCheckingLock] = useState(true);
+@@ -372,17 +405,18 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+     }
+   };
+ 
+-  const handleDistrictChange = async (districtId: any) => {
++  const handleDistrictChange = async (districtId: any, activeUserId?: number | null) => {
+     try {
+       if (!districtId) {
+         setPoliceStationOptions([{ label: 'Other', value: 'Other' }]);
+         return;
+       }
++      const uId = activeUserId !== undefined ? activeUserId : userId;
+       let psList = [];
+       if (districtId === 'Other') {
+-        psList = await getPoliceStations(null, null);
++        psList = await getPoliceStations(null, uId);
+       } else {
+-        psList = await getPoliceStations(Number(districtId), null);
++        psList = await getPoliceStations(Number(districtId), uId);
+       }
+       const formatted = psList.map(ps => ({
+         label: ps.name,
+@@ -397,10 +431,12 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+ 
+   useEffect(() => {
+     const fetchSuggestions = async () => {
++      const userIdVal = await AsyncStorage.getItem('@user_id');
++      const userId = userIdVal ? parseInt(userIdVal, 10) : null;
+       const suggestionsData: { [key: string]: string[] } = {};
+       for (const field of formFieldsDefinition) {
+         if (field.suggestions) {
+-          const fieldSuggestions = await getSuggestionsForField(field.name);
++          const fieldSuggestions = await getSuggestionsForField(field.name, userId);
+           suggestionsData[field.name] = fieldSuggestions.map((s) => s.name);
+         }
+       }
+@@ -408,8 +444,38 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+     };
+ 
+     const initData = async () => {
++      const userIdVal = await AsyncStorage.getItem('@user_id');
++      const activeUserId = userIdVal ? parseInt(userIdVal, 10) : null;
++      setUserId(activeUserId);
++
+       try {
+-        const districtsList = await getDistricts(null);
++        const caseTypesList = await getCaseTypes(activeUserId);
++        const formattedCaseTypes = caseTypesList.map(ct => ({ label: ct.name, value: ct.id }));
++        formattedCaseTypes.push({ label: 'Other', value: 'Other' });
++        setCaseTypeOptions(formattedCaseTypes);
++      } catch (error) {
++        console.error("Error fetching case types:", error);
++      }
++
++      try {
++        const courtsList = await getCourts(activeUserId);
++        const formattedCourts = courtsList.map(c => ({ label: c.name, value: c.id }));
++        formattedCourts.push({ label: 'Other', value: 'Other' });
++        setCourtOptions(formattedCourts);
++      } catch (error) {
++        console.error("Error fetching courts:", error);
++      }
++
++      try {
++        const userState = await getUserState();
++        console.log("Detected user state for AddCase:", userState);
++        let districtsList = [];
++        if (userState) {
++          districtsList = await getDistricts(activeUserId, userState);
++        }
++        if (districtsList.length === 0) {
++          districtsList = await getDistricts(activeUserId);
++        }
+         const formatted = districtsList.map(d => ({
+           label: d.name,
+           value: d.id
+@@ -431,16 +497,16 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+           );
+           if (psRow && psRow.district_id) {
+             setResolvedDistrictId(psRow.district_id);
+-            await handleDistrictChange(psRow.district_id);
++            await handleDistrictChange(psRow.district_id, activeUserId);
+           } else {
+-            await handleDistrictChange(null);
++            await handleDistrictChange(null, activeUserId);
+           }
+         } catch (e) {
+           console.error("Error resolving initial district:", e);
+-          await handleDistrictChange(null);
++          await handleDistrictChange(null, activeUserId);
+         }
+       } else {
+-        await handleDistrictChange(null);
++        await handleDistrictChange(null, activeUserId);
+       }
+     };
+ 
+@@ -472,14 +538,14 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+       if (initialValues.caseNumber) mappedInitialValues.CaseTitle = initialValues.caseNumber;
+       if (initialValues.dateFiled) mappedInitialValues.FiledDate = initialValues.dateFiled.toISOString();
+ 
+-      const initialCourt = dummyCourtOptionsForAdd.find(opt => opt.label === initialValues.court);
++      const initialCourt = courtOptions.find(opt => opt.label === initialValues.court);
+       if (initialCourt) mappedInitialValues.court_id = initialCourt.value;
+ 
+-      const initialCaseType = dummyCaseTypeOptionsForAdd.find(opt => opt.label === initialValues.caseType);
++      const initialCaseType = caseTypeOptions.find(opt => opt.label === initialValues.caseType);
+       if (initialCaseType) mappedInitialValues.case_type_id = initialCaseType.value;
+ 
+-      if (initialValues.crime_number) mappedInitialValues.crime_number = initialValues.crime_number;
+-      if (initialValues.crime_year) mappedInitialValues.crime_year = initialValues.crime_year.toString();
++      mappedInitialValues.crime_number = initialValues.crime_number || "";
++      mappedInitialValues.crime_year = initialValues.crime_year !== undefined && initialValues.crime_year !== null ? initialValues.crime_year.toString() : "";
+       if (initialValues.police_station_id) mappedInitialValues.police_station_id = initialValues.police_station_id;
+       if (initialValues.Undersection) mappedInitialValues.Undersection = initialValues.Undersection;
+ 
+@@ -508,15 +574,23 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+   const handleSubmitForm = async (formValues: Partial<CaseData>) => {
+     console.log("Submitting form values:", formValues);
+ 
++    const userIdVal = await AsyncStorage.getItem('@user_id');
++    const userId = userIdVal ? parseInt(userIdVal, 10) : null;
++
++    let crimeNo = null;
++    let crimeYr = null;
++    const crimeNo = formValues.crime_number && formValues.crime_number.trim() ? formValues.crime_number.trim() : null;
++    const crimeYr = formValues.crime_year && formValues.crime_year.toString().trim() ? parseInt(formValues.crime_year.toString().trim(), 10) : null;
++
+     let courtNameString = null;
+     if (formValues.court_id === 'Other') {
+       courtNameString = otherValues['court_id'];
+       if (courtNameString) {
+-        const newCourtId = await addCourt(courtNameString);
++        const newCourtId = await addCourt(courtNameString, userId);
+         formValues.court_id = newCourtId;
+       }
+     } else {
+-      const selectedCourtOption = dummyCourtOptionsForAdd.find(opt => opt.value === formValues.court_id);
++      const selectedCourtOption = courtOptions.find(opt => opt.value === formValues.court_id);
+       courtNameString = selectedCourtOption && selectedCourtOption.value !== '' ? selectedCourtOption.label : null;
+     }
+ 
+@@ -524,11 +598,11 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+     if (formValues.case_type_id === 'Other') {
+       caseTypeNameString = otherValues['case_type_id'];
+       if (caseTypeNameString) {
+-        const newCaseTypeId = await addCaseType(caseTypeNameString);
++        const newCaseTypeId = await addCaseType(caseTypeNameString, userId);
+         formValues.case_type_id = newCaseTypeId;
+       }
+     } else {
+-      const selectedCaseTypeOption = dummyCaseTypeOptionsForAdd.find(opt => opt.value === formValues.case_type_id);
++      const selectedCaseTypeOption = caseTypeOptions.find(opt => opt.value === formValues.case_type_id);
+       caseTypeNameString = selectedCaseTypeOption && selectedCaseTypeOption.value !== '' ? selectedCaseTypeOption.label : null;
+     }
+ 
+@@ -536,7 +610,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+     if (districtId === 'Other') {
+       const districtName = otherValues['district_id'];
+       if (districtName) {
+-        const newDistrictId = await addDistrict(districtName);
++        const newDistrictId = await addDistrict(districtName, null, userId);
+         districtId = newDistrictId;
+       } else {
+         districtId = null;
+@@ -549,7 +623,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+     if (policeStationId === 'Other') {
+       const psName = otherValues['police_station_id'];
+       if (psName) {
+-        const newPsId = await addPoliceStation(psName, districtId);
++        const newPsId = await addPoliceStation(psName, districtId, userId);
+         policeStationId = newPsId;
+       } else {
+         policeStationId = null;
+@@ -581,8 +655,8 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+         case_type_name: caseTypeNameString,
+         ...(changedFields.case_number && { case_number: changedFields.case_number }),
+         ...(changedFields.case_year && { case_year: changedFields.case_year ? parseInt(changedFields.case_year as string, 10) : null }),
+-        ...(changedFields.crime_number && { crime_number: changedFields.crime_number }),
+-        ...(changedFields.crime_year && { crime_year: changedFields.crime_year ? parseInt(changedFields.crime_year as string, 10) : null }),
++        crime_number: crimeNo,
++        crime_year: crimeYr,
+         ...(changedFields.JudgeName && { JudgeName: changedFields.JudgeName }),
+         ...(changedFields.OnBehalfOf && { OnBehalfOf: changedFields.OnBehalfOf }),
+         ...(changedFields.FirstParty && { FirstParty: changedFields.FirstParty }),
+@@ -622,9 +696,11 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+         } else { Alert.alert(t("alert_error"), t("editcase_err_save_details")); }
+       } catch (e) { console.error("Error updating case:", e); Alert.alert(t("alert_error"), t("editcase_err_general"));}
+     } else {
++      const userIdVal = await AsyncStorage.getItem('@user_id');
++      const userId = userIdVal ? parseInt(userIdVal, 10) : null;
+       const insertPayload: CaseInsertData = {
+         uniqueId: formValues.uniqueId || uniqueIdToUse,
+-        user_id: null,
++        user_id: userId,
+         CaseTitle: formValues.CaseTitle || null,
+         ClientName: formValues.ClientName || null,
+         CNRNumber: formValues.CNRNumber || null,
+@@ -635,8 +711,8 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+         case_type_name: caseTypeNameString,
+         case_number: formValues.case_number || null,
+         case_year: formValues.case_year ? parseInt(formValues.case_year as string, 10) : null,
+-        crime_number: formValues.crime_number || null,
+-        crime_year: formValues.crime_year ? parseInt(formValues.crime_year as string, 10) : null,
++        crime_number: crimeNo,
++        crime_year: crimeYr,
+         JudgeName: formValues.JudgeName || null,
+         OnBehalfOf: formValues.OnBehalfOf || null,
+         FirstParty: formValues.FirstParty || null,
+@@ -701,20 +777,59 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+                       </Text>
+                     </View>
+                     {formFieldsDefinition
+-                      .filter(f => group.fields.includes(f.name))
+-                      .map((fieldConfig) => (
+-                        <FormFieldRenderer
+-                          key={fieldConfig.name}
+-                          fieldConfig={fieldConfig}
+-                          formik={formikProps}
+-                          otherValues={otherValues}
+-                          setOtherValue={setOtherValue}
+-                          suggestions={suggestions}
+-                          policeStationOptions={policeStationOptions}
+-                          districtOptions={districtOptions}
+-                          onDistrictChange={handleDistrictChange}
+-                        />
+-                      ))}
++                      .filter(f => group.fields.includes(f.name) && f.name !== 'crime_year')
++                      .map((fieldConfig) => {
++                        if (fieldConfig.name === 'crime_number') {
++                          const crimeYearConfig = formFieldsDefinition.find(f => f.name === 'crime_year')!;
++                          return (
++                            <View key="crime_row" style={{ flexDirection: 'row', gap: 12 }}>
++                              <View style={{ flex: 2 }}>
++                                <FormFieldRenderer
++                                  fieldConfig={fieldConfig}
++                                  formik={formikProps}
++                                  otherValues={otherValues}
++                                  setOtherValue={setOtherValue}
++                                  suggestions={suggestions}
++                                  policeStationOptions={policeStationOptions}
++                                  districtOptions={districtOptions}
++                                  onDistrictChange={handleDistrictChange}
++                                  courtOptions={courtOptions}
++                                  caseTypeOptions={caseTypeOptions}
++                                />
++                              </View>
++                              <View style={{ flex: 1 }}>
++                                <FormFieldRenderer
++                                  fieldConfig={crimeYearConfig}
++                                  formik={formikProps}
++                                  otherValues={otherValues}
++                                  setOtherValue={setOtherValue}
++                                  suggestions={suggestions}
++                                  policeStationOptions={policeStationOptions}
++                                  districtOptions={districtOptions}
++                                  onDistrictChange={handleDistrictChange}
++                                  courtOptions={courtOptions}
++                                  caseTypeOptions={caseTypeOptions}
++                                />
++                              </View>
++                            </View>
++                          );
++                        }
++                        return (
++                          <FormFieldRenderer
++                            key={fieldConfig.name}
++                            fieldConfig={fieldConfig}
++                            formik={formikProps}
++                            otherValues={otherValues}
++                            setOtherValue={setOtherValue}
++                            suggestions={suggestions}
++                            policeStationOptions={policeStationOptions}
++                            districtOptions={districtOptions}
++                            onDistrictChange={handleDistrictChange}
++                            courtOptions={courtOptions}
++                            caseTypeOptions={caseTypeOptions}
++                          />
++                        );
++                      })}
+                   </View>
+                 ))}
+                 <View style={styles.actionButtonContainer}>
