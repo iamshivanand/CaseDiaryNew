@@ -3,6 +3,19 @@ import * as Sharing from 'expo-sharing';
 import { CaseWithDetails, getCaseTimelineEventsByCaseId } from '../DataBase';
 import { formatDate } from './commonFunctions';
 
+const appPromoFooterHtml = `
+  <div style="margin-top: 30px; padding-top: 12px; border-top: 1px solid #E5E7EB; text-align: center; font-family: Arial, sans-serif;">
+    <div style="display: inline-block; vertical-align: middle;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E3A8A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+      <span style="font-weight: bold; color: #1E3A8A; font-size: 12px; vertical-align: middle; letter-spacing: 0.5px;">CaseDiary</span>
+    </div>
+    <div style="margin-top: 4px; font-size: 10px; color: #777;">This is generated from CaseDiary</div>
+  </div>
+`;
+
 /**
  * Generates a beautiful case summary and timeline PDF and opens the sharing dialog.
  * 
@@ -168,6 +181,7 @@ export const exportCaseToPdf = async (caseDetails: CaseWithDetails): Promise<voi
               </tbody>
             </table>
           </div>
+          ${appPromoFooterHtml}
         </body>
       </html>
     `;
@@ -308,6 +322,7 @@ export const exportDailyCauseListToPdf = async (cases: any[], titleDate: string)
               ${rowsHtml}
             </tbody>
           </table>
+          ${appPromoFooterHtml}
         </body>
       </html>
     `;
@@ -465,6 +480,7 @@ export const exportCaseHistoryToPdf = async (caseDetails: CaseWithDetails): Prom
               ${timelineHtml}
             </tbody>
           </table>
+          ${appPromoFooterHtml}
         </body>
       </html>
     `;

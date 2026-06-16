@@ -15,7 +15,7 @@ import { getCases, addCaseTimelineEvent, updateCase, getCaseById } from "../../D
 import { Case } from "../../DataBase/schema";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { CaseDataScreen } from "../../Types/appTypes"; // Import the new data type
-import { formatDate, getCurrentUserId } from "../../utils/commonFunctions";
+import { formatDate, getCurrentUserId, getLocalDateString } from "../../utils/commonFunctions";
 import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import AdBanner from "../CommonComponents/AdBanner";
@@ -161,7 +161,7 @@ const CasesList = () => {
 
       // 2. Update case's next hearing date
       await updateCase(caseId, {
-        NextDate: nextHearingDate.toISOString(),
+        NextDate: getLocalDateString(nextHearingDate),
       }, userId);
 
       // 3. Refresh list from page 0

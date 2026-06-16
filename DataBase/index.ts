@@ -19,7 +19,15 @@ const DOCUMENTS_DIRECTORY = FileSystem.documentDirectory + "documents/";
 // These functions will now use the imported getDb
 export const addCaseType = async (name: string, userId?: number | null): Promise<number | null> => {
   const db = await getDb(); if (!name || name.trim() === "") throw new Error("Case type name cannot be empty.");
-  const result = await db.runAsync("INSERT INTO CaseTypes (name, user_id) VALUES (?, ?)", [name.trim(), userId ?? null]); return result.lastInsertRowId;
+  const trimmed = name.trim();
+  const existing = await db.getFirstAsync<{ id: number }>(
+    "SELECT id FROM CaseTypes WHERE LOWER(name) = LOWER(?) AND (user_id IS NULL OR user_id = ?)",
+    [trimmed, userId ?? null]
+  );
+  if (existing) {
+    return existing.id;
+  }
+  const result = await db.runAsync("INSERT INTO CaseTypes (name, user_id) VALUES (?, ?)", [trimmed, userId ?? null]); return result.lastInsertRowId;
 };
 export const getCaseTypes = async (userId?: number | null): Promise<CaseType[]> => {
   const db = await getDb(); let query = "SELECT * FROM CaseTypes WHERE user_id IS NULL"; const params: any[] = [];
@@ -35,7 +43,15 @@ export const deleteCaseType = async (id: number, userId: number): Promise<boolea
 
 export const addCourt = async (name: string, userId?: number | null): Promise<number | null> => {
   const db = await getDb(); if (!name || name.trim() === "") throw new Error("Court name cannot be empty.");
-  const result = await db.runAsync("INSERT INTO Courts (name, user_id) VALUES (?, ?)", [name.trim(), userId ?? null]); return result.lastInsertRowId;
+  const trimmed = name.trim();
+  const existing = await db.getFirstAsync<{ id: number }>(
+    "SELECT id FROM Courts WHERE LOWER(name) = LOWER(?) AND (user_id IS NULL OR user_id = ?)",
+    [trimmed, userId ?? null]
+  );
+  if (existing) {
+    return existing.id;
+  }
+  const result = await db.runAsync("INSERT INTO Courts (name, user_id) VALUES (?, ?)", [trimmed, userId ?? null]); return result.lastInsertRowId;
 };
 export const getCourts = async (userId?: number | null): Promise<Court[]> => {
   const db = await getDb(); let query = "SELECT * FROM Courts WHERE user_id IS NULL"; const params: any[] = [];
@@ -114,7 +130,7 @@ export const getFullDocumentPath = (storedFileName: string | null | undefined): 
 export type CaseInsertData = Omit<CaseRow, 'id' | 'created_at' | 'updated_at'>;
 export type CaseUpdateData = Partial<Omit<CaseRow, 'id' | 'uniqueId' | 'created_at' | 'updated_at'>>;
 
-import { formatDate } from '../utils/commonFunctions';
+import { formatDate, getLocalDateString } from '../utils/commonFunctions';
 
 export const addCase = async (caseData: CaseInsertData): Promise<number | null> => {
   const db = await getDb(); if (!caseData.uniqueId) throw new Error("uniqueId is required.");
@@ -191,20 +207,20 @@ export const getCases = async (
     }
 
     if (dateFilter) {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getLocalDateString(new Date());
       if (dateFilter === 'today') {
         whereClauses.push("c.NextDate = ?");
         params.push(todayStr);
       } else if (dateFilter === 'tomorrow') {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        const tomorrowStr = getLocalDateString(tomorrow);
         whereClauses.push("c.NextDate = ?");
         params.push(tomorrowStr);
       } else if (dateFilter === 'yesterday') {
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        const yesterdayStr = getLocalDateString(yesterday);
         whereClauses.push("c.NextDate = ?");
         params.push(yesterdayStr);
       } else if (dateFilter === 'undated') {
@@ -418,7 +434,7 @@ export const getTotalCases = async (userId?: number | null): Promise<number> => 
 
 export const getUpcomingHearings = async (userId?: number | null): Promise<number> => {
     const db = await getDb();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString(new Date());
     let sql = "SELECT COUNT(*) as count FROM Cases WHERE NextDate > ?";
     const params: any[] = [today];
     if (userId != null) {
@@ -474,9 +490,17 @@ export const getDistricts = async (userId?: number | null, state?: string | null
 export const addPoliceStation = async (name: string, districtId?: number | null, userId?: number | null): Promise<number | null> => {
   const db = await getDb();
   if (!name || name.trim() === "") throw new Error("Police station name cannot be empty.");
+  const trimmed = name.trim();
+  const existing = await db.getFirstAsync<{ id: number }>(
+    "SELECT id FROM PoliceStations WHERE LOWER(name) = LOWER(?) AND (district_id = ? OR (district_id IS NULL AND ? IS NULL)) AND (user_id IS NULL OR user_id = ?)",
+    [trimmed, districtId ?? null, districtId ?? null, userId ?? null]
+  );
+  if (existing) {
+    return existing.id;
+  }
   const result = await db.runAsync(
-    "INSERT OR IGNORE INTO PoliceStations (name, district_id, user_id) VALUES (?, ?, ?)",
-    [name.trim(), districtId ?? null, userId ?? null]
+    "INSERT INTO PoliceStations (name, district_id, user_id) VALUES (?, ?, ?)",
+    [trimmed, districtId ?? null, userId ?? null]
   );
   return result.lastInsertRowId;
 };

@@ -1,0 +1,332 @@
+import { ecourtsParserJS, convertIndianDateToLocal, parseRawECourtsData } from '../ecourtsParser';
+
+describe('ecourtsParser utils', () => {
+  describe('convertIndianDateToLocal', () => {
+    it('should convert DD-MM-YYYY format to YYYY-MM-DD', () => {
+      expect(convertIndianDateToLocal('15-06-2026')).toBe('2026-06-15');
+      expect(convertIndianDateToLocal('05-09-2025')).toBe('2025-09-05');
+    });
+
+    it('should convert DD/MM/YYYY format to YYYY-MM-DD', () => {
+      expect(convertIndianDateToLocal('25/12/2026')).toBe('2026-12-25');
+      expect(convertIndianDateToLocal('01/01/2024')).toBe('2024-01-01');
+    });
+
+    it('should handle single digit days and months by padding with zero', () => {
+      expect(convertIndianDateToLocal('5-2-2026')).toBe('2026-02-05');
+      expect(convertIndianDateToLocal('9/7/2025')).toBe('2025-07-09');
+    });
+
+    it('should return null for invalid formats', () => {
+      expect(convertIndianDateToLocal('2026-06-15')).toBeNull();
+      expect(convertIndianDateToLocal('June 15, 2026')).toBeNull();
+      expect(convertIndianDateToLocal('15-June-2026')).toBeNull();
+    });
+
+    it('should return null for empty/falsy inputs', () => {
+      expect(convertIndianDateToLocal('')).toBeNull();
+      expect(convertIndianDateToLocal(null as any)).toBeNull();
+      expect(convertIndianDateToLocal(undefined as any)).toBeNull();
+    });
+  });
+
+  describe('ecourtsParserJS extraction script & parseRawECourtsData mapping', () => {
+    let mockPostMessage: jest.Mock;
+    let mockTables: any[];
+    let mockHeadings: any[];
+
+    // Helper to create a mock row object
+    const createMockRow = (label: string, value: string) => {
+      const mockCells = [
+        { innerText: label, textContent: label },
+        { innerText: value, textContent: value }
+      ];
+      return {
+        querySelectorAll: (query: string) => {
+          if (query === 'td, th') {
+            return mockCells;
+          }
+          return [];
+        }
+      };
+    };
+
+    // Helper to create a mock table object
+    const createMockTable = (rowsData: { label: string; value: string }[]) => {
+      const mockRows = rowsData.map(d => createMockRow(d.label, d.value));
+      return {
+        querySelectorAll: (query: string) => {
+          if (query === 'tr') {
+            return mockRows;
+          }
+          return [];
+        }
+      };
+    };
+
+    beforeEach(() => {
+      mockPostMessage = jest.fn();
+      mockTables = [];
+      mockHeadings = [];
+
+      // Mock the global window and document objects
+      (global as any).window = {
+        ReactNativeWebView: {
+          postMessage: mockPostMessage,
+        }
+      };
+
+      (global as any).document = {
+        querySelectorAll: (query: string) => {
+          if (query === 'table') {
+            return mockTables;
+          }
+          if (query.includes('h1') || query.includes('.court_name')) {
+            return mockHeadings;
+          }
+          return [];
+        }
+      };
+    });
+
+    afterEach(() => {
+      delete (global as any).window;
+      delete (global as any).document;
+    });
+
+    it('should do nothing if no tables exist in the DOM', () => {
+      eval(ecourtsParserJS);
+      expect(mockPostMessage).not.toHaveBeenCalled();
+    });
+
+    it('should successfully parse case details from standard eCourts tables', () => {
+      mockTables.push(createMockTable([
+        { label: 'Case Type', value: 'Criminal Appeal' },
+        { label: 'Filing Number', value: '12345/2026' },
+        { label: 'CNR Number', value: 'DLDH010001232026' },
+        { label: 'Case Number', value: 'CRA/100/2026' },
+        { label: 'Next Hearing Date', value: '15-06-2026' },
+        { label: 'Petitioner / Plaintiff', value: 'John Doe' },
+        { label: 'Respondent / Defendant', value: 'Jane Smith' },
+        { label: 'Filing Date', value: '01-01-2026' },
+        { label: 'Presiding Officer', value: 'Justice S. K. Kaul' },
+        { label: 'Under Section', value: 'Section 302 IPC' },
+      ]));
+
+      mockHeadings.push({ innerText: 'High Court of Delhi', textContent: 'High Court of Delhi' });
+
+      eval(ecourtsParserJS);
+
+      expect(mockPostMessage).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockPostMessage.mock.calls[0][0]);
+      expect(payload.status).toBe('success');
+
+      // Call the dynamic mapper
+      const parsedData = parseRawECourtsData(payload.data);
+      expect(parsedData).toEqual({
+        case_type_name: 'Criminal Appeal',
+        filingNumber: '12345/2026',
+        CNRNumber: 'DLDH010001232026',
+        case_number: 'CRA/100/2026',
+        NextDate: '15-06-2026',
+        FirstParty: 'John Doe',
+        OppositeParty: 'Jane Smith',
+        dateFiled: '01-01-2026',
+        JudgeName: 'Justice S. K. Kaul',
+        Undersection: 'Section 302 IPC',
+        court_name: 'High Court of Delhi',
+        CaseTitle: 'John Doe vs. Jane Smith',
+        crime_year: '2026',
+        rawTables: expect.any(Array),
+      });
+    });
+
+    it('should handle missing fields gracefully', () => {
+      mockTables.push(createMockTable([
+        { label: 'CNR Number', value: 'MHCB010098762025' },
+        { label: 'Petitioner', value: 'Only Petitioner' },
+      ]));
+
+      eval(ecourtsParserJS);
+
+      expect(mockPostMessage).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockPostMessage.mock.calls[0][0]);
+      expect(payload.status).toBe('success');
+
+      const parsedData = parseRawECourtsData(payload.data);
+      expect(parsedData).toEqual({
+        CNRNumber: 'MHCB010098762025',
+        FirstParty: 'Only Petitioner',
+        CaseTitle: 'Only Petitioner',
+        rawTables: expect.any(Array),
+      });
+    });
+
+    it('should parse CNR Number removing inner whitespace and extracting 16-character code', () => {
+      mockTables.push(createMockTable([
+        { label: 'CNR Number', value: '   UPBR 01003153 2014 (Note the CNR number for future reference)   ' },
+      ]));
+
+      eval(ecourtsParserJS);
+
+      expect(mockPostMessage).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockPostMessage.mock.calls[0][0]);
+      expect(payload.status).toBe('success');
+
+      const parsedData = parseRawECourtsData(payload.data);
+      expect(parsedData.CNRNumber).toBe('UPBR010031532014');
+    });
+
+    it('should extract details from multi-column rows', () => {
+      const createMockRowWithCells = (cellValues: string[]) => {
+        const mockCells = cellValues.map(val => ({ innerText: val, textContent: val }));
+        return {
+          querySelectorAll: (query: string) => {
+            if (query === 'td, th') return mockCells;
+            return [];
+          }
+        };
+      };
+      
+      const mockRows = [
+        createMockRowWithCells(['Case Type', 'Sessions Trial']),
+        createMockRowWithCells(['Filing Number', '', 'Filing Date', '15-04-2014']),
+        createMockRowWithCells(['Registration Number', '100355/2014', 'Registration Date', '26-04-2014']),
+      ];
+      
+      mockTables.push({
+        querySelectorAll: (query: string) => {
+          if (query === 'tr') return mockRows;
+          return [];
+        }
+      });
+
+      eval(ecourtsParserJS);
+
+      expect(mockPostMessage).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockPostMessage.mock.calls[0][0]);
+      expect(payload.status).toBe('success');
+
+      const parsedData = parseRawECourtsData(payload.data);
+      expect(parsedData.case_type_name).toBe('Sessions Trial');
+      expect(parsedData.dateFiled).toBe('15-04-2014');
+      expect(parsedData.case_number).toBe('100355/2014');
+    });
+
+    it('should parse Acts and Sections from tabular Acts tables', () => {
+      const createMockRowWithCells = (cellValues: string[]) => {
+        const mockCells = cellValues.map(val => ({ innerText: val, textContent: val }));
+        return {
+          querySelectorAll: (query: string) => {
+            if (query === 'td, th') return mockCells;
+            return [];
+          }
+        };
+      };
+
+      const mockRows = [
+        createMockRowWithCells(['Under Act(s)', 'Under Section(s)']),
+        createMockRowWithCells(['Criminal Law Amendment Act', '308ipc']),
+      ];
+
+      mockTables.push({
+        querySelectorAll: (query: string) => {
+          if (query === 'tr') return mockRows;
+          return [];
+        }
+      });
+
+      eval(ecourtsParserJS);
+
+      expect(mockPostMessage).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockPostMessage.mock.calls[0][0]);
+      expect(payload.status).toBe('success');
+
+      const parsedData = parseRawECourtsData(payload.data);
+      expect(parsedData.Undersection).toBe('308ipc (Criminal Law Amendment Act)');
+    });
+
+    it('should clean petitioner and respondent names (removing advocate details and numbering) from vertical tables', () => {
+      const createMockRowWithCells = (cellValues: string[]) => {
+        const mockCells = cellValues.map(val => ({ innerText: val, textContent: val }));
+        return {
+          querySelectorAll: (query: string) => {
+            if (query === 'td, th') return mockCells;
+            return [];
+          }
+        };
+      };
+
+      const mockRows = [
+        createMockRowWithCells(['Petitioner and Advocate']),
+        createMockRowWithCells(['1) state of up\n   Advocate- ADGC-7']),
+        createMockRowWithCells(['Respondent and Advocate']),
+        createMockRowWithCells(['1) Gopendra pal\n   Advocate - Anuj Kumar Gangwar'])
+      ];
+
+      mockTables.push({
+        querySelectorAll: (query: string) => {
+          if (query === 'tr') return mockRows;
+          return [];
+        }
+      });
+
+      eval(ecourtsParserJS);
+
+      expect(mockPostMessage).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockPostMessage.mock.calls[0][0]);
+      expect(payload.status).toBe('success');
+
+      const parsedData = parseRawECourtsData(payload.data);
+      expect(parsedData.FirstParty).toBe('state of up');
+      expect(parsedData.OppositeParty).toBe('Gopendra pal');
+      expect(parsedData.CaseTitle).toBe('state of up vs. Gopendra pal');
+    });
+
+    it('should extract Next Hearing Date and skip First Hearing Date', () => {
+      mockTables.push(createMockTable([
+        { label: 'First Hearing Date', value: '18th December 2014' },
+        { label: 'Next Hearing Date', value: '16th June 2026' }
+      ]));
+
+      eval(ecourtsParserJS);
+
+      expect(mockPostMessage).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockPostMessage.mock.calls[0][0]);
+      expect(payload.status).toBe('success');
+
+      const parsedData = parseRawECourtsData(payload.data);
+      expect(parsedData.NextDate).toBe('16th June 2026');
+    });
+
+    it('should parse court name from headings with various keywords', () => {
+      mockTables.push(createMockTable([
+        { label: 'CNR Number', value: 'UPBR010031532014' }
+      ]));
+
+      mockHeadings.push({ innerText: 'District and Session Judge', textContent: 'District and Session Judge' });
+
+      eval(ecourtsParserJS);
+
+      expect(mockPostMessage).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockPostMessage.mock.calls[0][0]);
+      expect(payload.status).toBe('success');
+
+      const parsedData = parseRawECourtsData(payload.data);
+      expect(parsedData.court_name).toBe('District and Session Judge');
+    });
+
+    it('should handle errors during evaluation gracefully', () => {
+      (global as any).document.querySelectorAll = () => {
+        throw new Error('Query error');
+      };
+
+      eval(ecourtsParserJS);
+
+      expect(mockPostMessage).toHaveBeenCalledTimes(1);
+      const payload = JSON.parse(mockPostMessage.mock.calls[0][0]);
+      expect(payload.status).toBe('error');
+      expect(payload.message).toContain('Query error');
+    });
+  });
+});

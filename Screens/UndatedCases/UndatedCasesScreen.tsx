@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useContext } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
-import { formatDate } from '../../utils/commonFunctions';
+import { formatDate, getLocalDateString } from '../../utils/commonFunctions';
 import * as db from '../../DataBase';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
@@ -34,13 +34,12 @@ const UndatedCasesScreen = () => {
   const fetchUndatedCases = async () => {
     try {
       const allCases = await db.getCases();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const todayStr = getLocalDateString(new Date());
 
       const filteredCases = allCases.filter(c => {
-        if (!c.NextDate) return true;
-        const nextHearingDate = new Date(c.NextDate);
-        return nextHearingDate < today;
+        if (!c.NextDate || c.NextDate === 'N/A' || c.NextDate === '') return true;
+        const caseDate = c.NextDate.split('T')[0];
+        return caseDate < todayStr;
       });
 
       const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
@@ -95,7 +94,7 @@ const UndatedCasesScreen = () => {
 
       // 2. Update case's next hearing date
       await db.updateCase(caseId, {
-        NextDate: nextHearingDate.toISOString(),
+        NextDate: getLocalDateString(nextHearingDate),
       }, userId);
 
       // 3. Refresh the list

@@ -149,7 +149,7 @@ import * as db from '../../DataBase';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
-import { getCurrentUserId, formatDate } from '../../utils/commonFunctions';
+import { getCurrentUserId, formatDate, getLocalDateString } from '../../utils/commonFunctions';
 import { exportDailyCauseListToPdf } from '../../utils/pdfExporter';
 import { Alert } from 'react-native';
 import { useAdTrigger } from '../CommonComponents/AdManager';
@@ -178,12 +178,12 @@ const TodaysCasesSection = () => {
   const fetchTodaysCases = async () => {
     try {
       const allCases = await db.getCases();
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalDateString(new Date());
 
       const filteredCases = allCases.filter(c => {
         if (!c.NextDate) return false;
-        const nextHearingDate = new Date(c.NextDate).toISOString().split('T')[0];
-        return nextHearingDate === today;
+        const caseDate = c.NextDate.split('T')[0];
+        return caseDate === today;
       });
 
       const mappedCases: CaseDataScreen[] = filteredCases.map(mapCaseDbToScreen);
@@ -229,7 +229,7 @@ const TodaysCasesSection = () => {
 
       // 2. Update case's next hearing date
       await db.updateCase(caseId, {
-        NextDate: nextHearingDate.toISOString(),
+        NextDate: getLocalDateString(nextHearingDate),
       }, userId);
 
       // 3. Refresh the list
@@ -250,11 +250,11 @@ const TodaysCasesSection = () => {
           try {
             const todayStr = format(new Date(), "eeee, MMMM d, yyyy");
             const allDbCases = await db.getCases();
-            const today = new Date().toISOString().split('T')[0];
+            const today = getLocalDateString(new Date());
             const filteredDbCases = allDbCases.filter(c => {
               if (!c.NextDate) return false;
-              const nextHearingDate = new Date(c.NextDate).toISOString().split('T')[0];
-              return nextHearingDate === today;
+              const caseDate = c.NextDate.split('T')[0];
+              return caseDate === today;
             });
 
             await exportDailyCauseListToPdf(filteredDbCases, todayStr);

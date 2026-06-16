@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useContext } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
-import { formatDate } from '../../utils/commonFunctions';
+import { formatDate, getLocalDateString } from '../../utils/commonFunctions';
 import * as db from '../../DataBase';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
@@ -34,16 +34,14 @@ const YesterdaysCasesScreen = () => {
   const fetchYesterdaysCases = async () => {
     try {
       const allCases = await db.getCases();
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      const yesterdayString = yesterday.toISOString().split('T')[0];
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayString = getLocalDateString(yesterday);
 
       const filteredCases = allCases.filter(c => {
         if (!c.NextDate) return false;
-        const nextHearingDate = new Date(c.NextDate);
-        const nextHearingDateString = nextHearingDate.toISOString().split('T')[0];
-        return nextHearingDateString === yesterdayString;
+        const caseDate = c.NextDate.split('T')[0];
+        return caseDate === yesterdayString;
       });
 
       const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
@@ -98,7 +96,7 @@ const YesterdaysCasesScreen = () => {
 
       // 2. Update case's next hearing date
       await db.updateCase(caseId, {
-        NextDate: nextHearingDate.toISOString(),
+        NextDate: getLocalDateString(nextHearingDate),
       }, userId);
 
       // 3. Refresh the list

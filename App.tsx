@@ -96,7 +96,7 @@ const isVersionOlder = (local: string, remote: string) => {
   return false;
 };
 
-export default function App() {
+function AppContent() {
   const { theme } = useContext(ThemeContext);
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -278,47 +278,55 @@ export default function App() {
   }
 
   return (
+    <>
+      <NavigationContainer>
+        <SafeAreaView
+          style={{
+            flex: 1,
+            backgroundColor: theme.colors.background,
+          }}
+        >
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {onboardingComplete ? (
+              <Stack.Screen name="App">
+                {(props) => (
+                  <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+                    <Routes {...props} />
+                  </Animated.View>
+                )}
+              </Stack.Screen>
+            ) : (
+              <Stack.Screen
+                name="Onboarding"
+                component={OnboardingNavigator}
+              />
+            )}
+          </Stack.Navigator>
+        </SafeAreaView>
+      </NavigationContainer>
+      <CustomAlertModal />
+      <UpdateCheckModal
+        visible={updateModalVisible}
+        onClose={() => setUpdateModalVisible(false)}
+        forceUpdate={forceUpdate}
+        playStoreUrl={playStoreUrl}
+        appStoreUrl={appStoreUrl}
+        releaseNotes={releaseNotes}
+        latestVersion={latestVersion}
+      />
+    </>
+  );
+}
+
+export default function App() {
+  return (
     <ThemeProvider>
       <LanguageProvider>
         <OnboardingProvider>
           <AdProvider>
-            <NavigationContainer>
-            <SafeAreaView
-              style={{
-                flex: 1,
-                backgroundColor: theme.colors.background,
-              }}
-            >
-              <Stack.Navigator screenOptions={{ headerShown: false }}>
-                {onboardingComplete ? (
-                  <Stack.Screen name="App">
-                    {(props) => (
-                      <Animated.View style={[{ flex: 1 }, animatedStyle]}>
-                        <Routes {...props} />
-                      </Animated.View>
-                    )}
-                  </Stack.Screen>
-                ) : (
-                  <Stack.Screen
-                    name="Onboarding"
-                    component={OnboardingNavigator}
-                  />
-                )}
-              </Stack.Navigator>
-            </SafeAreaView>
-          </NavigationContainer>
-          <CustomAlertModal />
-          <UpdateCheckModal
-            visible={updateModalVisible}
-            onClose={() => setUpdateModalVisible(false)}
-            forceUpdate={forceUpdate}
-            playStoreUrl={playStoreUrl}
-            appStoreUrl={appStoreUrl}
-            releaseNotes={releaseNotes}
-            latestVersion={latestVersion}
-          />
-        </AdProvider>
-      </OnboardingProvider>
+            <AppContent />
+          </AdProvider>
+        </OnboardingProvider>
       </LanguageProvider>
     </ThemeProvider>
   );

@@ -24,6 +24,7 @@ export interface CaseData {
   case_type_id?: number | null; // FK to CaseTypes table
   case_number?: string | null; // From schema.ts, can be different from CaseTitle
   case_year?: number | null;
+  session_trial_number?: string | null;
   crime_number?: string | null;
   crime_year?: number | null;
 

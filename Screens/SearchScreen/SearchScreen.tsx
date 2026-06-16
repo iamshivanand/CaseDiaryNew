@@ -6,7 +6,7 @@ import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { CaseDataScreen } from "../../Types/appTypes";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
-import { getCurrentUserId } from "../../utils/commonFunctions";
+import { getCurrentUserId, getLocalDateString } from "../../utils/commonFunctions";
 import { useSearchCases } from "../../Hooks/useCases";
 import * as db from "../../DataBase";
 
@@ -55,7 +55,7 @@ const SearchScreen: React.FC = () => {
 
       // 2. Update case's next hearing date
       await db.updateCase(caseId, {
-        NextDate: nextHearingDate.toISOString(),
+        NextDate: getLocalDateString(nextHearingDate),
       }, userId);
 
       // 3. Refresh list from page 0

@@ -15,11 +15,13 @@ import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as db from "../../DataBase";
+import * as Animatable from "react-native-animatable";
 import { getUserState } from "../../utils/locationService";
 import { v4 as uuidv4 } from "uuid";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider"; // Import ThemeContext and Theme type
 import { useTranslation } from "../../Providers/LanguageProvider";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getLocalDateString, parseLocalDate } from "../../utils/commonFunctions";
 
 import { getEditCaseScreenStyles } from "./EditCaseScreenStyle"; // Import the function
 import FormInput from "../CommonComponents/FormInput";
@@ -58,6 +60,16 @@ const dummyCourtOptions: DropdownOption[] = [
 ];
 
 type EditCaseScreenRouteProp = RouteProp<RootStackParamList, "EditCase">;
+
+const deduplicateOptions = (options: DropdownOption[]): DropdownOption[] => {
+  const seen = new Set<string>();
+  return options.filter(opt => {
+    const key = opt.label.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 const EditCaseScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -131,7 +143,7 @@ const EditCaseScreen: React.FC = () => {
         value: ps.id
       }));
       formatted.push({ label: "Other", value: "Other" });
-      setPoliceStationOptions(formatted);
+      setPoliceStationOptions(deduplicateOptions(formatted));
     } catch (error) {
       console.error("Error fetching filtered police stations:", error);
     }
@@ -256,11 +268,11 @@ const EditCaseScreen: React.FC = () => {
             const caseTypesList = await db.getCaseTypes(activeUserId);
             const formattedCaseTypes = caseTypesList.map(ct => ({ label: ct.name, value: ct.id }));
             formattedCaseTypes.push({ label: "Other", value: "Other" });
-            setCaseTypeOptions(formattedCaseTypes);
+            setCaseTypeOptions(deduplicateOptions(formattedCaseTypes));
           } catch (error) {
             console.error("Error fetching case types:", error);
             const formattedFallback = dummyCaseTypeOptions.filter(o => o.value !== "");
-            setCaseTypeOptions(formattedFallback);
+            setCaseTypeOptions(deduplicateOptions(formattedFallback));
           }
 
           // Fetch Courts
@@ -268,11 +280,11 @@ const EditCaseScreen: React.FC = () => {
             const courtsList = await db.getCourts(activeUserId);
             const formattedCourts = courtsList.map(c => ({ label: c.name, value: c.id }));
             formattedCourts.push({ label: "Other", value: "Other" });
-            setCourtOptions(formattedCourts);
+            setCourtOptions(deduplicateOptions(formattedCourts));
           } catch (error) {
             console.error("Error fetching courts:", error);
             const formattedFallback = dummyCourtOptions.filter(o => o.value !== "");
-            setCourtOptions(formattedFallback);
+            setCourtOptions(deduplicateOptions(formattedFallback));
           }
 
           // Fetch districts
@@ -291,7 +303,7 @@ const EditCaseScreen: React.FC = () => {
               value: d.id
             }));
             formattedDistricts.push({ label: "Other", value: "Other" });
-            setDistrictOptions(formattedDistricts);
+            setDistrictOptions(deduplicateOptions(formattedDistricts));
           } catch (error) {
             console.error("Error fetching districts:", error);
           }
@@ -792,7 +804,12 @@ const EditCaseScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContentContainer}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.formContainer}>
+        <Animatable.View 
+          animation="fadeInUp" 
+          duration={600} 
+          useNativeDriver 
+          style={styles.formContainer}
+        >
           <FormInput
             label={t("field_case_title")}
             value={caseData.CaseTitle || ""}
@@ -889,9 +906,9 @@ const EditCaseScreen: React.FC = () => {
           />
           <DatePickerField
             label={t("field_filed_date")}
-            value={caseData.FiledDate ? new Date(caseData.FiledDate) : null}
+            value={caseData.FiledDate ? parseLocalDate(caseData.FiledDate) : null}
             onChange={(date) =>
-              handleInputChange("FiledDate", date ? date.toISOString() : null)
+              handleInputChange("FiledDate", date ? getLocalDateString(date) : null)
             }
           />
           <FormInput
@@ -920,33 +937,33 @@ const EditCaseScreen: React.FC = () => {
           />
           <DatePickerField
             label={t("field_hearing_date")}
-            value={caseData.HearingDate ? new Date(caseData.HearingDate) : null}
+            value={caseData.HearingDate ? parseLocalDate(caseData.HearingDate) : null}
             onChange={(date) =>
-              handleInputChange("HearingDate", date ? date.toISOString() : null)
+              handleInputChange("HearingDate", date ? getLocalDateString(date) : null)
             }
           />
           <DatePickerField
             label={t("field_statute_of_limitations")}
             value={
               caseData.StatuteOfLimitations
-                ? new Date(caseData.StatuteOfLimitations)
+                ? parseLocalDate(caseData.StatuteOfLimitations)
                 : null
             }
             onChange={(date) =>
               handleInputChange(
                 "StatuteOfLimitations",
-                date ? date.toISOString() : null
+                date ? getLocalDateString(date) : null
               )
             }
           />
           {caseData.Status === "Closed" && (
             <DatePickerField
               label={t("field_date_closed")}
-              value={caseData.ClosedDate ? new Date(caseData.ClosedDate) : null}
+              value={caseData.ClosedDate ? parseLocalDate(caseData.ClosedDate) : null}
               onChange={(date) =>
                 handleInputChange(
                   "ClosedDate",
-                  date ? date.toISOString() : null
+                  date ? getLocalDateString(date) : null
                 )
               }
             />
@@ -1035,7 +1052,7 @@ const EditCaseScreen: React.FC = () => {
                 ))
             )}
           </View>
-        </View>
+        </Animatable.View>
       </ScrollView>
       <View style={styles.bottomButtonContainer}>
         <ActionButton

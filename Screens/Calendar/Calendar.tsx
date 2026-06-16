@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import React, { useState, useCallback, useContext } from "react";
-import { formatDate } from "../../utils/commonFunctions";
+import { formatDate, getLocalDateString, parseLocalDate } from "../../utils/commonFunctions";
 import {
   ScrollView,
   StyleSheet,
@@ -31,7 +31,7 @@ const CalendarScreen: React.FC<Props> = () => {
   const { t, locale } = useTranslation();
   const currentDate = new Date();
   const [selected, setSelected] = useState(
-    currentDate.toISOString().slice(0, 10)
+    getLocalDateString(currentDate)
   );
   const [ResultToshow, setResultToShow] = useState<CaseDataScreen[]>([]);
   const [markedDates, setMarkedDates] = useState<any>({});
@@ -44,9 +44,8 @@ const CalendarScreen: React.FC<Props> = () => {
     const allCases = await db.getCases();
     const filteredCases = allCases.filter(c => {
       if (!c.NextDate) return false;
-      const nextHearingDate = new Date(c.NextDate).toISOString().split('T')[0];
-      const selectedDate = new Date(date).toISOString().split('T')[0];
-      return nextHearingDate === selectedDate;
+      const caseDate = c.NextDate.split('T')[0];
+      return caseDate === date;
     });
 
     const mappedCases: CaseDataScreen[] = filteredCases.map(mapCaseDbToScreen);
@@ -55,10 +54,12 @@ const CalendarScreen: React.FC<Props> = () => {
 
   const fetchAllDates = async () => {
     const allCases = await db.getCases();
-    const datesArray = allCases.map((item) => item.NextDate).filter(Boolean);
+    const datesArray = allCases
+      .map((item) => item.NextDate ? item.NextDate.split('T')[0] : null)
+      .filter(Boolean);
 
     const formattedDates = datesArray.reduce((acc: any, date) => {
-      const dateString = new Date(date).toISOString().split('T')[0];
+      const dateString = date;
       if (acc[dateString]) {
         acc[dateString].eventsCount += 1;
       } else {
@@ -104,7 +105,7 @@ const CalendarScreen: React.FC<Props> = () => {
 
       // 2. Update case's next hearing date
       await db.updateCase(caseId, {
-        NextDate: nextHearingDate.toISOString(),
+        NextDate: getLocalDateString(nextHearingDate),
       }, userId);
 
       // 3. Refresh the list
@@ -253,7 +254,7 @@ const CalendarScreen: React.FC<Props> = () => {
           <View style={styles.agendaHeader}>
             <Icon name="calendar-clock" size={22} color={theme.colors.primary} style={{ marginRight: 8 }} />
             <Text style={[styles.dateSubheading, { color: theme.colors.text }]}>
-              {t("cal_agenda_for")} {new Date(selected).toLocaleDateString(locale === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {t("cal_agenda_for")} {parseLocalDate(selected)?.toLocaleDateString(locale === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </Text>
           </View>
           

@@ -1,7 +1,10 @@
-// Screens/CommonComponents/DropdownPicker.tsx
 import React, { useContext, useState } from "react";
-import { View, Text, Platform, TextInput } from "react-native";
+import { View, Text, Platform, TextInput, LayoutAnimation, UIManager } from "react-native";
 import { Picker } from "@react-native-picker/picker";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { getDropdownPickerStyles } from "./DropdownPickerStyle";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { DropdownOption } from "../../Types/appTypes";
@@ -15,6 +18,7 @@ interface DropdownPickerProps {
   error?: string | null;
   placeholder?: string;
   onOtherValueChange?: (text: string) => void;
+  otherValue?: string;
   testID?: string;
 }
 
@@ -27,25 +31,32 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
   error,
   placeholder,
   onOtherValueChange,
+  otherValue,
   testID,
 }) => {
   const { theme } = useContext(ThemeContext);
   const styles = getDropdownPickerStyles(theme);
-  const [otherValue, setOtherValue] = useState("");
+  const [localOtherValue, setLocalOtherValue] = useState("");
+
+  const displayOtherValue = otherValue !== undefined ? otherValue : localOtherValue;
 
   const pickerOptions = placeholder
     ? [{ label: placeholder, value: "" } as DropdownOption, ...options]
     : options;
 
   const handleValueChange = (itemValue: string | number, itemIndex: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onValueChange(itemValue, itemIndex);
     if (itemValue !== "Other") {
-      setOtherValue("");
+      setLocalOtherValue("");
+      if (onOtherValueChange) {
+        onOtherValueChange("");
+      }
     }
   };
 
   const handleOtherTextChange = (text: string) => {
-    setOtherValue(text);
+    setLocalOtherValue(text);
     if (onOtherValueChange) {
       onOtherValueChange(text);
     }
@@ -92,7 +103,7 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
         <TextInput
           style={styles.otherInput}
           placeholder="Please specify"
-          value={otherValue}
+          value={displayOtherValue}
           onChangeText={handleOtherTextChange}
         />
       )}

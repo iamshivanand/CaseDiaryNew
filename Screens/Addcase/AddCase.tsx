@@ -33,11 +33,14 @@ import {
   getDb,
   getCourts,
   getCaseTypes,
+  addCaseTimelineEvent,
 } from "../../DataBase";
+import * as Animatable from "react-native-animatable";
+import { convertIndianDateToLocal } from "../../utils/ecourtsParser";
 import { getUserState } from "../../utils/locationService";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { CaseDataScreen } from "../../Types/appTypes";
-import { formatDate } from "../../utils/commonFunctions";
+import { formatDate, getLocalDateString, parseLocalDate } from "../../utils/commonFunctions";
 import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen";
 import { CaseData, DropdownOption as AppDropdownOption, caseStatusOptions, priorityOptions } from "../../Types/appTypes";
 
@@ -48,6 +51,7 @@ import ActionButton from "../CommonComponents/ActionButton";
 import { getAddCaseStyles } from "./AddCaseStyle";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 import { useTranslation } from "../../Providers/LanguageProvider";
+import { ECourtsImportModal } from "./components/ECourtsImportModal";
 
 interface FieldDefinition {
   name: keyof CaseData;
@@ -78,6 +82,7 @@ const formFieldsDefinition: FieldDefinition[] = [
   { name: "CaseTitle", type: "text", placeholder: "e.g., State vs. John Doe", label: "Case Title*", suggestions: true },
   { name: "CNRNumber", type: "text", placeholder: "Enter CNR Number", label: "CNR Number"},
   { name: "case_number", type: "text", placeholder: "e.g., CS/123/2023", label: "Case Number" },
+  { name: "session_trial_number", type: "text", placeholder: "Enter Sessions Trial Number", label: "Sessions Trial Number" },
   { name: "crime_number", type: "text", placeholder: "e.g., 123", label: "Crime/FIR No." },
   { name: "crime_year", type: "text", placeholder: new Date().getFullYear().toString(), label: "Year", maxLength: 4, keyboardType: "numeric" },
   { name: "Undersection", type: "text", placeholder: "e.g., Section 302 IPC", label: "Under Section(s)", suggestions: true },
@@ -105,7 +110,7 @@ const fieldGroups = [
   {
     title: "Client & Core Details",
     icon: "person-outline",
-    fields: ["CaseTitle", "CNRNumber", "case_number", "crime_number", "crime_year", "Undersection", "ClientName", "ClientContactNumber", "case_type_id", "court_id", "district_id", "police_station_id"]
+    fields: ["CaseTitle", "CNRNumber", "case_number", "session_trial_number", "crime_number", "crime_year", "Undersection", "ClientName", "ClientContactNumber", "case_type_id", "court_id", "district_id", "police_station_id"]
   },
   {
     title: "Parties & Court Details",
@@ -133,6 +138,7 @@ const getFieldLabelKey = (fieldName: string): string => {
     case "CaseTitle": return "field_case_title";
     case "ClientName": return "field_client_name";
     case "case_number": return "field_case_number";
+    case "session_trial_number": return "field_session_trial_number";
     case "crime_number": return "field_crime_number";
     case "crime_year": return "field_crime_year";
     case "CNRNumber": return "field_cnr_number";
@@ -163,6 +169,7 @@ const getFieldPlaceholderKey = (fieldName: string): string => {
     case "CaseTitle": return "placeholder_case_title";
     case "ClientName": return "placeholder_client_name";
     case "case_number": return "placeholder_case_number";
+    case "session_trial_number": return "placeholder_session_trial_number";
     case "crime_number": return "placeholder_crime_number";
     case "CNRNumber": return "placeholder_cnr_number";
     case "case_type_id": return "placeholder_case_type";
@@ -303,15 +310,26 @@ const FormFieldRenderer: React.FC<{
           options={getTranslatedOptions(selectOpts, t)}
           placeholder={translatedPlaceholder || `${t("alert_cancel")}...`}
           onOtherValueChange={(text) => setOtherValue(fieldName, text)}
+          otherValue={otherValues[fieldName]}
           testID={fieldConfig.testID}
         />
       );
     case "date":
-      return <DatePickerField {...commonInputProps} value={values[fieldName] ? new Date(values[fieldName] as string) : null} onChange={(date) => setFieldValue(fieldName, date ? date.toISOString() : null)} placeholder={translatedPlaceholder || "Select date"} />;
+      return <DatePickerField {...commonInputProps} value={values[fieldName] ? parseLocalDate(values[fieldName] as string) : null} onChange={(date) => setFieldValue(fieldName, date ? getLocalDateString(date) : null)} placeholder={translatedPlaceholder || "Select date"} />;
     default:
       console.warn("Unsupported field type:", fieldConfig.type);
       return null;
   }
+};
+
+const deduplicateOptions = (options: AppDropdownOption[]): AppDropdownOption[] => {
+  const seen = new Set<string>();
+  return options.filter(opt => {
+    const key = opt.label.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };
 
 const AddCase: React.FC<AddCaseProps> = ({ route }) => {
@@ -327,6 +345,91 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const uniqueIdToUse = routeUniqueId || initialValues?.uniqueId || generatedUniqueId;
 
   const [otherValues, setOtherValues] = useState<{ [key: string]: string }>({});
+  const [isECourtsModalVisible, setIsECourtsModalVisible] = useState(false);
+
+  const handleImportSuccess = (extractedData: any, setFieldValue: any) => {
+    if (extractedData.CaseTitle) setFieldValue("CaseTitle", extractedData.CaseTitle);
+    if (extractedData.CNRNumber) setFieldValue("CNRNumber", extractedData.CNRNumber);
+    if (extractedData.case_number) setFieldValue("case_number", extractedData.case_number);
+    if (extractedData.FirstParty) setFieldValue("FirstParty", extractedData.FirstParty);
+    if (extractedData.OppositeParty) setFieldValue("OppositeParty", extractedData.OppositeParty);
+    if (extractedData.NextDate) setFieldValue("HearingDate", extractedData.NextDate);
+
+    // Additional eCourts fields
+    if (extractedData.dateFiled) setFieldValue("FiledDate", extractedData.dateFiled);
+    if (extractedData.JudgeName) setFieldValue("JudgeName", extractedData.JudgeName);
+    if (extractedData.Undersection) setFieldValue("Undersection", extractedData.Undersection);
+    if (extractedData.OpposingCounsel) setFieldValue("OpposingCounsel", extractedData.OpposingCounsel);
+    if (extractedData.crime_number) setFieldValue("crime_number", extractedData.crime_number);
+    if (extractedData.crime_year) setFieldValue("crime_year", extractedData.crime_year);
+    if (extractedData.session_trial_number) setFieldValue("session_trial_number", extractedData.session_trial_number);
+
+    // Map status logically based on eCourts CaseStatus
+    if (extractedData.CaseStatus) {
+      const lowerStatus = extractedData.CaseStatus.toLowerCase();
+      if (lowerStatus.includes("disposed") || lowerStatus.includes("decided") || lowerStatus.includes("closed") || lowerStatus.includes("dismissed")) {
+        setFieldValue("Status", "Closed");
+      } else {
+        setFieldValue("Status", "In Progress");
+      }
+    } else if (extractedData.NextDate) {
+      setFieldValue("Status", "In Progress");
+    }
+
+    // Fuzzy matching for Court Option
+    if (extractedData.court_name) {
+      const normalizedScrapedCourt = extractedData.court_name.toLowerCase().trim();
+      const match = courtOptions.find(opt => {
+        const normalizedOpt = opt.label.toLowerCase().trim();
+        return normalizedOpt.includes(normalizedScrapedCourt) || normalizedScrapedCourt.includes(normalizedOpt);
+      });
+      if (match) {
+        setFieldValue("court_id", match.value);
+      } else {
+        setFieldValue("court_id", "Other");
+        setOtherValue("court_id", extractedData.court_name);
+      }
+    }
+
+    // Fuzzy matching for Case Type Option
+    if (extractedData.case_type_name) {
+      const normalizedScrapedType = extractedData.case_type_name.toLowerCase().trim();
+      const match = caseTypeOptions.find(opt => {
+        const normalizedOpt = opt.label.toLowerCase().trim();
+        return normalizedOpt.includes(normalizedScrapedType) || normalizedScrapedType.includes(normalizedOpt);
+      });
+      if (match) {
+        setFieldValue("case_type_id", match.value);
+      } else {
+        setFieldValue("case_type_id", "Other");
+        setOtherValue("case_type_id", extractedData.case_type_name);
+      }
+    }
+
+    // Fuzzy matching for Police Station Option
+    if (extractedData.police_station) {
+      const normalizedScrapedPS = extractedData.police_station.toLowerCase().trim();
+      const match = policeStationOptions.find(opt => {
+        const normalizedOpt = opt.label.toLowerCase().trim();
+        return normalizedOpt.includes(normalizedScrapedPS) || normalizedScrapedPS.includes(normalizedOpt);
+      });
+      if (match) {
+        setFieldValue("police_station_id", match.value);
+      } else {
+        setFieldValue("police_station_id", "Other");
+        setOtherValue("police_station_id", extractedData.police_station);
+      }
+    }
+
+    // Populate raw scraped data into Case Notes to avoid losing any other fields
+    if (extractedData.rawTables && extractedData.rawTables.length > 0) {
+      const formattedLines = extractedData.rawTables.map(
+        (item: any) => `${item.label}: ${item.value}`
+      ).join('\n');
+      const importNotes = `--- Imported from eCourts ---\n${formattedLines}`;
+      setFieldValue("CaseNotes", importNotes);
+    }
+  };
   const setOtherValue = (fieldName: string, value: string) => {
     setOtherValues((prev) => ({ ...prev, [fieldName]: value }));
   };
@@ -423,7 +526,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         value: ps.id
       }));
       formatted.push({ label: 'Other', value: 'Other' });
-      setPoliceStationOptions(formatted);
+      setPoliceStationOptions(deduplicateOptions(formatted));
     } catch (error) {
       console.error("Error fetching filtered police stations:", error);
     }
@@ -452,7 +555,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const caseTypesList = await getCaseTypes(activeUserId);
         const formattedCaseTypes = caseTypesList.map(ct => ({ label: ct.name, value: ct.id }));
         formattedCaseTypes.push({ label: 'Other', value: 'Other' });
-        setCaseTypeOptions(formattedCaseTypes);
+        setCaseTypeOptions(deduplicateOptions(formattedCaseTypes));
       } catch (error) {
         console.error("Error fetching case types:", error);
       }
@@ -461,7 +564,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         const courtsList = await getCourts(activeUserId);
         const formattedCourts = courtsList.map(c => ({ label: c.name, value: c.id }));
         formattedCourts.push({ label: 'Other', value: 'Other' });
-        setCourtOptions(formattedCourts);
+        setCourtOptions(deduplicateOptions(formattedCourts));
       } catch (error) {
         console.error("Error fetching courts:", error);
       }
@@ -481,7 +584,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           value: d.id
         }));
         formatted.push({ label: 'Other', value: 'Other' });
-        setDistrictOptions(formatted);
+        setDistrictOptions(deduplicateOptions(formatted));
       } catch (error) {
         console.error("Error fetching districts:", error);
       }
@@ -536,7 +639,11 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       if (initialValues.uniqueId) mappedInitialValues.uniqueId = initialValues.uniqueId;
       if (initialValues.id) mappedInitialValues.id = initialValues.id;
       if (initialValues.caseNumber) mappedInitialValues.CaseTitle = initialValues.caseNumber;
-      if (initialValues.dateFiled) mappedInitialValues.FiledDate = initialValues.dateFiled.toISOString();
+      if (initialValues.dateFiled) {
+        mappedInitialValues.FiledDate = initialValues.dateFiled instanceof Date 
+          ? getLocalDateString(initialValues.dateFiled) 
+          : getLocalDateString(new Date(initialValues.dateFiled));
+      }
 
       const initialCourt = courtOptions.find(opt => opt.label === initialValues.court);
       if (initialCourt) mappedInitialValues.court_id = initialCourt.value;
@@ -653,6 +760,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         case_type_name: caseTypeNameString,
         ...(changedFields.case_number && { case_number: changedFields.case_number }),
         ...(changedFields.case_year && { case_year: changedFields.case_year ? parseInt(changedFields.case_year as string, 10) : null }),
+        ...(changedFields.session_trial_number && { session_trial_number: changedFields.session_trial_number }),
         crime_number: crimeNo,
         crime_year: crimeYr,
         ...(changedFields.JudgeName && { JudgeName: changedFields.JudgeName }),
@@ -709,6 +817,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         case_type_name: caseTypeNameString,
         case_number: formValues.case_number || null,
         case_year: formValues.case_year ? parseInt(formValues.case_year as string, 10) : null,
+        session_trial_number: formValues.session_trial_number || null,
         crime_number: crimeNo,
         crime_year: crimeYr,
         JudgeName: formValues.JudgeName || null,
@@ -766,8 +875,38 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           >
             {(formikProps) => (
               <View>
+                {!update && (
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: `${theme.colors.primary}0D`,
+                      borderColor: theme.colors.primary,
+                      borderWidth: 1.5,
+                      borderStyle: "dashed",
+                      borderRadius: 12,
+                      paddingVertical: 14,
+                      paddingHorizontal: 16,
+                      marginBottom: 16,
+                    }}
+                    onPress={() => setIsECourtsModalVisible(true)}
+                  >
+                    <Ionicons name="cloud-download-outline" size={22} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                    <Text style={{ color: theme.colors.primary, fontSize: 15, fontWeight: "bold" }}>
+                      {t("btn_import_ecourts") || "Import Details from eCourts"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
                 {fieldGroups.map((group, groupIdx) => (
-                  <View key={groupIdx} style={[styles.groupCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border, borderWidth: 1 }]}>
+                  <Animatable.View 
+                    key={groupIdx} 
+                    animation="fadeInUp" 
+                    delay={groupIdx * 100} 
+                    duration={500} 
+                    useNativeDriver 
+                    style={[styles.groupCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border, borderWidth: 1 }]}
+                  >
                      <View style={[styles.groupHeader, { borderBottomWidth: 1, borderBottomColor: theme.colors.border }]}>
                       <Ionicons name={group.icon as any} size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
                       <Text style={[styles.groupTitle, { color: theme.colors.text }]}>
@@ -828,7 +967,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
                           />
                         );
                       })}
-                  </View>
+                  </Animatable.View>
                 ))}
                 <View style={styles.actionButtonContainer}>
                   <ActionButton
@@ -842,6 +981,11 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
                     type="secondary"
                   />
                 </View>
+                <ECourtsImportModal
+                  visible={isECourtsModalVisible}
+                  onClose={() => setIsECourtsModalVisible(false)}
+                  onImportSuccess={(data) => handleImportSuccess(data, formikProps.setFieldValue)}
+                />
               </View>
             )}
           </Formik>

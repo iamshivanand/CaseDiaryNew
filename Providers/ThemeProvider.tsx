@@ -57,17 +57,17 @@ const lightTheme: Theme = {
 const darkTheme: Theme = {
   dark: true,
   colors: {
-    primary: "#3B82F6", // Electric Sapphire Blue
-    secondary: "#FBBF24", // Champagne Gold
-    background: "#0F172A", // Slate-900
-    cardBackground: "#1E293B", // Slate-800
-    inputBackground: "#334155", // Slate-700
-    border: "#334155", // Slate-700
-    text: "#F8FAFC", // Slate-50
-    textSecondary: "#94A3B8", // Slate-400
-    success: "#34D399",
+    primary: "#6366F1", // Indigo Accent
+    secondary: "#38BDF8", // Sky Cyan Accent
+    background: "#0B0F19", // Midnight Sapphire Deep Black
+    cardBackground: "#161D2B", // Obsidian Navy Card
+    inputBackground: "#202B3E", // Steel Metallic Slate Input
+    border: "#2E3A4E", // Subtle Navy Border
+    text: "#F8FAFC", // Pure Off-White
+    textSecondary: "#94A3B8", // Pastel Slate Muted
+    success: "#10B981", // Vibrant Emerald Success
     warning: "#FBBF24",
-    danger: "#F87171",
+    danger: "#EF4444",
   },
   fonts: {
     regular: "Inter_400Regular",

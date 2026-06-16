@@ -104,6 +104,8 @@ export interface Case {
   OppositeParty?: string | null;    // Name of the opposite party (e.g., Defendant/Respondent)
   Accussed?: string | null;         // Name(s) of accused, if applicable
   ClientContactNumber?: string | null; // Contact number for the primary client
+  session_trial_number?: string | null; // Sessions Trial Number
+
 
   // Counsel Details
   JudgeName?: string | null;        // Name of the presiding judge
@@ -222,6 +224,8 @@ CREATE TABLE IF NOT EXISTS Cases (
   CNRNumber TEXT,
   case_number TEXT,
   case_year INTEGER,
+  session_trial_number TEXT,
+
 
   -- Court and Type (Name stored directly, ID for future linking)
   court_id INTEGER,         -- Retained for future linking, FK constraint removed
@@ -331,6 +335,18 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   // Cases table must be created before CaseDocuments and CaseHistoryLog if they have FKs to it
   await db.execAsync(CREATE_CASES_TABLE);
   await db.execAsync(CREATE_CASES_UPDATED_AT_TRIGGER); // Trigger for Cases
+
+  // Schema migration: Add column session_trial_number if it does not exist
+  try {
+    const tableInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(Cases);");
+    const hasSessionTrialNumber = tableInfo.some(col => col.name === 'session_trial_number');
+    if (!hasSessionTrialNumber) {
+      await db.execAsync("ALTER TABLE Cases ADD COLUMN session_trial_number TEXT;");
+      console.log("Migration: Added column session_trial_number to Cases table successfully.");
+    }
+  } catch (migrationError) {
+    console.error("Error migrating Cases table for session_trial_number:", migrationError);
+  }
   
   // Create indexes on Cases table for O(log N) query lookup speed
   await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_user_id ON Cases(user_id);`);
@@ -346,8 +362,71 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   await initializeUserProfileDB(db);
   await initializeUserInformationDB(db);
 
+  // Sanitize existing duplicates in lookup tables asynchronously in background
+  sanitizeLookupTable(db, 'CaseTypes', 'case_type_id', ['user_id']);
+  sanitizeLookupTable(db, 'Courts', 'court_id', ['user_id']);
+  sanitizeLookupTable(db, 'PoliceStations', 'police_station_id', ['district_id', 'user_id']);
+
   console.log("Database schema initialized.");
 };
+
+// Sanitizer for lookup tables to remove case-insensitive duplicates and clean Cases FK references
+const sanitizeLookupTable = async (
+  db: SQLite.SQLiteDatabase,
+  tableName: string,
+  foreignKeyCol: string,
+  extraGroupingCols: string[] = []
+): Promise<void> => {
+  try {
+    const grouping = ['LOWER(name)', ...extraGroupingCols].join(', ');
+    const selectCols = ['LOWER(name) as name_lower', ...extraGroupingCols].join(', ');
+    
+    const duplicateGroups = await db.getAllAsync<any>(
+      `SELECT ${selectCols} FROM ${tableName} GROUP BY ${grouping} HAVING COUNT(*) > 1`
+    );
+
+    for (const group of duplicateGroups) {
+      const whereClauses = [`LOWER(name) = ?`];
+      const params: any[] = [group.name_lower];
+      
+      for (const col of extraGroupingCols) {
+        if (group[col] === null || group[col] === undefined) {
+          whereClauses.push(`${col} IS NULL`);
+        } else {
+          whereClauses.push(`${col} = ?`);
+          params.push(group[col]);
+        }
+      }
+      
+      const rows = await db.getAllAsync<{ id: number, name: string }>(
+        `SELECT id, name FROM ${tableName} WHERE ${whereClauses.join(' AND ')} ORDER BY id ASC`,
+        params
+      );
+
+      if (rows.length > 1) {
+        const primaryRow = rows[0];
+        const duplicateIds = rows.slice(1).map(r => r.id);
+        const placeholders = duplicateIds.map(() => '?').join(', ');
+
+        // Update cases referencing duplicate IDs to reference primary ID
+        await db.runAsync(
+          `UPDATE Cases SET ${foreignKeyCol} = ? WHERE ${foreignKeyCol} IN (${placeholders})`,
+          [primaryRow.id, ...duplicateIds]
+        );
+
+        // Delete duplicate entries from lookup table
+        await db.runAsync(
+          `DELETE FROM ${tableName} WHERE id IN (${placeholders})`,
+          duplicateIds
+        );
+        console.log(`Sanitization: Merged duplicates in ${tableName} to primary ID ${primaryRow.id} (name: "${primaryRow.name}")`);
+      }
+    }
+  } catch (error) {
+    console.error(`Error sanitizing table ${tableName}:`, error);
+  }
+};
+
 
 // Utility to check if a table exists
 export const tableExists = async (db: SQLite.SQLiteDatabase, tableName: string): Promise<boolean> => {
@@ -367,17 +446,24 @@ export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> 
     await db.withTransactionAsync(async () => {
       for (const stateObj of statesAndDistrictsData.states) {
         for (const distName of stateObj.districts) {
-          await db.runAsync(
-            "INSERT OR IGNORE INTO Districts (name, state, user_id) VALUES (?, ?, NULL)",
-            [distName.trim(), stateObj.state.trim()]
+          const trimmedDist = distName.trim();
+          const trimmedState = stateObj.state.trim();
+          const existing = await db.getFirstAsync<{ id: number }>(
+            "SELECT id FROM Districts WHERE LOWER(name) = LOWER(?) AND LOWER(state) = LOWER(?) AND user_id IS NULL",
+            [trimmedDist, trimmedState]
           );
+          if (!existing) {
+            await db.runAsync(
+              "INSERT INTO Districts (name, state, user_id) VALUES (?, ?, NULL)",
+              [trimmedDist, trimmedState]
+            );
+          }
         }
       }
     });
     console.log("Predefined districts seeded or already exist.");
   } catch (error) {
     console.error("Error seeding predefined districts:", error);
-    // Decide if you want to throw, or just log and continue
   }
 
   // Seed Police Stations for Delhi, Maharashtra, and Uttar Pradesh
@@ -406,10 +492,17 @@ export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> 
         }
 
         for (const psName of stations) {
-          await db.runAsync(
-            "INSERT OR IGNORE INTO PoliceStations (name, district_id, user_id) VALUES (?, ?, NULL)",
-            [psName.trim(), dist.id]
+          const trimmedPs = psName.trim();
+          const existing = await db.getFirstAsync<{ id: number }>(
+            "SELECT id FROM PoliceStations WHERE LOWER(name) = LOWER(?) AND (district_id = ? OR (district_id IS NULL AND ? IS NULL)) AND user_id IS NULL",
+            [trimmedPs, dist.id, dist.id]
           );
+          if (!existing) {
+            await db.runAsync(
+              "INSERT INTO PoliceStations (name, district_id, user_id) VALUES (?, ?, NULL)",
+              [trimmedPs, dist.id]
+            );
+          }
         }
       }
     });
@@ -421,16 +514,21 @@ export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> 
   // Seed Case Types
   try {
     for (const caseType of PREDEFINED_CASE_TYPES) {
-      // Current DDL has UNIQUE (name, user_id), so user_id NULL means unique by name.
-      await db.runAsync(
-        "INSERT OR IGNORE INTO CaseTypes (name, user_id) VALUES (?, NULL)",
-        [caseType.name]
+      const trimmed = caseType.name.trim();
+      const existing = await db.getFirstAsync<{ id: number }>(
+        "SELECT id FROM CaseTypes WHERE LOWER(name) = LOWER(?) AND user_id IS NULL",
+        [trimmed]
       );
+      if (!existing) {
+        await db.runAsync(
+          "INSERT INTO CaseTypes (name, user_id) VALUES (?, NULL)",
+          [trimmed]
+        );
+      }
     }
     console.log("Predefined case types seeded or already exist.");
   } catch (error) {
     console.error("Error seeding predefined case types:", error);
-    // Decide if you want to throw, or just log and continue
   }
 
   // Seed Mock Cases for manual testing

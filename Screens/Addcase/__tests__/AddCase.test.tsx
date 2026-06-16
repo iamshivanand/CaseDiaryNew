@@ -31,6 +31,13 @@ jest.mock('@react-navigation/native', () => ({
   }),
 }));
 
+jest.mock('react-native-webview', () => {
+  const { View } = require('react-native');
+  return {
+    WebView: View,
+  };
+});
+
 describe('AddCase', () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -132,5 +139,21 @@ describe('AddCase', () => {
     const lockTitle = await findByText('Case Action Limit Reached');
     expect(lockTitle).toBeTruthy();
     getItemSpy.mockRestore();
+  });
+
+  it('should render the Import from eCourts button and trigger the modal on click', async () => {
+    const { getByText, queryByText } = render(<AddCase route={{ params: {} }} />);
+    const importButton = getByText('Import Details from eCourts');
+    expect(importButton).toBeTruthy();
+
+    // Verify modal is not displayed initially
+    expect(queryByText('eCourts Case Importer')).toBeNull();
+
+    // Trigger modal opening
+    fireEvent.press(importButton);
+
+    // Verify modal opens and instruction banner is shown
+    expect(getByText('eCourts Case Importer')).toBeTruthy();
+    expect(getByText(/Search for your case, solve the CAPTCHA/)).toBeTruthy();
   });
 });
