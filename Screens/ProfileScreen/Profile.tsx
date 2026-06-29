@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useCallback } from "react";
 import {
   View,
   ScrollView,
@@ -18,6 +18,7 @@ import {
   getTotalCases,
   getUpcomingHearings,
 } from "../../DataBase";
+import { useFocusEffect } from "@react-navigation/native";
 import ProfileHeader from "./components/ProfileHeader";
 import ActionButton from "../CommonComponents/ActionButton";
 import StatCard from "./components/StatCard"; // For non-editable stats
@@ -50,34 +51,35 @@ const ProfileScreen: React.FC = () => {
   const [tempLanguages, setTempLanguages] = useState("");
   const [tempYearsOfPractice, setTempYearsOfPractice] = useState("");
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      console.log("Fetching profile data...");
-      const db = await getDb();
-      const userId = await AsyncStorage.getItem("@user_id");
-      console.log("User ID from AsyncStorage:", userId);
-      if (userId) {
-        const profile = await getUserProfile(db, parseInt(userId, 10));
-        console.log("Profile data from DB:", profile);
-        const totalCases = await getTotalCases(db, parseInt(userId, 10));
-        const upcomingHearings = await getUpcomingHearings(
-          db,
-          parseInt(userId, 10)
-        );
-        if (profile) {
-          setProfileData({
-            ...profile,
-            stats: {
-              ...profile.stats,
-              totalCases,
-              upcomingHearings,
-            },
-          });
+  useFocusEffect(
+    useCallback(() => {
+      const fetchProfile = async () => {
+        console.log("Fetching profile data...");
+        const db = await getDb();
+        const userId = await AsyncStorage.getItem("@user_id");
+        console.log("User ID from AsyncStorage:", userId);
+        if (userId) {
+          const parsedUserId = parseInt(userId, 10);
+          const profile = await getUserProfile(db, parsedUserId);
+          console.log("Profile data from DB:", profile);
+          // getTotalCases and getUpcomingHearings call getDb() internally — no db arg
+          const totalCases = await getTotalCases(parsedUserId);
+          const upcomingHearings = await getUpcomingHearings(parsedUserId);
+          if (profile) {
+            setProfileData({
+              ...profile,
+              stats: {
+                ...profile.stats,
+                totalCases,
+                upcomingHearings,
+              },
+            });
+          }
         }
-      }
-    };
-    fetchProfile();
-  }, [AsyncStorage]);
+      };
+      fetchProfile();
+    }, [])
+  );
 
   // Effect to reset temp states if actual data changes from elsewhere (e.g. future API refresh)
   // or when exiting an edit mode.

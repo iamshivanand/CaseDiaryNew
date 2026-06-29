@@ -1,20 +1,46 @@
-// DataBase/connection.ts
 import * as SQLite from 'expo-sqlite';
 import { initializeSchema, seedInitialData } from './schema'; // Assuming schema.ts is in the same directory
+import { drizzle, ExpoSQLiteDatabase } from 'drizzle-orm/expo-sqlite';
+import * as schema from './drizzleSchema';
 
 const DATABASE_NAME = "CaseDiary.db";
 let dbInstance: SQLite.SQLiteDatabase | null = null;
+let drizzleDb: ExpoSQLiteDatabase<typeof schema> | null = null;
+
+export const getDrizzleDb = async (): Promise<ExpoSQLiteDatabase<typeof schema>> => {
+  const db = await getDb();
+  if (drizzleDb === null) {
+    drizzleDb = drizzle(db, { schema });
+  }
+  return drizzleDb;
+};
+
+/**
+ * Closes the active database connection and clears the singleton instance.
+ */
+export const resetDbInstance = async (): Promise<void> => {
+  console.log("Resetting DB instance from connection.ts.");
+  if (dbInstance) {
+    try {
+      await dbInstance.closeAsync();
+      console.log("DataBase/connection.ts: Database connection closed successfully.");
+    } catch (error) {
+      console.error("DataBase/connection.ts: Failed to close database connection:", error);
+    }
+  }
+  dbInstance = null;
+  drizzleDb = null;
+};
 
 /**
  * ONLY FOR TEST ENVIRONMENTS. Clears the singleton dbInstance.
  */
 export const __TEST_ONLY_resetDbInstance = () => {
-  if (process.env.NODE_ENV === 'test') {
-    console.log("Resetting DB instance from connection.ts for test environment.");
-    dbInstance = null;
-  } else {
-    console.warn("__TEST_ONLY_resetDbInstance called outside of test environment. This is not allowed.");
+  if (dbInstance) {
+    dbInstance.closeAsync().catch(err => console.error("Error closing in test reset:", err));
   }
+  dbInstance = null;
+  drizzleDb = null;
 };
 
 export const getDb = async (): Promise<SQLite.SQLiteDatabase> => {

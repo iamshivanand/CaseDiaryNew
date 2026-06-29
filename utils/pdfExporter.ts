@@ -10,9 +10,12 @@ const appPromoFooterHtml = `
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
       </svg>
-      <span style="font-weight: bold; color: #1E3A8A; font-size: 12px; vertical-align: middle; letter-spacing: 0.5px;">CaseDiary</span>
+      <span style="font-weight: bold; color: #1E3A8A; font-size: 12px; vertical-align: middle; letter-spacing: 0.5px;">Advocase</span>
     </div>
-    <div style="margin-top: 4px; font-size: 10px; color: #777;">This is generated from CaseDiary</div>
+    <div style="margin-top: 4px; font-size: 10px; color: #555;">
+      Generated using <strong>Advocase</strong>. Get your digital case diary now at 
+      <a href="https://play.google.com/store/apps/details?id=com.iamshiv.CaseDiary" style="color: #1E3A8A; text-decoration: underline; font-weight: bold;">Google Play Store</a>.
+    </div>
   </div>
 `;
 

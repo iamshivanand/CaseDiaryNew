@@ -35,3 +35,24 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# SQLite databases & temp files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+DataBase/data.db
+DataBase/test_backup_unencrypted.db
+DataBase/test_import.csv
+DataBase/test_import.json
+DataBase/Settings.xml
+
+# EAS configuration & local credentials
+.eas/
+credentials.json
+
+# log files
+*.log
+yarn-error.log
+npm-debug.log
+

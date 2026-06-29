@@ -105,7 +105,7 @@ const GenericModal: React.FC<GenericModalProps> = ({
                         key={option.value}
                         label={option.label}
                         value={option.value}
-                        color={theme.dark ? "#FFFFFF" : "#000000"}
+                        color={theme.colors.text}
                         style={{ backgroundColor: theme.colors.cardBackground }}
                       />
                     ))}

@@ -1,6 +1,7 @@
 import { NavigationContainer } from "@react-navigation/native";
 import React, { useContext, useEffect, useState } from "react";
 import { SafeAreaView, ActivityIndicator, View, Platform, Alert } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import mobileAds, { AppOpenAd, TestIds, AdEventType } from "react-native-google-mobile-ads";
 import { AdProvider, preloadAds } from "./Screens/CommonComponents/AdManager";
@@ -12,6 +13,14 @@ import UpdateCheckModal from "./Screens/CommonComponents/UpdateCheckModal";
 
 // Initialize the global alert interceptor
 initializeAlertInterceptor();
+
+// Global production console stripping
+if (!__DEV__) {
+  console.log = () => {};
+  console.info = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+}
 
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Animated, {
@@ -75,9 +84,13 @@ const OnboardingNavigator = () => (
   </OnboardingStack.Navigator>
 );
 
-// Production Android ID: ca-app-pub-6084954144919761/6781969722
-// Production iOS ID: ca-app-pub-3940256099942544/5575469517
-const appOpenAdUnitId = TestIds.APP_OPEN;
+// Android: ca-app-pub-6084954144919761/6781969722
+// iOS: ca-app-pub-3940256099942544/5575469517
+const appOpenAdUnitId = __DEV__
+  ? TestIds.APP_OPEN
+  : Platform.OS === "ios"
+  ? "ca-app-pub-3940256099942544/5575469517"
+  : "ca-app-pub-6084954144919761/6781969722";
 
 const appOpenAd = AppOpenAd.createForAdRequest(appOpenAdUnitId, {
   requestNonPersonalizedAdsOnly: true,
@@ -279,6 +292,7 @@ function AppContent() {
 
   return (
     <>
+      <StatusBar style={theme.dark ? "light" : "dark"} />
       <NavigationContainer>
         <SafeAreaView
           style={{

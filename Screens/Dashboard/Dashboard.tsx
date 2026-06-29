@@ -8,6 +8,7 @@ import { ThemeContext } from '../../Providers/ThemeProvider';
 import { useTranslation } from '../../Providers/LanguageProvider';
 import { mapCaseDbToScreen } from '../../utils/caseMapper';
 import { LinearGradient } from 'expo-linear-gradient';
+import { promptClientNotification } from '../../utils/whatsappNotifier';
 
 const WelcomeCard = () => {
   const { theme } = useContext(ThemeContext);
@@ -154,6 +155,97 @@ import { exportDailyCauseListToPdf } from '../../utils/pdfExporter';
 import { Alert } from 'react-native';
 import { useAdTrigger } from '../CommonComponents/AdManager';
 
+// ---- Stats Section ----
+const StatsSection = () => {
+  const { theme } = useContext(ThemeContext);
+  const navigation = useNavigation();
+  const { t } = useTranslation();
+  const [totalCases, setTotalCases] = useState(0);
+  const [upcomingHearings, setUpcomingHearings] = useState(0);
+
+  const fetchStats = async () => {
+    try {
+      const total = await db.getTotalCases();
+      const upcoming = await db.getUpcomingHearings();
+      setTotalCases(total);
+      setUpcomingHearings(upcoming);
+    } catch (e) {
+      console.error('Error fetching dashboard stats:', e);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchStats();
+    }, [])
+  );
+
+  const statCards = [
+    {
+      label: t('dash_stat_total_cases') || 'Total Cases',
+      value: totalCases,
+      icon: 'folder-open',
+      color: '#6366F1',
+      onPress: () => navigation.navigate('AllCases' as any),
+    },
+    {
+      label: t('dash_stat_upcoming') || 'Upcoming Hearings',
+      value: upcomingHearings,
+      icon: 'calendar',
+      color: '#10B981',
+      onPress: () => navigation.navigate('AllCases' as any),
+    },
+  ];
+
+  return (
+    <View style={{ marginBottom: 24 }}>
+      <SectionHeader title={t('dash_overview') || 'Overview'} />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        {statCards.map((card) => (
+          <TouchableOpacity
+            key={card.label}
+            onPress={card.onPress}
+            activeOpacity={0.85}
+            style={{
+              flex: 1,
+              marginHorizontal: 4,
+              backgroundColor: theme.colors.cardBackground,
+              borderRadius: 14,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 6,
+              elevation: 2,
+            }}
+          >
+            <View style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              backgroundColor: `${card.color}15`,
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 8,
+            }}>
+              <Ionicons name={card.icon as any} size={22} color={card.color} />
+            </View>
+            <Text style={{ fontSize: 26, fontWeight: '800', color: theme.colors.text }}>
+              {card.value}
+            </Text>
+            <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2, textAlign: 'center' }}>
+              {card.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+};
+
 const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
   return (
     <Animated.View entering={FadeInDown.delay(index * 100)}>
@@ -234,6 +326,11 @@ const TodaysCasesSection = () => {
 
       // 3. Refresh the list
       fetchTodaysCases();
+
+      // 4. Prompt WhatsApp notification to the client
+      setTimeout(() => {
+        promptClientNotification(caseId, getLocalDateString(nextHearingDate), notes);
+      }, 500);
     } catch (error) {
       console.error("Error updating hearing:", error);
     }
@@ -326,8 +423,8 @@ const TodaysCasesSection = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
-          onSave={(notes, nextHearingDate) =>
-            handleSaveHearing(notes, nextHearingDate, getCurrentUserId())
+          onSave={async (notes, nextHearingDate) =>
+            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId())
           }
         />
       )}
@@ -343,6 +440,7 @@ const DashboardScreen = () => {
         <View style={styles.content}>
           <WelcomeCard />
           <QuickActionsGrid />
+          {/* <StatsSection /> */}
           {/* <AdvertisementSection /> */}
           <TodaysCasesSection />
         </View>

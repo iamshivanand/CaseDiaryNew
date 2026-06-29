@@ -167,6 +167,29 @@ const CaseDetailsScreen: React.FC = () => {
     navigation.navigate("EditCase", { caseId: parseInt(caseDetails.id, 10) });
   };
 
+  const handleDeleteCase = () => {
+    Alert.alert(
+      t("casedetails_delete_title") || "Delete Case",
+      t("casedetails_delete_confirm") || "Are you sure you want to permanently delete this case? This action cannot be undone.",
+      [
+        { text: t("alert_cancel") || "Cancel", style: "cancel" },
+        {
+          text: t("casedetails_delete_btn") || "Delete",
+          style: "destructive",
+          onPress: async () => {
+            if (!caseDetails?.id) return;
+            try {
+              await db.deleteCase(parseInt(caseDetails.id.toString(), 10));
+              if (navigation.canGoBack()) navigation.goBack();
+            } catch (error) {
+              Alert.alert(t("alert_error") || "Error", "Failed to delete the case. Please try again.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleAddNewDocument = () => {
     // Navigate to a screen for adding documents
     // @ts-ignore
@@ -541,6 +564,13 @@ const CaseDetailsScreen: React.FC = () => {
                 />
               </View>
             </View>
+            <View style={{ marginTop: 12 }}>
+              <ActionButton
+                title={t("btn_delete_case") || "🗑️  Delete Case"}
+                onPress={handleDeleteCase}
+                type="danger"
+              />
+            </View>
           </View>
         );
       case "documentsHeader":
@@ -595,29 +625,29 @@ const CaseDetailsScreen: React.FC = () => {
               onChangeText={setCustomReminderText}
             />
             <View style={styles.modalButtonContainer}>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: '#25D366' }]}
+              <ActionButton
+                title={t("reminder_send_whatsapp")}
                 onPress={handleSendReminderWhatsApp}
-              >
-                <Ionicons name="logo-whatsapp" size={18} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={styles.modalButtonText}>{t("reminder_send_whatsapp")}</Text>
-              </TouchableOpacity>
+                leftIcon={<Ionicons name="logo-whatsapp" size={18} color="#FFF" />}
+                style={{ backgroundColor: '#25D366', marginVertical: 4 }}
+                textStyle={{ color: '#FFF' }}
+              />
               
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: '#3B82F6' }]}
+              <ActionButton
+                title={t("reminder_send_sms")}
                 onPress={handleSendReminderSMS}
-              >
-                <Ionicons name="chatbubble-ellipses" size={18} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={styles.modalButtonText}>{t("reminder_send_sms")}</Text>
-              </TouchableOpacity>
+                leftIcon={<Ionicons name="chatbubble-ellipses" size={18} color="#FFF" />}
+                style={{ backgroundColor: '#3B82F6', marginVertical: 4 }}
+                textStyle={{ color: '#FFF' }}
+              />
               
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: '#6B7280' }]}
+              <ActionButton
+                title={t("reminder_copy_clipboard")}
                 onPress={handleCopyReminderToClipboard}
-              >
-                <Ionicons name="copy" size={18} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={styles.modalButtonText}>{t("reminder_copy_clipboard")}</Text>
-              </TouchableOpacity>
+                leftIcon={<Ionicons name="copy" size={18} color="#FFF" />}
+                style={{ backgroundColor: '#6B7280', marginVertical: 4 }}
+                textStyle={{ color: '#FFF' }}
+              />
             </View>
             
             <TouchableOpacity

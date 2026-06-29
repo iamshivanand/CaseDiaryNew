@@ -6,7 +6,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../Types/navigationtypes';
 import { ThemeContext, ThemeMode } from '../../Providers/ThemeProvider';
 import { useTranslation } from '../../Providers/LanguageProvider';
-import { exportDatabaseBackup, importDatabaseBackup } from '../../utils/backupManager';
+import { exportDatabaseBackup } from '../../utils/backupManager';
 import { useAdTrigger } from '../CommonComponents/AdManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { reScheduleAllNotifications } from '../../utils/notificationScheduler';
@@ -159,17 +159,9 @@ const SettingsScreen = () => {
     }
   };
 
-  const handleRestore = async () => {
-    Alert.alert(
-      t("settings_restore_btn"),
-      locale === "en" 
-        ? "Warning: Restoring will overwrite your current database. Do you want to proceed?" 
-        : "चेतावनी: पुनर्स्थापित करने से आपका वर्तमान डेटाबेस अधिलेखित हो जाएगा। क्या आप आगे बढ़ना चाहते हैं?",
-      [
-        { text: t("alert_cancel"), style: "cancel" },
-        { text: t("alert_ok"), onPress: () => importDatabaseBackup() }
-      ]
-    );
+  const handleRestore = () => {
+    // @ts-ignore
+    navigation.navigate("DatabaseImportScreen");
   };
 
   const handleImportCSV = () => {

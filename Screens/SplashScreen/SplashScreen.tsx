@@ -10,6 +10,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { LinearGradient } from "expo-linear-gradient";
+import { StatusBar } from "expo-status-bar";
 
 const SplashScreen = () => {
   const logoScale = useSharedValue(0);
@@ -72,6 +73,7 @@ const SplashScreen = () => {
       colors={["#0F172A", "#1E1B4B", "#0F172A"]} // Sleek dark Indigo-Slate gradient
       style={styles.container}
     >
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       <View style={styles.logoOuterContainer}>
         {/* Animated Ripple Ring */}
         <Animated.View style={[styles.rippleRing, ringAnimatedStyle]} />

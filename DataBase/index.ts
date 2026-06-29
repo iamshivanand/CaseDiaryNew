@@ -5,11 +5,13 @@ import * as FileSystem from 'expo-file-system';
 import { CaseType, Court, District, PoliceStation, CaseDocument, Case as CaseRow, User } from './schema';
 
 // getDb is now imported from connection.ts
-import { getDb, __TEST_ONLY_resetDbInstance } from './connection';
+import { getDb, getDrizzleDb, __TEST_ONLY_resetDbInstance } from './connection';
 import { scheduleCaseReminder, cancelCaseReminder } from '../utils/notificationScheduler';
+import { eq, and } from 'drizzle-orm';
+import { Cases as drizzleCases } from './drizzleSchema';
 
 // Re-export getDb so it's available when importing from './DataBase'
-export { getDb };
+export { getDb, getDrizzleDb };
 
 const DOCUMENTS_DIRECTORY = FileSystem.documentDirectory + "documents/";
 
@@ -133,7 +135,7 @@ export type CaseUpdateData = Partial<Omit<CaseRow, 'id' | 'uniqueId' | 'created_
 import { formatDate, getLocalDateString } from '../utils/commonFunctions';
 
 export const addCase = async (caseData: CaseInsertData): Promise<number | null> => {
-  const db = await getDb(); if (!caseData.uniqueId) throw new Error("uniqueId is required.");
+  const drizzleDb = await getDrizzleDb(); if (!caseData.uniqueId) throw new Error("uniqueId is required.");
   const validCaseData: { [key: string]: any } = {};
   for (const key in caseData) {
     if (Object.prototype.hasOwnProperty.call(caseData, key)) {
@@ -145,15 +147,10 @@ export const addCase = async (caseData: CaseInsertData): Promise<number | null> 
       }
     }
   }
-  const fields = Object.keys(validCaseData).join(", ");
-  const placeholders = Object.keys(validCaseData).map(() => "?").join(", ");
-  const values = Object.values(validCaseData).map(val => (val === undefined ? null : val));
-  if (!fields || values.length === 0) throw new Error("No valid fields for addCase.");
+  if (Object.keys(validCaseData).length === 0) throw new Error("No valid fields for addCase.");
   try {
-    const sql = `INSERT INTO Cases (${fields}) VALUES (${placeholders})`;
-    console.log("Executing SQL for addCase:", sql, values);
-    const result = await db.runAsync(sql, values);
-    const caseId = result.lastInsertRowId;
+    const result = await drizzleDb.insert(drizzleCases).values(validCaseData).returning({ id: drizzleCases.id });
+    const caseId = result[0]?.id || null;
     if (caseId) {
       try {
         const newCase = await getCaseById(caseId);
@@ -165,7 +162,7 @@ export const addCase = async (caseData: CaseInsertData): Promise<number | null> 
       }
     }
     return caseId;
-  } catch (error) { console.error("Error adding case:", error, "SQL:", `INSERT INTO Cases (${fields}) VALUES (${placeholders})`, "Values:", values); throw error; }
+  } catch (error) { console.error("Error adding case via Drizzle:", error, "Values:", validCaseData); throw error; }
 };
 
 export interface CaseWithDetails extends CaseRow {
@@ -272,7 +269,7 @@ export const getCaseById = async (id: number, userId?: number | null): Promise<C
 };
 
 export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?: number | null): Promise<boolean> => {
-  const db = await getDb();
+  const drizzleDb = await getDrizzleDb();
   console.log("Updating case with ID:", id, "and data:", data);
   const currentCaseData = await getCaseById(id);
   if (!currentCaseData) {
@@ -294,18 +291,15 @@ export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?:
     console.warn("No fields for update.");
     return false;
   }
-  const fieldsToUpdate = Object.keys(validUpdateData)
-    .map((key) => `${key} = ?`)
-    .join(", ");
-  const valuesToUpdate = Object.values(validUpdateData).map((val) =>
-    val === undefined ? null : val
-  );
-  valuesToUpdate.push(id);
-  let sql = `UPDATE Cases SET ${fieldsToUpdate} WHERE id = ?`;
-  console.log("Executing SQL for updateCase:", sql, valuesToUpdate);
+
   try {
-    const result = await db.runAsync(sql, valuesToUpdate);
-    if (result.changes > 0) {
+    const result = await drizzleDb
+      .update(drizzleCases)
+      .set(validUpdateData)
+      .where(eq(drizzleCases.id, id))
+      .returning({ id: drizzleCases.id });
+    
+    if (result.length > 0) {
       try {
         const updatedCase = await getCaseById(id);
         if (updatedCase) {
@@ -322,20 +316,13 @@ export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?:
     }
     return false;
   } catch (error) {
-    console.error(
-      `Error updating case ID ${id}:`,
-      error,
-      "SQL:",
-      sql,
-      "Values:",
-      valuesToUpdate
-    );
+    console.error(`Error updating case ID ${id} via Drizzle:`, error);
     throw error;
   }
 };
 
 export const deleteCase = async (id: number, userId?: number | null): Promise<boolean> => {
-    const db = await getDb();
+    const drizzleDb = await getDrizzleDb();
     const documents = await getCaseDocuments(id);
     for (const doc of documents) {
         const filePath = getFullDocumentPath(doc.stored_filename);
@@ -349,10 +336,18 @@ export const deleteCase = async (id: number, userId?: number | null): Promise<bo
     } catch (e) {
       console.error("Failed to cancel notification on deleteCase:", e);
     }
-    let sql = "DELETE FROM Cases WHERE id = ?"; const params: any[] = [id];
-    if (userId != null) { sql += " AND user_id = ?"; params.push(userId); }
-    try { const result = await db.runAsync(sql, params); return result.changes > 0; }
-    catch (error) { console.error(`Error deleting case ID ${id}:`, error); throw error; }
+    try {
+      const conditions = [eq(drizzleCases.id, id)];
+      if (userId != null) {
+        conditions.push(eq(drizzleCases.user_id, userId));
+      }
+      const result = await drizzleDb
+        .delete(drizzleCases)
+        .where(and(...conditions))
+        .returning({ id: drizzleCases.id });
+      return result.length > 0;
+    }
+    catch (error) { console.error(`Error deleting case ID ${id} via Drizzle:`, error); throw error; }
 };
 
 export const searchCases = async (

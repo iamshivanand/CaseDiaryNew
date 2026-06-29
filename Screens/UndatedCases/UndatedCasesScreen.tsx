@@ -9,6 +9,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
 import { getCurrentUserId } from '../../utils/commonFunctions';
 import { ThemeContext } from '../../Providers/ThemeProvider';
+import { promptClientNotification } from '../../utils/whatsappNotifier';
 
 import { SafeAreaView, Platform } from "react-native";
 
@@ -46,7 +47,7 @@ const UndatedCasesScreen = () => {
         id: c.id,
         title: c.CaseTitle || 'No Title',
         client: c.ClientName || 'Unknown Client',
-        status: c.CaseStatus || 'Pending',
+        status: (c.CaseStatus === 'Active' || c.CaseStatus === 'Closed' || c.CaseStatus === 'Pending' ? c.CaseStatus : 'Pending') as 'Active' | 'Closed' | 'Pending',
         nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
         lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
         previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
@@ -99,6 +100,11 @@ const UndatedCasesScreen = () => {
 
       // 3. Refresh the list
       fetchUndatedCases();
+
+      // 4. Prompt WhatsApp notification to client
+      setTimeout(() => {
+        promptClientNotification(caseId, getLocalDateString(nextHearingDate), notes);
+      }, 500);
     } catch (error) {
       console.error("Error updating hearing:", error);
     }
@@ -135,8 +141,8 @@ const UndatedCasesScreen = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
-          onSave={(notes, nextHearingDate) =>
-            handleSaveHearing(notes, nextHearingDate, getCurrentUserId())
+          onSave={async (notes, nextHearingDate) =>
+            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId())
           }
         />
       )}

@@ -31,6 +31,7 @@ import SettingsScreen from "./Screens/Settings/SettingsScreen";
 import ManageLookupCategoryScreen from "./Screens/Settings/ManageLookupCategoryScreen";
 import ImportMigrationScreen from "./Screens/Onboarding/ImportMigrationScreen";
 import DuplicateReviewScreen from "./Screens/Onboarding/DuplicateReviewScreen";
+import DatabaseImportScreen from "./Screens/Settings/DatabaseImportScreen";
 
 // Import ParamList types
 import {
@@ -49,159 +50,196 @@ const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
 
 // Define Stack Navigators for each tab
 
-const HomeStack = () => (
-  <HomeStackNav.Navigator screenOptions={{ headerShown: true, headerTitleAlign: 'center' }}>
-    {/* Default to true for this stack */}
-    <HomeStackNav.Screen
-      name="HomeScreen"
-      component={DashboardScreen}
-      options={{ headerShown: false }}
-    />
-    {/* HomeScreen has custom header */}
-    <HomeStackNav.Screen
-      name="AllCases"
-      component={CasesList}
-      options={{ title: "All Cases" }}
-    />
-    {/* CaseDetail now points to the new CaseDetailsScreen (which was CaseDetailsScreenV2) */}
-    <HomeStackNav.Screen
-      name="CaseDetails"
-      component={CaseDetailsScreen} // This should be the new one, as CaseDetailsScreenV2 was renamed to this.
-      options={{
-        title: "Case Details",
-        headerBackground: () => (
-          <LinearGradient
-            colors={["#1E3A8A", "#3B82F6"]}
-            style={{ flex: 1 }}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          />
-        ),
-        headerTintColor: "#ffffff",
+const HomeStack = () => {
+  const { theme } = useContext(ThemeContext);
+  return (
+    <HomeStackNav.Navigator
+      screenOptions={{
+        headerShown: true,
+        headerTitleAlign: 'center',
+        headerStyle: {
+          backgroundColor: theme.colors.cardBackground,
+        },
+        headerTintColor: theme.colors.text,
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
       }}
-    />
-    {/* CaseDetailsV2 screen entry removed */}
-    <HomeStackNav.Screen
-      name="EditCase"
-      component={EditCaseScreen}
-      options={{ title: "Edit Case" }}
-    />
-    <HomeStackNav.Screen
-      name="AddCase"
-      component={AddCase}
-      options={{ title: "Add New Case" }}
-    />
-    <HomeStackNav.Screen
-      name="AddCaseDetails"
-      component={AddCaseDetails}
-      options={{ title: "Case Form" }}
-    />
-    <HomeStackNav.Screen
-      name="AddDocument"
-      component={AddDocumentScreen}
-      options={{ title: "Add Document" }}
-    />
-    <HomeStackNav.Screen
-      name="UndatedCases"
-      component={UndatedCasesScreen}
-      options={{ title: "Undated Cases" }}
-    />
-    <HomeStackNav.Screen
-      name="YesterdaysCases"
-      component={YesterdaysCasesScreen}
-      options={{ title: "Yesterday's Cases" }}
-    />
-    <HomeStackNav.Screen
-      name="GenerateDocument"
-      component={GenerateDocumentScreen}
-      options={{ title: "Draft Legal Document" }}
-    />
-    <HomeStackNav.Screen
-      name="DraftsHub"
-      component={DraftsHubScreen}
-      options={{ title: "Drafts Hub" }}
-    />
-    <HomeStackNav.Screen
-      name="ImportMigration"
-      component={ImportMigrationScreen}
-      options={{ title: "Import Data" }}
-    />
-    <HomeStackNav.Screen
-      name="DuplicateReview"
-      component={DuplicateReviewScreen}
-      options={{ title: "Resolve Duplicates" }}
-    />
-  </HomeStackNav.Navigator>
-);
+    >
+      {/* Default to true for this stack */}
+      <HomeStackNav.Screen
+        name="HomeScreen"
+        component={DashboardScreen}
+        options={{ headerShown: false }}
+      />
+      {/* HomeScreen has custom header */}
+      <HomeStackNav.Screen
+        name="AllCases"
+        component={CasesList}
+        options={{ title: "All Cases" }}
+      />
+      <HomeStackNav.Screen
+        name="CaseDetails"
+        component={CaseDetailsScreen} // This should be the new one, as CaseDetailsScreenV2 was renamed to this.
+        options={{
+          title: "Case Details",
+        }}
+      />
+      {/* CaseDetailsV2 screen entry removed */}
+      <HomeStackNav.Screen
+        name="EditCase"
+        component={EditCaseScreen}
+        options={{ title: "Edit Case" }}
+      />
+      <HomeStackNav.Screen
+        name="AddCase"
+        component={AddCase}
+        options={{ title: "Add New Case" }}
+      />
+      <HomeStackNav.Screen
+        name="AddCaseDetails"
+        component={AddCaseDetails}
+        options={{ title: "Case Form" }}
+      />
+      <HomeStackNav.Screen
+        name="AddDocument"
+        component={AddDocumentScreen}
+        options={{ title: "Add Document" }}
+      />
+      <HomeStackNav.Screen
+        name="UndatedCases"
+        component={UndatedCasesScreen}
+        options={{ title: "Undated Cases" }}
+      />
+      <HomeStackNav.Screen
+        name="YesterdaysCases"
+        component={YesterdaysCasesScreen}
+        options={{ title: "Yesterday's Cases" }}
+      />
+      <HomeStackNav.Screen
+        name="GenerateDocument"
+        component={GenerateDocumentScreen}
+        options={{ title: "Draft Legal Document" }}
+      />
+      <HomeStackNav.Screen
+        name="DraftsHub"
+        component={DraftsHubScreen}
+        options={{ title: "Drafts Hub" }}
+      />
+      <HomeStackNav.Screen
+        name="ImportMigration"
+        component={ImportMigrationScreen}
+        options={{ title: "Import Data" }}
+      />
+      <HomeStackNav.Screen
+        name="DuplicateReview"
+        component={DuplicateReviewScreen}
+        options={{ title: "Resolve Duplicates" }}
+      />
+    </HomeStackNav.Navigator>
+  );
+};
 
-const SearchStack = () => (
-  <SearchStackNav.Navigator screenOptions={{ headerShown: true, headerTitleAlign: 'center' }}>
-    <SearchStackNav.Screen name="SearchScreen" component={SearchScreen} options={{ headerShown: false }} />
-    <SearchStackNav.Screen
-      name="CaseDetails"
-      component={CaseDetailsScreen}
-      options={{
-        title: "Case Details",
-        headerBackground: () => (
-          <LinearGradient
-            colors={["#1E3A8A", "#3B82F6"]}
-            style={{ flex: 1 }}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          />
-        ),
-        headerTintColor: "#ffffff",
+const SearchStack = () => {
+  const { theme } = useContext(ThemeContext);
+  return (
+    <SearchStackNav.Navigator
+      screenOptions={{
+        headerShown: true,
+        headerTitleAlign: 'center',
+        headerStyle: {
+          backgroundColor: theme.colors.cardBackground,
+        },
+        headerTintColor: theme.colors.text,
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
       }}
-    />
-    <SearchStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
-  </SearchStackNav.Navigator>
-);
+    >
+      <SearchStackNav.Screen name="SearchScreen" component={SearchScreen} options={{ headerShown: false }} />
+      <SearchStackNav.Screen
+        name="CaseDetails"
+        component={CaseDetailsScreen}
+        options={{
+          title: "Case Details",
+        }}
+      />
+      <SearchStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
+    </SearchStackNav.Navigator>
+  );
+};
 
-const CalendarStack = () => (
-  <CalendarStackNav.Navigator screenOptions={{ headerShown: true, headerTitleAlign: 'center' }}>
-    <CalendarStackNav.Screen name="CalendarScreen" component={CalendarScreen} options={{ headerShown: false }} />
-    <CalendarStackNav.Screen
-      name="CaseDetails"
-      component={CaseDetailsScreen}
-      options={{
-        title: "Case Details",
-        headerBackground: () => (
-          <LinearGradient
-            colors={["#1E3A8A", "#3B82F6"]}
-            style={{ flex: 1 }}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          />
-        ),
-        headerTintColor: "#ffffff",
+const CalendarStack = () => {
+  const { theme } = useContext(ThemeContext);
+  return (
+    <CalendarStackNav.Navigator
+      screenOptions={{
+        headerShown: true,
+        headerTitleAlign: 'center',
+        headerStyle: {
+          backgroundColor: theme.colors.cardBackground,
+        },
+        headerTintColor: theme.colors.text,
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
       }}
-    />
-    <CalendarStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
-  </CalendarStackNav.Navigator>
-);
+    >
+      <CalendarStackNav.Screen name="CalendarScreen" component={CalendarScreen} options={{ headerShown: false }} />
+      <CalendarStackNav.Screen
+        name="CaseDetails"
+        component={CaseDetailsScreen}
+        options={{
+          title: "Case Details",
+        }}
+      />
+      <CalendarStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
+    </CalendarStackNav.Navigator>
+  );
+};
 
-const ProfileStack = () => (
-  <ProfileStackNav.Navigator screenOptions={{ headerShown: false, headerTitleAlign: 'center' }}>
-    <ProfileStackNav.Screen name="ProfileScreen" component={ProfileScreen} />
-    <ProfileStackNav.Screen name="SettingsScreen" component={SettingsScreen} options={{ headerShown: true, title: "Settings" }}/>
-    <ProfileStackNav.Screen
-      name="ManageLookupCategoryScreen"
-      component={ManageLookupCategoryScreen}
-      options={({ route }) => ({ title: route.params.title || "Manage Category", headerShown: true })}
-    />
-    <ProfileStackNav.Screen
-      name="ImportMigration"
-      component={ImportMigrationScreen}
-      options={{ headerShown: true, title: "Import Data" }}
-    />
-    <ProfileStackNav.Screen
-      name="DuplicateReview"
-      component={DuplicateReviewScreen}
-      options={{ headerShown: true, title: "Resolve Duplicates" }}
-    />
-    {/* Add AccountDetails screens here */}
-  </ProfileStackNav.Navigator>
-);
+const ProfileStack = () => {
+  const { theme } = useContext(ThemeContext);
+  return (
+    <ProfileStackNav.Navigator
+      screenOptions={{
+        headerShown: false,
+        headerTitleAlign: 'center',
+        headerStyle: {
+          backgroundColor: theme.colors.cardBackground,
+        },
+        headerTintColor: theme.colors.text,
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
+      <ProfileStackNav.Screen name="ProfileScreen" component={ProfileScreen} />
+      <ProfileStackNav.Screen name="SettingsScreen" component={SettingsScreen} options={{ headerShown: true, title: "Settings" }}/>
+      <ProfileStackNav.Screen
+        name="ManageLookupCategoryScreen"
+        component={ManageLookupCategoryScreen}
+        options={({ route }) => ({ title: route.params.title || "Manage Category", headerShown: true })}
+      />
+      <ProfileStackNav.Screen
+        name="ImportMigration"
+        component={ImportMigrationScreen}
+        options={{ headerShown: true, title: "Import Data" }}
+      />
+      <ProfileStackNav.Screen
+        name="DuplicateReview"
+        component={DuplicateReviewScreen}
+        options={{ headerShown: true, title: "Resolve Duplicates" }}
+      />
+      <ProfileStackNav.Screen
+        name="DatabaseImportScreen"
+        component={DatabaseImportScreen}
+        options={{ headerShown: true, title: "Restore Backup" }}
+      />
+      {/* Add AccountDetails screens here */}
+    </ProfileStackNav.Navigator>
+  );
+};
 
 const TabIcon = ({ name, color, size, focused }: { name: string; color: string; size: number; focused: boolean }) => {
   const scale = useSharedValue(1);
@@ -248,7 +286,8 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
             "SettingsScreen",
             "ManageLookupCategoryScreen",
             "GenerateDocument",
-            "DraftsHub"
+            "DraftsHub",
+            "DatabaseImportScreen"
           ];
           const shouldHide = hideTabsOn.includes(routeName);
 

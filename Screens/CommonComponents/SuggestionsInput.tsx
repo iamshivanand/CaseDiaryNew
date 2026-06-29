@@ -134,6 +134,7 @@ const getStyles = (theme: any, hasError: boolean) =>
       paddingHorizontal: 12,
       fontSize: 16,
       color: theme.colors.text,
+      backgroundColor: theme.colors.inputBackground || theme.colors.background,
     },
     resultList: {
       maxHeight: 200,

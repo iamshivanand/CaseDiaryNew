@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
@@ -8,9 +8,11 @@ import Animated, {
   withDelay,
 } from 'react-native-reanimated';
 import { useTranslation } from '../../Providers/LanguageProvider';
+import { ThemeContext } from '../../Providers/ThemeProvider';
 
 const DoneScreen = ({ navigation }) => {
   const { t } = useTranslation();
+  const { theme } = useContext(ThemeContext);
   const opacity = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -29,11 +31,11 @@ const DoneScreen = ({ navigation }) => {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Animated.View style={[styles.content, animatedStyle]}>
-        <Ionicons name="checkmark-circle-outline" size={100} color="#2D60FF" />
-        <Text style={styles.title}>{t('onboarding_done_title')}</Text>
-        <Text style={styles.subtitle}>
+        <Ionicons name="checkmark-circle-outline" size={100} color={theme.colors.success} />
+        <Text style={[styles.title, { color: theme.colors.text }]}>{t('onboarding_done_title')}</Text>
+        <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
           {t('onboarding_done_desc')}
         </Text>
       </Animated.View>
@@ -44,7 +46,6 @@ const DoneScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -55,12 +56,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#1E1E1E',
     marginTop: 20,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280',
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 20,

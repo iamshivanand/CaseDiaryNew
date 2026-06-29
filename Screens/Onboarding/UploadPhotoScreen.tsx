@@ -5,9 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from '../../Providers/LanguageProvider';
+import { ThemeContext } from '../../Providers/ThemeProvider';
 
 const UploadPhotoScreen = ({ navigation }) => {
   const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
+  const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
 
   const handleChooseImage = async () => {
@@ -26,16 +28,16 @@ const UploadPhotoScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.stepText}>{t('onboarding_step_2_of_4')}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Text style={[styles.stepText, { color: theme.colors.textSecondary }]}>{t('onboarding_step_2_of_4')}</Text>
       <View style={styles.content}>
-        <TouchableOpacity style={styles.uploadBox} onPress={handleChooseImage}>
+        <TouchableOpacity style={[styles.uploadBox, { borderColor: theme.colors.border, backgroundColor: theme.colors.inputBackground }]} onPress={handleChooseImage}>
           {onboardingData.avatarUrl ? (
             <Image source={{ uri: onboardingData.avatarUrl }} style={styles.previewImage} />
           ) : (
             <>
-              <Ionicons name="cloud-upload-outline" size={48} color="#6B7280" />
-              <Text style={styles.uploadText}>{t('onboarding_tap_upload_photo')}</Text>
+              <Ionicons name="cloud-upload-outline" size={48} color={theme.colors.textSecondary} />
+              <Text style={[styles.uploadText, { color: theme.colors.textSecondary }]}>{t('onboarding_tap_upload_photo')}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -45,11 +47,11 @@ const UploadPhotoScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('SetupProfile')}
           />
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.skipText}>{t('btn_previous')}</Text>
+            <Text style={[styles.skipText, { color: theme.colors.primary }]}>{t('btn_previous')}</Text>
           </TouchableOpacity>
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('SetupProfile')}>
-          <Text style={styles.skipText}>{t('btn_skip')}</Text>
+          <Text style={[styles.skipText, { color: theme.colors.primary }]}>{t('btn_skip')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -59,7 +61,6 @@ const UploadPhotoScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     padding: 24,
   },
@@ -72,20 +73,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
     borderWidth: 2,
-    borderColor: '#D1D5DB',
     borderStyle: 'dashed',
     borderRadius: 10,
-    backgroundColor: '#F9FAFB',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
   },
   uploadText: {
-    color: '#6B7280',
     marginTop: 8,
   },
   skipText: {
-    color: '#2D60FF',
     marginTop: 16,
   },
   buttonContainer: {
@@ -99,7 +96,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     marginBottom: 20,
     fontSize: 16,
-    color: '#6B7280',
   },
   previewImage: {
     width: '100%',

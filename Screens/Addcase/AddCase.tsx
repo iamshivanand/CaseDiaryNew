@@ -1,5 +1,5 @@
 import { Formik, FormikProps } from "formik";
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -17,7 +17,7 @@ import { v4 as uuidv4 } from "uuid";
 import { Ionicons } from "@expo/vector-icons";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
+import { promptClientNotification } from "../../utils/whatsappNotifier";
 import {
   addCase,
   updateCase,
@@ -343,6 +343,32 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const navigation = useNavigation();
   const generatedUniqueId = useMemo(() => uuidv4(), []);
   const uniqueIdToUse = routeUniqueId || initialValues?.uniqueId || generatedUniqueId;
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const cardLayouts = useRef<{ [key: number]: number }>({});
+  const fieldLayouts = useRef<{ [key: string]: number }>({});
+
+  const FormikErrorScroller = ({ errors, submitCount }: { errors: any; submitCount: number }) => {
+    useEffect(() => {
+      if (submitCount > 0) {
+        const errorFields = Object.keys(errors);
+        if (errorFields.length > 0) {
+          const firstErrorField = errorFields[0];
+          const groupIdx = fieldGroups.findIndex(g => g.fields.includes(firstErrorField));
+          
+          const cardY = cardLayouts.current[groupIdx] || 0;
+          const fieldY = fieldLayouts.current[firstErrorField] || 0;
+          const targetY = cardY + fieldY;
+          
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollTo({ y: Math.max(0, targetY - 20), animated: true });
+          }
+        }
+      }
+    }, [submitCount]);
+    
+    return null;
+  };
 
   const [otherValues, setOtherValues] = useState<{ [key: string]: string }>({});
   const [isECourtsModalVisible, setIsECourtsModalVisible] = useState(false);
@@ -799,6 +825,11 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           navigation.navigate("CaseDetails", {
             caseId: caseIdToUpdate,
           });
+          if (updatePayload.NextDate) {
+            setTimeout(() => {
+              promptClientNotification(caseIdToUpdate, updatePayload.NextDate, "Hearing updated.");
+            }, 600);
+          }
         } else { Alert.alert(t("alert_error"), t("editcase_err_save_details")); }
       } catch (e) { console.error("Error updating case:", e); Alert.alert(t("alert_error"), t("editcase_err_general"));}
     } else {
@@ -839,7 +870,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         CaseDescription: formValues.CaseDescription || null,
         CaseNotes: formValues.CaseNotes || null,
       };
-
+ 
       console.log("Attempting to insert with payload:", JSON.stringify(insertPayload, null, 2));
       try {
         const newCaseId = await addCase(insertPayload);
@@ -849,6 +880,11 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           navigation.navigate("CaseDetails", {
             caseId: newCaseId,
           });
+          if (insertPayload.NextDate) {
+            setTimeout(() => {
+              promptClientNotification(newCaseId, insertPayload.NextDate, "New case registered.");
+            }, 600);
+          }
         } else {
           Alert.alert(t("alert_error"), t("editcase_err_save_details"));
         }
@@ -862,6 +898,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollViewStyle}
         contentContainerStyle={styles.scrollContentContainerStyle}
         keyboardShouldPersistTaps="handled"
@@ -875,6 +912,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           >
             {(formikProps) => (
               <View>
+                <FormikErrorScroller errors={formikProps.errors} submitCount={formikProps.submitCount} />
                 {!update && (
                   <TouchableOpacity
                     style={{
@@ -906,6 +944,9 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
                     duration={500} 
                     useNativeDriver 
                     style={[styles.groupCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border, borderWidth: 1 }]}
+                    onLayout={(event) => {
+                      cardLayouts.current[groupIdx] = event.nativeEvent.layout.y;
+                    }}
                   >
                      <View style={[styles.groupHeader, { borderBottomWidth: 1, borderBottomColor: theme.colors.border }]}>
                       <Ionicons name={group.icon as any} size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
@@ -919,7 +960,14 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
                         if (fieldConfig.name === 'crime_number') {
                           const crimeYearConfig = formFieldsDefinition.find(f => f.name === 'crime_year')!;
                           return (
-                            <View key="crime_row" style={{ flexDirection: 'row', gap: 12 }}>
+                            <View 
+                              key="crime_row" 
+                              style={{ flexDirection: 'row', gap: 12 }}
+                              onLayout={(event) => {
+                                fieldLayouts.current[fieldConfig.name] = event.nativeEvent.layout.y;
+                                fieldLayouts.current[crimeYearConfig.name] = event.nativeEvent.layout.y;
+                              }}
+                            >
                               <View style={{ flex: 2 }}>
                                 <FormFieldRenderer
                                   fieldConfig={fieldConfig}
@@ -952,19 +1000,25 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
                           );
                         }
                         return (
-                          <FormFieldRenderer
+                          <View
                             key={fieldConfig.name}
-                            fieldConfig={fieldConfig}
-                            formik={formikProps}
-                            otherValues={otherValues}
-                            setOtherValue={setOtherValue}
-                            suggestions={suggestions}
-                            policeStationOptions={policeStationOptions}
-                            districtOptions={districtOptions}
-                            onDistrictChange={handleDistrictChange}
-                            courtOptions={courtOptions}
-                            caseTypeOptions={caseTypeOptions}
-                          />
+                            onLayout={(event) => {
+                              fieldLayouts.current[fieldConfig.name] = event.nativeEvent.layout.y;
+                            }}
+                          >
+                            <FormFieldRenderer
+                              fieldConfig={fieldConfig}
+                              formik={formikProps}
+                              otherValues={otherValues}
+                              setOtherValue={setOtherValue}
+                              suggestions={suggestions}
+                              policeStationOptions={policeStationOptions}
+                              districtOptions={districtOptions}
+                              onDistrictChange={handleDistrictChange}
+                              courtOptions={courtOptions}
+                              caseTypeOptions={caseTypeOptions}
+                            />
+                          </View>
                         );
                       })}
                   </Animatable.View>

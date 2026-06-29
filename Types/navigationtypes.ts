@@ -51,6 +51,7 @@ export type ProfileStackParamList = {
   };
   ImportMigration: { isFromOnboarding?: boolean };
   DuplicateReview: undefined;
+  DatabaseImportScreen: undefined;
   // Example: AccountDetails: undefined;
 };
 

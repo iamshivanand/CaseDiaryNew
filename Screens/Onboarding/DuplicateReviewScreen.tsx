@@ -78,8 +78,8 @@ const DuplicateReviewScreen: React.FC = () => {
     
     return (
       <View style={[styles.pairContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.cardBackground }]}>
-        <View style={styles.matchBadgeContainer}>
-          <Text style={styles.matchBadgeText}>
+        <View style={[styles.matchBadgeContainer, { backgroundColor: theme.colors.inputBackground }]}>
+          <Text style={[styles.matchBadgeText, { color: theme.colors.textSecondary }]}>
             {isCnrMatch 
               ? t("duplicate_row_cnr").replace("{cnr}", item.case1.CNRNumber) 
               : t("duplicate_row_num_court").replace("{num}", item.case1.case_number || 'N/A').replace("{court}", item.case1.court_name || 'N/A')}
@@ -105,7 +105,7 @@ const DuplicateReviewScreen: React.FC = () => {
               onPress={() => handleDeleteCase(item.case1.id, index, 1)}
               type="dashed"
               style={styles.deleteBtn}
-              textStyle={{ color: '#EF4444' }}
+              textStyle={{ color: theme.colors.danger }}
             />
           </View>
 
@@ -127,7 +127,7 @@ const DuplicateReviewScreen: React.FC = () => {
               onPress={() => handleDeleteCase(item.case2.id, index, 2)}
               type="dashed"
               style={styles.deleteBtn}
-              textStyle={{ color: '#EF4444' }}
+              textStyle={{ color: theme.colors.danger }}
             />
           </View>
         </View>
@@ -156,7 +156,7 @@ const DuplicateReviewScreen: React.FC = () => {
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="shield-checkmark-outline" size={80} color="#10B981" />
+              <Ionicons name="shield-checkmark-outline" size={80} color={theme.colors.success} />
               <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
                 {t("duplicate_no_found")}
               </Text>
@@ -165,7 +165,7 @@ const DuplicateReviewScreen: React.FC = () => {
         />
       )}
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { borderTopColor: theme.colors.border, backgroundColor: theme.colors.cardBackground }]}>
         <ActionButton
           title={t("duplicate_btn_done")}
           onPress={() => navigation.goBack()}

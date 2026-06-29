@@ -9,7 +9,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-na
 interface ActionButtonProps {
   title: string;
   onPress: () => void;
-  type?: "primary" | "secondary" | "dashed";
+  type?: "primary" | "secondary" | "dashed" | "danger";
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
@@ -67,6 +67,11 @@ const ActionButton: React.FC<ActionButtonProps> = ({
       buttonStyleConfig = styles.dashedButton;
       textStyleConfig = styles.dashedButtonText;
       finalActivityIndicatorColor = textStyleConfig.color || theme.colors.primary;
+      break;
+    case "danger":
+      buttonStyleConfig = styles.dangerButton;
+      textStyleConfig = styles.dangerButtonText;
+      finalActivityIndicatorColor = "#FFFFFF";
       break;
     default:
       buttonStyleConfig = styles.primaryButton;

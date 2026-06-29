@@ -17,8 +17,11 @@ export function formatDate(dateString) {
   }
 }
 
-export const getCurrentUserId = () => {
-  return 1;
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const getCurrentUserId = async (): Promise<number> => {
+  const id = await AsyncStorage.getItem('@user_id');
+  return id ? parseInt(id, 10) : 1;
 };
 
 export function getLocalDateString(date: Date): string {

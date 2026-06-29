@@ -1,7 +1,7 @@
 import { AntDesign } from "@expo/vector-icons";
 import React, { useContext, useState, useCallback } from "react";
 import { View, Text, TextInput, FlatList, ActivityIndicator, SafeAreaView, StyleSheet, Platform } from "react-native";
-import { ThemeContext } from "../../Providers/ThemeProvider";
+import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { CaseDataScreen } from "../../Types/appTypes";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
@@ -9,6 +9,7 @@ import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPop
 import { getCurrentUserId, getLocalDateString } from "../../utils/commonFunctions";
 import { useSearchCases } from "../../Hooks/useCases";
 import * as db from "../../DataBase";
+import { promptClientNotification } from "../../utils/whatsappNotifier";
 
 const SearchScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
@@ -60,6 +61,11 @@ const SearchScreen: React.FC = () => {
 
       // 3. Refresh list from page 0
       refreshSearch();
+
+      // 4. Prompt WhatsApp notification to client
+      setTimeout(() => {
+        promptClientNotification(caseId, getLocalDateString(nextHearingDate), notes);
+      }, 500);
     } catch (error) {
       console.error("Error updating hearing:", error);
     }
@@ -137,8 +143,8 @@ const SearchScreen: React.FC = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
-          onSave={(notes, nextHearingDate) =>
-            handleSaveHearing(notes, nextHearingDate, getCurrentUserId())
+          onSave={async (notes, nextHearingDate) =>
+            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId())
           }
         />
       )}

@@ -1,16 +1,20 @@
 import { StyleSheet } from "react-native";
+import { Theme } from "../../Providers/ThemeProvider";
 
-export const InputStyles = StyleSheet.create({
+export const getInputStyles = (theme: Theme) => StyleSheet.create({
   textInput: {
     height: 40,
     minWidth: "90%",
-    borderWidth: 1, // Set the border width
-    borderColor: "gray", // Set the border color
-    borderRadius: 5, // Set the border radius for rounded corners
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 5,
     paddingHorizontal: 10,
     marginBottom: 20,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.inputBackground,
   },
   label: {
     marginBottom: 2,
+    color: theme.colors.textSecondary,
   },
 });

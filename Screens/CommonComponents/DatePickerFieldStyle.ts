@@ -7,41 +7,40 @@ export const getDatePickerFieldStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 8,
-    color: theme.colors.labelText || theme.colors.text,
+    color: theme.colors.text,
   },
   dateTouchable: {
     height: 48,
     borderWidth: 1,
-    borderColor: theme.colors.border || "#D1D5DB",
+    borderColor: theme.colors.border,
     borderRadius: 8,
-    backgroundColor: theme.colors.inputBackground || theme.colors.background,
+    backgroundColor: theme.colors.inputBackground,
     justifyContent: "center",
     paddingHorizontal: 12,
   },
   dateText: {
     fontSize: 16,
-    color: theme.colors.inputText || theme.colors.text,
+    color: theme.colors.text,
   },
   placeholderText: {
     fontSize: 16,
-    color: theme.colors.placeholderText || "#9CA3AF",
+    color: theme.colors.textSecondary,
   },
   inputContainer: {
     marginBottom: 20,
   },
   errorText: {
-    color: theme.colors.errorText || 'red',
+    color: theme.colors.danger,
     fontSize: 12,
     marginTop: 4,
   },
-  // Styles for iOS Picker Modal (can also be themed)
   modalOverlay: {
       flex: 1,
       justifyContent: 'flex-end',
-      backgroundColor: theme.colors.modalOverlayBg || 'rgba(15, 23, 42, 0.65)',
+      backgroundColor: 'rgba(15, 23, 42, 0.65)',
   },
   modalContainer: {
-      backgroundColor: theme.colors.modalBackground || theme.colors.background,
+      backgroundColor: theme.colors.cardBackground,
       borderTopRightRadius: 24,
       borderTopLeftRadius: 24,
       padding: 20,
@@ -52,9 +51,3 @@ export const getDatePickerFieldStyles = (theme: Theme) => StyleSheet.create({
       marginTop: 20,
   }
 });
-
-// Suggested new theme colors:
-// modalOverlayBg?: string;
-// modalBackground?: string;
-// errorBorder?: string; (already suggested)
-// placeholderText?: string; (already suggested)

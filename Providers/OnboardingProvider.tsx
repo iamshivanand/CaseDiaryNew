@@ -1,12 +1,30 @@
-import React, { createContext, useState } from 'react';
+import React, { createContext, useState, ReactNode } from 'react';
 
-export const OnboardingContext = createContext({
+export interface OnboardingData {
+  fullName?: string;
+  phone?: string;
+  email?: string;
+  gender?: string;
+  avatarUrl?: string;
+  title?: string;
+  experience?: string;
+  license?: string;
+  location?: string;
+  practiceAreas?: string[];
+}
+
+interface OnboardingContextProps {
+  onboardingData: OnboardingData;
+  setOnboardingData: React.Dispatch<React.SetStateAction<OnboardingData>>;
+}
+
+export const OnboardingContext = createContext<OnboardingContextProps>({
   onboardingData: {},
-  setOnboardingData: (data: any) => {},
+  setOnboardingData: () => {},
 });
 
-const OnboardingProvider = ({ children }) => {
-  const [onboardingData, setOnboardingData] = useState({});
+const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
 
   return (
     <OnboardingContext.Provider value={{ onboardingData, setOnboardingData }}>

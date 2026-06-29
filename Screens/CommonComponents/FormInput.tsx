@@ -198,7 +198,7 @@ const FormInput: React.FC<FormInputProps> = ({
         style={[
           styles.textInput,
           multiline ? styles.textInputMultiline : { height: 48 },
-          error ? { borderColor: theme.colors.errorBorder || "red" } : {},
+          error ? { borderColor: theme.colors.danger } : {},
           style,
         ]}
         value={value}
@@ -208,7 +208,7 @@ const FormInput: React.FC<FormInputProps> = ({
         secureTextEntry={secureTextEntry}
         multiline={multiline}
         numberOfLines={multiline ? numberOfLines || 4 : 1}
-        placeholderTextColor={theme.colors.placeholderText || "#9CA3AF"}
+        placeholderTextColor={theme.colors.textSecondary}
         {...rest}
       />
 

@@ -21,6 +21,7 @@ import { getCurrentUserId } from "../../utils/commonFunctions";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { mapCaseDbToScreen } from "../../utils/caseMapper";
 import { useTranslation } from "../../Providers/LanguageProvider";
+import { promptClientNotification } from "../../utils/whatsappNotifier";
 
 interface Props {
   // Add your prop types here
@@ -111,6 +112,11 @@ const CalendarScreen: React.FC<Props> = () => {
       // 3. Refresh the list
       fetchAllDates();
       getResultFromDate(selected);
+
+      // 4. Prompt WhatsApp notification to client
+      setTimeout(() => {
+        promptClientNotification(caseId, getLocalDateString(nextHearingDate), notes);
+      }, 500);
     } catch (error) {
       console.error("Error updating hearing:", error);
     }
@@ -285,8 +291,8 @@ const CalendarScreen: React.FC<Props> = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
-          onSave={(notes, nextHearingDate) =>
-            handleSaveHearing(notes, nextHearingDate, getCurrentUserId())
+          onSave={async (notes, nextHearingDate) =>
+            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId())
           }
         />
       )}

@@ -4,9 +4,11 @@ import InputField from './components/InputField';
 import PrimaryButton from './components/PrimaryButton';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 import { useTranslation } from '../../Providers/LanguageProvider';
+import { ThemeContext } from '../../Providers/ThemeProvider';
 
 const SetupProfileScreen = ({ navigation }) => {
   const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
+  const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [experience, setExperience] = useState('');
@@ -14,8 +16,8 @@ const SetupProfileScreen = ({ navigation }) => {
   const [location, setLocation] = useState('');
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.stepText}>{t('onboarding_step_3_of_4')}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Text style={[styles.stepText, { color: theme.colors.textSecondary }]}>{t('onboarding_step_3_of_4')}</Text>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <InputField
           label={t('onboarding_prof_title')}
@@ -61,7 +63,7 @@ const SetupProfileScreen = ({ navigation }) => {
             }}
           />
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.skipText}>{t('btn_previous')}</Text>
+            <Text style={[styles.skipText, { color: theme.colors.primary }]}>{t('btn_previous')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -72,7 +74,6 @@ const SetupProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     padding: 24,
   },
@@ -87,7 +88,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   skipText: {
-    color: '#2D60FF',
     marginTop: 16,
   },
   stepText: {
@@ -95,7 +95,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     marginBottom: 20,
     fontSize: 16,
-    color: '#6B7280',
   },
 });
 

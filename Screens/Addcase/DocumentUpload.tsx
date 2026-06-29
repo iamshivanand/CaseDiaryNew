@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useContext } from 'react';
 import { View, StyleSheet, FlatList, Alert, Platform } from 'react-native';
 import { Button, List, Text, useTheme, IconButton, ActivityIndicator, Divider } from 'react-native-paper';
 import * as DocumentPicker from 'expo-document-picker';
@@ -7,6 +7,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
 import { useTranslation } from '../../Providers/LanguageProvider';
+import { ThemeContext } from '../../Providers/ThemeProvider';
 
 import * as db from '../../DataBase'; // Corrected import
 import { CaseDocument } from '../../DataBase/schema';
@@ -18,7 +19,7 @@ export type DocumentUploadRouteParams = {
 type DocumentUploadScreenRouteProp = RouteProp<{ Documents: DocumentUploadRouteParams }, 'Documents'>;
 
 const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
-  const theme = useTheme();
+  const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
 
   const [documents, setDocuments] = useState<CaseDocument[]>([]);
@@ -182,13 +183,20 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
     <List.Item
       title={item.original_display_name}
       description={`${t("doc_info_type")}: ${item.file_type || 'N/A'}, ${t("doc_info_size")}: ${item.file_size ? (item.file_size / 1024).toFixed(2) + ' KB' : 'N/A'}`}
-      titleStyle={{ color: theme.colors.onSurface }}
-      descriptionStyle={{ color: theme.colors.onSurfaceVariant }}
-      left={props => <List.Icon {...props} icon={ item.file_type?.startsWith('image') ? "file-image-outline" : "file-document-outline"} />}
+      titleStyle={{ color: theme.colors.text }}
+      descriptionStyle={{ color: theme.colors.textSecondary }}
+      left={props => (
+        <List.Icon
+          {...props}
+          color={theme.colors.primary}
+          icon={item.file_type?.startsWith('image') ? "file-image-outline" : "file-document-outline"}
+        />
+      )}
       right={props => (
         <IconButton
           {...props}
           icon="download"
+          iconColor={theme.colors.primary}
           onPress={() => handleDownloadDocument(item)}
         />
       )}
@@ -201,6 +209,7 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
         <Button
           mode="contained"
           onPress={handlePickAndUploadDocument}
+          buttonColor={theme.colors.primary}
           style={{ flex: 1, marginRight: 4, justifyContent: 'center' }}
           icon="file-document-outline"
           loading={isUploading}
@@ -228,9 +237,9 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
           data={documents}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
-          ItemSeparatorComponent={() => <Divider />}
+          ItemSeparatorComponent={() => <Divider style={{ backgroundColor: theme.colors.border }} />}
           ListEmptyComponent={
-            !loading ? <Text style={styles.emptyText}>{t("doc_no_documents")}</Text> : null
+            !loading ? <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>{t("doc_no_documents")}</Text> : null
           }
           contentContainerStyle={styles.listContentContainer}
         />

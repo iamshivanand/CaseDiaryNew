@@ -71,10 +71,10 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
     modalOverlay: {
         flex: 1,
         justifyContent: 'flex-end',
-        backgroundColor: theme.colors.modalOverlayBg || 'rgba(15, 23, 42, 0.65)',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
     },
     modalContainer: {
-        backgroundColor: theme.colors.modalBackground || theme.colors.cardBackground,
+        backgroundColor: theme.colors.cardBackground,
         borderTopRightRadius: 24,
         borderTopLeftRadius: 24,
         padding: 20,
@@ -111,7 +111,7 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
       <TouchableOpacity
         style={[
             styles.dateTouchable,
-            error ? { borderColor: theme.colors.errorBorder || 'red' } : {}
+            error ? { borderColor: theme.colors.danger } : {}
         ]}
         onPress={openPicker}
         activeOpacity={0.7}

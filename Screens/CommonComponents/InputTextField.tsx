@@ -1,15 +1,15 @@
-import React from "react";
+import React, { useContext } from "react";
 import { View, Text, TextInput, KeyboardTypeOptions } from "react-native";
 
-import { InputStyles } from "./InputTextFieldStyle";
+import { getInputStyles } from "./InputTextFieldStyle";
+import { ThemeContext } from "../../Providers/ThemeProvider";
 
 interface InputFieldProps<T> {
-  // Add your prop types here
   placeholder: string;
   inputType: string;
   keyboardType?: KeyboardTypeOptions;
   label: string;
-  value?: T; // Use TypeScript generics for value
+  value?: T;
   onChange?: (value: T) => void;
 }
 
@@ -21,6 +21,9 @@ const InputTextField = <T extends string>({
   value,
   onChange,
 }: InputFieldProps<T>) => {
+  const { theme } = useContext(ThemeContext);
+  const styles = getInputStyles(theme);
+
   const handleChange = (text: string) => {
     if (onChange) {
       onChange(text as T);
@@ -28,10 +31,11 @@ const InputTextField = <T extends string>({
   };
   return (
     <>
-      <Text style={InputStyles.label}>{label}</Text>
+      <Text style={styles.label}>{label}</Text>
       <TextInput
-        style={InputStyles.textInput}
+        style={styles.textInput}
         placeholder={placeholder}
+        placeholderTextColor={theme.colors.textSecondary}
         secureTextEntry={inputType === "password"}
         keyboardType={keyboardType ? keyboardType : "default"}
         value={value as string}

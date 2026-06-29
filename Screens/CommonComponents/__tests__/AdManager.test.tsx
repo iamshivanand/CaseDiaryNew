@@ -17,11 +17,10 @@ declare global {
   var interstitialListeners: { [key: string]: Function };
 }
 
-global.rewardedListeners = {};
-global.interstitialListeners = {};
-
-// Create mocks inside the mock definition to prevent undefined reference due to hoisting
 jest.mock("react-native-google-mobile-ads", () => {
+  global.rewardedListeners = {};
+  global.interstitialListeners = {};
+
   const mockRewarded = {
     loaded: false,
     load: jest.fn(),

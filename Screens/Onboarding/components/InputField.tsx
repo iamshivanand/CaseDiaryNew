@@ -1,15 +1,30 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { View, Text, TextInput, StyleSheet, TextInputProps } from 'react-native';
+import { ThemeContext } from '../../../Providers/ThemeProvider';
 
 interface InputFieldProps extends TextInputProps {
   label: string;
 }
 
-const InputField: React.FC<InputFieldProps> = ({ label, ...props }) => {
+const InputField: React.FC<InputFieldProps> = ({ label, style, ...props }) => {
+  const { theme } = useContext(ThemeContext);
+  
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput style={styles.input} {...props} />
+      <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{label}</Text>
+      <TextInput 
+        style={[
+          styles.input, 
+          { 
+            borderColor: theme.colors.border, 
+            color: theme.colors.text, 
+            backgroundColor: theme.colors.inputBackground 
+          },
+          style
+        ]} 
+        placeholderTextColor={theme.colors.textSecondary}
+        {...props} 
+      />
     </View>
   );
 };
@@ -19,17 +34,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    color: '#6B7280',
     marginBottom: 8,
     fontSize: 15,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
     borderRadius: 10,
     padding: 12,
     fontSize: 15,
-    color: '#1E1E1E',
   },
 });
 

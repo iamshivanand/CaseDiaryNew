@@ -6,55 +6,99 @@ import { Ionicons } from "@expo/vector-icons";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import ActionButton from "./ActionButton";
 
-// Production Android ID: ca-app-pub-6084954144919761/3119046561
-// Production iOS ID: ca-app-pub-3940256099942544/1712485313
-const rewardedAdUnitId = TestIds.REWARDED;
+// Android: ca-app-pub-6084954144919761/3119046561
+// iOS: ca-app-pub-3940256099942544/1712485313
+const rewardedAdUnitId = __DEV__
+  ? TestIds.REWARDED
+  : Platform.OS === "ios"
+  ? "ca-app-pub-3940256099942544/1712485313"
+  : "ca-app-pub-6084954144919761/3119046561";
 
-// Production Android ID: ca-app-pub-6084954144919761/4080470524
-// Production iOS ID: ca-app-pub-3940256099942544/4411468910
-const interstitialAdUnitId = TestIds.INTERSTITIAL;
-
-// Create single global instances
-let rewardedAd = RewardedAd.createForAdRequest(rewardedAdUnitId, { requestNonPersonalizedAdsOnly: true });
-let interstitialAd = InterstitialAd.createForAdRequest(interstitialAdUnitId, { requestNonPersonalizedAdsOnly: true });
+// Android: ca-app-pub-6084954144919761/4080470524
+// iOS: ca-app-pub-3940256099942544/4411468910
+const interstitialAdUnitId = __DEV__
+  ? TestIds.INTERSTITIAL
+  : Platform.OS === "ios"
+  ? "ca-app-pub-3940256099942544/4411468910"
+  : "ca-app-pub-6084954144919761/4080470524";
 
 // State tracking for preloader to prevent race conditions
 let isRewardedAdLoading = false;
 let isInterstitialAdLoading = false;
 
+// Create single global instances
+let rewardedAd: RewardedAd;
+let interstitialAd: InterstitialAd;
+
+export const createRewardedAd = () => {
+  try {
+    rewardedAd = RewardedAd.createForAdRequest(rewardedAdUnitId, { requestNonPersonalizedAdsOnly: true });
+    
+    const unsubL = rewardedAd.addAdEventListener(AdEventType.LOADED, () => {
+      isRewardedAdLoading = false;
+      unsubL();
+      unsubE();
+    });
+    
+    const unsubE = rewardedAd.addAdEventListener(AdEventType.ERROR, (err) => {
+      isRewardedAdLoading = false;
+      console.warn("Rewarded ad failed to load, recreating instance:", err);
+      unsubL();
+      unsubE();
+      createRewardedAd(); // Recreate immediately on error
+    });
+  } catch (e) {
+    console.error("Failed to create RewardedAd instance:", e);
+  }
+};
+
+export const createInterstitialAd = () => {
+  try {
+    interstitialAd = InterstitialAd.createForAdRequest(interstitialAdUnitId, { requestNonPersonalizedAdsOnly: true });
+    
+    const unsubL = interstitialAd.addAdEventListener(AdEventType.LOADED, () => {
+      isInterstitialAdLoading = false;
+      unsubL();
+      unsubE();
+    });
+    
+    const unsubE = interstitialAd.addAdEventListener(AdEventType.ERROR, (err) => {
+      isInterstitialAdLoading = false;
+      console.warn("Interstitial ad failed to load, recreating instance:", err);
+      unsubL();
+      unsubE();
+      createInterstitialAd(); // Recreate immediately on error
+    });
+  } catch (e) {
+    console.error("Failed to create InterstitialAd instance:", e);
+  }
+};
+
+// Initial instantiation
+createRewardedAd();
+createInterstitialAd();
+
 // Preload helper
 export const preloadAds = () => {
   try {
-    if (!rewardedAd.loaded && !isRewardedAdLoading) {
+    if (rewardedAd && !rewardedAd.loaded && !isRewardedAdLoading) {
       isRewardedAdLoading = true;
-      const unsubLoaded = rewardedAd.addAdEventListener(AdEventType.LOADED, () => {
+      try {
+        rewardedAd.load();
+      } catch (err) {
         isRewardedAdLoading = false;
-        unsubLoaded();
-        unsubError();
-      });
-      const unsubError = rewardedAd.addAdEventListener(AdEventType.ERROR, (err) => {
-        isRewardedAdLoading = false;
-        console.warn("Failed to preload rewarded ad:", err);
-        unsubLoaded();
-        unsubError();
-      });
-      rewardedAd.load();
+        console.warn("Failed to load rewarded ad inside preloadAds:", err);
+      }
     }
 
-    if (!interstitialAd.loaded && !isInterstitialAdLoading) {
+    if (interstitialAd && !interstitialAd.loaded && !isInterstitialAdLoading) {
       isInterstitialAdLoading = true;
-      const unsubLoaded = interstitialAd.addAdEventListener(AdEventType.LOADED, () => {
+      try {
+        interstitialAd.load();
+      } catch (err) {
         isInterstitialAdLoading = false;
-        unsubLoaded();
-        unsubError();
-      });
-      const unsubError = interstitialAd.addAdEventListener(AdEventType.ERROR, (err) => {
-        isInterstitialAdLoading = false;
-        console.warn("Failed to preload interstitial ad:", err);
-        unsubLoaded();
-        unsubError();
-      });
-      interstitialAd.load();
+        console.warn("Failed to load interstitial ad inside preloadAds:", err);
+      }
     }
   } catch (e) {
     console.warn("Failed to preload ads:", e);
@@ -209,7 +253,18 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       } else {
         isInterstitialAdLoading = true;
       }
-      targetAd.load();
+      try {
+        targetAd.load();
+      } catch (loadErr) {
+        if (adType === "rewarded") {
+          isRewardedAdLoading = false;
+        } else {
+          isInterstitialAdLoading = false;
+        }
+        console.warn(`Synchronous error calling targetAd.load() for ${adType}:`, loadErr);
+        cleanUpAdRequest();
+        setShowSkip(true);
+      }
     }
   };
 
@@ -221,19 +276,14 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       unsubClosed();
       // Re-initialize and preload for next use
       if (adType === "rewarded") {
-        rewardedAd = RewardedAd.createForAdRequest(rewardedAdUnitId, { requestNonPersonalizedAdsOnly: true });
+        createRewardedAd();
         isRewardedAdLoading = true;
-        const unsubL = rewardedAd.addAdEventListener(AdEventType.LOADED, () => {
+        try {
+          rewardedAd.load();
+        } catch (loadErr) {
           isRewardedAdLoading = false;
-          unsubL();
-          unsubE();
-        });
-        const unsubE = rewardedAd.addAdEventListener(AdEventType.ERROR, () => {
-          isRewardedAdLoading = false;
-          unsubL();
-          unsubE();
-        });
-        rewardedAd.load();
+          console.warn("Failed to reload rewarded ad after close:", loadErr);
+        }
 
         if (rewardEarned) {
           setShowRewardModal(true);
@@ -244,19 +294,14 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           }
         }
       } else {
-        interstitialAd = InterstitialAd.createForAdRequest(interstitialAdUnitId, { requestNonPersonalizedAdsOnly: true });
+        createInterstitialAd();
         isInterstitialAdLoading = true;
-        const unsubL = interstitialAd.addAdEventListener(AdEventType.LOADED, () => {
+        try {
+          interstitialAd.load();
+        } catch (loadErr) {
           isInterstitialAdLoading = false;
-          unsubL();
-          unsubE();
-        });
-        const unsubE = interstitialAd.addAdEventListener(AdEventType.ERROR, () => {
-          isInterstitialAdLoading = false;
-          unsubL();
-          unsubE();
-        });
-        interstitialAd.load();
+          console.warn("Failed to reload interstitial ad after close:", loadErr);
+        }
 
         if (onCompleteCallbackRef.current) {
           onCompleteCallbackRef.current(true); // Interstitial completed

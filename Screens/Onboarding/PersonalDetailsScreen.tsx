@@ -5,9 +5,11 @@ import PrimaryButton from './components/PrimaryButton';
 import { Picker } from '@react-native-picker/picker';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
 import { useTranslation } from '../../Providers/LanguageProvider';
+import { ThemeContext } from '../../Providers/ThemeProvider';
 
 const PersonalDetailsScreen = ({ navigation }) => {
   const { setOnboardingData } = useContext(OnboardingContext);
+  const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -15,8 +17,8 @@ const PersonalDetailsScreen = ({ navigation }) => {
   const [gender, setGender] = useState('Male');
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.stepText}>{t('onboarding_step_1_of_4')}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Text style={[styles.stepText, { color: theme.colors.textSecondary }]}>{t('onboarding_step_1_of_4')}</Text>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <InputField
           label={t('onboarding_full_name')}
@@ -38,14 +40,16 @@ const PersonalDetailsScreen = ({ navigation }) => {
           onChangeText={setEmail}
           keyboardType="email-address"
         />
-        <View style={styles.pickerContainer}>
+        <View style={[styles.pickerContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.inputBackground }]}>
           <Picker
             selectedValue={gender}
             onValueChange={(itemValue) => setGender(itemValue)}
+            style={{ color: theme.colors.text }}
+            dropdownIconColor={theme.colors.textSecondary}
           >
-            <Picker.Item label={t('gender_male')} value="Male" />
-            <Picker.Item label={t('gender_female')} value="Female" />
-            <Picker.Item label={t('gender_other')} value="Other" />
+            <Picker.Item label={t('gender_male')} value="Male" color={theme.colors.text} style={{ backgroundColor: theme.colors.inputBackground }} />
+            <Picker.Item label={t('gender_female')} value="Female" color={theme.colors.text} style={{ backgroundColor: theme.colors.inputBackground }} />
+            <Picker.Item label={t('gender_other')} value="Other" color={theme.colors.text} style={{ backgroundColor: theme.colors.inputBackground }} />
           </Picker>
         </View>
         <View style={styles.buttonContainer}>
@@ -72,7 +76,6 @@ const PersonalDetailsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     padding: 24,
   },
@@ -82,9 +85,9 @@ const styles = StyleSheet.create({
   },
   pickerContainer: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
     borderRadius: 10,
     marginBottom: 20,
+    justifyContent: 'center',
   },
   buttonContainer: {
     paddingHorizontal: 24,
@@ -94,7 +97,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     marginBottom: 20,
     fontSize: 16,
-    color: '#6B7280',
   },
 });
 

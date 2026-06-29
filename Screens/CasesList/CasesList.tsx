@@ -20,6 +20,7 @@ import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import AdBanner from "../CommonComponents/AdBanner";
 import { useTranslation } from "../../Providers/LanguageProvider";
+import { promptClientNotification } from "../../utils/whatsappNotifier";
 
 const transformApiCaseToCaseDataScreen = (apiCase: Case): CaseDataScreen => {
   return {
@@ -166,6 +167,11 @@ const CasesList = () => {
 
       // 3. Refresh list from page 0
       fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
+
+      // 4. Prompt WhatsApp notification to client
+      setTimeout(() => {
+        promptClientNotification(caseId, getLocalDateString(nextHearingDate), notes);
+      }, 500);
     } catch (error) {
       console.error("Error updating hearing:", error);
     }
@@ -277,8 +283,8 @@ const CasesList = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
-          onSave={(notes, nextHearingDate) =>
-            handleSaveHearing(notes, nextHearingDate, getCurrentUserId())
+          onSave={async (notes, nextHearingDate) =>
+            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId())
           }
         />
       )}

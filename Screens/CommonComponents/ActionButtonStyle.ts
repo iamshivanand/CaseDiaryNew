@@ -51,5 +51,13 @@ export const getActionButtonStyles = (theme: Theme) => StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
-  }
+  },
+  dangerButton: {
+    backgroundColor: "#EF4444",
+    borderWidth: 0,
+  },
+  dangerButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
 });

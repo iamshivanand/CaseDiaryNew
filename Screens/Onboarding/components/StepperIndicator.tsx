@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useContext } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
 } from 'react-native-reanimated';
+import { ThemeContext } from '../../../Providers/ThemeProvider';
 
 interface StepperIndicatorProps {
   steps: string[];
@@ -12,6 +13,7 @@ interface StepperIndicatorProps {
 }
 
 const StepperIndicator: React.FC<StepperIndicatorProps> = ({ steps, currentStep }) => {
+  const { theme } = useContext(ThemeContext);
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -29,21 +31,25 @@ const StepperIndicator: React.FC<StepperIndicatorProps> = ({ steps, currentStep 
   return (
     <View style={styles.container}>
       <View style={styles.connectorContainer}>
-        <View style={styles.connector} />
-        <Animated.View style={[styles.connector, styles.activeConnector, animatedStyle]} />
+        <View style={[styles.connector, { backgroundColor: theme.colors.border }]} />
+        <Animated.View style={[styles.connector, styles.activeConnector, { backgroundColor: theme.colors.primary }, animatedStyle]} />
       </View>
       {steps.map((step, index) => (
         <View key={index} style={styles.stepContainer}>
           <View
             style={[
               styles.circle,
-              index + 1 <= currentStep ? styles.activeCircle : styles.inactiveCircle,
+              index + 1 <= currentStep 
+                ? { backgroundColor: theme.colors.primary } 
+                : { backgroundColor: theme.colors.border },
             ]}
           >
             <Text
               style={[
                 styles.stepText,
-                index + 1 <= currentStep ? styles.activeText : styles.inactiveText,
+                index + 1 <= currentStep 
+                  ? { color: '#FFFFFF' } 
+                  : { color: theme.colors.text },
               ]}
             >
               {index + 1}
@@ -52,7 +58,9 @@ const StepperIndicator: React.FC<StepperIndicatorProps> = ({ steps, currentStep 
           <Text
             style={[
               styles.stepLabel,
-              index + 1 === currentStep ? styles.activeLabel : styles.inactiveLabel,
+              index + 1 === currentStep 
+                ? { color: theme.colors.text, fontWeight: '600' } 
+                : { color: theme.colors.textSecondary },
             ]}
           >
             {step}
@@ -83,33 +91,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activeCircle: {
-    backgroundColor: '#2D60FF',
-  },
-  inactiveCircle: {
-    backgroundColor: '#D1D5DB',
-  },
   stepText: {
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  activeText: {
-    color: '#FFFFFF',
-  },
-  inactiveText: {
-    color: '#1E1E1E',
   },
   stepLabel: {
     marginTop: 8,
     fontSize: 12,
     textAlign: 'center',
-  },
-  activeLabel: {
-    color: '#1E1E1E',
-    fontWeight: '600',
-  },
-  inactiveLabel: {
-    color: '#6B7280',
   },
   connectorContainer: {
     position: 'absolute',
@@ -121,10 +110,8 @@ const styles = StyleSheet.create({
   connector: {
     flex: 1,
     height: 2,
-    backgroundColor: '#E5E7EB',
   },
   activeConnector: {
-    backgroundColor: '#2D60FF',
     position: 'absolute',
     top: 0,
     left: 0,

@@ -14,7 +14,7 @@ export const mapCaseDbToScreen = (dbCase: Partial<CaseWithDetails> & { id: numbe
     id: dbCase.id,
     title: dbCase.CaseTitle || 'No Title',
     client: dbCase.ClientName || 'Unknown Client',
-    status: dbCase.CaseStatus || 'Pending',
+    status: (dbCase.CaseStatus === 'Active' || dbCase.CaseStatus === 'Closed' || dbCase.CaseStatus === 'Pending' ? dbCase.CaseStatus : 'Pending') as 'Active' | 'Pending' | 'Closed',
     nextHearing: dbCase.NextDate ? formatDate(dbCase.NextDate) : 'N/A',
     lastUpdate: dbCase.updated_at ? formatDate(dbCase.updated_at) : 'N/A',
     previousHearing: dbCase.PreviousDate ? formatDate(dbCase.PreviousDate) : 'N/A',

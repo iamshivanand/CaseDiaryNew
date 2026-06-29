@@ -68,7 +68,7 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
       <View
         style={[
           styles.pickerContainer,
-          error ? { borderColor: theme.colors.errorBorder || "red" } : {},
+          error ? { borderColor: theme.colors.danger } : {},
           !enabled ? styles.disabledPickerContainer : {},
         ]}
       >
@@ -80,8 +80,8 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
           style={styles.picker}
           dropdownIconColor={
             Platform.OS === "ios"
-              ? theme.colors.textSecondary || "#D1D5DB"
-              : theme.colors.primary || "#1D4ED8"
+              ? theme.colors.textSecondary
+              : theme.colors.primary
           }
           mode="dropdown"
         >
@@ -92,9 +92,10 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
               value={option.value}
               color={
                 option.value === "" && placeholder
-                  ? theme.colors.placeholderText || "#9CA3AF"
-                  : styles.picker.color
+                  ? theme.colors.textSecondary
+                  : theme.colors.text
               }
+              style={{ backgroundColor: theme.colors.inputBackground }}
             />
           ))}
         </Picker>
@@ -103,6 +104,7 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
         <TextInput
           style={styles.otherInput}
           placeholder="Please specify"
+          placeholderTextColor={theme.colors.textSecondary}
           value={displayOtherValue}
           onChangeText={handleOtherTextChange}
         />

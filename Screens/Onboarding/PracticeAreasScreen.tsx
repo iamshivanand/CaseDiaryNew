@@ -7,6 +7,7 @@ import { getDb, addUser, updateUserProfile } from '../../DataBase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { emitter } from '../../utils/event-emitter';
 import { useTranslation } from '../../Providers/LanguageProvider';
+import { ThemeContext } from '../../Providers/ThemeProvider';
 
 const practiceAreas = [
   'Criminal Law',
@@ -28,6 +29,7 @@ const areaTranslationKeys: { [key: string]: string } = {
 
 const PracticeAreasScreen = ({ navigation }) => {
   const { onboardingData, setOnboardingData } = useContext(OnboardingContext);
+  const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
   const [otherArea, setOtherArea] = useState('');
@@ -39,17 +41,19 @@ const PracticeAreasScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.stepText}>{t('onboarding_step_4_of_4')}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Text style={[styles.stepText, { color: theme.colors.textSecondary }]}>{t('onboarding_step_4_of_4')}</Text>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Text style={styles.title}>{t('onboarding_select_areas')}</Text>
+        <Text style={[styles.title, { color: theme.colors.text }]}>{t('onboarding_select_areas')}</Text>
         <View style={styles.grid}>
           {practiceAreas.map((area) => (
             <TouchableOpacity
               key={area}
               style={[
                 styles.pill,
-                selectedAreas.includes(area) ? styles.activePill : styles.inactivePill,
+                selectedAreas.includes(area) 
+                  ? { backgroundColor: theme.colors.primary } 
+                  : { backgroundColor: theme.colors.inputBackground },
               ]}
               onPress={() => toggleArea(area)}
             >
@@ -57,7 +61,7 @@ const PracticeAreasScreen = ({ navigation }) => {
                 style={
                   selectedAreas.includes(area)
                     ? styles.activePillText
-                    : styles.inactivePillText
+                    : [styles.inactivePillText, { color: theme.colors.textSecondary }]
                 }
               >
                 {t(areaTranslationKeys[area] as any)}
@@ -67,7 +71,9 @@ const PracticeAreasScreen = ({ navigation }) => {
           <TouchableOpacity
             style={[
               styles.pill,
-              selectedAreas.includes('Other') ? styles.activePill : styles.inactivePill,
+              selectedAreas.includes('Other') 
+                ? { backgroundColor: theme.colors.primary } 
+                : { backgroundColor: theme.colors.inputBackground },
             ]}
             onPress={() => toggleArea('Other')}
           >
@@ -75,7 +81,7 @@ const PracticeAreasScreen = ({ navigation }) => {
               style={
                 selectedAreas.includes('Other')
                   ? styles.activePillText
-                  : styles.inactivePillText
+                  : [styles.inactivePillText, { color: theme.colors.textSecondary }]
               }
             >
               {t('gender_other')}
@@ -109,7 +115,7 @@ const PracticeAreasScreen = ({ navigation }) => {
               try {
                 const db = await getDb();
                 console.log('Database instance:', db);
-                const userId = await addUser(finalOnboardingData.fullName, finalOnboardingData.email);
+                const userId = await addUser(finalOnboardingData.fullName || '', finalOnboardingData.email || '');
                 console.log('User ID:', userId);
                 if (userId) {
                    await updateUserProfile(db, userId, finalOnboardingData);
@@ -123,7 +129,7 @@ const PracticeAreasScreen = ({ navigation }) => {
             }}
           />
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.skipText}>{t('btn_previous')}</Text>
+            <Text style={[styles.skipText, { color: theme.colors.primary }]}>{t('btn_previous')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -134,7 +140,6 @@ const PracticeAreasScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     padding: 24,
   },
@@ -145,7 +150,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#1E1E1E',
     marginBottom: 20,
   },
   grid: {
@@ -159,18 +163,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     margin: 5,
   },
-  activePill: {
-    backgroundColor: '#2D60FF',
-  },
-  inactivePill: {
-    backgroundColor: '#F3F4F6',
-  },
   activePillText: {
     color: '#FFFFFF',
     fontWeight: '500',
   },
   inactivePillText: {
-    color: '#6B7280',
     fontWeight: '500',
   },
   buttonContainer: {
@@ -180,7 +177,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   skipText: {
-    color: '#2D60FF',
     marginTop: 16,
   },
   stepText: {
@@ -188,7 +184,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     marginBottom: 20,
     fontSize: 16,
-    color: '#6B7280',
   },
 });
 

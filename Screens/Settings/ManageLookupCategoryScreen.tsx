@@ -14,20 +14,24 @@ import {
   Provider as PaperProvider, // To use Dialog
 } from 'react-native-paper';
 import { RouteProp, useRoute, useFocusEffect } from '@react-navigation/native';
-import * as db from '../../DataBase'; // Assuming all DB functions are exported
-import { CaseType, Court, District, PoliceStation } from '../../DataBase/schema'; // Import types
-import { RootStackParamList } from '../../Types/navigationtypes'; // Adjust path
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as db from '../../DataBase';
+import { ProfileStackParamList } from '../../Types/navigationtypes';
 
-// Define the types for lookup items. Could be a union type.
-type LookupItem = CaseType | Court | District | PoliceStation;
+export interface LookupItem {
+  id: number;
+  name: string;
+  user_id?: number | null;
+  state?: string;
+}
 
-type ManageLookupCategoryScreenRouteProp = RouteProp<
-  RootStackParamList,
-  'ManageLookupCategoryScreen'
->;
+type ManageLookupCategoryScreenRouteProp = RouteProp<ProfileStackParamList, 'ManageLookupCategoryScreen'>;
 
-// A mock user ID. In a real app, this would come from an auth context.
-const MOCK_USER_ID = 1; // Replace with actual user ID when auth is implemented
+// Helper: reads real user ID from storage (device is always single-user; ID is set during onboarding)
+const getCurrentUserId = async (): Promise<number> => {
+  const id = await AsyncStorage.getItem('@user_id');
+  return id ? parseInt(id, 10) : 1;
+};
 
 const ManageLookupCategoryScreen = () => {
   const theme = useTheme();
@@ -49,8 +53,7 @@ const ManageLookupCategoryScreen = () => {
     setLoading(true);
     try {
       let fetchedItems: LookupItem[] = [];
-      // TODO: Get current logged-in user ID when auth is implemented
-      const currentUserId = MOCK_USER_ID;
+      const currentUserId = await getCurrentUserId();
 
       switch (categoryName) {
         case 'CaseTypes':
@@ -60,11 +63,9 @@ const ManageLookupCategoryScreen = () => {
           fetchedItems = await db.getCourts(currentUserId);
           break;
         case 'Districts':
-          // Districts might have 'state' as well, handle accordingly if adding/editing
           fetchedItems = await db.getDistricts(currentUserId);
           break;
         case 'PoliceStations':
-          // PoliceStations might need districtId if showing contextually, or show all
           fetchedItems = await db.getPoliceStations(undefined, currentUserId);
           break;
         default:
@@ -92,9 +93,7 @@ const ManageLookupCategoryScreen = () => {
     }
     setIsAdding(true);
     try {
-      // TODO: Get current logged-in user ID
-      const currentUserId = MOCK_USER_ID;
-      let success = false;
+      const currentUserId = await getCurrentUserId();
       let newId: number | null = null;
 
       switch (categoryName) {
@@ -105,13 +104,9 @@ const ManageLookupCategoryScreen = () => {
           newId = await db.addCourt(newItemName.trim(), currentUserId);
           break;
         case 'Districts':
-          // For districts, you might need a state field as well.
-          // This simplified version only adds name.
           newId = await db.addDistrict(newItemName.trim(), undefined, currentUserId);
           break;
         case 'PoliceStations':
-          // For police stations, you might need a district_id.
-          // This simplified version only adds name.
           newId = await db.addPoliceStation(newItemName.trim(), undefined, currentUserId);
           break;
         default:
@@ -119,11 +114,11 @@ const ManageLookupCategoryScreen = () => {
           setIsAdding(false);
           return;
       }
-      success = newId !== null;
+      const success = newId !== null;
 
       if (success) {
         setNewItemName('');
-        fetchData(); // Refresh list
+        fetchData();
         Alert.alert('Success', `${categoryName.slice(0, -1)} added successfully.`);
       } else {
         Alert.alert('Error', `Failed to add ${categoryName.slice(0, -1)}.`);
@@ -136,10 +131,11 @@ const ManageLookupCategoryScreen = () => {
     }
   };
 
-  const openEditDialog = (item: LookupItem) => {
-    if (item.user_id !== MOCK_USER_ID) { // Only allow editing user's own items
-        Alert.alert("Permission Denied", "You can only edit items you created.");
-        return;
+  const openEditDialog = async (item: LookupItem) => {
+    const userId = await getCurrentUserId();
+    if (item.user_id !== userId) {
+      Alert.alert("Permission Denied", "You can only edit items you created.");
+      return;
     }
     setEditingItem(item);
     setEditedName(item.name);
@@ -148,92 +144,91 @@ const ManageLookupCategoryScreen = () => {
 
   const handleEditItem = async () => {
     if (!editingItem || !editedName.trim()) return;
-
-    // Ensure it's a user-specific item
-    if (editingItem.user_id !== MOCK_USER_ID) {
-        Alert.alert("Error", "Cannot edit global items or items not created by you.");
-        setDialogVisible(false);
-        return;
+    const userId = await getCurrentUserId();
+    if (editingItem.user_id !== userId) {
+      Alert.alert("Error", "Cannot edit global items or items not created by you.");
+      setDialogVisible(false);
+      return;
     }
 
-    setLoading(true); // Use general loading or a specific editing loader
+    setLoading(true);
     try {
-        let success = false;
-        switch (categoryName) {
-            case 'CaseTypes':
-                success = await db.updateCaseType(editingItem.id, editedName.trim(), MOCK_USER_ID);
-                break;
-            case 'Courts':
-                success = await db.updateCourt(editingItem.id, editedName.trim(), MOCK_USER_ID);
-                break;
-            // Add cases for Districts, PoliceStations if they support editing
-            // Remember to handle fields like 'state' for Districts or 'district_id' for PoliceStations
-            default:
-                Alert.alert("Error", "Editing not supported for this category yet.");
-        }
-        if (success) {
-            Alert.alert("Success", `${categoryName.slice(0, -1)} updated.`);
-            fetchData();
-        } else {
-            Alert.alert("Error", `Failed to update ${categoryName.slice(0, -1)}.`);
-        }
+      let success = false;
+      switch (categoryName) {
+        case 'CaseTypes':
+          success = await db.updateCaseType(editingItem.id, editedName.trim(), userId);
+          break;
+        case 'Courts':
+          success = await db.updateCourt(editingItem.id, editedName.trim(), userId);
+          break;
+        default:
+          Alert.alert("Error", "Editing not supported for this category yet.");
+      }
+      if (success) {
+        Alert.alert("Success", `${categoryName.slice(0, -1)} updated.`);
+        fetchData();
+      } else {
+        Alert.alert("Error", `Failed to update ${categoryName.slice(0, -1)}.`);
+      }
     } catch (error: any) {
-        Alert.alert("Error", error.message || "Failed to update item.");
+      Alert.alert("Error", error.message || "Failed to update item.");
     } finally {
-        setLoading(false);
-        setDialogVisible(false);
-        setEditingItem(null);
+      setLoading(false);
+      setDialogVisible(false);
+      setEditingItem(null);
     }
   };
 
 
-  const confirmDeleteItem = (item: LookupItem) => {
-     if (item.user_id !== MOCK_USER_ID) { // Only allow deleting user's own items
-        Alert.alert("Permission Denied", "You can only delete items you created.");
-        return;
+  const confirmDeleteItem = async (item: LookupItem) => {
+    const userId = await getCurrentUserId();
+    if (item.user_id !== userId) {
+      Alert.alert("Permission Denied", "You can only delete items you created.");
+      return;
     }
     Alert.alert(
-        "Confirm Delete",
-        `Are you sure you want to delete "${item.name}"? This might affect existing cases using this item.`,
-        [
-            { text: "Cancel", style: "cancel" },
-            { text: "Delete", style: "destructive", onPress: () => handleDeleteItem(item.id) }
-        ]
+      "Confirm Delete",
+      `Are you sure you want to delete "${item.name}"? This might affect existing cases using this item.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => handleDeleteItem(item.id, userId) }
+      ]
     );
   };
 
-  const handleDeleteItem = async (itemId: number) => {
+  const handleDeleteItem = async (itemId: number, userId: number) => {
     setLoading(true);
     try {
-        let success = false;
-         switch (categoryName) {
-            case 'CaseTypes':
-                success = await db.deleteCaseType(itemId, MOCK_USER_ID);
-                break;
-            case 'Courts':
-                success = await db.deleteCourt(itemId, MOCK_USER_ID);
-                break;
-            // Add cases for Districts, PoliceStations
-            default:
-                Alert.alert("Error", "Deletion not supported for this category yet.");
-        }
-        if (success) {
-            Alert.alert("Success", `${categoryName.slice(0, -1)} deleted.`);
-            fetchData();
-        } else {
-            Alert.alert("Error", `Failed to delete ${categoryName.slice(0, -1)}. It might be in use or you don't have permission.`);
-        }
+      let success = false;
+      switch (categoryName) {
+        case 'CaseTypes':
+          success = await db.deleteCaseType(itemId, userId);
+          break;
+        case 'Courts':
+          success = await db.deleteCourt(itemId, userId);
+          break;
+        default:
+          Alert.alert("Error", "Deletion not supported for this category yet.");
+      }
+      if (success) {
+        Alert.alert("Success", `${categoryName.slice(0, -1)} deleted.`);
+        fetchData();
+      } else {
+        Alert.alert("Error", `Failed to delete ${categoryName.slice(0, -1)}. It might be in use or you don't have permission.`);
+      }
     } catch (error: any) {
-         Alert.alert("Error", error.message || "Failed to delete item.");
+      Alert.alert("Error", error.message || "Failed to delete item.");
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
 
   const renderItem = ({ item }: { item: LookupItem }) => {
-    const isUserSpecific = item.user_id === MOCK_USER_ID; // Adjust with real user ID
+    // null/undefined user_id = global/seeded item; matching userId = user's own custom item
     const isGlobal = item.user_id === null || item.user_id === undefined;
+    // For display purposes: treat any non-global item as user's own in single-user app
+    const isUserSpecific = !isGlobal;
 
     let subtitle = '';
     if (isGlobal) subtitle = 'Global';

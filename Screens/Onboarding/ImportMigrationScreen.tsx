@@ -44,7 +44,7 @@ const TARGET_FIELDS = [
 ];
 
 const ImportMigrationScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute();
   const params = (route.params || {}) as RouteParams;
   const isFromOnboarding = params.isFromOnboarding ?? false;
@@ -234,9 +234,9 @@ const ImportMigrationScreen: React.FC = () => {
                     style={{ color: theme.colors.text }}
                     dropdownIconColor={theme.colors.textSecondary}
                   >
-                    <Picker.Item label="-- None / Optional --" value="none" />
+                    <Picker.Item label="-- None / Optional --" value="none" color={theme.colors.text} style={{ backgroundColor: theme.colors.cardBackground }} />
                     {headers.map(h => (
-                      <Picker.Item key={h} label={h} value={h} />
+                      <Picker.Item key={h} label={h} value={h} color={theme.colors.text} style={{ backgroundColor: theme.colors.cardBackground }} />
                     ))}
                   </Picker>
                 </View>
