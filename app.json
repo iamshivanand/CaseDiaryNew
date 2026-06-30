@@ -23,7 +23,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.iamshiv.CaseDiary"
+      "package": "com.iamshiv.CaseDiary",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
