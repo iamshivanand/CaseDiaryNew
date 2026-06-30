@@ -67,87 +67,26 @@ const webViewDebugJS = `
 
 const focusFormJS = `
   (function() {
-    function cropPage() {
-      // 1. Inject CSS stylesheet to hide standard header/navigation/footer/leftMenu elements
-      const css = \`
-        header, footer, nav, .footer, .header, .top-bar, #header, #footer,
-        .leftMenu, #leftMenu, .sidebar, #sidebar, .logo, .banner, #logo, #banner,
-        .welcome-text, .breadcrumb, #left-sidebar, .left-sidebar,
-        #top-navigation, .navbar, #menu, .menu, #menubar, .menubar,
-        
-        /* Help, FAQ, How-To, and Footer section elements */
-        #how_to_search, .how_to_search, #help, .help, #instructions, .instructions,
-        #disclaimer, .disclaimer, #footerSection, .footerSection, #howToSearch,
-        #howToSearch_div, #showHelp, .showHelp, #help_div, .help_div, #faq, .faq,
-        .help-block, #how_to_find_cnr, .how-to-find-cnr, #how_to_search_div,
-        .bottom-footer, #bottom-footer, .site-footer, #site-footer {
-          display: none !important;
-        }
-        
-        body {
-          margin: 0 !important;
-          padding: 0 !important;
-          background: #ffffff !important;
-        }
-        
-        /* Ensure the main container expands nicely */
-        .container, .container-fluid, .row, .col-md-9, .col-sm-9, #rightMenu, .rightMenu, #main_content, .main-content {
-          width: 100% !important;
-          max-width: 100% !important;
-          margin: 0 !important;
-          padding: 10px !important;
-          float: none !important;
-        }
-      \`;
-      
-      let style = document.getElementById('webview-crop-style');
-      if (!style) {
-        style = document.createElement('style');
-        style.id = 'webview-crop-style';
-        style.appendChild(document.createTextNode(css));
-        document.head.appendChild(style);
-      }
-      
-      // 2. Locate the CNR input block and hide all non-ancestor siblings
+    function scrollToCnr() {
       const cnrInput = document.getElementById('cnr_no') || document.querySelector('input[name="cnr_no"]');
       if (cnrInput) {
-        // We found it! Let's find the nearest card/form/table container
-        let container = cnrInput.closest('.card') || cnrInput.closest('.panel') || cnrInput.closest('form') || cnrInput.closest('table') || cnrInput.parentElement;
-        if (container) {
-          let current = container;
-          while (current && current !== document.body) {
-            let sibling = current.parentElement ? current.parentElement.firstElementChild : null;
-            while (sibling) {
-              if (sibling !== current && !sibling.contains(cnrInput)) {
-                // Hide other tabs/sections
-                sibling.style.setProperty('display', 'none', 'important');
-              }
-              sibling = sibling.nextElementSibling;
-            }
-            current = current.parentElement;
-          }
-          
-          // Style container itself to take full space
-          container.style.setProperty('width', '100%', 'important');
-          container.style.setProperty('max-width', '100%', 'important');
-          container.style.setProperty('margin', '0', 'important');
-          container.style.setProperty('padding', '10px', 'important');
-          container.style.setProperty('border', 'none', 'important');
-          container.style.setProperty('box-shadow', 'none', 'important');
-        }
+        cnrInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        try {
+          cnrInput.focus();
+        } catch (e) {}
       }
     }
     
     // Execute multiple times to handle dynamic loading
-    cropPage();
-    setTimeout(cropPage, 200);
-    setTimeout(cropPage, 500);
-    setTimeout(cropPage, 1000);
-    setTimeout(cropPage, 2000);
+    scrollToCnr();
+    setTimeout(scrollToCnr, 200);
+    setTimeout(scrollToCnr, 500);
+    setTimeout(scrollToCnr, 1000);
+    setTimeout(scrollToCnr, 2000);
 
     document.addEventListener('click', function() {
-      setTimeout(cropPage, 100);
-      setTimeout(cropPage, 300);
+      setTimeout(scrollToCnr, 100);
+      setTimeout(scrollToCnr, 300);
     });
   })();
   true;
