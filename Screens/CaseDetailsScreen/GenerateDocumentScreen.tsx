@@ -19,6 +19,7 @@ import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system";
 import { Ionicons } from "@expo/vector-icons";
 import { v4 as uuidv4 } from "uuid";
+import { auth } from "../../utils/firebaseConfig";
 
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 import { useTranslation } from "../../Providers/LanguageProvider";
@@ -118,6 +119,13 @@ const GenerateDocumentScreen: React.FC = () => {
   const [caseDetails, setCaseDetails] = useState<CaseWithDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [aiGeneratedHtml, setAiGeneratedHtml] = useState<string | null>(null);
+  const [aiGeneratedPreviewText, setAiGeneratedPreviewText] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAiGeneratedHtml(null);
+    setAiGeneratedPreviewText(null);
+  }, [documentType, outputLanguage]);
 
   // Tab selector: "fields" or "preview"
   const [activeTab, setActiveTab] = useState<"fields" | "preview">("fields");
@@ -264,6 +272,7 @@ const GenerateDocumentScreen: React.FC = () => {
 
   // Compile document properties
   const getInterpolatedHtml = (): string => {
+    if (aiGeneratedHtml) return aiGeneratedHtml;
     const parties = caseTitle || `${clientName || "Petitioner"} vs ${oppositePartyName || "Respondent"}`;
     const isHindi = outputLanguage === "hi";
 
@@ -501,6 +510,7 @@ const GenerateDocumentScreen: React.FC = () => {
   };
 
   const getPreviewText = (): string => {
+    if (aiGeneratedPreviewText) return aiGeneratedPreviewText;
     const parties = caseTitle || `${clientName || "Petitioner"} vs ${oppositePartyName || "Respondent"}`;
 
     return getTemplateTextPreview(documentType, {
@@ -669,6 +679,153 @@ const GenerateDocumentScreen: React.FC = () => {
         } catch (error) {
           console.error("Error generating PDF template:", error);
           Alert.alert(t("alert_error"), t("doc_err_upload_general"));
+        } finally {
+          setIsGenerating(false);
+        }
+      }
+    });
+  };
+
+  const validateFieldsForAi = (): boolean => {
+    if (!clientName) {
+      Alert.alert(t("alert_error"), "Client Name is required for drafting.");
+      return false;
+    }
+    if (!advocateName) {
+      Alert.alert(t("alert_error"), "Advocate Name is required for drafting.");
+      return false;
+    }
+
+    if (documentType === "bail" || documentType === "anticipatory_bail") {
+      if (!groundOfBail) {
+        Alert.alert(t("alert_error"), "Ground of Bail is required for bail drafting.");
+        return false;
+      }
+      if (!policeStation) {
+        Alert.alert(t("alert_error"), "Police Station is required for bail drafting.");
+        return false;
+      }
+    } else if (documentType === "adjournment") {
+      if (!adjournmentReason) {
+        Alert.alert(t("alert_error"), "Reason for Adjournment is required.");
+        return false;
+      }
+    } else if (documentType === "legal_notice" || documentType === "cheque_bounce") {
+      if (!receiverAddress) {
+        Alert.alert(t("alert_error"), "Recipient Address is required for notices.");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleGenerateWithAi = async () => {
+    if (!validateFieldsForAi()) {
+      return;
+    }
+
+    try {
+      const isPremiumVal = await AsyncStorage.getItem("@user_is_premium");
+      const premiumTier = await AsyncStorage.getItem("@user_premium_tier");
+
+      if (isPremiumVal !== "true" || premiumTier !== "ultra") {
+        Alert.alert(
+          "Ultra Premium Feature",
+          "AI Legal Drafting is exclusive to the Ultra Premium tier. Upgrade now to unlock automated legal documents and AI research chatbot!",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Upgrade",
+              onPress: () => {
+                // Navigate to pricing/upgrade screen
+              }
+            }
+          ]
+        );
+        return;
+      }
+    } catch (err) {
+      console.warn("Entitlement check failed:", err);
+      return;
+    }
+
+    await showAdWithPreload("rewarded", async (success) => {
+      if (success) {
+        setIsGenerating(true);
+        await cacheAdvocateProfile();
+
+        try {
+          const userToken = await auth.currentUser?.getIdToken();
+          if (!userToken) {
+            throw new Error("User session not found. Please log in.");
+          }
+
+          const response = await fetch("https://us-central1-casediary-iamshiv.cloudfunctions.net/generateAiDraft", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${userToken}`,
+            },
+            body: JSON.stringify({
+              documentType,
+              language: outputLanguage,
+              fields: {
+                caseTitle,
+                clientName,
+                oppositePartyName,
+                courtName,
+                caseNumber,
+                caseYear,
+                advocateName,
+                advocateEnrollment,
+                advocateAddress,
+                adjournmentReason,
+                policeStation,
+                firNumber,
+                firYear,
+                groundOfBail,
+                deponentAge,
+                deponentAddress,
+                receiverAddress,
+                affidavitFacts,
+                preliminaryObjections,
+                replyOnMerits,
+                demandText,
+                restraintPrayer,
+                valuation,
+                replyPoints,
+                decreeDate,
+                satisfactionDetails,
+                chequeNumber,
+                dishonorDate,
+                termMonths,
+                witness1,
+                witness2,
+              }
+            })
+          });
+
+          if (!response.ok) {
+            const errJson = await response.json();
+            throw new Error(errJson.error || "Failed to generate draft from AI.");
+          }
+
+          const data = await response.json();
+          if (!data.html || !data.text) {
+            throw new Error("Invalid response received from AI service.");
+          }
+
+          setAiGeneratedHtml(data.html);
+          setAiGeneratedPreviewText(data.text);
+
+          Alert.alert(
+            "Draft Generated!",
+            "AI has completed drafting your custom legal document. You can view the live preview or export/share it directly.",
+            [{ text: "OK" }]
+          );
+        } catch (error: any) {
+          console.error("AI Generation Error:", error);
+          Alert.alert("AI Drafting Failed", error?.message || "Failed to connect to the AI drafting service. Please try again.");
         } finally {
           setIsGenerating(false);
         }
@@ -1174,13 +1331,20 @@ const GenerateDocumentScreen: React.FC = () => {
               </View>
             )}
 
-            <View style={{ marginTop: 24 }}>
+            <View style={{ marginTop: 24, gap: 12 }}>
+              <ActionButton
+                title={isGenerating ? t("docgen_preparing") : "Draft with AI ✨"}
+                onPress={handleGenerateWithAi}
+                type="primary"
+                style={{ backgroundColor: "#8B5CF6" }}
+                disabled={isGenerating || !advocateName}
+                loading={isGenerating}
+              />
               <ActionButton
                 title={isGenerating ? t("docgen_preparing") : caseId ? t("docgen_btn_export_share") : t("docgen_btn_save_draft")}
                 onPress={handleGeneratePdf}
-                type="primary"
+                type="secondary"
                 disabled={isGenerating || !advocateName}
-                loading={isGenerating}
               />
             </View>
           </View>
@@ -1193,13 +1357,20 @@ const GenerateDocumentScreen: React.FC = () => {
             <View style={styles.legalRedMarginLine} />
             <Text style={styles.legalDraftText}>{getPreviewText()}</Text>
           </ScrollView>
-          <View style={styles.floatingPreviewButton}>
+          <View style={[styles.floatingPreviewButton, { gap: 12 }]}>
+            <ActionButton
+              title={isGenerating ? t("docgen_preparing") : "Draft with AI ✨"}
+              onPress={handleGenerateWithAi}
+              type="primary"
+              style={{ backgroundColor: "#8B5CF6" }}
+              disabled={isGenerating || !advocateName}
+              loading={isGenerating}
+            />
             <ActionButton
               title={isGenerating ? t("docgen_preparing") : caseId ? t("docgen_btn_export_share_short") : t("docgen_btn_save_draft_short")}
               onPress={handleGeneratePdf}
-              type="primary"
+              type="secondary"
               disabled={isGenerating || !advocateName}
-              loading={isGenerating}
             />
           </View>
         </View>

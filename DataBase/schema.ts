@@ -66,6 +66,8 @@ export interface CaseDocument {
   file_size?: number | null; // In bytes
   created_at: string; // ISO8601, when document was added
   user_id?: number | null; // Who uploaded this document, if relevant
+  sync_status?: "synced" | "local_only" | null;
+  remote_url?: string | null;
 }
 
 export interface Case {
@@ -202,6 +204,8 @@ CREATE TABLE IF NOT EXISTS CaseDocuments (
   file_size INTEGER,
   created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
   user_id INTEGER, -- Optional: if document privacy is per user, not just per case
+  sync_status TEXT DEFAULT 'local_only',
+  remote_url TEXT,
   FOREIGN KEY (case_id) REFERENCES Cases(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE SET NULL
 );`;
@@ -355,6 +359,22 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_updated_at ON Cases(updated_at);`);
 
   await db.execAsync(CREATE_CASE_DOCUMENTS_TABLE);
+
+  // Migrate existing CaseDocuments columns if missing
+  try {
+    const docTableInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(CaseDocuments);");
+    if (!docTableInfo.some(col => col.name === 'sync_status')) {
+      await db.execAsync("ALTER TABLE CaseDocuments ADD COLUMN sync_status TEXT DEFAULT 'local_only';");
+      console.log("Migration: Added column sync_status to CaseDocuments table successfully.");
+    }
+    if (!docTableInfo.some(col => col.name === 'remote_url')) {
+      await db.execAsync("ALTER TABLE CaseDocuments ADD COLUMN remote_url TEXT;");
+      console.log("Migration: Added column remote_url to CaseDocuments table successfully.");
+    }
+  } catch (docMigrationError) {
+    console.error("Error migrating CaseDocuments table:", docMigrationError);
+  }
+
   await db.execAsync(CREATE_CASE_DOCUMENTS_CASE_ID_INDEX);
   await db.execAsync(CREATE_CASE_TIMELINE_TABLE);
   await db.execAsync(CREATE_CASE_TIMELINE_CASE_ID_INDEX);

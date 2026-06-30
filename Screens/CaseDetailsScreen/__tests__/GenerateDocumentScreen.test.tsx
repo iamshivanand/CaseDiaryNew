@@ -2,6 +2,16 @@ import React from "react";
 import { render, fireEvent, waitFor } from "@testing-library/react-native";
 import GenerateDocumentScreen from "../GenerateDocumentScreen";
 import ThemeProvider from "../../../Providers/ThemeProvider";
+
+jest.mock("../../../utils/firebaseConfig", () => ({
+  auth: {
+    currentUser: {
+      getIdToken: jest.fn(() => Promise.resolve("mock-token")),
+    },
+  },
+  db: {},
+  storage: {},
+}));
 import LanguageProvider from "../../../Providers/LanguageProvider";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";

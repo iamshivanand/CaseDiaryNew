@@ -110,6 +110,12 @@ interface AdContextProps {
     adType: "rewarded" | "interstitial",
     onComplete: (success: boolean) => void
   ) => Promise<void>;
+  incrementNextDateUpdateCounter: (
+    onComplete: (success: boolean) => void
+  ) => Promise<void>;
+  incrementCaseActionCounter: (
+    onComplete: (success: boolean) => void
+  ) => Promise<void>;
 }
 
 const AdContext = createContext<AdContextProps | null>(null);
@@ -333,6 +339,52 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }
   };
 
+  const incrementNextDateUpdateCounter = async (onComplete: (success: boolean) => void) => {
+    try {
+      const isPremiumVal = await AsyncStorage.getItem("@user_is_premium");
+      if (isPremiumVal === "true") {
+        onComplete(true);
+        return;
+      }
+      const rawCount = await AsyncStorage.getItem("@free_next_date_update_count");
+      const currentCount = rawCount ? parseInt(rawCount, 10) : 0;
+      const nextCount = currentCount + 1;
+      await AsyncStorage.setItem("@free_next_date_update_count", nextCount.toString());
+
+      if (nextCount % 10 === 0) {
+        await showAdWithPreload("rewarded", onComplete);
+      } else {
+        onComplete(true);
+      }
+    } catch (e) {
+      console.warn("Failed to check next date ad counter:", e);
+      onComplete(true);
+    }
+  };
+
+  const incrementCaseActionCounter = async (onComplete: (success: boolean) => void) => {
+    try {
+      const isPremiumVal = await AsyncStorage.getItem("@user_is_premium");
+      if (isPremiumVal === "true") {
+        onComplete(true);
+        return;
+      }
+      const rawCount = await AsyncStorage.getItem("@free_case_action_count");
+      const currentCount = rawCount ? parseInt(rawCount, 10) : 0;
+      const nextCount = currentCount + 1;
+      await AsyncStorage.setItem("@free_case_action_count", nextCount.toString());
+
+      if (nextCount % 10 === 0) {
+        await showAdWithPreload("rewarded", onComplete);
+      } else {
+        onComplete(true);
+      }
+    } catch (e) {
+      console.warn("Failed to check case action ad counter:", e);
+      onComplete(true);
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -340,7 +392,13 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   }, []);
 
   return (
-    <AdContext.Provider value={{ showAdWithPreload }}>
+    <AdContext.Provider
+      value={{
+        showAdWithPreload,
+        incrementNextDateUpdateCounter,
+        incrementCaseActionCounter,
+      }}
+    >
       {children}
       {loading && (
         <Modal visible={loading} transparent animationType="fade">
