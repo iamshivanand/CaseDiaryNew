@@ -50,6 +50,7 @@ DataBase/Settings.xml
 # EAS configuration & local credentials
 .eas/
 credentials.json
+/DataBase/keys/
 
 # log files
 *.log

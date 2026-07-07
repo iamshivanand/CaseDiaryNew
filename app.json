@@ -19,12 +19,14 @@
       "supportsTablet": true
     },
     "android": {
+      "compileSdkVersion": 35,
+      "targetSdkVersion": 35,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.iamshiv.CaseDiary",
-      "versionCode": 1
+      "versionCode": 5
     },
     "web": {
       "favicon": "./assets/favicon.png"

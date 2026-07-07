@@ -1,6 +1,7 @@
-import { NavigatorScreenParams } from '@react-navigation/native'; // Needed for nested navigators
-import { CaseDetails } from "../Screens/CaseDetailsScreen/CaseDetailsScreen"; // Summary type
+import { NavigatorScreenParams } from "@react-navigation/native"; // Needed for nested navigators
+
 import { CaseData, Document, TimelineEvent } from "./appTypes"; // Comprehensive types
+import { CaseDetails } from "../Screens/CaseDetailsScreen/CaseDetailsScreen"; // Summary type
 
 // Stack for the "Home" or "Cases" Tab
 export type HomeStackParamList = {
@@ -12,33 +13,49 @@ export type HomeStackParamList = {
   EditCase: {
     caseId?: number;
     initialCaseData?: Partial<CaseData> & {
-      documents?: Document[],
-      timelineEvents?: TimelineEvent[]
-    }
+      documents?: Document[];
+      timelineEvents?: TimelineEvent[];
+    };
   };
   AddCase: { uniqueId?: string };
-  AddCaseDetails: { update?: boolean; initialValues?: CaseDetails; uniqueId?: string };
+  AddCaseDetails: {
+    update?: boolean;
+    initialValues?: CaseDetails;
+    uniqueId?: string;
+  };
   AddDocument: { caseId: string | number };
   UndatedCases: undefined;
   YesterdaysCases: undefined;
-  GenerateDocument: { caseId?: number };
+  GenerateDocument: {
+    caseId?: number;
+    templateType?: string;
+    draftId?: string;
+  };
   DraftsHub: undefined;
+  EditDraft: {
+    draftId?: string;
+    caseId?: number;
+    initialHtml?: string;
+    templateType?: string;
+    title?: string;
+  };
   ImportMigration: { isFromOnboarding?: boolean };
   DuplicateReview: undefined;
+  PdfViewer: { pdfUri: string; title: string };
 };
 
 // Stack for the "Search" Tab
 export type SearchStackParamList = {
   SearchScreen: undefined;
   CaseDetails: { caseId: number };
-  EditCase: { caseId: number, initialCaseData?: Partial<CaseData> };
+  EditCase: { caseId: number; initialCaseData?: Partial<CaseData> };
 };
 
 // Stack for the "Calendar" Tab
 export type CalendarStackParamList = {
   CalendarScreen: undefined;
   CaseDetails: { caseId: number };
-  EditCase: { caseId: number, initialCaseData?: Partial<CaseData> };
+  EditCase: { caseId: number; initialCaseData?: Partial<CaseData> };
 };
 
 // Stack for the "Profile" Tab (can include Settings)
@@ -46,12 +63,13 @@ export type ProfileStackParamList = {
   ProfileScreen: undefined;
   SettingsScreen: undefined;
   ManageLookupCategoryScreen: {
-    categoryName: 'CaseTypes' | 'Courts' | 'Districts' | 'PoliceStations';
+    categoryName: "CaseTypes" | "Courts" | "Districts" | "PoliceStations";
     title: string;
   };
   ImportMigration: { isFromOnboarding?: boolean };
   DuplicateReview: undefined;
   DatabaseImportScreen: undefined;
+  ECourtsAppImport: undefined;
   // Example: AccountDetails: undefined;
 };
 

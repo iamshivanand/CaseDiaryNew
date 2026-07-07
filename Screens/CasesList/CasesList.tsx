@@ -1,5 +1,10 @@
 import { AntDesign, Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import {
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+  RouteProp,
+} from "@react-navigation/native";
 import React, { useCallback, useContext, useState, useEffect } from "react";
 import {
   FlatList,
@@ -11,16 +16,27 @@ import {
   View,
   ActivityIndicator,
 } from "react-native"; // Removed Dimensions, ScrollView
-import { getCases, addCaseTimelineEvent, updateCase, getCaseById } from "../../DataBase";
+
+import { ECourtsTextImportModal } from "./components/ECourtsTextImportModal";
+import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
+import {
+  getCases,
+  addCaseTimelineEvent,
+  updateCase,
+  getCaseById,
+} from "../../DataBase";
 import { Case } from "../../DataBase/schema";
+import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { CaseDataScreen } from "../../Types/appTypes"; // Import the new data type
-import { formatDate, getCurrentUserId, getLocalDateString } from "../../utils/commonFunctions";
-import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
+import {
+  formatDate,
+  getCurrentUserId,
+  getLocalDateString,
+} from "../../utils/commonFunctions";
+import { promptClientNotification } from "../../utils/whatsappNotifier";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import AdBanner from "../CommonComponents/AdBanner";
-import { useTranslation } from "../../Providers/LanguageProvider";
-import { promptClientNotification } from "../../utils/whatsappNotifier";
 
 const transformApiCaseToCaseDataScreen = (apiCase: Case): CaseDataScreen => {
   return {
@@ -38,7 +54,7 @@ const transformApiCaseToCaseDataScreen = (apiCase: Case): CaseDataScreen => {
 };
 type FilterStatus = "Active" | "Closed";
 
-type CasesListRouteProp = RouteProp<{ params: { Filter?: string } }, 'params'>;
+type CasesListRouteProp = RouteProp<{ params: { Filter?: string } }, "params">;
 
 const LIMIT = 20;
 
@@ -54,8 +70,9 @@ const CasesList = () => {
   const [debouncedSearchText, setDebouncedSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterStatus>("Active");
   const [isPopupVisible, setPopupVisible] = useState(false);
+  const [isImportModalVisible, setImportModalVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -69,49 +86,60 @@ const CasesList = () => {
   }, [searchText]);
 
   // Fetch paginated cases from the database
-  const fetchCasesList = useCallback(async (offset: number, queryText: string, currentFilter: string, currentActiveFilter: FilterStatus) => {
-    setIsLoading(true);
-    try {
-      let dateFilter: 'today' | 'tomorrow' | 'yesterday' | 'undated' | null = null;
-      let status: 'Active' | 'Closed' | 'All' = currentActiveFilter;
+  const fetchCasesList = useCallback(
+    async (
+      offset: number,
+      queryText: string,
+      currentFilter: string,
+      currentActiveFilter: FilterStatus
+    ) => {
+      setIsLoading(true);
+      try {
+        let dateFilter: "today" | "tomorrow" | "yesterday" | "undated" | null =
+          null;
+        let status: "Active" | "Closed" | "All" = currentActiveFilter;
 
-      if (currentFilter === 'todaysCases') {
-        dateFilter = 'today';
-        status = 'All';
-      } else if (currentFilter === 'tomorrowCases') {
-        dateFilter = 'tomorrow';
-        status = 'All';
-      } else if (currentFilter === 'yesterdayCases') {
-        dateFilter = 'yesterday';
-        status = 'All';
-      }
-
-      const results = await getCases(
-        null, // Global case retrieval or pass specific user if needed
-        LIMIT,
-        offset,
-        {
-          status,
-          dateFilter,
-          searchQuery: queryText,
+        if (currentFilter === "todaysCases") {
+          dateFilter = "today";
+          status = "All";
+        } else if (currentFilter === "tomorrowCases") {
+          dateFilter = "tomorrow";
+          status = "All";
+        } else if (currentFilter === "yesterdayCases") {
+          dateFilter = "yesterday";
+          status = "All";
         }
-      );
 
-      const mapped = results ? results.map(transformApiCaseToCaseDataScreen) : [];
+        const results = await getCases(
+          null, // Global case retrieval or pass specific user if needed
+          LIMIT,
+          offset,
+          {
+            status,
+            dateFilter,
+            searchQuery: queryText,
+          }
+        );
 
-      if (offset === 0) {
-        setCases(mapped);
-      } else {
-        setCases((prev) => [...prev, ...mapped]);
+        const mapped = results
+          ? results.map(transformApiCaseToCaseDataScreen)
+          : [];
+
+        if (offset === 0) {
+          setCases(mapped);
+        } else {
+          setCases((prev) => [...prev, ...mapped]);
+        }
+        setHasMore(mapped.length === LIMIT);
+      } catch (error) {
+        console.error("Error fetching cases list:", error);
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
-      setHasMore(mapped.length === LIMIT);
-    } catch (error) {
-      console.error("Error fetching cases list:", error);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Fetch initial page on tab focus, filter change, or query change
   useFocusEffect(
@@ -127,9 +155,22 @@ const CasesList = () => {
 
   const loadMore = useCallback(() => {
     if (!isLoading && hasMore) {
-      fetchCasesList(cases.length, debouncedSearchText, filterParam || "", activeFilter);
+      fetchCasesList(
+        cases.length,
+        debouncedSearchText,
+        filterParam || "",
+        activeFilter
+      );
     }
-  }, [isLoading, hasMore, cases.length, debouncedSearchText, filterParam, activeFilter, fetchCasesList]);
+  }, [
+    isLoading,
+    hasMore,
+    cases.length,
+    debouncedSearchText,
+    filterParam,
+    activeFilter,
+    fetchCasesList,
+  ]);
 
   const handleSearchChange = useCallback((text: string) => {
     setSearchText(text);
@@ -140,68 +181,121 @@ const CasesList = () => {
     setPopupVisible(true);
   }, []);
 
-  const handleSaveHearing = useCallback(async (notes: string, nextHearingDate: Date, userId: number) => {
-    if (!selectedCase || !selectedCase.id) return;
-    const caseId = parseInt(selectedCase.id.toString(), 10);
-    if (isNaN(caseId)) return;
+  const handleSaveHearing = useCallback(
+    async (notes: string, nextHearingDate: Date, userId: number) => {
+      if (!selectedCase || !selectedCase.id) return;
+      const caseId = parseInt(selectedCase.id.toString(), 10);
+      if (isNaN(caseId)) return;
 
-    try {
-      const caseExists = await getCaseById(caseId);
-      if (!caseExists) {
-        console.error("Case not found");
-        return;
+      try {
+        const caseExists = await getCaseById(caseId);
+        if (!caseExists) {
+          console.error("Case not found");
+          return;
+        }
+        // 1. Add timeline event
+        if (notes) {
+          await addCaseTimelineEvent({
+            case_id: caseId,
+            hearing_date: new Date().toISOString(),
+            notes,
+          });
+        }
+
+        // 2. Update case's next hearing date
+        await updateCase(
+          caseId,
+          {
+            NextDate: getLocalDateString(nextHearingDate),
+          },
+          userId
+        );
+
+        // 3. Refresh list from page 0
+        fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
+
+        // 4. Prompt WhatsApp notification to client
+        setTimeout(() => {
+          promptClientNotification(
+            caseId,
+            getLocalDateString(nextHearingDate),
+            notes
+          );
+        }, 500);
+      } catch (error) {
+        console.error("Error updating hearing:", error);
       }
-      // 1. Add timeline event
-      if (notes) {
-        await addCaseTimelineEvent({
-          case_id: caseId,
-          hearing_date: new Date().toISOString(),
-          notes: notes,
-        });
-      }
-
-      // 2. Update case's next hearing date
-      await updateCase(caseId, {
-        NextDate: getLocalDateString(nextHearingDate),
-      }, userId);
-
-      // 3. Refresh list from page 0
-      fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
-
-      // 4. Prompt WhatsApp notification to client
-      setTimeout(() => {
-        promptClientNotification(caseId, getLocalDateString(nextHearingDate), notes);
-      }, 500);
-    } catch (error) {
-      console.error("Error updating hearing:", error);
-    }
-  }, [selectedCase, debouncedSearchText, filterParam, activeFilter, fetchCasesList]);
+    },
+    [
+      selectedCase,
+      debouncedSearchText,
+      filterParam,
+      activeFilter,
+      fetchCasesList,
+    ]
+  );
 
   const navigateToAddCase = useCallback(() => {
     // @ts-ignore
     navigation.navigate("AddCase");
   }, [navigation]);
 
-  const renderItem = useCallback(({ item }: { item: CaseDataScreen }) => (
-    <NewCaseCard
-      caseDetails={item}
-      onUpdateHearingPress={() => handleUpdateHearing(item)}
-    />
-  ), [handleUpdateHearing]);
+  const renderItem = useCallback(
+    ({ item }: { item: CaseDataScreen }) => (
+      <NewCaseCard
+        caseDetails={item}
+        onUpdateHearingPress={() => handleUpdateHearing(item)}
+      />
+    ),
+    [handleUpdateHearing]
+  );
 
-  const keyExtractor = useCallback((item: CaseDataScreen) => item.id.toString(), []);
+  const keyExtractor = useCallback(
+    (item: CaseDataScreen) => item.id.toString(),
+    []
+  );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
+    >
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{t("cases_header_title")}</Text>
-        <TouchableOpacity onPress={navigateToAddCase} style={styles.addButton}>
-          <Ionicons name="add-circle-outline" size={32} color={theme.colors.primary || "#007AFF"} />
-        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+          {t("cases_header_title")}
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <TouchableOpacity
+            onPress={() => setImportModalVisible(true)}
+            style={[styles.addButton, { marginRight: 8 }]}
+          >
+            <Ionicons
+              name="cloud-download-outline"
+              size={28}
+              color={theme.colors.primary || "#007AFF"}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={navigateToAddCase}
+            style={styles.addButton}
+          >
+            <Ionicons
+              name="add-circle-outline"
+              size={32}
+              color={theme.colors.primary || "#007AFF"}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
-        <View style={[styles.inputWrapper, { backgroundColor: theme.colors.cardBackground || theme.colors.card }]}>
+        <View
+          style={[
+            styles.inputWrapper,
+            {
+              backgroundColor: theme.colors.cardBackground || theme.colors.card,
+            },
+          ]}
+        >
           <AntDesign
             name="search1"
             size={20}
@@ -223,24 +317,44 @@ const CasesList = () => {
           <TouchableOpacity
             style={[
               styles.toggleButton,
-              activeFilter === "Active" ? styles.activeButton : styles.inactiveButton,
-              activeFilter === "Active" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.border || '#E0E0E0' }
+              activeFilter === "Active"
+                ? styles.activeButton
+                : styles.inactiveButton,
+              activeFilter === "Active"
+                ? { backgroundColor: theme.colors.primary || "#007AFF" }
+                : { backgroundColor: theme.colors.border || "#E0E0E0" },
             ]}
             onPress={() => setActiveFilter("Active")}
           >
-            <Text style={activeFilter === "Active" ? styles.activeButtonText : [styles.inactiveButtonText, { color: theme.colors.text }]}>
+            <Text
+              style={
+                activeFilter === "Active"
+                  ? styles.activeButtonText
+                  : [styles.inactiveButtonText, { color: theme.colors.text }]
+              }
+            >
               {t("cases_filter_active")}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.toggleButton,
-              activeFilter === "Closed" ? styles.activeButton : styles.inactiveButton,
-              activeFilter === "Closed" ? { backgroundColor: theme.colors.primary || '#007AFF' } : { backgroundColor: theme.colors.border || '#E0E0E0' }
+              activeFilter === "Closed"
+                ? styles.activeButton
+                : styles.inactiveButton,
+              activeFilter === "Closed"
+                ? { backgroundColor: theme.colors.primary || "#007AFF" }
+                : { backgroundColor: theme.colors.border || "#E0E0E0" },
             ]}
             onPress={() => setActiveFilter("Closed")}
           >
-            <Text style={activeFilter === "Closed" ? styles.activeButtonText : [styles.inactiveButtonText, { color: theme.colors.text }]}>
+            <Text
+              style={
+                activeFilter === "Closed"
+                  ? styles.activeButtonText
+                  : [styles.inactiveButtonText, { color: theme.colors.text }]
+              }
+            >
               {t("cases_filter_closed")}
             </Text>
           </TouchableOpacity>
@@ -266,7 +380,14 @@ const CasesList = () => {
         ListEmptyComponent={
           !isLoading ? (
             <View style={styles.emptyListContainer}>
-              <Text style={[styles.emptyListText, { color: theme.colors.textSecondary }]}>{t("cases_no_cases")}</Text>
+              <Text
+                style={[
+                  styles.emptyListText,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
+                {t("cases_no_cases")}
+              </Text>
             </View>
           ) : null
         }
@@ -288,6 +409,18 @@ const CasesList = () => {
           }
         />
       )}
+      <ECourtsTextImportModal
+        visible={isImportModalVisible}
+        onClose={() => setImportModalVisible(false)}
+        onImportSuccess={() => {
+          fetchCasesList(
+            0,
+            debouncedSearchText,
+            filterParam || "",
+            activeFilter
+          );
+        }}
+      />
       <AdBanner />
     </SafeAreaView>
   );
@@ -326,7 +459,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     // backgroundColor: '#F0F0F0', // Light grey background for search bar
     borderWidth: 1, // Optional: if you prefer a border
-    borderColor: '#D1D1D6', // Optional
+    borderColor: "#D1D1D6", // Optional
   },
   searchIcon: {
     marginRight: 8,

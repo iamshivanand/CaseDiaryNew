@@ -2,7 +2,7 @@
 import * as FileSystem from 'expo-file-system';
 // SQLite import might not be directly needed here if all DB interactions use getDb()
 // import * as SQLite from 'expo-sqlite';
-import { CaseType, Court, District, PoliceStation, CaseDocument, Case as CaseRow, User } from './schema';
+import { CaseType, Court, District, PoliceStation, CaseDocument, Case as CaseRow, User, DocumentDraft } from './schema';
 
 // getDb is now imported from connection.ts
 import { getDb, getDrizzleDb, __TEST_ONLY_resetDbInstance } from './connection';
@@ -515,5 +515,62 @@ export const getPoliceStations = async (districtId?: number | null, userId?: num
   }
   query += " ORDER BY name ASC";
   return db.getAllAsync<PoliceStation>(query, params);
+};
+
+// --- Document Draft Management ---
+
+export const saveDocumentDraft = async (draft: DocumentDraft): Promise<void> => {
+  const db = await getDb();
+  await db.runAsync(
+    `INSERT OR REPLACE INTO document_drafts (id, case_id, title, template_type, html_content, is_custom_template, created_at, updated_at) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      draft.id,
+      draft.case_id ?? null,
+      draft.title,
+      draft.template_type,
+      draft.html_content,
+      draft.is_custom_template,
+      draft.created_at || new Date().toISOString(),
+      new Date().toISOString(),
+    ]
+  );
+};
+
+export const getDocumentDrafts = async (
+  caseId?: number | null,
+  isCustomTemplate?: number | null
+): Promise<DocumentDraft[]> => {
+  const db = await getDb();
+  let query = "SELECT * FROM document_drafts WHERE 1=1";
+  const params: any[] = [];
+  if (isCustomTemplate !== undefined && isCustomTemplate !== null) {
+    query += " AND is_custom_template = ?";
+    params.push(isCustomTemplate);
+  }
+  if (caseId !== undefined) {
+    if (caseId === null) {
+      query += " AND case_id IS NULL";
+    } else {
+      query += " AND case_id = ?";
+      params.push(caseId);
+    }
+  }
+  query += " ORDER BY updated_at DESC";
+  return db.getAllAsync<DocumentDraft>(query, params);
+};
+
+export const getDocumentDraftById = async (id: string): Promise<DocumentDraft | null> => {
+  const db = await getDb();
+  return db.getFirstAsync<DocumentDraft>(
+    "SELECT * FROM document_drafts WHERE id = ?",
+    [id]
+  );
+};
+
+export const deleteDocumentDraft = async (id: string): Promise<boolean> => {
+  const db = await getDb();
+  const result = await db.runAsync("DELETE FROM document_drafts WHERE id = ?", [id]);
+  return result.changes > 0;
 };
 

@@ -1,37 +1,42 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React, { useContext, useEffect } from "react";
 import { View, Platform } from "react-native"; // Removed ScrollView, Text
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
-import { LinearGradient } from "expo-linear-gradient";
-import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 
-import { ThemeContext } from "./Providers/ThemeProvider";
 import { useTranslation } from "./Providers/LanguageProvider";
+import { ThemeContext } from "./Providers/ThemeProvider";
 
 // Import Screens for Stacks
-import DashboardScreen from "./Screens/Dashboard/Dashboard";
-import CasesList from "./Screens/CasesList/CasesList";
-import CaseDetailsScreen from "./Screens/CaseDetailsScreen/CaseDetailsScreen"; // This is now the new, refactored screen
-// import CaseDetailsScreenV2 from "./Screens/CaseDetailsScreenV2/CaseDetailsScreenV2"; // V2 Import removed
-import EditCaseScreen from "./Screens/EditCase/EditCaseScreen";
 import AddCase from "./Screens/Addcase/AddCase";
 import AddCaseDetails from "./Screens/Addcase/AddCaseDetails";
 import AddDocumentScreen from "./Screens/Addcase/AddDocument";
+import CalendarScreen from "./Screens/Calendar/Calendar";
+import CaseDetailsScreen from "./Screens/CaseDetailsScreen/CaseDetailsScreen"; // This is now the new, refactored screen
+import EditDraftScreen from "./Screens/CaseDetailsScreen/EditDraftScreen";
+import GenerateDocumentScreen from "./Screens/CaseDetailsScreen/GenerateDocumentScreen";
+import CasesList from "./Screens/CasesList/CasesList";
+import DashboardScreen from "./Screens/Dashboard/Dashboard";
+// import CaseDetailsScreenV2 from "./Screens/CaseDetailsScreenV2/CaseDetailsScreenV2"; // V2 Import removed
+import EditCaseScreen from "./Screens/EditCase/EditCaseScreen";
+import DuplicateReviewScreen from "./Screens/Onboarding/DuplicateReviewScreen";
+import ImportMigrationScreen from "./Screens/Onboarding/ImportMigrationScreen";
+import PdfViewerScreen from "./Screens/PdfViewer/PdfViewerScreen";
+import ProfileScreen from "./Screens/ProfileScreen/Profile"; // Renamed import for clarity
+import SearchScreen from "./Screens/SearchScreen/SearchScreen";
+import DatabaseImportScreen from "./Screens/Settings/DatabaseImportScreen";
+import DraftsHubScreen from "./Screens/Settings/DraftsHubScreen";
+import ECourtsAppImportScreen from "./Screens/Settings/ECourtsAppImportScreen";
+import ManageLookupCategoryScreen from "./Screens/Settings/ManageLookupCategoryScreen";
+import SettingsScreen from "./Screens/Settings/SettingsScreen";
 import UndatedCasesScreen from "./Screens/UndatedCases/UndatedCasesScreen";
 import YesterdaysCasesScreen from "./Screens/YesterdaysCases/YesterdaysCasesScreen";
-import GenerateDocumentScreen from "./Screens/CaseDetailsScreen/GenerateDocumentScreen";
-import DraftsHubScreen from "./Screens/Settings/DraftsHubScreen";
-
-import SearchScreen from "./Screens/SearchScreen/SearchScreen";
-import CalendarScreen from "./Screens/Calendar/Calendar";
-import ProfileScreen from "./Screens/ProfileScreen/Profile"; // Renamed import for clarity
-import SettingsScreen from "./Screens/Settings/SettingsScreen";
-import ManageLookupCategoryScreen from "./Screens/Settings/ManageLookupCategoryScreen";
-import ImportMigrationScreen from "./Screens/Onboarding/ImportMigrationScreen";
-import DuplicateReviewScreen from "./Screens/Onboarding/DuplicateReviewScreen";
-import DatabaseImportScreen from "./Screens/Settings/DatabaseImportScreen";
 
 // Import ParamList types
 import {
@@ -56,13 +61,13 @@ const HomeStack = () => {
     <HomeStackNav.Navigator
       screenOptions={{
         headerShown: true,
-        headerTitleAlign: 'center',
+        headerTitleAlign: "center",
         headerStyle: {
           backgroundColor: theme.colors.cardBackground,
         },
         headerTintColor: theme.colors.text,
         headerTitleStyle: {
-          fontWeight: 'bold',
+          fontWeight: "bold",
         },
       }}
     >
@@ -127,6 +132,11 @@ const HomeStack = () => {
         options={{ title: "Drafts Hub" }}
       />
       <HomeStackNav.Screen
+        name="EditDraft"
+        component={EditDraftScreen}
+        options={{ headerShown: false }}
+      />
+      <HomeStackNav.Screen
         name="ImportMigration"
         component={ImportMigrationScreen}
         options={{ title: "Import Data" }}
@@ -135,6 +145,11 @@ const HomeStack = () => {
         name="DuplicateReview"
         component={DuplicateReviewScreen}
         options={{ title: "Resolve Duplicates" }}
+      />
+      <HomeStackNav.Screen
+        name="PdfViewer"
+        component={PdfViewerScreen}
+        options={{ title: "PDF Viewer" }}
       />
     </HomeStackNav.Navigator>
   );
@@ -146,17 +161,21 @@ const SearchStack = () => {
     <SearchStackNav.Navigator
       screenOptions={{
         headerShown: true,
-        headerTitleAlign: 'center',
+        headerTitleAlign: "center",
         headerStyle: {
           backgroundColor: theme.colors.cardBackground,
         },
         headerTintColor: theme.colors.text,
         headerTitleStyle: {
-          fontWeight: 'bold',
+          fontWeight: "bold",
         },
       }}
     >
-      <SearchStackNav.Screen name="SearchScreen" component={SearchScreen} options={{ headerShown: false }} />
+      <SearchStackNav.Screen
+        name="SearchScreen"
+        component={SearchScreen}
+        options={{ headerShown: false }}
+      />
       <SearchStackNav.Screen
         name="CaseDetails"
         component={CaseDetailsScreen}
@@ -164,7 +183,11 @@ const SearchStack = () => {
           title: "Case Details",
         }}
       />
-      <SearchStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
+      <SearchStackNav.Screen
+        name="EditCase"
+        component={EditCaseScreen}
+        options={{ title: "Edit Case" }}
+      />
     </SearchStackNav.Navigator>
   );
 };
@@ -175,17 +198,21 @@ const CalendarStack = () => {
     <CalendarStackNav.Navigator
       screenOptions={{
         headerShown: true,
-        headerTitleAlign: 'center',
+        headerTitleAlign: "center",
         headerStyle: {
           backgroundColor: theme.colors.cardBackground,
         },
         headerTintColor: theme.colors.text,
         headerTitleStyle: {
-          fontWeight: 'bold',
+          fontWeight: "bold",
         },
       }}
     >
-      <CalendarStackNav.Screen name="CalendarScreen" component={CalendarScreen} options={{ headerShown: false }} />
+      <CalendarStackNav.Screen
+        name="CalendarScreen"
+        component={CalendarScreen}
+        options={{ headerShown: false }}
+      />
       <CalendarStackNav.Screen
         name="CaseDetails"
         component={CaseDetailsScreen}
@@ -193,7 +220,11 @@ const CalendarStack = () => {
           title: "Case Details",
         }}
       />
-      <CalendarStackNav.Screen name="EditCase" component={EditCaseScreen} options={{ title: "Edit Case" }} />
+      <CalendarStackNav.Screen
+        name="EditCase"
+        component={EditCaseScreen}
+        options={{ title: "Edit Case" }}
+      />
     </CalendarStackNav.Navigator>
   );
 };
@@ -204,22 +235,29 @@ const ProfileStack = () => {
     <ProfileStackNav.Navigator
       screenOptions={{
         headerShown: false,
-        headerTitleAlign: 'center',
+        headerTitleAlign: "center",
         headerStyle: {
           backgroundColor: theme.colors.cardBackground,
         },
         headerTintColor: theme.colors.text,
         headerTitleStyle: {
-          fontWeight: 'bold',
+          fontWeight: "bold",
         },
       }}
     >
       <ProfileStackNav.Screen name="ProfileScreen" component={ProfileScreen} />
-      <ProfileStackNav.Screen name="SettingsScreen" component={SettingsScreen} options={{ headerShown: true, title: "Settings" }}/>
+      <ProfileStackNav.Screen
+        name="SettingsScreen"
+        component={SettingsScreen}
+        options={{ headerShown: true, title: "Settings" }}
+      />
       <ProfileStackNav.Screen
         name="ManageLookupCategoryScreen"
         component={ManageLookupCategoryScreen}
-        options={({ route }) => ({ title: route.params.title || "Manage Category", headerShown: true })}
+        options={({ route }) => ({
+          title: route.params.title || "Manage Category",
+          headerShown: true,
+        })}
       />
       <ProfileStackNav.Screen
         name="ImportMigration"
@@ -236,12 +274,27 @@ const ProfileStack = () => {
         component={DatabaseImportScreen}
         options={{ headerShown: true, title: "Restore Backup" }}
       />
+      <ProfileStackNav.Screen
+        name="ECourtsAppImport"
+        component={ECourtsAppImportScreen}
+        options={{ headerShown: true, title: "Import from eCourts App" }}
+      />
       {/* Add AccountDetails screens here */}
     </ProfileStackNav.Navigator>
   );
 };
 
-const TabIcon = ({ name, color, size, focused }: { name: string; color: string; size: number; focused: boolean }) => {
+const TabIcon = ({
+  name,
+  color,
+  size,
+  focused,
+}: {
+  name: string;
+  color: string;
+  size: number;
+  focused: boolean;
+}) => {
   const scale = useSharedValue(1);
 
   useEffect(() => {
@@ -264,7 +317,8 @@ const TabIcon = ({ name, color, size, focused }: { name: string; color: string; 
   );
 };
 
-const Appro: React.FC = () => { // Props interface removed as it was empty
+const Appro: React.FC = () => {
+  // Props interface removed as it was empty
   const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
   return (
@@ -275,76 +329,101 @@ const Appro: React.FC = () => { // Props interface removed as it was empty
         screenOptions={({ route }) => {
           const routeName = getFocusedRouteNameFromRoute(route) ?? "";
           const hideTabsOn = [
-            "CaseDetails", 
-            "EditCase", 
-            "AddCase", 
-            "AddCaseDetails", 
-            "AddDocument", 
-            "UndatedCases", 
-            "YesterdaysCases", 
+            "CaseDetails",
+            "EditCase",
+            "AddCase",
+            "AddCaseDetails",
+            "AddDocument",
+            "UndatedCases",
+            "YesterdaysCases",
             "AllCases",
             "SettingsScreen",
             "ManageLookupCategoryScreen",
             "GenerateDocument",
             "DraftsHub",
-            "DatabaseImportScreen"
+            "DatabaseImportScreen",
           ];
           const shouldHide = hideTabsOn.includes(routeName);
 
           return {
             headerShown: false, // Headers are managed by inner stacks
             tabBarStyle: {
-              position: 'absolute',
-              bottom: Platform.OS === 'ios' ? 24 : 16,
+              position: "absolute",
+              bottom: Platform.OS === "ios" ? 24 : 16,
               left: 16,
               right: 16,
               borderRadius: 24,
-              height: 65,      // Slightly increased height for better touchability and spacing
-              backgroundColor: theme.dark ? '#1E293B' : '#FFFFFF',
-              borderTopColor: theme.dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+              height: 65, // Slightly increased height for better touchability and spacing
+              backgroundColor: theme.dark ? "#1E293B" : "#FFFFFF",
+              borderTopColor: theme.dark
+                ? "rgba(255, 255, 255, 0.08)"
+                : "rgba(0, 0, 0, 0.05)",
               borderTopWidth: 1,
               borderWidth: 1,
-              borderColor: theme.dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
-              shadowColor: '#000',
+              borderColor: theme.dark
+                ? "rgba(255, 255, 255, 0.08)"
+                : "rgba(0, 0, 0, 0.05)",
+              shadowColor: "#000",
               shadowOffset: { width: 0, height: 10 },
               shadowOpacity: 0.08,
               shadowRadius: 12,
               elevation: 8,
               paddingBottom: 8,
               paddingTop: 4,
-              ...(shouldHide && { display: 'none' })
+              ...(shouldHide && { display: "none" }),
             },
-          tabBarIcon: ({ color, size, focused }) => {
-            let iconName: string = "home"; // Default, ensure type safety
+            tabBarIcon: ({ color, size, focused }) => {
+              let iconName: string = "home"; // Default, ensure type safety
 
-            if (route.name === "HomeTab") {
-              iconName = focused ? "home" : "home-outline";
-            } else if (route.name === "SearchTab") {
-              iconName = focused ? "search" : "search-outline";
-            } else if (route.name === "CalendarTab") {
-              iconName = focused ? "calendar" : "calendar-outline";
-            } else if (route.name === "ProfileTab") {
-              iconName = focused ? "person-circle" : "person-circle-outline";
-            }
+              if (route.name === "HomeTab") {
+                iconName = focused ? "home" : "home-outline";
+              } else if (route.name === "SearchTab") {
+                iconName = focused ? "search" : "search-outline";
+              } else if (route.name === "CalendarTab") {
+                iconName = focused ? "calendar" : "calendar-outline";
+              } else if (route.name === "ProfileTab") {
+                iconName = focused ? "person-circle" : "person-circle-outline";
+              }
 
-            return (
-              <TabIcon name={iconName} color={color} size={focused ? size + 2 : size} focused={focused} />
-            );
-          },
-          tabBarActiveTintColor: theme.colors.primary || "#020748",
-          tabBarInactiveTintColor: theme.colors.textSecondary || "grey", // Use theme color or a sensible default
-          tabBarLabelStyle: {
-            fontSize: 11, // Adjust font size for labels
-            marginBottom: 3, // Space between icon and label
-          }
-        };
-      }}
+              return (
+                <TabIcon
+                  name={iconName}
+                  color={color}
+                  size={focused ? size + 2 : size}
+                  focused={focused}
+                />
+              );
+            },
+            tabBarActiveTintColor: theme.colors.primary || "#020748",
+            tabBarInactiveTintColor: theme.colors.textSecondary || "grey", // Use theme color or a sensible default
+            tabBarLabelStyle: {
+              fontSize: 11, // Adjust font size for labels
+              marginBottom: 3, // Space between icon and label
+            },
+          };
+        }}
       >
         {/* Tab.Screen names now refer to routes in MainAppTabParamList */}
-        <Tab.Screen name="HomeTab" component={HomeStack} options={{ tabBarLabel: t("nav_home") }} />
-        <Tab.Screen name="SearchTab" component={SearchStack} options={{ tabBarLabel: t("nav_search") }} />
-        <Tab.Screen name="CalendarTab" component={CalendarStack} options={{ tabBarLabel: t("nav_calendar") }} />
-        <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ tabBarLabel: t("nav_profile") }} />
+        <Tab.Screen
+          name="HomeTab"
+          component={HomeStack}
+          options={{ tabBarLabel: t("nav_home") }}
+        />
+        <Tab.Screen
+          name="SearchTab"
+          component={SearchStack}
+          options={{ tabBarLabel: t("nav_search") }}
+        />
+        <Tab.Screen
+          name="CalendarTab"
+          component={CalendarStack}
+          options={{ tabBarLabel: t("nav_calendar") }}
+        />
+        <Tab.Screen
+          name="ProfileTab"
+          component={ProfileStack}
+          options={{ tabBarLabel: t("nav_profile") }}
+        />
       </Tab.Navigator>
     </View>
   );

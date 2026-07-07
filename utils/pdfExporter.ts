@@ -1,7 +1,9 @@
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import { CaseWithDetails, getCaseTimelineEventsByCaseId } from '../DataBase';
-import { formatDate } from './commonFunctions';
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+import { Alert } from "react-native";
+
+import { formatDate } from "./commonFunctions";
+import { CaseWithDetails, getCaseTimelineEventsByCaseId } from "../DataBase";
 
 const appPromoFooterHtml = `
   <div style="margin-top: 30px; padding-top: 12px; border-top: 1px solid #E5E7EB; text-align: center; font-family: Arial, sans-serif;">
@@ -21,23 +23,26 @@ const appPromoFooterHtml = `
 
 /**
  * Generates a beautiful case summary and timeline PDF and opens the sharing dialog.
- * 
+ *
  * @param caseDetails The case details object
  */
-export const exportCaseToPdf = async (caseDetails: CaseWithDetails): Promise<void> => {
+export const exportCaseToPdf = async (
+  caseDetails: CaseWithDetails,
+  navigation?: any
+): Promise<void> => {
   try {
     const timelineEvents = await getCaseTimelineEventsByCaseId(caseDetails.id);
-    
-    let timelineHtml = '';
+
+    let timelineHtml = "";
     if (timelineEvents.length > 0) {
-      timelineEvents.forEach(event => {
+      timelineEvents.forEach((event) => {
         timelineHtml += `
           <tr>
             <td style="padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold; width: 120px;">
               ${formatDate(event.hearing_date)}
             </td>
             <td style="padding: 10px; border-bottom: 1px solid #ddd;">
-              ${event.notes || 'No notes added'}
+              ${event.notes || "No notes added"}
             </td>
           </tr>
         `;
@@ -137,27 +142,27 @@ export const exportCaseToPdf = async (caseDetails: CaseWithDetails): Promise<voi
             <div class="info-grid">
               <div class="info-item">
                 <div class="info-label">Case Title</div>
-                <div class="info-value" style="font-weight: bold; font-size: 17px;">${caseDetails.CaseTitle || 'N/A'}</div>
+                <div class="info-value" style="font-weight: bold; font-size: 17px;">${caseDetails.CaseTitle || "N/A"}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">Client Name</div>
-                <div class="info-value">${caseDetails.ClientName || 'N/A'}</div>
+                <div class="info-value">${caseDetails.ClientName || "N/A"}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">Case Number / Year</div>
-                <div class="info-value">${caseDetails.case_number || 'N/A'} / ${caseDetails.case_year || 'N/A'}</div>
+                <div class="info-value">${caseDetails.case_number || "N/A"} / ${caseDetails.case_year || "N/A"}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">CNR Number</div>
-                <div class="info-value">${caseDetails.CNRNumber || 'N/A'}</div>
+                <div class="info-value">${caseDetails.CNRNumber || "N/A"}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">Court Name</div>
-                <div class="info-value">${caseDetails.court_name || 'N/A'}</div>
+                <div class="info-value">${caseDetails.court_name || "N/A"}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">Case Type</div>
-                <div class="info-value">${caseDetails.case_type_name || 'N/A'}</div>
+                <div class="info-value">${caseDetails.case_type_name || "N/A"}</div>
               </div>
               <div class="info-item">
                 <div class="info-label">Next Hearing Date</div>
@@ -165,7 +170,7 @@ export const exportCaseToPdf = async (caseDetails: CaseWithDetails): Promise<voi
               </div>
               <div class="info-item">
                 <div class="info-label">Status</div>
-                <div class="info-value">${caseDetails.CaseStatus || 'N/A'}</div>
+                <div class="info-value">${caseDetails.CaseStatus || "N/A"}</div>
               </div>
             </div>
           </div>
@@ -189,18 +194,57 @@ export const exportCaseToPdf = async (caseDetails: CaseWithDetails): Promise<voi
       </html>
     `;
 
-    // 1. Render HTML template to PDF file
-    const { uri } = await Print.printToFileAsync({ html: htmlContent });
-    
-    // 2. Open sharing panel
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: `Export_${caseDetails.CaseTitle || 'Case'}`,
-        UTI: 'com.adobe.pdf',
-      });
+    // 1. Render HTML template to PDF file (Legal size by default)
+    const { uri } = await Print.printToFileAsync({
+      html: htmlContent,
+      width: 612,
+      height: 1008,
+    });
+
+    // 2. Open sharing/viewing options
+    const docTitle = `Export_${caseDetails.CaseTitle || "Case"}`;
+    if (navigation) {
+      Alert.alert(
+        caseDetails.CaseTitle || "Case Summary",
+        "Choose an action for this PDF:",
+        [
+          {
+            text: "Open in App",
+            onPress: () => {
+              navigation.navigate("PdfViewer", {
+                pdfUri: uri,
+                title: docTitle,
+              });
+            },
+          },
+          {
+            text: "Share PDF",
+            onPress: async () => {
+              if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri, {
+                  mimeType: "application/pdf",
+                  dialogTitle: docTitle,
+                  UTI: "com.adobe.pdf",
+                });
+              }
+            },
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+        ]
+      );
     } else {
-      console.warn("PDF sharing is not available on this platform.");
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: docTitle,
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        console.warn("PDF sharing is not available on this platform.");
+      }
     }
   } catch (error) {
     console.error("Failed to export case to PDF:", error);
@@ -212,9 +256,13 @@ export const exportCaseToPdf = async (caseDetails: CaseWithDetails): Promise<voi
  * Exports today's cause list of cases to a structured PDF for junior advocates.
  * Includes a blank 'Notes' column on the right for manual handwriting.
  */
-export const exportDailyCauseListToPdf = async (cases: any[], titleDate: string): Promise<void> => {
+export const exportDailyCauseListToPdf = async (
+  cases: any[],
+  titleDate: string,
+  navigation?: any
+): Promise<void> => {
   try {
-    let rowsHtml = '';
+    let rowsHtml = "";
     if (cases.length > 0) {
       cases.forEach((c, index) => {
         rowsHtml += `
@@ -223,22 +271,22 @@ export const exportDailyCauseListToPdf = async (cases: any[], titleDate: string)
               ${index + 1}
             </td>
             <td style="padding: 8px; border: 1px solid #aaa; font-size: 12px; font-weight: bold;">
-              ${c.CaseTitle || 'No Title'}<br/>
+              ${c.CaseTitle || "No Title"}<br/>
               <span style="font-size: 10px; color: #555; font-weight: normal;">
-                CNR: ${c.CNRNumber || 'N/A'}<br/>
-                Client: ${c.ClientName || 'N/A'} (${c.ClientContactNumber || 'N/A'})
+                CNR: ${c.CNRNumber || "N/A"}<br/>
+                Client: ${c.ClientName || "N/A"} (${c.ClientContactNumber || "N/A"})
               </span>
             </td>
             <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px;">
-              ${c.court_name || 'N/A'}<br/>
-              <span style="font-size: 10px; color: #555;">${c.JudgeName || ''}</span>
+              ${c.court_name || "N/A"}<br/>
+              <span style="font-size: 10px; color: #555;">${c.JudgeName || ""}</span>
             </td>
             <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px; text-align: center;">
-              ${c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A'}
+              ${c.PreviousDate ? formatDate(c.PreviousDate) : "N/A"}
             </td>
             <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px;">
-              ${c.CaseStatus || 'N/A'}<br/>
-              <span style="font-size: 10px; color: #555;">${c.Undersection || ''}</span>
+              ${c.CaseStatus || "N/A"}<br/>
+              <span style="font-size: 10px; color: #555;">${c.Undersection || ""}</span>
             </td>
             <td style="padding: 8px; border: 1px solid #aaa; width: 220px; height: 50px; background-color: #fafafa;">
               <!-- Blank column for hand-written notes -->
@@ -330,16 +378,55 @@ export const exportDailyCauseListToPdf = async (cases: any[], titleDate: string)
       </html>
     `;
 
-    const { uri } = await Print.printToFileAsync({ html: htmlContent });
-    
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: `Daily_Cause_List_${titleDate.replace(/[^a-zA-Z0-9]/g, '_')}`,
-        UTI: 'com.adobe.pdf',
-      });
+    const { uri } = await Print.printToFileAsync({
+      html: htmlContent,
+      width: 612,
+      height: 1008,
+    });
+
+    const docTitle = `Daily_Cause_List_${titleDate.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    if (navigation) {
+      Alert.alert(
+        `Cause List - ${titleDate}`,
+        "Choose an action for this PDF:",
+        [
+          {
+            text: "Open in App",
+            onPress: () => {
+              navigation.navigate("PdfViewer", {
+                pdfUri: uri,
+                title: `Cause List - ${titleDate}`,
+              });
+            },
+          },
+          {
+            text: "Share PDF",
+            onPress: async () => {
+              if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri, {
+                  mimeType: "application/pdf",
+                  dialogTitle: docTitle,
+                  UTI: "com.adobe.pdf",
+                });
+              }
+            },
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+        ]
+      );
     } else {
-      console.warn("PDF sharing is not available on this platform.");
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: docTitle,
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        console.warn("PDF sharing is not available on this platform.");
+      }
     }
   } catch (error) {
     console.error("Failed to export cause list to PDF:", error);
@@ -350,11 +437,14 @@ export const exportDailyCauseListToPdf = async (cases: any[], titleDate: string)
 /**
  * Generates a clean Case History PDF containing only all the previous dates, hearing logs, and records.
  */
-export const exportCaseHistoryToPdf = async (caseDetails: CaseWithDetails): Promise<void> => {
+export const exportCaseHistoryToPdf = async (
+  caseDetails: CaseWithDetails,
+  navigation?: any
+): Promise<void> => {
   try {
     const timelineEvents = await getCaseTimelineEventsByCaseId(caseDetails.id);
-    
-    let timelineHtml = '';
+
+    let timelineHtml = "";
     if (timelineEvents.length > 0) {
       timelineEvents.forEach((event, index) => {
         timelineHtml += `
@@ -366,7 +456,7 @@ export const exportCaseHistoryToPdf = async (caseDetails: CaseWithDetails): Prom
               ${formatDate(event.hearing_date)}
             </td>
             <td style="padding: 10px; border: 1px solid #ccc; font-size: 14px;">
-              ${event.notes || 'No notes/records logged for this date.'}
+              ${event.notes || "No notes/records logged for this date."}
             </td>
           </tr>
         `;
@@ -461,12 +551,12 @@ export const exportCaseHistoryToPdf = async (caseDetails: CaseWithDetails): Prom
           <div class="meta-section">
             <div class="meta-title">Case details</div>
             <div class="meta-grid">
-              <div class="meta-item"><span>Case Title:</span> ${caseDetails.CaseTitle || 'N/A'}</div>
-              <div class="meta-item"><span>Client Name:</span> ${caseDetails.ClientName || 'N/A'}</div>
-              <div class="meta-item"><span>Case Number:</span> ${caseDetails.case_number || 'N/A'}</div>
-              <div class="meta-item"><span>CNR Number:</span> ${caseDetails.CNRNumber || 'N/A'}</div>
-              <div class="meta-item"><span>Court Name:</span> ${caseDetails.court_name || 'N/A'}</div>
-              <div class="meta-item"><span>Case Type:</span> ${caseDetails.case_type_name || 'N/A'}</div>
+              <div class="meta-item"><span>Case Title:</span> ${caseDetails.CaseTitle || "N/A"}</div>
+              <div class="meta-item"><span>Client Name:</span> ${caseDetails.ClientName || "N/A"}</div>
+              <div class="meta-item"><span>Case Number:</span> ${caseDetails.case_number || "N/A"}</div>
+              <div class="meta-item"><span>CNR Number:</span> ${caseDetails.CNRNumber || "N/A"}</div>
+              <div class="meta-item"><span>Court Name:</span> ${caseDetails.court_name || "N/A"}</div>
+              <div class="meta-item"><span>Case Type:</span> ${caseDetails.case_type_name || "N/A"}</div>
             </div>
           </div>
 
@@ -488,16 +578,55 @@ export const exportCaseHistoryToPdf = async (caseDetails: CaseWithDetails): Prom
       </html>
     `;
 
-    const { uri } = await Print.printToFileAsync({ html: htmlContent });
-    
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: `History_${caseDetails.CaseTitle || 'Case'}`,
-        UTI: 'com.adobe.pdf',
-      });
+    const { uri } = await Print.printToFileAsync({
+      html: htmlContent,
+      width: 612,
+      height: 1008,
+    });
+
+    const docTitle = `History_${caseDetails.CaseTitle || "Case"}`;
+    if (navigation) {
+      Alert.alert(
+        `History - ${caseDetails.CaseTitle || "Case"}`,
+        "Choose an action for this PDF:",
+        [
+          {
+            text: "Open in App",
+            onPress: () => {
+              navigation.navigate("PdfViewer", {
+                pdfUri: uri,
+                title: `History - ${caseDetails.CaseTitle || "Case"}`,
+              });
+            },
+          },
+          {
+            text: "Share PDF",
+            onPress: async () => {
+              if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri, {
+                  mimeType: "application/pdf",
+                  dialogTitle: docTitle,
+                  UTI: "com.adobe.pdf",
+                });
+              }
+            },
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+        ]
+      );
     } else {
-      console.warn("PDF sharing is not available on this platform.");
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: docTitle,
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        console.warn("PDF sharing is not available on this platform.");
+      }
     }
   } catch (error) {
     console.error("Failed to export case history to PDF:", error);

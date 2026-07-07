@@ -1,15 +1,53 @@
-import { NavigationContainer } from "@react-navigation/native";
-import React, { useContext, useEffect, useState } from "react";
-import { SafeAreaView, ActivityIndicator, View, Platform, Alert } from "react-native";
-import { StatusBar } from "expo-status-bar";
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_700Bold,
+} from "@expo-google-fonts/inter";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import mobileAds, { AppOpenAd, TestIds, AdEventType } from "react-native-google-mobile-ads";
-import { AdProvider, preloadAds } from "./Screens/CommonComponents/AdManager";
-import { initializeAlertInterceptor } from "./utils/AlertManager";
-import CustomAlertModal from "./Screens/CommonComponents/CustomAlertModal";
-import { useFonts, Inter_400Regular, Inter_500Medium, Inter_700Bold } from "@expo-google-fonts/inter";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { CardStyleInterpolators } from "@react-navigation/stack";
 import * as Application from "expo-application";
+import { StatusBar } from "expo-status-bar";
+import React, { useContext, useEffect, useState } from "react";
+import {
+  SafeAreaView,
+  ActivityIndicator,
+  View,
+  Platform,
+  Alert,
+} from "react-native";
+import mobileAds, {
+  AppOpenAd,
+  TestIds,
+  AdEventType,
+} from "react-native-google-mobile-ads";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from "react-native-reanimated";
+
+import { getDb } from "./DataBase";
+import LanguageProvider from "./Providers/LanguageProvider";
+import OnboardingProvider from "./Providers/OnboardingProvider";
+import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
+import Routes from "./Routes/Routes";
+import { AdProvider, preloadAds } from "./Screens/CommonComponents/AdManager";
+import CustomAlertModal from "./Screens/CommonComponents/CustomAlertModal";
 import UpdateCheckModal from "./Screens/CommonComponents/UpdateCheckModal";
+import DoneScreen from "./Screens/Onboarding/DoneScreen";
+import DuplicateReviewScreen from "./Screens/Onboarding/DuplicateReviewScreen";
+import GreetingScreen from "./Screens/Onboarding/GreetingScreen";
+import ImportMigrationScreen from "./Screens/Onboarding/ImportMigrationScreen";
+import PracticeAreasScreen from "./Screens/Onboarding/PracticeAreasScreen";
+import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
+import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
+import SplashScreen from "./Screens/SplashScreen/SplashScreen";
+import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
+import { initializeAlertInterceptor } from "./utils/AlertManager";
+import { emitter } from "./utils/event-emitter";
 
 // Initialize the global alert interceptor
 initializeAlertInterceptor();
@@ -22,34 +60,8 @@ if (!__DEV__) {
   console.error = () => {};
 }
 
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from "react-native-reanimated";
-import { emitter } from "./utils/event-emitter";
-
-import { getDb } from "./DataBase";
-import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
-import OnboardingProvider from "./Providers/OnboardingProvider";
-import LanguageProvider from "./Providers/LanguageProvider";
-import Routes from "./Routes/Routes";
-import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
-import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
-import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
-import PracticeAreasScreen from "./Screens/Onboarding/PracticeAreasScreen";
-import SplashScreen from "./Screens/SplashScreen/SplashScreen";
-import GreetingScreen from "./Screens/Onboarding/GreetingScreen";
-import ImportMigrationScreen from "./Screens/Onboarding/ImportMigrationScreen";
-import DuplicateReviewScreen from "./Screens/Onboarding/DuplicateReviewScreen";
-
 const Stack = createNativeStackNavigator();
 const OnboardingStack = createNativeStackNavigator();
-
-import DoneScreen from "./Screens/Onboarding/DoneScreen";
-
-import { CardStyleInterpolators } from '@react-navigation/stack';
 
 const OnboardingNavigator = () => (
   <OnboardingStack.Navigator
@@ -89,8 +101,8 @@ const OnboardingNavigator = () => (
 const appOpenAdUnitId = __DEV__
   ? TestIds.APP_OPEN
   : Platform.OS === "ios"
-  ? "ca-app-pub-3940256099942544/5575469517"
-  : "ca-app-pub-6084954144919761/6781969722";
+    ? "ca-app-pub-3940256099942544/5575469517"
+    : "ca-app-pub-6084954144919761/6781969722";
 
 const appOpenAd = AppOpenAd.createForAdRequest(appOpenAdUnitId, {
   requestNonPersonalizedAdsOnly: true,
@@ -124,7 +136,9 @@ function AppContent() {
   // Update check state variables
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(false);
-  const [playStoreUrl, setPlayStoreUrl] = useState("https://play.google.com/store/apps/details?id=com.iamshiv.CaseDiary");
+  const [playStoreUrl, setPlayStoreUrl] = useState(
+    "https://play.google.com/store/apps/details?id=com.iamshiv.CaseDiary"
+  );
   const [appStoreUrl, setAppStoreUrl] = useState("");
   const [latestVersion, setLatestVersion] = useState("1.0.0");
   const [releaseNotes, setReleaseNotes] = useState("");
@@ -154,10 +168,17 @@ function AppContent() {
 
           if (response.ok) {
             const data = await response.json();
-            const localVersion = Application.nativeApplicationVersion || "1.0.0";
+            const localVersion =
+              Application.nativeApplicationVersion || "1.0.0";
 
-            const minRequired = Platform.OS === "ios" ? data.minIosVersion : data.minAndroidVersion;
-            const latestAvailable = Platform.OS === "ios" ? data.latestIosVersion : data.latestAndroidVersion;
+            const minRequired =
+              Platform.OS === "ios"
+                ? data.minIosVersion
+                : data.minAndroidVersion;
+            const latestAvailable =
+              Platform.OS === "ios"
+                ? data.latestIosVersion
+                : data.latestAndroidVersion;
 
             if (data.playStoreUrl) setPlayStoreUrl(data.playStoreUrl);
             if (data.appStoreUrl) setAppStoreUrl(data.appStoreUrl);
@@ -225,39 +246,53 @@ function AppContent() {
             setSplashscreenVisible(false);
           };
 
-          // Setup timeout for ad loading (max 3 seconds)
+          // Setup timeout for ad loading (max 1 second)
           const timeoutId = setTimeout(() => {
             if (!adShownOrFailed) {
-              console.log("AppOpenAd preload timeout reached. Proceeding to app.");
+              console.log(
+                "AppOpenAd preload timeout reached. Proceeding to app."
+              );
               adShownOrFailed = true;
               cleanup();
               proceedToApp();
             }
-          }, 3000);
+          }, 1000);
 
-          const unsubLoaded = appOpenAd.addAdEventListener(AdEventType.LOADED, () => {
-            clearTimeout(timeoutId);
-            showOpenAd();
-          });
+          const unsubLoaded = appOpenAd.addAdEventListener(
+            AdEventType.LOADED,
+            () => {
+              clearTimeout(timeoutId);
+              showOpenAd();
+            }
+          );
 
-          const unsubError = appOpenAd.addAdEventListener(AdEventType.ERROR, (error) => {
-            clearTimeout(timeoutId);
-            console.warn("AppOpenAd failed to load:", error);
-            cleanup();
-            proceedToApp();
-          });
+          const unsubError = appOpenAd.addAdEventListener(
+            AdEventType.ERROR,
+            (error) => {
+              clearTimeout(timeoutId);
+              console.warn("AppOpenAd failed to load:", error);
+              cleanup();
+              proceedToApp();
+            }
+          );
 
-          const unsubClosed = appOpenAd.addAdEventListener(AdEventType.CLOSED, () => {
-            cleanup();
-            proceedToApp();
-          });
+          const unsubClosed = appOpenAd.addAdEventListener(
+            AdEventType.CLOSED,
+            () => {
+              cleanup();
+              proceedToApp();
+            }
+          );
 
           appOpenAd.load();
         } else {
           setSplashscreenVisible(false);
         }
       } catch (error) {
-        console.error("Failed to initialize database or ads from App.tsx:", error);
+        console.error(
+          "Failed to initialize database or ads from App.tsx:",
+          error
+        );
         setSplashscreenVisible(false);
       } finally {
         setLoading(false);
@@ -310,10 +345,7 @@ function AppContent() {
                 )}
               </Stack.Screen>
             ) : (
-              <Stack.Screen
-                name="Onboarding"
-                component={OnboardingNavigator}
-              />
+              <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
             )}
           </Stack.Navigator>
         </SafeAreaView>

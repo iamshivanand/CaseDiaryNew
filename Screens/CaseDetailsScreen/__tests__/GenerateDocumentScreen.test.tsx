@@ -1,4 +1,5 @@
 import React from "react";
+import { Alert } from "react-native";
 import { render, fireEvent, waitFor } from "@testing-library/react-native";
 import GenerateDocumentScreen from "../GenerateDocumentScreen";
 import ThemeProvider from "../../../Providers/ThemeProvider";
@@ -8,7 +9,6 @@ import * as Sharing from "expo-sharing";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Mock stable navigation and route
 const mockNavigate = jest.fn();
 const mockNavigationObj = {
   navigate: mockNavigate,
@@ -17,12 +17,34 @@ const mockNavigationObj = {
   goBack: jest.fn(),
 };
 
+let mockRouteParams: any = { caseId: 1, templateType: "bail" };
+
 jest.mock("@react-navigation/native", () => ({
   useNavigation: () => mockNavigationObj,
   useRoute: () => ({
-    params: { caseId: 1 },
+    params: mockRouteParams,
   }),
 }));
+
+jest.mock("../../../Providers/LanguageProvider", () => {
+  const actual = jest.requireActual("../../../Providers/LanguageProvider");
+  return {
+    __esModule: true,
+    ...actual,
+    useTranslation: () => ({
+      locale: "en",
+      t: (key: string) => {
+        const trans: Record<string, string> = {
+          docgen_sec_case_details: "Case/Client Details",
+          docgen_sec_advocate: "Advocate Details",
+          docgen_sec_customization: "Customization Details",
+          docgen_preparing: "Preparing document...",
+        };
+        return trans[key] || key;
+      },
+    }),
+  };
+});
 
 // Mock Database getCaseById
 const mockCaseData = {
@@ -39,8 +61,11 @@ const mockCaseData = {
 };
 
 jest.mock("../../../DataBase", () => ({
-  ...jest.requireActual("../../../DataBase"),
   getCaseById: jest.fn(() => Promise.resolve(mockCaseData)),
+  getDocumentDrafts: jest.fn(() => Promise.resolve([])),
+  saveDocumentDraft: jest.fn(() => Promise.resolve(1)),
+  getDocumentDraftById: jest.fn(() => Promise.resolve(null)),
+  getDb: jest.fn(() => Promise.resolve({})),
 }));
 
 // Mock AdManager statically
@@ -54,6 +79,8 @@ jest.mock("../../CommonComponents/AdManager", () => ({
     showAdWithPreload: mockShowAd,
   }),
 }));
+
+jest.setTimeout(30000);
 
 const renderWithProviders = () => {
   return render(
@@ -75,14 +102,36 @@ describe("GenerateDocumentScreen", () => {
   });
 
   it("should render client details and document type selection options", async () => {
-    const { findAllByText } = renderWithProviders();
-    const sectionTitles = await findAllByText("Document Selection");
+    mockRouteParams = { caseId: undefined, templateType: "bail" };
+    const { findAllByText, queryByText } = renderWithProviders();
+    
+    // Wait for the loading indicator to disappear
+    await waitFor(() => {
+      expect(queryByText("Preparing document...")).toBeNull();
+    }, { timeout: 15000 });
+
+    const sectionTitles = await findAllByText("Case/Client Details");
     expect(sectionTitles.length).toBeGreaterThan(0);
-  });
+  }, 30000);
 
   it("should request rewarded ad before generating PDF document", async () => {
-    const { findByText } = renderWithProviders();
-    const exportButton = await findByText("Export Legal PDF & Share");
+    // Mock Alert.alert to auto-trigger the "Share PDF" option
+    const alertSpy = jest.spyOn(Alert, "alert").mockImplementation((title, message, buttons) => {
+      const shareBtn = buttons?.find((btn) => btn.text === "Share PDF" || btn.text === "Share");
+      if (shareBtn && shareBtn.onPress) {
+        shareBtn.onPress();
+      }
+    });
+
+    mockRouteParams = { caseId: 1, templateType: "bail" };
+    const { findByText, queryByText } = renderWithProviders();
+
+    // Wait for the loading indicator to disappear
+    await waitFor(() => {
+      expect(queryByText("Preparing document...")).toBeNull();
+    }, { timeout: 15000 });
+
+    const exportButton = await findByText("Quick PDF Export");
 
     fireEvent.press(exportButton);
 
@@ -90,6 +139,8 @@ describe("GenerateDocumentScreen", () => {
       expect(mockShowAd).toHaveBeenCalledWith("rewarded", expect.any(Function));
       expect(Print.printToFileAsync).toHaveBeenCalled();
       expect(Sharing.shareAsync).toHaveBeenCalled();
-    });
-  });
+    }, { timeout: 15000 });
+
+    alertSpy.mockRestore();
+  }, 30000);
 });

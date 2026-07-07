@@ -1,4 +1,10 @@
 // Screens/CaseDetailsScreen/GenerateDocumentScreen.tsx
+import { Ionicons, FontAwesome } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import * as FileSystem from "expo-file-system";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import React, { useContext, useEffect, useLayoutEffect, useState } from "react";
 import {
   View,
@@ -11,25 +17,24 @@ import {
   Platform,
   TouchableOpacity,
   Dimensions,
+  TextInput,
+  Modal,
+  SafeAreaView,
+  FlatList,
 } from "react-native";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
-import * as FileSystem from "expo-file-system";
-import { Ionicons } from "@expo/vector-icons";
+import { WebView } from "react-native-webview";
 import { v4 as uuidv4 } from "uuid";
 
-import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
+import {
+  getCaseById,
+  CaseWithDetails,
+  getDocumentDrafts,
+  DocumentDraft,
+  saveDocumentDraft,
+} from "../../DataBase";
 import { useTranslation } from "../../Providers/LanguageProvider";
-import { useAdTrigger } from "../CommonComponents/AdManager";
+import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 import { HomeStackParamList } from "../../Types/navigationtypes";
-import { getCaseById } from "../../DataBase";
-import { CaseWithDetails } from "../../DataBase";
-import FormInput from "../CommonComponents/FormInput";
-import DropdownPicker from "../CommonComponents/DropdownPicker";
-import ActionButton from "../CommonComponents/ActionButton";
-import SectionHeader from "../CommonComponents/SectionHeader";
 import { formatDate } from "../../utils/commonFunctions";
 import {
   getVakalatnamaHtml,
@@ -52,21 +57,194 @@ import {
   getConsumerComplaintHtml,
   getRentAgreementHtml,
   getPowerOfAttorneyHtml,
-  getTemplateTextPreview,
 } from "../../utils/documentTemplates";
+import { LEGAL_VOCABULARY } from "../../utils/legalVocabulary";
+import { getOfflineEditorHtml } from "../../utils/offlineEditorTemplate";
+import ActionButton from "../CommonComponents/ActionButton";
+import { useAdTrigger } from "../CommonComponents/AdManager";
+import FormInput from "../CommonComponents/FormInput";
+import SectionHeader from "../CommonComponents/SectionHeader";
 
 type GenerateDocumentScreenRouteProp = RouteProp<
   HomeStackParamList,
   "GenerateDocument"
 >;
 
+const DRAFTS_DIRECTORY = FileSystem.documentDirectory + "drafts/";
+
 const categories = [
   { label: "All Categories", value: "all" },
   { label: "Civil (CPC)", value: "civil" },
   { label: "Criminal (CrPC)", value: "criminal" },
   { label: "Commercial / ADR", value: "commercial" },
-  { label: "Common Deeds", value: "common" },
+  { label: "Common Docs", value: "common" },
 ];
+
+const BUILT_IN_TEMPLATES = [
+  {
+    id: "built_in_vakalatnama",
+    template_type: "vakalatnama",
+    title: "Vakalatnama",
+    category: "common",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_adjournment",
+    template_type: "adjournment",
+    title: "Adjournment Application",
+    category: "common",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_bail",
+    template_type: "bail",
+    title: "Bail Application",
+    category: "criminal",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_affidavit",
+    template_type: "affidavit",
+    title: "Affidavit",
+    category: "common",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_written_statement",
+    template_type: "written_statement",
+    title: "Written Statement",
+    category: "civil",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_legal_notice",
+    template_type: "legal_notice",
+    title: "Legal Notice",
+    category: "common",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_caveat",
+    template_type: "caveat",
+    title: "Caveat Petition",
+    category: "civil",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_injunction",
+    template_type: "injunction",
+    title: "Temporary Injunction",
+    category: "civil",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_plaint",
+    template_type: "plaint",
+    title: "Plaint (Civil Suit)",
+    category: "civil",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_rejoinder",
+    template_type: "rejoinder",
+    title: "Replication / Rejoinder",
+    category: "civil",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_execution",
+    template_type: "execution",
+    title: "Execution Petition",
+    category: "civil",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_anticipatory_bail",
+    template_type: "anticipatory_bail",
+    title: "Anticipatory Bail",
+    category: "criminal",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_private_complaint",
+    template_type: "private_complaint",
+    title: "Private Complaint",
+    category: "criminal",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_fir_quashing",
+    template_type: "fir_quashing",
+    title: "FIR Quashing Petition",
+    category: "criminal",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_exemption",
+    template_type: "exemption",
+    title: "Exemption Application",
+    category: "common",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_cheque_bounce",
+    template_type: "cheque_bounce",
+    title: "Cheque Bounce Notice",
+    category: "commercial",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_arbitration_sec9",
+    template_type: "arbitration_sec9",
+    title: "Arbitration Sec 9",
+    category: "commercial",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_consumer_complaint",
+    template_type: "consumer_complaint",
+    title: "Consumer Complaint",
+    category: "commercial",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_rent_agreement",
+    template_type: "rent_agreement",
+    title: "Rent Agreement",
+    category: "commercial",
+    isBuiltIn: true,
+  },
+  {
+    id: "built_in_power_of_attorney",
+    template_type: "power_of_attorney",
+    title: "Power of Attorney",
+    category: "commercial",
+    isBuiltIn: true,
+  },
+];
+
+const documentTypeColors: { [key: string]: string } = {
+  vakalatnama: "#10B981", // Emerald/Green
+  adjournment: "#3B82F6", // Blue
+  bail: "#F59E0B", // Amber
+  affidavit: "#8B5CF6", // Violet
+  written_statement: "#EC4899", // Pink
+  legal_notice: "#EF4444", // Red
+  caveat: "#06B6D4", // Cyan
+  injunction: "#6366F1", // Indigo
+  plaint: "#10B981",
+  rejoinder: "#F59E0B",
+  execution: "#8B5CF6",
+  anticipatory_bail: "#3B82F6",
+  private_complaint: "#EC4899",
+  fir_quashing: "#EF4444",
+  exemption: "#06B6D4",
+  cheque_bounce: "#6366F1",
+  arbitration_sec9: "#8B5CF6",
+  consumer_complaint: "#10B981",
+  rent_agreement: "#F59E0B",
+  power_of_attorney: "#EC4899",
+};
 
 interface DocumentTypeOption {
   label: string;
@@ -77,40 +255,106 @@ interface DocumentTypeOption {
 const documentTypeOptions: DocumentTypeOption[] = [
   // Civil (CPC)
   { label: "Plaint (Civil Suit)", value: "plaint", category: "civil" },
-  { label: "Written Statement (Defense Reply)", value: "written_statement", category: "civil" },
+  {
+    label: "Written Statement (Defense Reply)",
+    value: "written_statement",
+    category: "civil",
+  },
   { label: "Replication / Rejoinder", value: "rejoinder", category: "civil" },
-  { label: "Temporary Injunction / Stay (Order 39 R 1/2)", value: "injunction", category: "civil" },
-  { label: "Execution Petition (Order 21)", value: "execution", category: "civil" },
-  { label: "Caveat Petition (Sec 148A CPC)", value: "caveat", category: "civil" },
+  {
+    label: "Temporary Injunction / Stay (Order 39 R 1/2)",
+    value: "injunction",
+    category: "civil",
+  },
+  {
+    label: "Execution Petition (Order 21)",
+    value: "execution",
+    category: "civil",
+  },
+  {
+    label: "Caveat Petition (Sec 148A CPC)",
+    value: "caveat",
+    category: "civil",
+  },
   { label: "Adjournment Application", value: "adjournment", category: "civil" },
 
   // Criminal (CrPC)
-  { label: "Bail Application (Sec 439 CrPC)", value: "bail", category: "criminal" },
-  { label: "Anticipatory Bail (Sec 438 CrPC)", value: "anticipatory_bail", category: "criminal" },
-  { label: "Private Complaint (Sec 200 CrPC)", value: "private_complaint", category: "criminal" },
-  { label: "FIR Quashing Petition (Sec 482)", value: "fir_quashing", category: "criminal" },
-  { label: "Exemption Application (Sec 205/317)", value: "exemption", category: "criminal" },
+  {
+    label: "Bail Application (Sec 439 CrPC)",
+    value: "bail",
+    category: "criminal",
+  },
+  {
+    label: "Anticipatory Bail (Sec 438 CrPC)",
+    value: "anticipatory_bail",
+    category: "criminal",
+  },
+  {
+    label: "Private Complaint (Sec 200 CrPC)",
+    value: "private_complaint",
+    category: "criminal",
+  },
+  {
+    label: "FIR Quashing Petition (Sec 482)",
+    value: "fir_quashing",
+    category: "criminal",
+  },
+  {
+    label: "Exemption Application (Sec 205/317)",
+    value: "exemption",
+    category: "criminal",
+  },
 
   // Commercial / ADR
-  { label: "Cheque Bounce Notice (Sec 138 NI)", value: "cheque_bounce", category: "commercial" },
-  { label: "Arbitration Section 9 Petition", value: "arbitration_sec9", category: "commercial" },
-  { label: "Consumer Complaint", value: "consumer_complaint", category: "commercial" },
+  {
+    label: "Cheque Bounce Notice (Sec 138 NI)",
+    value: "cheque_bounce",
+    category: "commercial",
+  },
+  {
+    label: "Arbitration Section 9 Petition",
+    value: "arbitration_sec9",
+    category: "commercial",
+  },
+  {
+    label: "Consumer Complaint",
+    value: "consumer_complaint",
+    category: "commercial",
+  },
 
   // Common Deeds
-  { label: "Vakalatnama (Authority Letter)", value: "vakalatnama", category: "common" },
+  {
+    label: "Vakalatnama (Authority Letter)",
+    value: "vakalatnama",
+    category: "common",
+  },
   { label: "Supporting Affidavit", value: "affidavit", category: "common" },
-  { label: "Legal Notice (Demand Notice)", value: "legal_notice", category: "common" },
+  {
+    label: "Legal Notice (Demand Notice)",
+    value: "legal_notice",
+    category: "common",
+  },
   { label: "Rent Agreement", value: "rent_agreement", category: "common" },
-  { label: "Power of Attorney (POA)", value: "power_of_attorney", category: "common" },
+  {
+    label: "Power of Attorney (POA)",
+    value: "power_of_attorney",
+    category: "common",
+  },
 ];
 
-const DRAFTS_DIRECTORY = FileSystem.documentDirectory + "draft_documents/";
+const getTemplateLabel = (type: string): string => {
+  if (!type) return "";
+  return type
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
 
 const GenerateDocumentScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<GenerateDocumentScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const styles = getStyles(theme);
   const { showAdWithPreload } = useAdTrigger();
 
@@ -119,57 +363,450 @@ const GenerateDocumentScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Tab selector: "fields" or "preview"
   const [activeTab, setActiveTab] = useState<"fields" | "preview">("fields");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [documentType, setDocumentType] = useState<string>("vakalatnama");
+  const [documentType, setDocumentType] = useState<string>(
+    route.params?.templateType || ""
+  );
+  const [isTemplateSelected, setIsTemplateSelected] = useState<boolean>(
+    !!route.params?.templateType
+  );
   const [outputLanguage, setOutputLanguage] = useState<"en" | "hi">("en");
+
+  const [customTemplates, setCustomTemplates] = useState<DocumentDraft[]>([]);
+  const [templateSearchQuery, setTemplateSearchQuery] = useState("");
+  const [selectedTemplateCategory, setSelectedTemplateCategory] =
+    useState("all");
+
+  const [isTransitionFinished, setIsTransitionFinished] = useState(
+    process.env.NODE_ENV === "test"
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsTransitionFinished(true);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const fetchCustomTemplates = async () => {
+      try {
+        const templates = await getDocumentDrafts(null, 1);
+        setCustomTemplates(templates);
+      } catch (err) {
+        console.error("Failed to load custom templates:", err);
+      }
+    };
+    fetchCustomTemplates();
+  }, []);
+
+  useEffect(() => {
+    if (route.params?.templateType) {
+      setDocumentType(route.params.templateType);
+      setIsTemplateSelected(true);
+      if (route.params.draftId) {
+        const fetchDraftHtml = async () => {
+          try {
+            const draft = await db.getDocumentDraftById(route.params.draftId!);
+            if (draft) {
+              setHtmlContent(draft.html_content);
+            }
+          } catch (e) {
+            console.error(
+              "Failed to load draft HTML on template pre-select:",
+              e
+            );
+          }
+        };
+        fetchDraftHtml();
+      }
+    }
+  }, [route.params?.templateType, route.params?.draftId]);
+
+  // Rich-text editor states
+  const [htmlContent, setHtmlContent] = useState("");
+  const [isRichTextModified, setIsRichTextModified] = useState(false);
+  const [font, setFont] = useState("Times New Roman");
+  const [lineHeight, setLineHeight] = useState("1.6");
+  const [topMargin, setTopMargin] = useState(24);
+  const [bottomMargin, setBottomMargin] = useState(24);
+  const [leftMargin, setLeftMargin] = useState(55);
+  const [rightMargin, setRightMargin] = useState(24);
+  const [letterheadSpace, setLetterheadSpace] = useState(0);
+  const [isPageSetupVisible, setIsPageSetupVisible] = useState(false);
+  const [pageSize, setPageSize] = useState<"a4" | "legal">("legal");
+  const [toolbarMode, setToolbarMode] = useState<"format" | "legal">("format");
+  const [isVocabularyVisible, setIsVocabularyVisible] = useState(false);
+  const [isSignatureListVisible, setIsSignatureListVisible] = useState(false);
+  const [vocabSearchQuery, setVocabSearchQuery] = useState("");
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [customTemplateTitle, setCustomTemplateTitle] = useState("");
+  const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
+
+  const [editorState, setEditorState] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    alignLeft: true,
+    alignCenter: false,
+    alignRight: false,
+    alignJustify: false,
+    orderedList: false,
+    unorderedList: false,
+  });
+
+  const getFilteredTemplates = () => {
+    const combined = [
+      ...BUILT_IN_TEMPLATES,
+      ...customTemplates.map((t) => ({
+        id: t.id,
+        template_type: t.template_type,
+        title: t.title,
+        category: "common",
+        isBuiltIn: false,
+      })),
+    ];
+
+    let filtered = combined;
+    if (templateSearchQuery.trim() !== "") {
+      const q = templateSearchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.template_type.toLowerCase().includes(q)
+      );
+    }
+
+    if (selectedTemplateCategory !== "all") {
+      filtered = filtered.filter(
+        (t) => t.category === selectedTemplateCategory
+      );
+    }
+
+    return filtered;
+  };
+
+  const renderTemplateCardItem = ({ item }: { item: any }) => {
+    const color =
+      documentTypeColors[item.template_type] || theme.colors.primary;
+    return (
+      <TouchableOpacity
+        style={{
+          flex: 1,
+          margin: 6,
+          backgroundColor: theme.colors.cardBackground,
+          borderRadius: 12,
+          padding: 12,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+          alignItems: "center",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 3,
+          elevation: 2,
+          maxWidth: (Dimensions.get("window").width - 32) / 2 - 12,
+        }}
+        activeOpacity={0.85}
+        onPress={async () => {
+          setDocumentType(item.template_type);
+          if (!item.isBuiltIn) {
+            try {
+              const draft = await db.getDocumentDraftById(item.id);
+              if (draft) {
+                setHtmlContent(draft.html_content);
+              }
+            } catch (err) {
+              console.error("Failed to load template draft HTML:", err);
+            }
+          } else {
+            setHtmlContent("");
+          }
+          setIsTemplateSelected(true);
+          setActiveTab("fields");
+        }}
+      >
+        <View
+          style={{
+            width: 72,
+            height: 114,
+            backgroundColor: "#fcf9f2",
+            borderRadius: 6,
+            borderWidth: 1.5,
+            borderColor: "#e2d2b2",
+            position: "relative",
+            overflow: "hidden",
+            marginBottom: 10,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 2,
+            elevation: 3,
+          }}
+        >
+          <View
+            style={{
+              position: "absolute",
+              left: 14,
+              top: 0,
+              bottom: 0,
+              width: 1,
+              backgroundColor: "#ef4444",
+              opacity: 0.6,
+            }}
+          />
+          <View
+            style={{ marginTop: 14, paddingLeft: 18, paddingRight: 6, gap: 5 }}
+          >
+            <View
+              style={{ height: 3, backgroundColor: "#d1d5db", width: "80%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#d1d5db", width: "90%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#d1d5db", width: "65%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#e5e7eb", width: "85%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#e5e7eb", width: "70%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#e5e7eb", width: "90%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#e5e7eb", width: "50%" }}
+            />
+          </View>
+          <View
+            style={{
+              position: "absolute",
+              bottom: 4,
+              right: 4,
+              backgroundColor: color,
+              borderRadius: 3,
+              paddingHorizontal: 4,
+              paddingVertical: 2,
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 8, fontWeight: "bold" }}>
+              PDF
+            </Text>
+          </View>
+        </View>
+
+        <Text
+          style={{
+            fontSize: 13,
+            fontWeight: "bold",
+            color: theme.colors.text,
+            textAlign: "center",
+            marginBottom: 6,
+            height: 36,
+          }}
+          numberOfLines={2}
+        >
+          {item.title}
+        </Text>
+
+        <View
+          style={{
+            backgroundColor: item.isBuiltIn
+              ? `${theme.colors.primary}12`
+              : `${theme.colors.success}12`,
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: 4,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: "600",
+              color: item.isBuiltIn
+                ? theme.colors.primary
+                : theme.colors.success,
+            }}
+          >
+            {item.isBuiltIn ? "Built-in" : "Custom"}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const webViewRef = React.useRef<WebView>(null);
+  const saveCallbackRef = React.useRef<((html: string) => void) | null>(null);
+
+  const postMessageToWebView = (message: object) => {
+    const jsonStr = JSON.stringify(message);
+    const escaped = jsonStr.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    webViewRef.current?.injectJavaScript(
+      `window.handleRNMessage('${escaped}'); void(0);`
+    );
+  };
+
+  const applyLayoutSettings = (
+    newFont: string = font,
+    newSpacing: string = lineHeight,
+    newPageSize: "a4" | "legal" = pageSize,
+    tMargin: number = topMargin,
+    bMargin: number = bottomMargin,
+    lMargin: number = leftMargin,
+    rMargin: number = rightMargin,
+    lhSpace: number = letterheadSpace
+  ) => {
+    postMessageToWebView({
+      type: "layout",
+      font: newFont,
+      lineHeight: newSpacing,
+      pageSize: newPageSize,
+      topMargin: tMargin,
+      bottomMargin: bMargin,
+      leftMargin: lMargin,
+      rightMargin: rMargin,
+      letterheadSpace: lhSpace,
+    });
+  };
+
+  const triggerFormat = (command: string, value: string | null = null) => {
+    postMessageToWebView({
+      type: "exec",
+      command,
+      value,
+    });
+  };
+
+  const handleEditorMessage = async (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === "state") {
+        setEditorState(data.state);
+      } else if (data.type === "change") {
+        setIsRichTextModified(true);
+      } else if (data.type === "save") {
+        if (saveCallbackRef.current) {
+          saveCallbackRef.current(data.html);
+          saveCallbackRef.current = null;
+        }
+      } else if (data.type === "error") {
+        console.error("WebView Editor Error:", data.error);
+      }
+    } catch (e) {
+      console.error("Error parsing message from webview:", e);
+    }
+  };
+
+  const handleTabChange = (newTab: "fields" | "preview") => {
+    if (newTab === "fields" && isRichTextModified) {
+      Alert.alert(
+        t("docgen_unsaved_title") || "Unsaved Changes",
+        "Switching back to the form will discard your manual editor customizations. Do you want to continue?",
+        [
+          { text: t("alert_cancel") || "Keep Editing", style: "cancel" },
+          {
+            text: t("alert_discard") || "Discard",
+            style: "destructive",
+            onPress: () => {
+              setIsRichTextModified(false);
+              setActiveTab("fields");
+            },
+          },
+        ]
+      );
+    } else {
+      if (newTab === "preview") {
+        const compiledHtml = getInterpolatedHtml();
+        setHtmlContent(compiledHtml);
+      }
+      setActiveTab(newTab);
+    }
+  };
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: t("docgen_header_title") });
   }, [navigation, t]);
 
-  const getTranslatedCategories = () => {
-    return categories.map(cat => {
-      let label = cat.label;
-      switch (cat.value) {
-        case "all": label = t("docgen_cat_all"); break;
-        case "civil": label = t("docgen_cat_civil"); break;
-        case "criminal": label = t("docgen_cat_criminal"); break;
-        case "commercial": label = t("docgen_cat_commercial"); break;
-        case "common": label = t("docgen_cat_common"); break;
-      }
-      return { ...cat, label };
-    });
-  };
-
   const getTranslatedDocTypes = () => {
-    return documentTypeOptions.map(opt => {
+    return documentTypeOptions.map((opt) => {
       let label = opt.label;
       switch (opt.value) {
-        case "plaint": label = t("docgen_opt_plaint"); break;
-        case "written_statement": label = t("docgen_opt_written_statement"); break;
-        case "rejoinder": label = t("docgen_opt_rejoinder"); break;
-        case "injunction": label = t("docgen_opt_injunction"); break;
-        case "execution": label = t("docgen_opt_execution"); break;
-        case "caveat": label = t("docgen_opt_caveat"); break;
-        case "adjournment": label = t("docgen_opt_adjournment"); break;
-        case "bail": label = t("docgen_opt_bail"); break;
-        case "anticipatory_bail": label = t("docgen_opt_anticipatory_bail"); break;
-        case "private_complaint": label = t("docgen_opt_private_complaint"); break;
-        case "fir_quashing": label = t("docgen_opt_fir_quashing"); break;
-        case "exemption": label = t("docgen_opt_exemption"); break;
-        case "cheque_bounce": label = t("docgen_opt_cheque_bounce"); break;
-        case "arbitration_sec9": label = t("docgen_opt_arbitration_sec9"); break;
-        case "consumer_complaint": label = t("docgen_opt_consumer_complaint"); break;
-        case "vakalatnama": label = t("docgen_opt_vakalatnama"); break;
-        case "affidavit": label = t("docgen_opt_affidavit"); break;
-        case "legal_notice": label = t("docgen_opt_legal_notice"); break;
-        case "rent_agreement": label = t("docgen_opt_rent_agreement"); break;
-        case "power_of_attorney": label = t("docgen_opt_power_of_attorney"); break;
+        case "plaint":
+          label = t("docgen_opt_plaint");
+          break;
+        case "written_statement":
+          label = t("docgen_opt_written_statement");
+          break;
+        case "rejoinder":
+          label = t("docgen_opt_rejoinder");
+          break;
+        case "injunction":
+          label = t("docgen_opt_injunction");
+          break;
+        case "execution":
+          label = t("docgen_opt_execution");
+          break;
+        case "caveat":
+          label = t("docgen_opt_caveat");
+          break;
+        case "adjournment":
+          label = t("docgen_opt_adjournment");
+          break;
+        case "bail":
+          label = t("docgen_opt_bail");
+          break;
+        case "anticipatory_bail":
+          label = t("docgen_opt_anticipatory_bail");
+          break;
+        case "private_complaint":
+          label = t("docgen_opt_private_complaint");
+          break;
+        case "fir_quashing":
+          label = t("docgen_opt_fir_quashing");
+          break;
+        case "exemption":
+          label = t("docgen_opt_exemption");
+          break;
+        case "cheque_bounce":
+          label = t("docgen_opt_cheque_bounce");
+          break;
+        case "arbitration_sec9":
+          label = t("docgen_opt_arbitration_sec9");
+          break;
+        case "consumer_complaint":
+          label = t("docgen_opt_consumer_complaint");
+          break;
+        case "vakalatnama":
+          label = t("docgen_opt_vakalatnama");
+          break;
+        case "affidavit":
+          label = t("docgen_opt_affidavit");
+          break;
+        case "legal_notice":
+          label = t("docgen_opt_legal_notice");
+          break;
+        case "rent_agreement":
+          label = t("docgen_opt_rent_agreement");
+          break;
+        case "power_of_attorney":
+          label = t("docgen_opt_power_of_attorney");
+          break;
       }
       return { ...opt, label };
     });
+  };
+
+  const getFullDocTypesList = () => {
+    const standardList = getTranslatedDocTypes();
+    const customList = customTemplates.map((tpl) => ({
+      label: tpl.title,
+      value: `custom_${tpl.id}`,
+      category: tpl.template_type || "common",
+      isCustom: true,
+    }));
+    return [...standardList, ...customList];
   };
 
   // Shared Case/Client details (Editable if no caseId is provided)
@@ -190,15 +827,33 @@ const GenerateDocumentScreen: React.FC = () => {
   const [policeStation, setPoliceStation] = useState("");
   const [firNumber, setFirNumber] = useState("");
   const [firYear, setFirYear] = useState(new Date().getFullYear().toString());
-  const [groundOfBail, setGroundOfBail] = useState("");
   const [deponentAge, setDeponentAge] = useState("");
   const [deponentAddress, setDeponentAddress] = useState("");
   const [receiverAddress, setReceiverAddress] = useState("");
-  const [affidavitFacts, setAffidavitFacts] = useState("");
-  const [preliminaryObjections, setPreliminaryObjections] = useState("");
-  const [replyOnMerits, setReplyOnMerits] = useState("");
-  const [demandText, setDemandText] = useState("");
-  const [restraintPrayer, setRestraintPrayer] = useState("");
+
+  // Dynamic paragraph list states
+  const [groundOfBailList, setGroundOfBailList] = useState<string[]>([""]);
+  const [affidavitFactsList, setAffidavitFactsList] = useState<string[]>([""]);
+  const [preliminaryObjectionsList, setPreliminaryObjectionsList] = useState<
+    string[]
+  >([""]);
+  const [replyOnMeritsList, setReplyOnMeritsList] = useState<string[]>([""]);
+  const [demandTextList, setDemandTextList] = useState<string[]>([""]);
+  const [restraintPrayerList, setRestraintPrayerList] = useState<string[]>([
+    "",
+  ]);
+
+  const formatListHtml = (list: string[], prefixNumber = false) => {
+    const active = list.filter((item) => item && item.trim() !== "");
+    if (active.length === 0) return "";
+    if (active.length === 1) return active[0];
+    return active
+      .map(
+        (item, idx) =>
+          `<div>${prefixNumber ? `(${idx + 1}) ` : ""}${item}</div>`
+      )
+      .join("");
+  };
 
   // New specific fields
   const [valuation, setValuation] = useState("");
@@ -220,7 +875,9 @@ const GenerateDocumentScreen: React.FC = () => {
           const details = await getCaseById(caseId);
           if (details) {
             setCaseDetails(details);
-            setCaseTitle(`${details.FirstParty || details.ClientName || "Petitioner"} vs ${details.OppositeParty || "Respondent"}`);
+            setCaseTitle(
+              `${details.FirstParty || details.ClientName || "Petitioner"} vs ${details.OppositeParty || "Respondent"}`
+            );
             setClientName(details.ClientName || "");
             setOppositePartyName(details.OppositeParty || "");
             setCourtName(details.court_name || "");
@@ -229,13 +886,17 @@ const GenerateDocumentScreen: React.FC = () => {
 
             // Template-specific defaults
             setFirNumber(details.case_number || "");
-            setPoliceStation(details.court_name ? `${details.court_name} Jurisdiction` : "");
+            setPoliceStation(
+              details.court_name ? `${details.court_name} Jurisdiction` : ""
+            );
           }
         }
 
         // Load cached advocate details
         const cachedName = await AsyncStorage.getItem("@advocate_name");
-        const cachedEnrollment = await AsyncStorage.getItem("@advocate_enrollment");
+        const cachedEnrollment = await AsyncStorage.getItem(
+          "@advocate_enrollment"
+        );
         const cachedAddress = await AsyncStorage.getItem("@advocate_address");
 
         if (cachedName) setAdvocateName(cachedName);
@@ -262,367 +923,547 @@ const GenerateDocumentScreen: React.FC = () => {
     }
   };
 
+  const interpolateCustomHtml = (html: string): string => {
+    let result = html;
+    const replacements: Record<string, string> = {
+      "\\[COURT NAME\\]": courtName || "District Court",
+      "\\[CASE NUMBER\\]": caseNumber || "______",
+      "\\[CASE YEAR\\]": caseYear || "2026",
+      "\\[CLIENT NAME\\]": clientName || "Client",
+      "\\[ADVOCATE NAME\\]": advocateName || "Advocate",
+      "\\[ADVOCATE ENROLLMENT\\]": advocateEnrollment || "______",
+      "\\[ADVOCATE ADDRESS\\]": advocateAddress || "______",
+      "\\[POLICE STATION\\]": policeStation || "______",
+      "\\[FIR NUMBER\\]": firNumber || "______",
+      "\\[FIR YEAR\\]": firYear || "2026",
+      "\\[OPPOSITE PARTY\\]": oppositePartyName || "Opposite Party",
+      "\\[OPPOSITE PARTY ADDRESS\\]": receiverAddress || "______",
+      "\\[SENDER NAME\\]": clientName || "Client",
+      "\\[SENDER ADDRESS\\]": deponentAddress || "______",
+      "\\[RECEIVER NAME\\]": oppositePartyName || "Respondent",
+      "\\[RECEIVER ADDRESS\\]": receiverAddress || "______",
+    };
+
+    for (const [placeholder, value] of Object.entries(replacements)) {
+      const regex = new RegExp(placeholder, "g");
+      result = result.replace(regex, value);
+    }
+    return result;
+  };
+
+  const checkIfBoilerplateChanged = (editorHtml: string): boolean => {
+    const compiledHtml = getInterpolatedHtml();
+
+    const cleanText = (html: string) => {
+      if (!html) return "";
+      return html
+        .replace(/<!--.*?-->/gs, "")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    };
+
+    const editorTextClean = cleanText(editorHtml);
+    const compiledTextClean = cleanText(compiledHtml);
+
+    return editorTextClean !== compiledTextClean;
+  };
+
   // Compile document properties
   const getInterpolatedHtml = (): string => {
-    const parties = caseTitle || `${clientName || "Petitioner"} vs ${oppositePartyName || "Respondent"}`;
+    const parties =
+      caseTitle ||
+      `${clientName || "Petitioner"} vs ${oppositePartyName || "Respondent"}`;
     const isHindi = outputLanguage === "hi";
 
+    if (documentType.startsWith("custom_")) {
+      const customId = documentType.replace("custom_", "");
+      const selectedTpl = customTemplates.find((tpl) => tpl.id === customId);
+      if (selectedTpl) {
+        return interpolateCustomHtml(selectedTpl.html_content);
+      }
+      return "";
+    }
+
     if (documentType === "vakalatnama") {
-      return getVakalatnamaHtml({
-        courtName: courtName || "District Court",
-        suitNumber: caseNumber,
-        caseYear: caseYear,
-        parties: parties,
-        clientName: clientName || "Client",
-        advocateName: advocateName || "Advocate",
-        advocateEnrollment: advocateEnrollment,
-        advocateAddress: advocateAddress,
-      }, isHindi);
+      return getVakalatnamaHtml(
+        {
+          courtName: courtName || "District Court",
+          suitNumber: caseNumber,
+          caseYear,
+          parties,
+          clientName: clientName || "Client",
+          advocateName: advocateName || "Advocate",
+          advocateEnrollment,
+          advocateAddress,
+        },
+        isHindi
+      );
     } else if (documentType === "adjournment") {
-      return getAdjournmentHtml({
-        courtName: courtName || "District Court",
-        caseNumber: caseNumber,
-        parties: parties,
-        nextHearingDate: caseDetails?.NextDate ? formatDate(caseDetails.NextDate) : "",
-        reason: adjournmentReason || "Counsel is busy in another court",
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getAdjournmentHtml(
+        {
+          courtName: courtName || "District Court",
+          caseNumber,
+          parties,
+          nextHearingDate: caseDetails?.NextDate
+            ? formatDate(caseDetails.NextDate)
+            : "",
+          reason: adjournmentReason || "Counsel is busy in another court",
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "bail") {
-      return getBailHtml({
-        courtName: courtName || "Sessions Court",
-        policeStation: policeStation,
-        firNumber: firNumber,
-        firYear: firYear,
-        underSection: caseDetails?.Undersection || "",
-        accusedName: caseDetails?.Accussed || clientName || "Accused",
-        groundOfBail: groundOfBail || "the investigation is complete",
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getBailHtml(
+        {
+          courtName: courtName || "Sessions Court",
+          policeStation,
+          firNumber,
+          firYear,
+          underSection: caseDetails?.Undersection || "",
+          accusedName: caseDetails?.Accussed || clientName || "Accused",
+          groundOfBail:
+            formatListHtml(groundOfBailList, true) ||
+            "the investigation is complete",
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "affidavit") {
-      return getAffidavitHtml({
-        courtName: courtName || "District Court",
-        caseNumber: caseNumber,
-        parties: parties,
-        deponentName: clientName || "Deponent",
-        deponentAge: deponentAge,
-        deponentAddress: deponentAddress,
-        facts: affidavitFacts,
-      }, isHindi);
+      return getAffidavitHtml(
+        {
+          courtName: courtName || "District Court",
+          caseNumber,
+          parties,
+          deponentName: clientName || "Deponent",
+          deponentAge,
+          deponentAddress,
+          facts: formatListHtml(affidavitFactsList, false),
+        },
+        isHindi
+      );
     } else if (documentType === "written_statement") {
-      return getWrittenStatementHtml({
-        courtName: courtName || "District Court",
-        caseNumber: caseNumber,
-        parties: parties,
-        respondentName: clientName || "Respondent",
-        preliminaryObjections: preliminaryObjections,
-        replyOnMerits: replyOnMerits,
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getWrittenStatementHtml(
+        {
+          courtName: courtName || "District Court",
+          caseNumber,
+          parties,
+          respondentName: clientName || "Respondent",
+          preliminaryObjections: formatListHtml(
+            preliminaryObjectionsList,
+            true
+          ),
+          replyOnMerits: formatListHtml(replyOnMeritsList, true),
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "legal_notice") {
-      return getLegalNoticeHtml({
-        senderName: clientName || "Client",
-        senderAddress: deponentAddress,
-        receiverName: oppositePartyName || "Recipient",
-        receiverAddress: receiverAddress,
-        noticeSubject: caseTitle || "Legal Demand Notice",
-        noticeFacts: affidavitFacts,
-        demandText: demandText,
-        advocateName: advocateName || "Advocate",
-        advocateEnrollment: advocateEnrollment,
-        advocateAddress: advocateAddress,
-      }, isHindi);
+      return getLegalNoticeHtml(
+        {
+          senderName: clientName || "Client",
+          senderAddress: deponentAddress,
+          receiverName: oppositePartyName || "Recipient",
+          receiverAddress,
+          noticeSubject: caseTitle || "Legal Demand Notice",
+          noticeFacts: formatListHtml(affidavitFactsList, false),
+          demandText: formatListHtml(demandTextList, false),
+          advocateName: advocateName || "Advocate",
+          advocateEnrollment,
+          advocateAddress,
+        },
+        isHindi
+      );
     } else if (documentType === "caveat") {
-      return getCaveatHtml({
-        courtName: courtName || "District Court",
-        caveatorName: clientName || "Caveator",
-        caveatorAddress: deponentAddress,
-        expectedOppositePartyName: oppositePartyName || "Opposite Party",
-        expectedOppositePartyAddress: receiverAddress,
-        subjectMatter: caseTitle || "Subject Dispute",
-        advocateName: advocateName || "Advocate",
-        advocateEnrollment: advocateEnrollment,
-        advocateAddress: advocateAddress,
-      }, isHindi);
+      return getCaveatHtml(
+        {
+          courtName: courtName || "District Court",
+          caveatorName: clientName || "Caveator",
+          caveatorAddress: deponentAddress,
+          expectedOppositePartyName: oppositePartyName || "Opposite Party",
+          expectedOppositePartyAddress: receiverAddress,
+          subjectMatter: caseTitle || "Subject Dispute",
+          advocateName: advocateName || "Advocate",
+          advocateEnrollment,
+          advocateAddress,
+        },
+        isHindi
+      );
     } else if (documentType === "injunction") {
-      return getInjunctionHtml({
-        courtName: courtName || "District Court",
-        caseNumber: caseNumber,
-        parties: parties,
-        applicantName: clientName || "Applicant",
-        injunctionFacts: affidavitFacts,
-        restraintPrayer: restraintPrayer,
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getInjunctionHtml(
+        {
+          courtName: courtName || "District Court",
+          caseNumber,
+          parties,
+          applicantName: clientName || "Applicant",
+          injunctionFacts: formatListHtml(affidavitFactsList, false),
+          restraintPrayer: formatListHtml(restraintPrayerList, false),
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "plaint") {
-      return getPlaintHtml({
-        courtName: courtName || "District Court",
-        caseNumber: caseNumber,
-        caseYear: caseYear,
-        parties: parties,
-        plaintiffName: clientName || "Plaintiff",
-        defendantName: oppositePartyName || "Defendant",
-        valuation: valuation,
-        suitFacts: affidavitFacts,
-        prayerText: restraintPrayer,
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getPlaintHtml(
+        {
+          courtName: courtName || "District Court",
+          caseNumber,
+          caseYear,
+          parties,
+          plaintiffName: clientName || "Plaintiff",
+          defendantName: oppositePartyName || "Defendant",
+          valuation,
+          suitFacts: formatListHtml(affidavitFactsList, false),
+          prayerText: formatListHtml(restraintPrayerList, false),
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "rejoinder") {
-      return getRejoinderHtml({
-        courtName: courtName || "District Court",
-        caseNumber: caseNumber,
-        caseYear: caseYear,
-        parties: parties,
-        replyPoints: replyPoints,
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getRejoinderHtml(
+        {
+          courtName: courtName || "District Court",
+          caseNumber,
+          caseYear,
+          parties,
+          replyPoints,
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "execution") {
-      return getExecutionHtml({
-        courtName: courtName || "District Court",
-        caseNumber: caseNumber,
-        caseYear: caseYear,
-        decreeHolder: clientName || "Decree Holder",
-        judgmentDebtor: oppositePartyName || "Judgment Debtor",
-        decreeDate: decreeDate,
-        decreetalAmount: valuation,
-        satisfactionDetails: satisfactionDetails,
-        reliefSought: restraintPrayer,
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getExecutionHtml(
+        {
+          courtName: courtName || "District Court",
+          caseNumber,
+          caseYear,
+          decreeHolder: clientName || "Decree Holder",
+          judgmentDebtor: oppositePartyName || "Judgment Debtor",
+          decreeDate,
+          decreetalAmount: valuation,
+          satisfactionDetails,
+          reliefSought: formatListHtml(restraintPrayerList, false),
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "anticipatory_bail") {
-      return getAnticipatoryBailHtml({
-        courtName: courtName || "Sessions Court",
-        policeStation: policeStation,
-        firNumber: firNumber,
-        firYear: firYear,
-        underSection: caseDetails?.Undersection || "",
-        applicantName: clientName || "Applicant",
-        apprehensionReason: adjournmentReason,
-        grounds: groundOfBail,
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getAnticipatoryBailHtml(
+        {
+          courtName: courtName || "Sessions Court",
+          policeStation,
+          firNumber,
+          firYear,
+          underSection: caseDetails?.Undersection || "",
+          applicantName: clientName || "Applicant",
+          apprehensionReason: adjournmentReason,
+          grounds: formatListHtml(groundOfBailList, true),
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "private_complaint") {
-      return getPrivateComplaintHtml({
-        courtName: courtName || "Magistrate Court",
-        complainantName: clientName || "Complainant",
-        complainantAddress: deponentAddress,
-        accusedName: oppositePartyName || "Accused",
-        accusedAddress: receiverAddress,
-        incidentDate: decreeDate,
-        incidentFacts: affidavitFacts,
-        offences: caseDetails?.Undersection || "IPC Sections",
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getPrivateComplaintHtml(
+        {
+          courtName: courtName || "Magistrate Court",
+          complainantName: clientName || "Complainant",
+          complainantAddress: deponentAddress,
+          accusedName: oppositePartyName || "Accused",
+          accusedAddress: receiverAddress,
+          incidentDate: decreeDate,
+          incidentFacts: formatListHtml(affidavitFactsList, false),
+          offences: caseDetails?.Undersection || "IPC Sections",
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "fir_quashing") {
-      return getFirQuashingHtml({
-        courtName: courtName || "High Court",
-        policeStation: policeStation,
-        firNumber: firNumber,
-        firYear: firYear,
-        applicantName: clientName || "Applicant",
-        groundsOfQuashing: groundOfBail,
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getFirQuashingHtml(
+        {
+          courtName: courtName || "High Court",
+          policeStation,
+          firNumber,
+          firYear,
+          applicantName: clientName || "Applicant",
+          groundsOfQuashing: formatListHtml(groundOfBailList, true),
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "exemption") {
-      return getExemptionHtml({
-        courtName: courtName || "District Court",
-        caseNumber: caseNumber,
-        caseYear: caseYear,
-        parties: parties,
-        accusedName: clientName || "Accused",
-        excuseReason: groundOfBail || "medical grounds",
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getExemptionHtml(
+        {
+          courtName: courtName || "District Court",
+          caseNumber,
+          caseYear,
+          parties,
+          accusedName: clientName || "Accused",
+          excuseReason:
+            formatListHtml(groundOfBailList, true) || "medical grounds",
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "cheque_bounce") {
-      return getChequeBounceHtml({
-        senderName: clientName || "Payee",
-        senderAddress: deponentAddress,
-        receiverName: oppositePartyName || "Drawer",
-        receiverAddress: receiverAddress,
-        chequeNumber: chequeNumber,
-        chequeDate: decreeDate,
-        bankName: policeStation || "Bank",
-        chequeAmount: valuation,
-        dishonorDate: dishonorDate,
-        dishonorReason: groundOfBail || "Funds Insufficient",
-        noticeDate: new Date().toLocaleDateString("en-IN"),
-        demandPeriod: "15",
-        advocateName: advocateName || "Advocate",
-        advocateEnrollment: advocateEnrollment,
-        advocateAddress: advocateAddress,
-      }, isHindi);
+      return getChequeBounceHtml(
+        {
+          senderName: clientName || "Payee",
+          senderAddress: deponentAddress,
+          receiverName: oppositePartyName || "Drawer",
+          receiverAddress,
+          chequeNumber,
+          chequeDate: decreeDate,
+          bankName: policeStation || "Bank",
+          chequeAmount: valuation,
+          dishonorDate,
+          dishonorReason:
+            formatListHtml(groundOfBailList, true) || "Funds Insufficient",
+          noticeDate: new Date().toLocaleDateString("en-IN"),
+          demandPeriod: "15",
+          advocateName: advocateName || "Advocate",
+          advocateEnrollment,
+          advocateAddress,
+        },
+        isHindi
+      );
     } else if (documentType === "arbitration_sec9") {
-      return getArbitrationSec9Html({
-        courtName: courtName || "District Court",
-        parties: parties,
-        agreementDate: decreeDate,
-        disputeDetails: groundOfBail,
-        interimRelief: restraintPrayer,
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getArbitrationSec9Html(
+        {
+          courtName: courtName || "District Court",
+          parties,
+          agreementDate: decreeDate,
+          disputeDetails: formatListHtml(groundOfBailList, true),
+          interimRelief: formatListHtml(restraintPrayerList, false),
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "consumer_complaint") {
-      return getConsumerComplaintHtml({
-        forumName: courtName || "Consumer Forum",
-        complainantName: clientName || "Complainant",
-        oppositePartyName: oppositePartyName || "Opposite Party",
-        productDetails: caseTitle || "Product purchased",
-        costAmount: valuation,
-        deficiencyDetails: groundOfBail,
-        compensationSought: restraintPrayer,
-        advocateName: advocateName || "Advocate",
-      }, isHindi);
+      return getConsumerComplaintHtml(
+        {
+          forumName: courtName || "Consumer Forum",
+          complainantName: clientName || "Complainant",
+          oppositePartyName: oppositePartyName || "Opposite Party",
+          productDetails: caseTitle || "Product purchased",
+          costAmount: valuation,
+          deficiencyDetails: formatListHtml(groundOfBailList, true),
+          compensationSought: formatListHtml(restraintPrayerList, false),
+          advocateName: advocateName || "Advocate",
+        },
+        isHindi
+      );
     } else if (documentType === "rent_agreement") {
-      return getRentAgreementHtml({
-        landlordName: clientName || "Landlord",
-        landlordAddress: deponentAddress,
-        tenantName: oppositePartyName || "Tenant",
-        tenantAddress: receiverAddress,
-        propertyAddress: deponentAddress || "Rented Premises",
-        rentAmount: valuation,
-        securityDeposit: satisfactionDetails,
-        termMonths: termMonths,
-        agreementDate: decreeDate,
-        witness1: witness1,
-        witness2: witness2,
-      }, isHindi);
+      return getRentAgreementHtml(
+        {
+          landlordName: clientName || "Landlord",
+          landlordAddress: deponentAddress,
+          tenantName: oppositePartyName || "Tenant",
+          tenantAddress: receiverAddress,
+          propertyAddress: deponentAddress || "Rented Premises",
+          rentAmount: valuation,
+          securityDeposit: satisfactionDetails,
+          termMonths,
+          agreementDate: decreeDate,
+          witness1,
+          witness2,
+        },
+        isHindi
+      );
     } else if (documentType === "power_of_attorney") {
-      return getPowerOfAttorneyHtml({
-        principalName: clientName || "Principal",
-        principalAddress: deponentAddress,
-        attorneyName: oppositePartyName || "Attorney",
-        attorneyAddress: receiverAddress,
-        powersGranted: restraintPrayer,
-        executionDate: decreeDate,
-        witness1: witness1,
-        witness2: witness2,
-      }, isHindi);
+      return getPowerOfAttorneyHtml(
+        {
+          principalName: clientName || "Principal",
+          principalAddress: deponentAddress,
+          attorneyName: oppositePartyName || "Attorney",
+          attorneyAddress: receiverAddress,
+          powersGranted: formatListHtml(restraintPrayerList, false),
+          executionDate: decreeDate,
+          witness1,
+          witness2,
+        },
+        isHindi
+      );
     }
 
     return "";
   };
 
-  const getPreviewText = (): string => {
-    const parties = caseTitle || `${clientName || "Petitioner"} vs ${oppositePartyName || "Respondent"}`;
-
-    return getTemplateTextPreview(documentType, {
-      courtName: courtName || "[COURT NAME]",
-      suitNumber: caseNumber || "______",
-      caseNumber: caseNumber || "______",
-      caseYear: caseYear || "2026",
-      parties: parties,
-      clientName: clientName || "[CLIENT NAME]",
-      advocateName: advocateName || "[ADVOCATE NAME]",
-      advocateEnrollment: advocateEnrollment || "______",
-      advocateAddress: advocateAddress || "[ADVOCATE ADDRESS]",
-      reason: adjournmentReason || "[REASON FOR ADJOURNMENT]",
-      policeStation: policeStation || "[POLICE STATION]",
-      firNumber: firNumber || "______",
-      firYear: firYear || "2026",
-      underSection: caseDetails?.Undersection || "[SECTIONS]",
-      accusedName: caseDetails?.Accussed || clientName || "[ACCUSED NAME]",
-      groundOfBail: groundOfBail || "[GROUNDS FOR BAIL]",
-      deponentName: clientName || "[DEPONENT]",
-      deponentAge: deponentAge || "___",
-      deponentAddress: deponentAddress || "[DEPONENT ADDRESS]",
-      facts: affidavitFacts || "[AFFIDAVIT STATEMENTS]",
-      respondentName: clientName || "[RESPONDENT NAME]",
-      preliminaryObjections: preliminaryObjections || "[PRELIMINARY OBJECTIONS]",
-      replyOnMerits: replyOnMerits || "[REPLY ON MERITS]",
-      receiverName: oppositePartyName || "[RECEIVER NAME]",
-      receiverAddress: receiverAddress || "[RECEIVER ADDRESS]",
-      senderName: clientName || "[SENDER NAME]",
-      senderAddress: deponentAddress || "[SENDER ADDRESS]",
-      noticeFacts: affidavitFacts || "[NOTICE FACTS]",
-      demandText: demandText || "[DEMAND STATEMENT]",
-      caveatorName: clientName || "[CAVEATOR]",
-      caveatorAddress: deponentAddress || "[CAVEATOR ADDRESS]",
-      expectedOppositePartyName: oppositePartyName || "[OPPOSITE PARTY]",
-      expectedOppositePartyAddress: receiverAddress || "[OPPOSITE PARTY ADDRESS]",
-      subjectMatter: caseTitle || "[SUBJECT DISPUTE]",
-      applicantName: clientName || "[APPLICANT NAME]",
-      injunctionFacts: affidavitFacts || "[INJUNCTION STATEMENTS]",
-      restraintPrayer: restraintPrayer || "[RESTRAINT STAY PRAYER]",
-      plaintiffName: clientName || "[PLAINTIFF NAME]",
-      defendantName: oppositePartyName || "[DEFENDANT NAME]",
-      valuation: valuation || "[VALUATION/AMOUNT]",
-      suitFacts: affidavitFacts || "[SUIT FACTS]",
-      prayerText: restraintPrayer || "[PRAYER TEXT]",
-      replyPoints: replyPoints || "[REJOINDER REPLY POINTS]",
-      decreeHolder: clientName || "[DECREE HOLDER]",
-      judgmentDebtor: oppositePartyName || "[JUDGMENT DEBTOR]",
-      decreeDate: decreeDate || "[DECREE DATE]",
-      decreetalAmount: valuation || "[DECREETAL AMOUNT]",
-      satisfactionDetails: satisfactionDetails || "[SATISFACTION DETAILS]",
-      reliefSought: restraintPrayer || "[RELIEF SOUGHT]",
-      apprehensionReason: adjournmentReason || "[APPREHENSION REASON]",
-      grounds: groundOfBail || "[GROUNDS]",
-      complainantName: clientName || "[COMPLAINANT NAME]",
-      complainantAddress: deponentAddress || "[COMPLAINANT ADDRESS]",
-      accusedName: oppositePartyName || "[ACCUSED NAME]",
-      accusedAddress: receiverAddress || "[ACCUSED ADDRESS]",
-      incidentDate: decreeDate || "[INCIDENT DATE]",
-      incidentFacts: affidavitFacts || "[INCIDENT FACTS]",
-      offences: caseDetails?.Undersection || "[OFFENCES]",
-      groundsOfQuashing: groundOfBail || "[GROUNDS FOR QUASHING]",
-      excuseReason: groundOfBail || "[REASON FOR EXEMPTION]",
-      chequeNumber: chequeNumber || "[CHEQUE NUMBER]",
-      chequeDate: decreeDate || "[CHEQUE DATE]",
-      bankName: policeStation || "[BANK NAME]",
-      chequeAmount: valuation || "[CHEQUE AMOUNT]",
-      dishonorDate: dishonorDate || "[DISHONOR DATE]",
-      dishonorReason: groundOfBail || "[DISHONOR REASON]",
-      noticeDate: new Date().toLocaleDateString("en-IN"),
-      demandPeriod: "15",
-      agreementDate: decreeDate || "[AGREEMENT DATE]",
-      disputeDetails: groundOfBail || "[DISPUTE DETAILS]",
-      interimRelief: restraintPrayer || "[INTERIM RELIEF]",
-      forumName: courtName || "[CONSUMER COMMISSION FORUM]",
-      productDetails: caseTitle || "[PRODUCT DETAILS]",
-      costAmount: valuation || "[PRODUCT COST AMOUNT]",
-      deficiencyDetails: groundOfBail || "[DEFICIENCY DETAILS]",
-      compensationSought: restraintPrayer || "[COMPENSATION SOUGHT]",
-      landlordName: clientName || "[LANDLORD NAME]",
-      landlordAddress: deponentAddress || "[LANDLORD ADDRESS]",
-      tenantName: oppositePartyName || "[TENANT NAME]",
-      tenantAddress: receiverAddress || "[TENANT ADDRESS]",
-      propertyAddress: deponentAddress || "[PROPERTY ADDRESS]",
-      rentAmount: valuation || "[RENT AMOUNT]",
-      securityDeposit: satisfactionDetails || "[SECURITY DEPOSIT]",
-      termMonths: termMonths || "[TERM MONTHS]",
-      witness1: witness1 || "[WITNESS 1]",
-      witness2: witness2 || "[WITNESS 2]",
-      principalName: clientName || "[PRINCIPAL NAME]",
-      principalAddress: deponentAddress || "[PRINCIPAL ADDRESS]",
-      attorneyName: oppositePartyName || "[ATTORNEY NAME]",
-      attorneyAddress: receiverAddress || "[ATTORNEY ADDRESS]",
-      powersGranted: restraintPrayer || "[POWERS GRANTED]",
-      executionDate: decreeDate || "[EXECUTION DATE]",
-    }, outputLanguage);
+  const renderDynamicParagraphInput = (
+    label: string,
+    list: string[],
+    setList: React.Dispatch<React.SetStateAction<string[]>>,
+    placeholder: string
+  ) => {
+    return (
+      <View style={{ marginBottom: 16 }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: "bold",
+            color: theme.colors.text,
+            marginBottom: 8,
+          }}
+        >
+          {label}
+        </Text>
+        {list.map((text, idx) => (
+          <View
+            key={idx}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 8,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <FormInput
+                label=""
+                value={text}
+                onChangeText={(val) => {
+                  const updated = [...list];
+                  updated[idx] = val;
+                  setList(updated);
+                }}
+                placeholder={`${placeholder} (${locale === "hi" ? "पैराग्राफ" : "Paragraph"} ${idx + 1})...`}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+            {list.length > 1 && (
+              <TouchableOpacity
+                style={{
+                  marginLeft: 8,
+                  padding: 8,
+                  borderRadius: 8,
+                  backgroundColor: "#EF4444",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  height: 48,
+                  width: 48,
+                }}
+                onPress={() => {
+                  setList(list.filter((_, i) => i !== idx));
+                }}
+              >
+                <Ionicons name="trash-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
+        <TouchableOpacity
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 4,
+            padding: 10,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: theme.colors.primary,
+            borderStyle: "dashed",
+            justifyContent: "center",
+          }}
+          onPress={() => setList([...list, ""])}
+        >
+          <Ionicons
+            name="add"
+            size={18}
+            color={theme.colors.primary}
+            style={{ marginRight: 4 }}
+          />
+          <Text
+            style={{
+              color: theme.colors.primary,
+              fontWeight: "bold",
+              fontSize: 13,
+            }}
+          >
+            {locale === "hi" ? "पैराग्राफ जोड़ें" : "Add Paragraph"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
-  const handleGeneratePdf = async () => {
+  const executePdfExport = async (html: string) => {
     await showAdWithPreload("rewarded", async (success) => {
       if (success) {
         setIsGenerating(true);
         await cacheAdvocateProfile();
 
         try {
-          const htmlContent = getInterpolatedHtml();
-          const { uri } = await Print.printToFileAsync({ html: htmlContent });
+          const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin })} -->`;
+          const formattedHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8" />
+              <style>
+                body {
+                  font-family: ${font};
+                  line-height: ${lineHeight};
+                  padding-top: ${topMargin}px;
+                  padding-left: 30px;
+                  padding-right: 30px;
+                  color: #1f2937;
+                }
+                p {
+                  margin: 0 0 12px 0;
+                }
+              </style>
+            </head>
+            <body>
+              ${html.replace(/<!-- CD_LAYOUT:(.*?) -->/, "")}
+            </body>
+            </html>
+          `;
+
+          const { uri } = await Print.printToFileAsync({
+            html: formattedHtml,
+            width: 612,
+            height: 1008,
+          });
 
           if (caseId) {
-            // Case-associated document sharing
-            if (await Sharing.isAvailableAsync()) {
-              await Sharing.shareAsync(uri, {
-                mimeType: "application/pdf",
-                dialogTitle: `Export_${documentType.toUpperCase()}`,
-                UTI: "com.adobe.pdf",
-              });
-            }
+            // Case-associated document sharing / opening options
+            const docTitle = `Export_${documentType.toUpperCase()}`;
+            Alert.alert(
+              t("docgen_alert_saved_title") || "Document Generated",
+              "Choose an action for this PDF:",
+              [
+                {
+                  text: "Open in App",
+                  onPress: () => {
+                    // @ts-ignore
+                    navigation.navigate("PdfViewer", {
+                      pdfUri: uri,
+                      title: docTitle,
+                    });
+                  },
+                },
+                {
+                  text: "Share PDF",
+                  onPress: async () => {
+                    if (await Sharing.isAvailableAsync()) {
+                      await Sharing.shareAsync(uri, {
+                        mimeType: "application/pdf",
+                        dialogTitle: docTitle,
+                        UTI: "com.adobe.pdf",
+                      });
+                    }
+                  },
+                },
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                },
+              ]
+            );
           } else {
             // Stand-alone Document Mode: save to drafts directory and cache metadata in AsyncStorage
             const dirInfo = await FileSystem.getInfoAsync(DRAFTS_DIRECTORY);
             if (!dirInfo.exists) {
-              await FileSystem.makeDirectoryAsync(DRAFTS_DIRECTORY, { intermediates: true });
+              await FileSystem.makeDirectoryAsync(DRAFTS_DIRECTORY, {
+                intermediates: true,
+              });
             }
 
             const draftId = uuidv4();
@@ -632,12 +1473,14 @@ const GenerateDocumentScreen: React.FC = () => {
             await FileSystem.copyAsync({ from: uri, to: destinationUri });
 
             // Retrieve existing unassociated drafts
-            const existingRaw = await AsyncStorage.getItem("@unassociated_documents");
+            const existingRaw = await AsyncStorage.getItem(
+              "@unassociated_documents"
+            );
             const existingDrafts = existingRaw ? JSON.parse(existingRaw) : [];
 
             const newDraft = {
               id: draftId,
-              title: `${documentTypeOptions.find((o) => o.value === documentType)?.label || "Draft"} - ${
+              title: `${getFullDocTypesList().find((o) => o.value === documentType)?.label || "Draft"} - ${
                 clientName || "Unassociated"
               }`,
               templateType: documentType,
@@ -646,12 +1489,49 @@ const GenerateDocumentScreen: React.FC = () => {
             };
 
             existingDrafts.push(newDraft);
-            await AsyncStorage.setItem("@unassociated_documents", JSON.stringify(existingDrafts));
+            await AsyncStorage.setItem(
+              "@unassociated_documents",
+              JSON.stringify(existingDrafts)
+            );
+
+            // Also save to SQLite
+            await saveDocumentDraft({
+              id: draftId,
+              case_id: null,
+              title: newDraft.title,
+              template_type: documentType,
+              html_content: metadataComment + html,
+              is_custom_template: 0,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
 
             Alert.alert(
               t("docgen_alert_saved_title"),
               t("docgen_alert_saved_desc"),
               [
+                {
+                  text: "Open in App",
+                  onPress: () => {
+                    // @ts-ignore
+                    navigation.navigate("PdfViewer", {
+                      pdfUri: destinationUri,
+                      title: newDraft.title,
+                    });
+                  },
+                },
+                {
+                  text: "Share PDF",
+                  onPress: async () => {
+                    if (await Sharing.isAvailableAsync()) {
+                      await Sharing.shareAsync(destinationUri, {
+                        mimeType: "application/pdf",
+                        dialogTitle: newDraft.title,
+                        UTI: "com.adobe.pdf",
+                      });
+                    }
+                  },
+                },
                 {
                   text: t("docgen_alert_go_drafts"),
                   onPress: () => {
@@ -662,6 +1542,7 @@ const GenerateDocumentScreen: React.FC = () => {
                 {
                   text: t("docgen_alert_close"),
                   onPress: () => navigation.goBack(),
+                  style: "cancel",
                 },
               ]
             );
@@ -676,14 +1557,218 @@ const GenerateDocumentScreen: React.FC = () => {
     });
   };
 
-  if (isLoading) {
+  const handleGeneratePdf = async () => {
+    try {
+      if (activeTab === "preview" && webViewRef.current) {
+        postMessageToWebView({ type: "requestSave" });
+        saveCallbackRef.current = async (html) => {
+          setHtmlContent(html);
+          await executePdfExport(html);
+        };
+      } else {
+        const html = getInterpolatedHtml();
+        await executePdfExport(html);
+      }
+    } catch (e) {
+      console.error("DEBUG handleGeneratePdf error:", e);
+    }
+  };
+
+  const handleEditCustomize = async () => {
+    setIsGenerating(true);
+    await cacheAdvocateProfile();
+    try {
+      const htmlContent = getInterpolatedHtml();
+      // @ts-ignore
+      navigation.navigate("EditDraft", {
+        caseId: caseId ? Number(caseId) : undefined,
+        initialHtml: htmlContent,
+        templateType: documentType,
+        title: `${getTranslatedDocTypes().find((o) => o.value === documentType)?.label || "Draft"} - ${clientName || "Custom"}`,
+      });
+    } catch (error) {
+      console.error("Error creating initial customization HTML:", error);
+      Alert.alert(t("alert_error"), "Could not prepare draft text.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  if (isLoading || !isTransitionFinished) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+      <View
+        style={[styles.centered, { backgroundColor: theme.colors.background }]}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={{ marginTop: 12, color: theme.colors.textSecondary }}>
           {t("docgen_preparing")}
         </Text>
       </View>
+    );
+  }
+
+  if (!isTemplateSelected) {
+    return (
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: theme.colors.background }}
+      >
+        {/* Template Selector Screen Header */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.colors.border,
+            backgroundColor: theme.colors.cardBackground,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={{ marginRight: 12 }}
+          >
+            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "bold",
+              color: theme.colors.text,
+            }}
+          >
+            Select Document Template
+          </Text>
+        </View>
+
+        {/* Search Bar */}
+        <View
+          style={{ padding: 12, backgroundColor: theme.colors.cardBackground }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: theme.colors.background,
+              borderRadius: 8,
+              paddingHorizontal: 10,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              height: 40,
+            }}
+          >
+            <Ionicons
+              name="search-outline"
+              size={18}
+              color={theme.colors.textSecondary}
+              style={{ marginRight: 6 }}
+            />
+            <TextInput
+              placeholder="Search templates..."
+              placeholderTextColor={theme.colors.textSecondary}
+              style={{
+                flex: 1,
+                color: theme.colors.text,
+                fontSize: 14,
+                padding: 0,
+              }}
+              value={templateSearchQuery}
+              onChangeText={setTemplateSearchQuery}
+            />
+            {templateSearchQuery !== "" && (
+              <TouchableOpacity onPress={() => setTemplateSearchQuery("")}>
+                <Ionicons
+                  name="close-circle"
+                  size={16}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Categories segmented tabs deck */}
+        <View
+          style={{ height: 48, backgroundColor: theme.colors.cardBackground }}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              gap: 8,
+            }}
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: theme.colors.border,
+            }}
+          >
+            {categories.map((cat) => {
+              const isSelected = selectedTemplateCategory === cat.value;
+              return (
+                <TouchableOpacity
+                  key={cat.value}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 20,
+                    backgroundColor: isSelected
+                      ? theme.colors.primary
+                      : `${theme.colors.border}40`,
+                    height: 28,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                  onPress={() => setSelectedTemplateCategory(cat.value)}
+                >
+                  <Text
+                    style={{
+                      color: isSelected ? "#ffffff" : theme.colors.text,
+                      fontSize: 12,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Grid List */}
+        <FlatList
+          data={getFilteredTemplates()}
+          renderItem={renderTemplateCardItem}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          contentContainerStyle={{ padding: 10, paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+                marginTop: 40,
+              }}
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={48}
+                color={theme.colors.textSecondary}
+                style={{ opacity: 0.5 }}
+              />
+              <Text
+                style={{ marginTop: 10, color: theme.colors.textSecondary }}
+              >
+                No matching templates found
+              </Text>
+            </View>
+          }
+        />
+      </SafeAreaView>
     );
   }
 
@@ -696,26 +1781,54 @@ const GenerateDocumentScreen: React.FC = () => {
       {/* Tab Selectors */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === "fields" && styles.activeTabButton]}
-          onPress={() => setActiveTab("fields")}
+          style={[
+            styles.tabButton,
+            activeTab === "fields" && styles.activeTabButton,
+          ]}
+          onPress={() => handleTabChange("fields")}
         >
           <Ionicons
             name="create-outline"
             size={18}
-            color={activeTab === "fields" ? theme.colors.primary : theme.colors.textSecondary}
+            color={
+              activeTab === "fields"
+                ? theme.colors.primary
+                : theme.colors.textSecondary
+            }
           />
-          <Text style={[styles.tabText, activeTab === "fields" && styles.activeTabText]}>{t("docgen_tab_fields")}</Text>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "fields" && styles.activeTabText,
+            ]}
+          >
+            {locale === "hi" ? "फ़ॉर्म इनटेक" : "Form Intake"}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === "preview" && styles.activeTabButton]}
-          onPress={() => setActiveTab("preview")}
+          style={[
+            styles.tabButton,
+            activeTab === "preview" && styles.activeTabButton,
+          ]}
+          onPress={() => handleTabChange("preview")}
         >
           <Ionicons
-            name="eye-outline"
+            name="create"
             size={18}
-            color={activeTab === "preview" ? theme.colors.primary : theme.colors.textSecondary}
+            color={
+              activeTab === "preview"
+                ? theme.colors.primary
+                : theme.colors.textSecondary
+            }
           />
-          <Text style={[styles.tabText, activeTab === "preview" && styles.activeTabText]}>{t("docgen_tab_preview")}</Text>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "preview" && styles.activeTabText,
+            ]}
+          >
+            {locale === "hi" ? "लाइव एडिटर" : "Live Editor"}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -726,39 +1839,62 @@ const GenerateDocumentScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.formContainer}>
-            <SectionHeader title={t("docgen_sec_selection")} />
-            <DropdownPicker
-              label={t("docgen_sec_selection")}
-              selectedValue={selectedCategory}
-              onValueChange={(val) => {
-                const newCat = val as string;
-                setSelectedCategory(newCat);
-                // Auto-select first document of new category if current one is not valid
-                const isStillValid = documentTypeOptions.some(
-                  (opt) => opt.value === documentType && (newCat === "all" || opt.category === newCat)
-                );
-                if (!isStillValid) {
-                  const firstOfCategory = documentTypeOptions.find(
-                    (opt) => newCat === "all" || opt.category === newCat
-                  );
-                  if (firstOfCategory) {
-                    setDocumentType(firstOfCategory.value);
-                  }
-                }
+            {/* Active Template Information Banner */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                backgroundColor: `${theme.colors.primary}10`,
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 16,
+                borderWidth: 1,
+                borderColor: `${theme.colors.primary}20`,
               }}
-              options={getTranslatedCategories()}
-            />
-
-            <DropdownPicker
-              label={t("docgen_opt_vakalatnama")}
-              selectedValue={documentType}
-              onValueChange={(val) => setDocumentType(val as string)}
-              options={getTranslatedDocTypes().filter(
-                (opt) => selectedCategory === "all" || opt.category === selectedCategory
+            >
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: theme.colors.textSecondary,
+                    fontWeight: "600",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Active Template
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "bold",
+                    color: theme.colors.text,
+                  }}
+                >
+                  {getTranslatedDocTypes().find((o) => o.value === documentType)
+                    ?.label || getTemplateLabel(documentType)}
+                </Text>
+              </View>
+              {!route.params?.templateType && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                  }}
+                  onPress={() => setIsTemplateSelected(false)}
+                >
+                  <Text
+                    style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}
+                  >
+                    Change
+                  </Text>
+                </TouchableOpacity>
               )}
-              placeholder={t("docgen_opt_vakalatnama")}
-            />
+            </View>
 
+            {/* Language Selection */}
             <SectionHeader title={t("docgen_sec_lang")} />
             <View style={{ flexDirection: "row", marginBottom: 16 }}>
               <TouchableOpacity
@@ -874,41 +2010,55 @@ const GenerateDocumentScreen: React.FC = () => {
               </View>
             )}
 
-            {(documentType === "bail" || documentType === "anticipatory_bail" || documentType === "fir_quashing" || documentType === "private_complaint" || documentType === "cheque_bounce") && (
+            {(documentType === "bail" ||
+              documentType === "anticipatory_bail" ||
+              documentType === "fir_quashing" ||
+              documentType === "private_complaint" ||
+              documentType === "cheque_bounce") && (
               <View>
                 <FormInput
-                  label={documentType === "cheque_bounce" ? t("docgen_field_bank_name") : t("docgen_field_police_station")}
+                  label={
+                    documentType === "cheque_bounce"
+                      ? t("docgen_field_bank_name")
+                      : t("docgen_field_police_station")
+                  }
                   value={policeStation}
                   onChangeText={setPoliceStation}
-                  placeholder={documentType === "cheque_bounce" ? t("docgen_placeholder_bank_name") : t("docgen_placeholder_police_station")}
+                  placeholder={
+                    documentType === "cheque_bounce"
+                      ? t("docgen_placeholder_bank_name")
+                      : t("docgen_placeholder_police_station")
+                  }
                 />
-                {documentType !== "cheque_bounce" && documentType !== "private_complaint" && (
-                  <View>
-                    <FormInput
-                      label={t("docgen_field_fir_number")}
-                      value={firNumber}
-                      onChangeText={setFirNumber}
-                      placeholder={t("docgen_placeholder_fir_number")}
-                    />
-                    <FormInput
-                      label={t("docgen_field_fir_year")}
-                      value={firYear}
-                      onChangeText={setFirYear}
-                      placeholder={t("docgen_placeholder_fir_year")}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                )}
-                {(documentType === "bail" || documentType === "anticipatory_bail" || documentType === "fir_quashing") && (
-                  <FormInput
-                    label={documentType === "fir_quashing" ? t("docgen_field_quashing_grounds") : t("docgen_field_bail_grounds")}
-                    value={groundOfBail}
-                    onChangeText={setGroundOfBail}
-                    placeholder={t("docgen_placeholder_bail_grounds")}
-                    multiline
-                    numberOfLines={4}
-                  />
-                )}
+                {documentType !== "cheque_bounce" &&
+                  documentType !== "private_complaint" && (
+                    <View>
+                      <FormInput
+                        label={t("docgen_field_fir_number")}
+                        value={firNumber}
+                        onChangeText={setFirNumber}
+                        placeholder={t("docgen_placeholder_fir_number")}
+                      />
+                      <FormInput
+                        label={t("docgen_field_fir_year")}
+                        value={firYear}
+                        onChangeText={setFirYear}
+                        placeholder={t("docgen_placeholder_fir_year")}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  )}
+                {(documentType === "bail" ||
+                  documentType === "anticipatory_bail" ||
+                  documentType === "fir_quashing") &&
+                  renderDynamicParagraphInput(
+                    documentType === "fir_quashing"
+                      ? t("docgen_field_quashing_grounds")
+                      : t("docgen_field_bail_grounds"),
+                    groundOfBailList,
+                    setGroundOfBailList,
+                    t("docgen_placeholder_bail_grounds")
+                  )}
                 {documentType === "anticipatory_bail" && (
                   <FormInput
                     label={t("docgen_field_apprehension_reason")}
@@ -922,9 +2072,15 @@ const GenerateDocumentScreen: React.FC = () => {
               </View>
             )}
 
-            {(documentType === "affidavit" || documentType === "legal_notice" || documentType === "caveat" || documentType === "private_complaint" || documentType === "rent_agreement" || documentType === "power_of_attorney" || documentType === "cheque_bounce") && (
+            {(documentType === "affidavit" ||
+              documentType === "legal_notice" ||
+              documentType === "caveat" ||
+              documentType === "private_complaint" ||
+              documentType === "rent_agreement" ||
+              documentType === "power_of_attorney" ||
+              documentType === "cheque_bounce") && (
               <View>
-                {caseId && (documentType === "affidavit") && (
+                {caseId && documentType === "affidavit" && (
                   <FormInput
                     label={t("docgen_field_deponent_name")}
                     value={clientName}
@@ -946,10 +2102,10 @@ const GenerateDocumentScreen: React.FC = () => {
                     documentType === "rent_agreement"
                       ? t("docgen_field_landlord_addr")
                       : documentType === "power_of_attorney"
-                      ? t("docgen_field_principal_addr")
-                      : documentType === "cheque_bounce"
-                      ? t("docgen_field_payee_addr")
-                      : t("docgen_field_deponent_addr")
+                        ? t("docgen_field_principal_addr")
+                        : documentType === "cheque_bounce"
+                          ? t("docgen_field_payee_addr")
+                          : t("docgen_field_deponent_addr")
                   }
                   value={deponentAddress}
                   onChangeText={setDeponentAddress}
@@ -960,10 +2116,10 @@ const GenerateDocumentScreen: React.FC = () => {
                     documentType === "rent_agreement"
                       ? t("docgen_field_tenant_addr")
                       : documentType === "power_of_attorney"
-                      ? t("docgen_field_attorney_addr")
-                      : documentType === "cheque_bounce"
-                      ? t("docgen_field_drawer_addr")
-                      : t("docgen_field_receiver_addr")
+                        ? t("docgen_field_attorney_addr")
+                        : documentType === "cheque_bounce"
+                          ? t("docgen_field_drawer_addr")
+                          : t("docgen_field_receiver_addr")
                   }
                   value={receiverAddress}
                   onChangeText={setReceiverAddress}
@@ -972,88 +2128,86 @@ const GenerateDocumentScreen: React.FC = () => {
               </View>
             )}
 
-            {(documentType === "affidavit" || documentType === "injunction" || documentType === "plaint" || documentType === "private_complaint") && (
-              <FormInput
-                label={
-                  documentType === "plaint"
-                    ? t("docgen_field_suit_facts")
-                    : documentType === "private_complaint"
+            {(documentType === "affidavit" ||
+              documentType === "injunction" ||
+              documentType === "plaint" ||
+              documentType === "private_complaint") &&
+              renderDynamicParagraphInput(
+                documentType === "plaint"
+                  ? t("docgen_field_suit_facts")
+                  : documentType === "private_complaint"
                     ? t("docgen_field_incident_facts")
-                    : t("docgen_field_facts")
-                }
-                value={affidavitFacts}
-                onChangeText={setAffidavitFacts}
-                placeholder={t("docgen_placeholder_facts")}
-                multiline
-                numberOfLines={5}
-              />
-            )}
+                    : t("docgen_field_facts"),
+                affidavitFactsList,
+                setAffidavitFactsList,
+                t("docgen_placeholder_facts")
+              )}
 
             {documentType === "written_statement" && (
               <View>
-                <FormInput
-                  label={t("docgen_field_prelim_objections")}
-                  value={preliminaryObjections}
-                  onChangeText={setPreliminaryObjections}
-                  placeholder={t("docgen_placeholder_prelim_objections")}
-                  multiline
-                  numberOfLines={4}
-                />
-                <FormInput
-                  label={t("docgen_field_reply_merits")}
-                  value={replyOnMerits}
-                  onChangeText={setReplyOnMerits}
-                  placeholder={t("docgen_placeholder_reply_merits")}
-                  multiline
-                  numberOfLines={4}
-                />
+                {renderDynamicParagraphInput(
+                  t("docgen_field_prelim_objections"),
+                  preliminaryObjectionsList,
+                  setPreliminaryObjectionsList,
+                  t("docgen_placeholder_prelim_objections")
+                )}
+                {renderDynamicParagraphInput(
+                  t("docgen_field_reply_merits"),
+                  replyOnMeritsList,
+                  setReplyOnMeritsList,
+                  t("docgen_placeholder_reply_merits")
+                )}
               </View>
             )}
 
-            {(documentType === "legal_notice" || documentType === "cheque_bounce") && (
-              <FormInput
-                label={t("docgen_field_demand_text")}
-                value={demandText}
-                onChangeText={setDemandText}
-                placeholder={t("docgen_placeholder_demand_text")}
-              />
-            )}
+            {(documentType === "legal_notice" ||
+              documentType === "cheque_bounce") &&
+              renderDynamicParagraphInput(
+                t("docgen_field_demand_text"),
+                demandTextList,
+                setDemandTextList,
+                t("docgen_placeholder_demand_text")
+              )}
 
-            {(documentType === "injunction" || documentType === "plaint" || documentType === "execution" || documentType === "arbitration_sec9" || documentType === "consumer_complaint" || documentType === "power_of_attorney") && (
-              <FormInput
-                label={
-                  documentType === "plaint"
-                    ? t("docgen_field_suit_relief")
-                    : documentType === "execution"
+            {(documentType === "injunction" ||
+              documentType === "plaint" ||
+              documentType === "execution" ||
+              documentType === "arbitration_sec9" ||
+              documentType === "consumer_complaint" ||
+              documentType === "power_of_attorney") &&
+              renderDynamicParagraphInput(
+                documentType === "plaint"
+                  ? t("docgen_field_suit_relief")
+                  : documentType === "execution"
                     ? t("docgen_field_exec_relief")
                     : documentType === "arbitration_sec9"
-                    ? t("docgen_field_interim_relief")
-                    : documentType === "consumer_complaint"
-                    ? t("docgen_field_consumer_relief")
-                    : documentType === "power_of_attorney"
-                    ? t("docgen_field_poa_powers")
-                    : t("docgen_field_injunction_prayer")
-                }
-                value={restraintPrayer}
-                onChangeText={setRestraintPrayer}
-                placeholder={t("docgen_placeholder_relief")}
-                multiline
-                numberOfLines={4}
-              />
-            )}
+                      ? t("docgen_field_interim_relief")
+                      : documentType === "consumer_complaint"
+                        ? t("docgen_field_consumer_relief")
+                        : documentType === "power_of_attorney"
+                          ? t("docgen_field_poa_powers")
+                          : t("docgen_field_injunction_prayer"),
+                restraintPrayerList,
+                setRestraintPrayerList,
+                t("docgen_placeholder_relief")
+              )}
 
-            {(documentType === "plaint" || documentType === "execution" || documentType === "cheque_bounce" || documentType === "consumer_complaint" || documentType === "rent_agreement") && (
+            {(documentType === "plaint" ||
+              documentType === "execution" ||
+              documentType === "cheque_bounce" ||
+              documentType === "consumer_complaint" ||
+              documentType === "rent_agreement") && (
               <FormInput
                 label={
                   documentType === "plaint"
                     ? t("docgen_field_suit_valuation")
                     : documentType === "execution"
-                    ? t("docgen_field_exec_decree_amount")
-                    : documentType === "cheque_bounce"
-                    ? t("docgen_field_cheque_amount")
-                    : documentType === "consumer_complaint"
-                    ? t("docgen_field_consumer_cost")
-                    : t("docgen_field_monthly_rent")
+                      ? t("docgen_field_exec_decree_amount")
+                      : documentType === "cheque_bounce"
+                        ? t("docgen_field_cheque_amount")
+                        : documentType === "consumer_complaint"
+                          ? t("docgen_field_consumer_cost")
+                          : t("docgen_field_monthly_rent")
                 }
                 value={valuation}
                 onChangeText={setValuation}
@@ -1073,18 +2227,22 @@ const GenerateDocumentScreen: React.FC = () => {
               />
             )}
 
-            {(documentType === "execution" || documentType === "private_complaint" || documentType === "cheque_bounce" || documentType === "arbitration_sec9" || documentType === "rent_agreement") && (
+            {(documentType === "execution" ||
+              documentType === "private_complaint" ||
+              documentType === "cheque_bounce" ||
+              documentType === "arbitration_sec9" ||
+              documentType === "rent_agreement") && (
               <FormInput
                 label={
                   documentType === "execution"
                     ? t("docgen_field_exec_decree_date")
                     : documentType === "cheque_bounce"
-                    ? t("docgen_field_cheque_date")
-                    : documentType === "private_complaint"
-                    ? t("docgen_field_incident_date")
-                    : documentType === "arbitration_sec9"
-                    ? t("docgen_field_arbitration_date")
-                    : t("docgen_field_rent_date")
+                      ? t("docgen_field_cheque_date")
+                      : documentType === "private_complaint"
+                        ? t("docgen_field_incident_date")
+                        : documentType === "arbitration_sec9"
+                          ? t("docgen_field_arbitration_date")
+                          : t("docgen_field_rent_date")
                 }
                 value={decreeDate}
                 onChangeText={setDecreeDate}
@@ -1092,7 +2250,8 @@ const GenerateDocumentScreen: React.FC = () => {
               />
             )}
 
-            {(documentType === "execution" || documentType === "rent_agreement") && (
+            {(documentType === "execution" ||
+              documentType === "rent_agreement") && (
               <FormInput
                 label={
                   documentType === "execution"
@@ -1101,7 +2260,11 @@ const GenerateDocumentScreen: React.FC = () => {
                 }
                 value={satisfactionDetails}
                 onChangeText={setSatisfactionDetails}
-                placeholder={documentType === "execution" ? t("docgen_placeholder_exec_recovery") : t("docgen_placeholder_rent_deposit")}
+                placeholder={
+                  documentType === "execution"
+                    ? t("docgen_placeholder_exec_recovery")
+                    : t("docgen_placeholder_rent_deposit")
+                }
               />
             )}
 
@@ -1132,7 +2295,8 @@ const GenerateDocumentScreen: React.FC = () => {
               />
             )}
 
-            {(documentType === "rent_agreement" || documentType === "power_of_attorney") && (
+            {(documentType === "rent_agreement" ||
+              documentType === "power_of_attorney") && (
               <View>
                 <FormInput
                   label={t("docgen_field_witness1")}
@@ -1176,9 +2340,18 @@ const GenerateDocumentScreen: React.FC = () => {
 
             <View style={{ marginTop: 24 }}>
               <ActionButton
-                title={isGenerating ? t("docgen_preparing") : caseId ? t("docgen_btn_export_share") : t("docgen_btn_save_draft")}
-                onPress={handleGeneratePdf}
+                title="Edit & Customize Draft"
+                onPress={handleEditCustomize}
                 type="primary"
+                disabled={isGenerating || !advocateName}
+                style={{ marginBottom: 12 }}
+              />
+              <ActionButton
+                title={
+                  isGenerating ? t("docgen_preparing") : "Quick PDF Export"
+                }
+                onPress={handleGeneratePdf}
+                type="secondary"
                 disabled={isGenerating || !advocateName}
                 loading={isGenerating}
               />
@@ -1186,22 +2359,1846 @@ const GenerateDocumentScreen: React.FC = () => {
           </View>
         </ScrollView>
       ) : (
-        /* Real-time Document Live Preview Layout mimicking standard Court Legal Paper sheet */
-        <View style={styles.previewContainer}>
-          <ScrollView contentContainerStyle={styles.legalPageSheet} showsVerticalScrollIndicator={true}>
-            {/* Standard Red side margin line representing court ledger sheets */}
-            <View style={styles.legalRedMarginLine} />
-            <Text style={styles.legalDraftText}>{getPreviewText()}</Text>
-          </ScrollView>
-          <View style={styles.floatingPreviewButton}>
-            <ActionButton
-              title={isGenerating ? t("docgen_preparing") : caseId ? t("docgen_btn_export_share_short") : t("docgen_btn_save_draft_short")}
+        /* Dynamic Rich-Text preview and formatting workspace */
+        <View style={{ flex: 1 }}>
+          <WebView
+            ref={webViewRef}
+            source={{ html: getOfflineEditorHtml(htmlContent) }}
+            onMessage={handleEditorMessage}
+            style={{ flex: 1 }}
+            originWhitelist={["*"]}
+            javaScriptEnabled
+            domStorageEnabled
+            onLoadEnd={() => {
+              postMessageToWebView({ type: "load", html: htmlContent });
+              applyLayoutSettings(
+                font,
+                lineHeight,
+                pageSize,
+                topMargin,
+                bottomMargin,
+                leftMargin,
+                rightMargin,
+                letterheadSpace
+              );
+            }}
+            onShouldStartLoadWithRequest={() => false}
+          />
+
+          {/* Form Actions Overlay */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              padding: 12,
+              backgroundColor: theme.colors.cardBackground,
+              borderTopWidth: 1,
+              borderTopColor: theme.colors.border,
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: theme.colors.primary,
+                borderRadius: 8,
+                paddingVertical: 12,
+                justifyContent: "center",
+                alignItems: "center",
+                marginRight: 6,
+                flexDirection: "row",
+              }}
+              onPress={() => {
+                postMessageToWebView({ type: "requestSave" });
+                saveCallbackRef.current = async (html) => {
+                  setHtmlContent(html);
+                  const boilerplateChanged = checkIfBoilerplateChanged(html);
+
+                  const saveDraftRoutine = async () => {
+                    try {
+                      setIsSavingTemplate(true);
+                      const idToSave = uuidv4();
+                      const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace })} -->`;
+                      const title = `${getFullDocTypesList().find((o) => o.value === documentType)?.label || "Draft"} - ${clientName || "Case"}`;
+
+                      await saveDocumentDraft({
+                        id: idToSave,
+                        case_id: caseId ? Number(caseId) : null,
+                        title,
+                        template_type: documentType,
+                        html_content: metadataComment + html,
+                        is_custom_template: 0,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                      });
+
+                      Alert.alert(
+                        locale === "hi" ? "सफलता" : "Success",
+                        locale === "hi"
+                          ? "ड्राफ्ट सफलतापूर्वक सहेजा गया।"
+                          : "Draft saved successfully.",
+                        [{ text: "OK", onPress: () => navigation.goBack() }]
+                      );
+                    } catch (err) {
+                      console.error("Failed to save draft:", err);
+                      Alert.alert("Error", "Could not save draft to database.");
+                    } finally {
+                      setIsSavingTemplate(false);
+                    }
+                  };
+
+                  if (boilerplateChanged) {
+                    Alert.alert(
+                      locale === "hi"
+                        ? "टेम्पलेट सहेजें?"
+                        : "Save Custom Template?",
+                      locale === "hi"
+                        ? "आपने इस टेम्पलेट के मूल पाठ में बदलाव किया है। क्या आप इसे भविष्य के दस्तावेज़ों के लिए एक कस्टम टेम्पलेट के रूप में सहेजना चाहेंगे?"
+                        : "You have modified the boilerplate text of this template. Would you like to save this as a custom reusable template for future documents?",
+                      [
+                        {
+                          text:
+                            locale === "hi"
+                              ? "हाँ, टेम्पलेट सहेजें"
+                              : "Yes, Save as Template",
+                          onPress: () => {
+                            setCustomTemplateTitle("");
+                            setIsSaveModalVisible(true);
+                          },
+                        },
+                        {
+                          text:
+                            locale === "hi"
+                              ? "नहीं, केवल ड्राफ्ट"
+                              : "No, Just Save Draft",
+                          onPress: saveDraftRoutine,
+                        },
+                        {
+                          text: locale === "hi" ? "रद्द करें" : "Cancel",
+                          style: "cancel",
+                        },
+                      ]
+                    );
+                  } else {
+                    await saveDraftRoutine();
+                  }
+                };
+              }}
+            >
+              <Ionicons
+                name="save-outline"
+                size={16}
+                color="#fff"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 13 }}>
+                {locale === "hi" ? "ड्राफ्ट सहेजें" : "Save Draft"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: theme.colors.cardBackground,
+                borderColor: theme.colors.primary,
+                borderWidth: 1,
+                borderRadius: 8,
+                paddingVertical: 12,
+                justifyContent: "center",
+                alignItems: "center",
+                marginRight: 6,
+                flexDirection: "row",
+              }}
+              onPress={() => setIsPageSetupVisible(true)}
+            >
+              <Ionicons
+                name="settings-outline"
+                size={16}
+                color={theme.colors.primary}
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                style={{
+                  color: theme.colors.primary,
+                  fontWeight: "bold",
+                  fontSize: 13,
+                }}
+              >
+                Page Setup
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#10B981",
+                borderRadius: 8,
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                justifyContent: "center",
+                alignItems: "center",
+                flexDirection: "row",
+              }}
               onPress={handleGeneratePdf}
-              type="primary"
-              disabled={isGenerating || !advocateName}
-              loading={isGenerating}
-            />
+              disabled={isGenerating}
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={16}
+                color="#fff"
+                style={{ marginRight: 4 }}
+              />
+              <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 13 }}>
+                Export PDF
+              </Text>
+            </TouchableOpacity>
           </View>
+
+          {/* Toolbar Mode Switcher */}
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: theme.colors.cardBackground,
+              borderTopWidth: 1,
+              borderTopColor: theme.colors.border,
+              paddingHorizontal: 12,
+              paddingTop: 8,
+              paddingBottom: 2,
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TouchableOpacity
+                style={{
+                  paddingVertical: 4,
+                  paddingHorizontal: 12,
+                  borderRadius: 12,
+                  backgroundColor:
+                    toolbarMode === "format"
+                      ? theme.colors.primary
+                      : "transparent",
+                }}
+                onPress={() => setToolbarMode("format")}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "bold",
+                    color:
+                      toolbarMode === "format"
+                        ? "#fff"
+                        : theme.colors.textSecondary,
+                  }}
+                >
+                  {locale === "hi" ? "फ़ॉर्मेटिंग" : "Formatting"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  paddingVertical: 4,
+                  paddingHorizontal: 12,
+                  borderRadius: 12,
+                  backgroundColor:
+                    toolbarMode === "legal"
+                      ? theme.colors.primary
+                      : "transparent",
+                }}
+                onPress={() => setToolbarMode("legal")}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "bold",
+                    color:
+                      toolbarMode === "legal"
+                        ? "#fff"
+                        : theme.colors.textSecondary,
+                  }}
+                >
+                  {locale === "hi" ? "लीगल असिस्ट" : "Legal Assist"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text
+              style={{
+                fontSize: 11,
+                color: theme.colors.textSecondary,
+                fontWeight: "500",
+              }}
+            >
+              {pageSize === "legal"
+                ? "Legal Size (Double-Spaced)"
+                : "A4 Size (1.5 Spaced)"}
+            </Text>
+          </View>
+
+          {/* Dynamic Formatting Toolbar */}
+          {toolbarMode === "format" ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-around",
+                paddingVertical: 8,
+                backgroundColor: theme.colors.inputBackground,
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.border,
+              }}
+            >
+              <TouchableOpacity
+                style={[
+                  { padding: 8, borderRadius: 6 },
+                  editorState.bold && { backgroundColor: theme.colors.primary },
+                ]}
+                onPress={() => triggerFormat("bold")}
+              >
+                <FontAwesome
+                  name="bold"
+                  size={18}
+                  color={editorState.bold ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  { padding: 8, borderRadius: 6 },
+                  editorState.italic && {
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+                onPress={() => triggerFormat("italic")}
+              >
+                <FontAwesome
+                  name="italic"
+                  size={18}
+                  color={editorState.italic ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  { padding: 8, borderRadius: 6 },
+                  editorState.underline && {
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+                onPress={() => triggerFormat("underline")}
+              >
+                <FontAwesome
+                  name="underline"
+                  size={18}
+                  color={editorState.underline ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <View
+                style={{
+                  width: 1,
+                  height: 20,
+                  backgroundColor: theme.colors.border,
+                }}
+              />
+
+              <TouchableOpacity
+                style={[
+                  { padding: 8, borderRadius: 6 },
+                  editorState.alignLeft && {
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+                onPress={() => triggerFormat("justifyLeft")}
+              >
+                <FontAwesome
+                  name="align-left"
+                  size={18}
+                  color={editorState.alignLeft ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  { padding: 8, borderRadius: 6 },
+                  editorState.alignCenter && {
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+                onPress={() => triggerFormat("justifyCenter")}
+              >
+                <FontAwesome
+                  name="align-center"
+                  size={18}
+                  color={editorState.alignCenter ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  { padding: 8, borderRadius: 6 },
+                  editorState.alignRight && {
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+                onPress={() => triggerFormat("justifyRight")}
+              >
+                <FontAwesome
+                  name="align-right"
+                  size={18}
+                  color={editorState.alignRight ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <View
+                style={{
+                  width: 1,
+                  height: 20,
+                  backgroundColor: theme.colors.border,
+                }}
+              />
+
+              <TouchableOpacity
+                style={[
+                  { padding: 8, borderRadius: 6 },
+                  editorState.unorderedList && {
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+                onPress={() => triggerFormat("insertUnorderedList")}
+              >
+                <FontAwesome
+                  name="list-ul"
+                  size={18}
+                  color={editorState.unorderedList ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  { padding: 8, borderRadius: 6 },
+                  editorState.orderedList && {
+                    backgroundColor: theme.colors.primary,
+                  },
+                ]}
+                onPress={() => triggerFormat("insertOrderedList")}
+              >
+                <FontAwesome
+                  name="list-ol"
+                  size={18}
+                  color={editorState.orderedList ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ padding: 8 }}
+                onPress={() => triggerFormat("insertParagraph")}
+              >
+                <Ionicons
+                  name="add-circle-outline"
+                  size={18}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                gap: 8,
+              }}
+              style={{
+                backgroundColor: theme.colors.inputBackground,
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.border,
+                width: "100%",
+                maxHeight: 50,
+              }}
+            >
+              {/* Symbols */}
+              {["§", "¶", "Δ", "π", "№"].map((sym) => (
+                <TouchableOpacity
+                  key={sym}
+                  style={{
+                    padding: 8,
+                    borderRadius: 6,
+                    backgroundColor: theme.colors.cardBackground,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    minWidth: 34,
+                    alignItems: "center",
+                  }}
+                  onPress={() => triggerFormat("insertText", sym)}
+                >
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontWeight: "bold",
+                      fontSize: 14,
+                    }}
+                  >
+                    {sym}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              <View
+                style={{
+                  width: 1,
+                  height: 20,
+                  backgroundColor: theme.colors.border,
+                }}
+              />
+
+              {/* Outlining Toggle (Legal List) */}
+              <TouchableOpacity
+                style={{
+                  padding: 7,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                  backgroundColor: theme.colors.cardBackground,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+                onPress={() => triggerFormat("toggleLegalList")}
+              >
+                <FontAwesome
+                  name="list-ol"
+                  size={14}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={{
+                    color: theme.colors.text,
+                    fontSize: 11,
+                    fontWeight: "600",
+                  }}
+                >
+                  Legal List
+                </Text>
+              </TouchableOpacity>
+
+              {/* Signature Block */}
+              <TouchableOpacity
+                style={{
+                  padding: 7,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                  backgroundColor: theme.colors.cardBackground,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+                onPress={() => setIsSignatureListVisible(true)}
+              >
+                <Ionicons
+                  name="pencil"
+                  size={14}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={{
+                    color: theme.colors.text,
+                    fontSize: 11,
+                    fontWeight: "600",
+                  }}
+                >
+                  Signature
+                </Text>
+              </TouchableOpacity>
+
+              {/* Legal Dictionary (Vocabulary) */}
+              <TouchableOpacity
+                style={{
+                  padding: 7,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                  backgroundColor: theme.colors.cardBackground,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+                onPress={() => setIsVocabularyVisible(true)}
+              >
+                <Ionicons
+                  name="book-outline"
+                  size={14}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={{
+                    color: theme.colors.text,
+                    fontSize: 11,
+                    fontWeight: "600",
+                  }}
+                >
+                  Dictionary
+                </Text>
+              </TouchableOpacity>
+
+              <View
+                style={{
+                  width: 1,
+                  height: 20,
+                  backgroundColor: theme.colors.border,
+                }}
+              />
+
+              {/* Case Converters */}
+              {[
+                { label: "UPPER", value: "upper" },
+                { label: "lower", value: "lower" },
+                { label: "Title", value: "title" },
+              ].map((c) => (
+                <TouchableOpacity
+                  key={c.value}
+                  style={{
+                    padding: 7,
+                    paddingHorizontal: 8,
+                    borderRadius: 6,
+                    backgroundColor: theme.colors.cardBackground,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                  }}
+                  onPress={() => triggerFormat("changeCase", c.value)}
+                >
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontSize: 11,
+                      fontWeight: "600",
+                    }}
+                  >
+                    {c.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              <View
+                style={{
+                  width: 1,
+                  height: 20,
+                  backgroundColor: theme.colors.border,
+                }}
+              />
+
+              {/* Placeholder Navigator */}
+              <TouchableOpacity
+                style={{
+                  padding: 7,
+                  paddingHorizontal: 10,
+                  borderRadius: 6,
+                  backgroundColor: theme.colors.primary,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+                onPress={() => triggerFormat("nextPlaceholder")}
+              >
+                <Ionicons
+                  name="play-skip-forward-outline"
+                  size={12}
+                  color="#fff"
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={{ color: "#fff", fontSize: 11, fontWeight: "bold" }}
+                >
+                  Next
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          )}
+
+          {/* Page Setup Modal */}
+          <Modal
+            visible={isPageSetupVisible}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setIsPageSetupVisible(false)}
+          >
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                justifyContent: "flex-end",
+              }}
+            >
+              <View
+                style={{
+                  backgroundColor: theme.colors.cardBackground,
+                  borderTopLeftRadius: 20,
+                  borderTopRightRadius: 20,
+                  padding: 20,
+                  maxHeight: "80%",
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingBottom: 16,
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      fontWeight: "bold",
+                      color: theme.colors.text,
+                    }}
+                  >
+                    {locale === "hi" ? "पेज सेटअप" : "Page Setup"}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setIsPageSetupVisible(false)}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={24}
+                      color={theme.colors.text}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ paddingVertical: 16 }}>
+                  {/* Font selection */}
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "bold",
+                      color: theme.colors.textSecondary,
+                      marginBottom: 8,
+                    }}
+                  >
+                    {locale === "hi" ? "फ़ॉन्ट" : "Font Family"}
+                  </Text>
+                  <View style={{ flexDirection: "row", marginBottom: 16 }}>
+                    {[
+                      {
+                        label: "Times New Roman",
+                        value: "'Times New Roman', Georgia, serif",
+                      },
+                      {
+                        label: "Georgia",
+                        value: "Georgia, 'Times New Roman', serif",
+                      },
+                      { label: "Arial", value: "Arial, Helvetica, sans-serif" },
+                    ].map((item) => (
+                      <TouchableOpacity
+                        key={item.label}
+                        style={{
+                          flex: 1,
+                          padding: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor:
+                            font === item.value
+                              ? theme.colors.primary
+                              : theme.colors.border,
+                          backgroundColor:
+                            font === item.value
+                              ? "rgba(59, 130, 246, 0.1)"
+                              : "transparent",
+                          alignItems: "center",
+                          marginHorizontal: 4,
+                        }}
+                        onPress={() => {
+                          setFont(item.value);
+                          applyLayoutSettings(
+                            item.value,
+                            lineHeight,
+                            pageSize,
+                            topMargin,
+                            bottomMargin,
+                            leftMargin,
+                            rightMargin,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color:
+                              font === item.value
+                                ? theme.colors.primary
+                                : theme.colors.text,
+                            fontSize: 12,
+                            fontWeight: "600",
+                          }}
+                        >
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Line Spacing */}
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "bold",
+                      color: theme.colors.textSecondary,
+                      marginBottom: 8,
+                    }}
+                  >
+                    {locale === "hi" ? "लाइन स्पेसिंग" : "Line Spacing"}
+                  </Text>
+                  <View style={{ flexDirection: "row", marginBottom: 16 }}>
+                    {[
+                      { label: "1.15", value: "1.15" },
+                      { label: "1.5", value: "1.5" },
+                      { label: "2.0 (Double)", value: "2.0" },
+                    ].map((item) => (
+                      <TouchableOpacity
+                        key={item.label}
+                        style={{
+                          flex: 1,
+                          padding: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor:
+                            lineHeight === item.value
+                              ? theme.colors.primary
+                              : theme.colors.border,
+                          backgroundColor:
+                            lineHeight === item.value
+                              ? "rgba(59, 130, 246, 0.1)"
+                              : "transparent",
+                          alignItems: "center",
+                          marginHorizontal: 4,
+                        }}
+                        onPress={() => {
+                          setLineHeight(item.value);
+                          applyLayoutSettings(
+                            font,
+                            item.value,
+                            pageSize,
+                            topMargin,
+                            bottomMargin,
+                            leftMargin,
+                            rightMargin,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color:
+                              lineHeight === item.value
+                                ? theme.colors.primary
+                                : theme.colors.text,
+                            fontSize: 12,
+                            fontWeight: "600",
+                          }}
+                        >
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Paper Size */}
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "bold",
+                      color: theme.colors.textSecondary,
+                      marginBottom: 8,
+                      marginTop: 12,
+                    }}
+                  >
+                    {locale === "hi" ? "पेज साइज" : "Paper Size"}
+                  </Text>
+                  <View style={{ flexDirection: "row", marginBottom: 16 }}>
+                    {[
+                      { label: "A4 Size", value: "a4" },
+                      { label: "Legal Size", value: "legal" },
+                    ].map((item) => (
+                      <TouchableOpacity
+                        key={item.value}
+                        style={{
+                          flex: 1,
+                          padding: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor:
+                            pageSize === item.value
+                              ? theme.colors.primary
+                              : theme.colors.border,
+                          backgroundColor:
+                            pageSize === item.value
+                              ? "rgba(59, 130, 246, 0.1)"
+                              : "transparent",
+                          alignItems: "center",
+                          marginHorizontal: 4,
+                        }}
+                        onPress={() => {
+                          setPageSize(item.value as "a4" | "legal");
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            item.value as "a4" | "legal",
+                            topMargin,
+                            bottomMargin,
+                            leftMargin,
+                            rightMargin,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color:
+                              pageSize === item.value
+                                ? theme.colors.primary
+                                : theme.colors.text,
+                            fontSize: 12,
+                            fontWeight: "600",
+                          }}
+                        >
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Margins Steppers */}
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "bold",
+                      color: theme.colors.textSecondary,
+                      marginBottom: 8,
+                      marginTop: 12,
+                    }}
+                  >
+                    {locale === "hi" ? "दस्तावेज़ मार्जिन" : "Document Margins"}
+                  </Text>
+
+                  {/* Top Margin */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginVertical: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: theme.colors.text,
+                        fontSize: 13,
+                        fontWeight: "500",
+                      }}
+                    >
+                      Top Margin
+                    </Text>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <TouchableOpacity
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          backgroundColor: theme.colors.cardBackground,
+                        }}
+                        onPress={() => {
+                          const v = Math.max(0, topMargin - 5);
+                          setTopMargin(v);
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            pageSize,
+                            v,
+                            bottomMargin,
+                            leftMargin,
+                            rightMargin,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="remove"
+                          size={14}
+                          color={theme.colors.text}
+                        />
+                      </TouchableOpacity>
+                      <Text
+                        style={{
+                          width: 60,
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          color: theme.colors.text,
+                          fontSize: 12,
+                        }}
+                      >
+                        {topMargin} px
+                      </Text>
+                      <TouchableOpacity
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          backgroundColor: theme.colors.cardBackground,
+                        }}
+                        onPress={() => {
+                          const v = Math.min(200, topMargin + 5);
+                          setTopMargin(v);
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            pageSize,
+                            v,
+                            bottomMargin,
+                            leftMargin,
+                            rightMargin,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="add"
+                          size={14}
+                          color={theme.colors.text}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Left Margin */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginVertical: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: theme.colors.text,
+                        fontSize: 13,
+                        fontWeight: "500",
+                      }}
+                    >
+                      Left Margin
+                    </Text>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <TouchableOpacity
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          backgroundColor: theme.colors.cardBackground,
+                        }}
+                        onPress={() => {
+                          const v = Math.max(20, leftMargin - 5);
+                          setLeftMargin(v);
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            pageSize,
+                            topMargin,
+                            bottomMargin,
+                            v,
+                            rightMargin,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="remove"
+                          size={14}
+                          color={theme.colors.text}
+                        />
+                      </TouchableOpacity>
+                      <Text
+                        style={{
+                          width: 60,
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          color: theme.colors.text,
+                          fontSize: 12,
+                        }}
+                      >
+                        {leftMargin} px
+                      </Text>
+                      <TouchableOpacity
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          backgroundColor: theme.colors.cardBackground,
+                        }}
+                        onPress={() => {
+                          const v = Math.min(200, leftMargin + 5);
+                          setLeftMargin(v);
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            pageSize,
+                            topMargin,
+                            bottomMargin,
+                            v,
+                            rightMargin,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="add"
+                          size={14}
+                          color={theme.colors.text}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Right Margin */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginVertical: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: theme.colors.text,
+                        fontSize: 13,
+                        fontWeight: "500",
+                      }}
+                    >
+                      Right Margin
+                    </Text>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <TouchableOpacity
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          backgroundColor: theme.colors.cardBackground,
+                        }}
+                        onPress={() => {
+                          const v = Math.max(0, rightMargin - 5);
+                          setRightMargin(v);
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            pageSize,
+                            topMargin,
+                            bottomMargin,
+                            leftMargin,
+                            v,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="remove"
+                          size={14}
+                          color={theme.colors.text}
+                        />
+                      </TouchableOpacity>
+                      <Text
+                        style={{
+                          width: 60,
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          color: theme.colors.text,
+                          fontSize: 12,
+                        }}
+                      >
+                        {rightMargin} px
+                      </Text>
+                      <TouchableOpacity
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          backgroundColor: theme.colors.cardBackground,
+                        }}
+                        onPress={() => {
+                          const v = Math.min(200, rightMargin + 5);
+                          setRightMargin(v);
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            pageSize,
+                            topMargin,
+                            bottomMargin,
+                            leftMargin,
+                            v,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="add"
+                          size={14}
+                          color={theme.colors.text}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Bottom Margin */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginVertical: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: theme.colors.text,
+                        fontSize: 13,
+                        fontWeight: "500",
+                      }}
+                    >
+                      Bottom Margin
+                    </Text>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <TouchableOpacity
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          backgroundColor: theme.colors.cardBackground,
+                        }}
+                        onPress={() => {
+                          const v = Math.max(0, bottomMargin - 5);
+                          setBottomMargin(v);
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            pageSize,
+                            topMargin,
+                            v,
+                            leftMargin,
+                            rightMargin,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="remove"
+                          size={14}
+                          color={theme.colors.text}
+                        />
+                      </TouchableOpacity>
+                      <Text
+                        style={{
+                          width: 60,
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          color: theme.colors.text,
+                          fontSize: 12,
+                        }}
+                      >
+                        {bottomMargin} px
+                      </Text>
+                      <TouchableOpacity
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          backgroundColor: theme.colors.cardBackground,
+                        }}
+                        onPress={() => {
+                          const v = Math.min(200, bottomMargin + 5);
+                          setBottomMargin(v);
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            pageSize,
+                            topMargin,
+                            v,
+                            leftMargin,
+                            rightMargin,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="add"
+                          size={14}
+                          color={theme.colors.text}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Letterhead Top Space */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginVertical: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: theme.colors.text,
+                        fontSize: 13,
+                        fontWeight: "500",
+                      }}
+                    >
+                      Letterhead Top Space
+                    </Text>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <TouchableOpacity
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          backgroundColor: theme.colors.cardBackground,
+                        }}
+                        onPress={() => {
+                          const v = Math.max(0, letterheadSpace - 10);
+                          setLetterheadSpace(v);
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            pageSize,
+                            topMargin,
+                            bottomMargin,
+                            leftMargin,
+                            rightMargin,
+                            v
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="remove"
+                          size={14}
+                          color={theme.colors.text}
+                        />
+                      </TouchableOpacity>
+                      <Text
+                        style={{
+                          width: 60,
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          color: theme.colors.text,
+                          fontSize: 12,
+                        }}
+                      >
+                        {letterheadSpace} px
+                      </Text>
+                      <TouchableOpacity
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          backgroundColor: theme.colors.cardBackground,
+                        }}
+                        onPress={() => {
+                          const v = Math.min(300, letterheadSpace + 10);
+                          setLetterheadSpace(v);
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            pageSize,
+                            topMargin,
+                            bottomMargin,
+                            leftMargin,
+                            rightMargin,
+                            v
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="add"
+                          size={14}
+                          color={theme.colors.text}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Save Custom Template Modal */}
+          <Modal
+            visible={isSaveModalVisible}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setIsSaveModalVisible(false)}
+          >
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                justifyContent: "center",
+                padding: 20,
+              }}
+            >
+              <View
+                style={{
+                  backgroundColor: theme.colors.cardBackground,
+                  borderRadius: 16,
+                  padding: 20,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "bold",
+                    color: theme.colors.text,
+                    marginBottom: 12,
+                  }}
+                >
+                  Save Custom Template
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: theme.colors.textSecondary,
+                    marginBottom: 12,
+                  }}
+                >
+                  Provide a name for this customized template format to reuse it
+                  later:
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: theme.colors.inputBackground,
+                    color: theme.colors.text,
+                    padding: 12,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    marginBottom: 16,
+                    fontSize: 14,
+                  }}
+                  value={customTemplateTitle}
+                  onChangeText={setCustomTemplateTitle}
+                  placeholder="e.g. My Bail Application Format"
+                  placeholderTextColor={theme.colors.textSecondary}
+                />
+                <View
+                  style={{ flexDirection: "row", justifyContent: "flex-end" }}
+                >
+                  <TouchableOpacity
+                    style={{ padding: 12, marginRight: 8 }}
+                    onPress={() => setIsSaveModalVisible(false)}
+                  >
+                    <Text
+                      style={{
+                        color: theme.colors.textSecondary,
+                        fontWeight: "600",
+                      }}
+                    >
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: theme.colors.primary,
+                      borderRadius: 8,
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                    onPress={async () => {
+                      if (!customTemplateTitle.trim()) {
+                        Alert.alert(
+                          "Error",
+                          "Please provide a valid template name."
+                        );
+                        return;
+                      }
+                      setIsSavingTemplate(true);
+                      try {
+                        const templateId = uuidv4();
+                        const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace })} -->`;
+                        const contentWithMetadata =
+                          metadataComment + htmlContent;
+
+                        await saveDocumentDraft({
+                          id: templateId,
+                          case_id: null,
+                          title: customTemplateTitle,
+                          template_type: documentType,
+                          html_content: contentWithMetadata,
+                          is_custom_template: 1,
+                          created_at: new Date().toISOString(),
+                          updated_at: new Date().toISOString(),
+                        });
+
+                        const templates = await getDocumentDrafts(null, 1);
+                        setCustomTemplates(templates);
+
+                        Alert.alert(
+                          "Success",
+                          "Custom template saved successfully."
+                        );
+                        setIsSaveModalVisible(false);
+                      } catch (err) {
+                        console.error("Failed to save custom template:", err);
+                        Alert.alert(
+                          "Error",
+                          "Could not save custom template to database."
+                        );
+                      } finally {
+                        setIsSavingTemplate(false);
+                      }
+                    }}
+                    disabled={isSavingTemplate}
+                  >
+                    {isSavingTemplate ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                        Save Template
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+          {/* Signature Modal */}
+          <Modal
+            visible={isSignatureListVisible}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setIsSignatureListVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>
+                    Insert Signature / Verification
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setIsSignatureListVisible(false)}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={24}
+                      color={theme.colors.text}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView contentContainerStyle={{ paddingVertical: 12 }}>
+                  {[
+                    {
+                      title: "Advocate Signature Block",
+                      description:
+                        "Standard right-aligned block for advocate's signature and designation.",
+                      html: `<table style="width: 100%; border: none; margin-top: 30px; font-family: inherit;"><tr><td style="width: 50%; border: none;"></td><td style="width: 50%; text-align: right; border: none;"><strong>[ADVOCATE NAME]</strong><br/>Advocate for Petitioner</td></tr></table>`,
+                    },
+                    {
+                      title: "Double Signature Block",
+                      description:
+                        "Left-aligned Petitioner block + right-aligned Advocate block.",
+                      html: `<table style="width: 100%; border: none; margin-top: 30px; font-family: inherit;"><tr><td style="width: 50%; text-align: left; border: none;"><strong>[CLIENT NAME]</strong><br/>Petitioner / Plaintiff</td><td style="width: 50%; text-align: right; border: none;"><strong>[ADVOCATE NAME]</strong><br/>Advocate for Petitioner</td></tr></table>`,
+                    },
+                    {
+                      title: "Court Verification Block",
+                      description:
+                        "Formal pleading verification box confirming facts under oath.",
+                      html: `<div style="border: 1.5px solid #1f2937; padding: 14px; margin-top: 24px; border-radius: 4px; font-family: inherit; line-height: 1.6;"><p style="margin: 0 0 12px 0; text-align: center;"><strong><u>VERIFICATION</u></strong></p><p style="margin: 0 0 12px 0;">I, the deponent above named, do hereby solemnly declare and verify that the contents of paragraphs 1 to ___ are true and correct to my personal knowledge, and nothing material has been concealed therefrom.</p><p style="margin: 0 0 20px 0;">Verified at New Delhi on this day ___ of ____, 2026.</p><table style="width: 100%; border: none; margin-top: 20px;"><tr><td style="width: 50%; border: none;"><strong>DEPONENT</strong></td><td style="width: 50%; text-align: right; border: none;"><strong>IDENTIFIED BY ME</strong></td></tr></table></div>`,
+                    },
+                  ].map((item, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={{
+                        backgroundColor: theme.colors.cardBackground,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        borderRadius: 8,
+                        padding: 14,
+                        marginBottom: 12,
+                      }}
+                      onPress={() => {
+                        triggerFormat("insertHTML", item.html);
+                        setIsSignatureListVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          fontWeight: "bold",
+                          color: theme.colors.text,
+                          marginBottom: 4,
+                        }}
+                      >
+                        {item.title}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: theme.colors.textSecondary,
+                        }}
+                      >
+                        {item.description}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Vocabulary Modal */}
+          <Modal
+            visible={isVocabularyVisible}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setIsVocabularyVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Legal Dictionary</Text>
+                  <TouchableOpacity
+                    onPress={() => setIsVocabularyVisible(false)}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={24}
+                      color={theme.colors.text}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Search Bar */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: theme.colors.background,
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    height: 40,
+                    marginBottom: 12,
+                  }}
+                >
+                  <Ionicons
+                    name="search-outline"
+                    size={18}
+                    color={theme.colors.textSecondary}
+                    style={{ marginRight: 6 }}
+                  />
+                  <TextInput
+                    placeholder="Search legal words..."
+                    placeholderTextColor={theme.colors.textSecondary}
+                    style={{
+                      flex: 1,
+                      color: theme.colors.text,
+                      fontSize: 14,
+                      padding: 0,
+                    }}
+                    value={vocabSearchQuery}
+                    onChangeText={setVocabSearchQuery}
+                  />
+                  {vocabSearchQuery !== "" && (
+                    <TouchableOpacity onPress={() => setVocabSearchQuery("")}>
+                      <Ionicons
+                        name="close-circle"
+                        size={16}
+                        color={theme.colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <ScrollView
+                  contentContainerStyle={{ paddingBottom: 24 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {LEGAL_VOCABULARY.filter(
+                    (item) =>
+                      item.english
+                        .toLowerCase()
+                        .includes(vocabSearchQuery.toLowerCase()) ||
+                      item.hindi.includes(vocabSearchQuery) ||
+                      item.transliteration
+                        .toLowerCase()
+                        .includes(vocabSearchQuery.toLowerCase())
+                  ).map((item, idx) => (
+                    <View
+                      key={idx}
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.colors.border,
+                        paddingVertical: 12,
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 4,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 15,
+                            fontWeight: "bold",
+                            color: theme.colors.text,
+                          }}
+                        >
+                          {item.english}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: "bold",
+                            color: theme.colors.primary,
+                          }}
+                        >
+                          {item.hindi}
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: theme.colors.textSecondary,
+                          fontStyle: "italic",
+                          marginBottom: 6,
+                        }}
+                      >
+                        Pronunciation: {item.transliteration}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: theme.colors.textSecondary,
+                          marginBottom: 8,
+                        }}
+                      >
+                        {item.meaning}
+                      </Text>
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <TouchableOpacity
+                          style={{
+                            backgroundColor: `${theme.colors.primary}12`,
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            borderRadius: 4,
+                            borderWidth: 0.5,
+                            borderColor: theme.colors.primary,
+                          }}
+                          onPress={() => {
+                            triggerFormat("insertText", item.english);
+                            setIsVocabularyVisible(false);
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: theme.colors.primary,
+                              fontSize: 11,
+                              fontWeight: "bold",
+                            }}
+                          >
+                            Insert English
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{
+                            backgroundColor: `${theme.colors.primary}12`,
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            borderRadius: 4,
+                            borderWidth: 0.5,
+                            borderColor: theme.colors.primary,
+                          }}
+                          onPress={() => {
+                            triggerFormat("insertText", item.hindi);
+                            setIsVocabularyVisible(false);
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: theme.colors.primary,
+                              fontSize: 11,
+                              fontWeight: "bold",
+                            }}
+                          >
+                            Insert Hindi
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
         </View>
       )}
     </KeyboardAvoidingView>
@@ -1314,6 +4311,34 @@ const getStyles = (theme: Theme) =>
     activeLangText: {
       color: theme.colors.primary,
       fontWeight: "bold",
+    },
+    categoryGrid: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 16,
+    },
+    categoryCard: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardBackground,
+      borderRadius: 8,
+      marginHorizontal: 4,
+    },
+    selectedCategoryCard: {
+      borderColor: theme.colors.primary,
+      backgroundColor: theme.colors.primary,
+    },
+    categoryCardText: {
+      fontSize: 10,
+      fontWeight: "600",
+      color: theme.colors.textSecondary,
+    },
+    selectedCategoryCardText: {
+      color: "#ffffff",
     },
   });
 

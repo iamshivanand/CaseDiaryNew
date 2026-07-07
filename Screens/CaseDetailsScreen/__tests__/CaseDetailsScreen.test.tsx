@@ -96,7 +96,7 @@ describe("CaseDetailsScreen", () => {
 
     await waitFor(() => {
       expect(mockShowAd).toHaveBeenCalledWith("rewarded", expect.any(Function));
-      expect(exportCaseToPdf).toHaveBeenCalledWith(mockCaseData);
+      expect(exportCaseToPdf).toHaveBeenCalledWith(mockCaseData, mockNavigationObj);
     });
   });
 

@@ -135,6 +135,17 @@ export interface CaseTimelineRow {
   updated_at: string; // ISO8601
 }
 
+export interface DocumentDraft {
+  id: string;
+  case_id?: number | null;
+  title: string;
+  template_type: string;
+  html_content: string;
+  is_custom_template: number; // 0 or 1
+  created_at: string;
+  updated_at: string;
+}
+
 
 // ---------------
 // DDL STATEMENTS
@@ -309,6 +320,27 @@ BEGIN
   UPDATE CaseTimeline SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = OLD.id;
 END;`;
 
+export const CREATE_DOCUMENT_DRAFTS_TABLE = `
+CREATE TABLE IF NOT EXISTS document_drafts (
+  id TEXT PRIMARY KEY,
+  case_id INTEGER,
+  title TEXT NOT NULL,
+  template_type TEXT NOT NULL,
+  html_content TEXT NOT NULL,
+  is_custom_template INTEGER DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+  updated_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+  FOREIGN KEY (case_id) REFERENCES Cases(id) ON DELETE SET NULL
+);`;
+
+export const CREATE_DOCUMENT_DRAFTS_UPDATED_AT_TRIGGER = `
+CREATE TRIGGER IF NOT EXISTS trigger_document_drafts_updated_at
+AFTER UPDATE ON document_drafts
+FOR EACH ROW
+BEGIN
+  UPDATE document_drafts SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = OLD.id;
+END;`;
+
 
 import { initializeUserProfileDB } from './userProfileDB';
 import { initializeUserInformationDB } from './userInformationDB';
@@ -359,6 +391,8 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   await db.execAsync(CREATE_CASE_TIMELINE_TABLE);
   await db.execAsync(CREATE_CASE_TIMELINE_CASE_ID_INDEX);
   await db.execAsync(CREATE_CASE_TIMELINE_UPDATED_AT_TRIGGER);
+  await db.execAsync(CREATE_DOCUMENT_DRAFTS_TABLE);
+  await db.execAsync(CREATE_DOCUMENT_DRAFTS_UPDATED_AT_TRIGGER);
   await initializeUserProfileDB(db);
   await initializeUserInformationDB(db);
 
