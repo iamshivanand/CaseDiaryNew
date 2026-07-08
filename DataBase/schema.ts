@@ -140,7 +140,7 @@ export interface DocumentDraft {
   case_id?: number | null;
   title: string;
   template_type: string;
-  html_content: string;
+  html_content?: string;
   is_custom_template: number; // 0 or 1
   created_at: string;
   updated_at: string;

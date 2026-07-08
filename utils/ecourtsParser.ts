@@ -390,6 +390,10 @@ export function parseRawECourtsData(rawData: any): ExtractedCaseData {
     caseData.CaseTitle = `${caseData.FirstParty} vs. ${caseData.OppositeParty}`;
   } else if (caseData.FirstParty) {
     caseData.CaseTitle = caseData.FirstParty;
+  } else if (caseData.OppositeParty) {
+    caseData.CaseTitle = `State vs. ${caseData.OppositeParty}`;
+  } else {
+    caseData.CaseTitle = caseData.case_number || caseData.CNRNumber || "Imported Case";
   }
 
   // 5. Fallback for crime_year if not explicitly set
@@ -471,13 +475,146 @@ export interface ParsedTextCase {
   case_number?: string;
   case_year?: string;
   court_name?: string;
+  case_type_name?: string;
   NextDate?: string;
+  PreviousDate?: string;
+  CaseNotes?: string;
+  Accussed?: string;
   CaseStatus?: string;
+  alreadyExists?: boolean;
+}
+
+export function checkDuplicateCases(
+  parsedCases: ParsedTextCase[],
+  existingCases: { CNRNumber: string | null; case_number: string | null; court_name: string | null }[]
+): (ParsedTextCase & { alreadyExists: boolean })[] {
+  return parsedCases.map(c => {
+    const cnr = c.CNRNumber?.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    const caseNo = c.case_number?.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    const court = c.court_name?.trim().toLowerCase().replace(/\s+/g, "");
+
+    let alreadyExists = false;
+
+    if (cnr && cnr !== "" && cnr !== "na" && cnr !== "n/a") {
+      const found = existingCases.some(e => {
+        const eCnr = e.CNRNumber?.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+        return eCnr && eCnr === cnr;
+      });
+      if (found) alreadyExists = true;
+    }
+
+    if (!alreadyExists && caseNo && caseNo !== "" && court && court !== "") {
+      const found = existingCases.some(e => {
+        const eCaseNo = e.case_number?.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+        const eCourt = e.court_name?.trim().toLowerCase().replace(/\s+/g, "");
+        return eCaseNo && eCaseNo === caseNo && eCourt && eCourt === court;
+      });
+      if (found) alreadyExists = true;
+    }
+
+    return {
+      ...c,
+      alreadyExists
+    };
+  });
 }
 
 export function parseECourtsTxtFile(text: string): ParsedTextCase[] {
   const cases: ParsedTextCase[] = [];
   if (!text) return cases;
+
+  const trimmedText = text.trim();
+  if (trimmedText.startsWith("[") && trimmedText.endsWith("]")) {
+    try {
+      const parsedArray = JSON.parse(trimmedText);
+      if (Array.isArray(parsedArray)) {
+        for (const item of parsedArray) {
+          let caseObj: any = null;
+          if (typeof item === "string") {
+            try {
+              caseObj = JSON.parse(item);
+            } catch (innerErr) {
+              // ignore
+            }
+          } else if (typeof item === "object" && item !== null) {
+            caseObj = item;
+          }
+
+          if (caseObj) {
+            const petName = caseObj.petparty_name || "";
+            const resName = caseObj.resparty_name || "";
+            let title = "";
+            if (petName && resName) {
+              title = `${petName} vs. ${resName}`;
+            } else {
+              title = petName || resName || caseObj.case_no || "Imported Case";
+            }
+
+            let nextDate = "";
+            if (caseObj.date_next_list) {
+              nextDate = caseObj.date_next_list;
+            }
+
+            let previousDate = "";
+            if (caseObj.date_last_list) {
+              previousDate = caseObj.date_last_list;
+            }
+
+            let court = "";
+            if (caseObj.court_no_desg_name || caseObj.establishment_name) {
+              court = caseObj.court_no_desg_name && caseObj.establishment_name
+                ? `${caseObj.court_no_desg_name}, ${caseObj.establishment_name}`
+                : (caseObj.court_no_desg_name || caseObj.establishment_name || "");
+            }
+
+            let caseNo = "";
+            if (caseObj.reg_no && caseObj.reg_year) {
+              caseNo = `${caseObj.reg_no}/${caseObj.reg_year}`;
+            } else {
+              caseNo = caseObj.case_no || "";
+            }
+
+            let accused = "";
+            const lowerType = (caseObj.type_name || "").toLowerCase();
+            const lowerPet = (petName || "").toLowerCase();
+            if (
+              lowerType.includes("criminal") ||
+              lowerType.includes("trial") ||
+              lowerType.includes("bail") ||
+              lowerType.includes("state") ||
+              lowerPet.includes("state") ||
+              lowerPet.includes("govt") ||
+              lowerPet.includes("sarkar")
+            ) {
+              accused = resName;
+            }
+
+            cases.push({
+              CaseTitle: title,
+              ClientName: petName || "Client",
+              FirstParty: petName || "Client",
+              OppositeParty: resName || "Opposite Party",
+              CNRNumber: caseObj.cino || undefined,
+              case_number: caseNo || undefined,
+              case_year: caseObj.reg_year ? caseObj.reg_year.toString() : undefined,
+              court_name: court || undefined,
+              case_type_name: caseObj.type_name || undefined,
+              NextDate: nextDate || undefined,
+              PreviousDate: previousDate || undefined,
+              CaseNotes: caseObj.note || undefined,
+              Accussed: accused || undefined,
+              CaseStatus: caseObj.date_of_decision ? "Closed" : "Active",
+            });
+          }
+        }
+        if (cases.length > 0) {
+          return cases;
+        }
+      }
+    } catch (err) {
+      console.log("Failed to parse as JSON backup, falling back to text regex parsing:", err);
+    }
+  }
 
   const lines = text.split(/\r?\n/);
   let detectedDelimited = false;
@@ -504,29 +641,23 @@ export function parseECourtsTxtFile(text: string): ParsedTextCase[] {
 
         parts.forEach((part) => {
           const cleanPart = part.replace(/\s+/g, "");
-          if (/^[A-Za-z]{4}\d{12}$/.test(cleanPart)) {
+          const isCnr = /^[A-Za-z]{4}\d{12}$/.test(cleanPart);
+          const isDate = /\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/.test(part);
+          const isTitle = part.toLowerCase().includes(" vs ") ||
+                          part.toLowerCase().includes(" v/s ") ||
+                          part.toLowerCase().includes(" versus ");
+          const isCaseNo = /[A-Za-z]+\s*\/\s*\d+/.test(part) || /^\d+\/\d{4}$/.test(part);
+
+          if (isCnr) {
             cnr = cleanPart.toUpperCase();
-          } else if (/\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/.test(part)) {
+          } else if (isDate) {
             const converted = convertIndianDateToLocal(part);
             if (converted) nextDate = converted;
-          } else if (
-            part.toLowerCase().includes(" vs ") ||
-            part.toLowerCase().includes(" v/s ") ||
-            part.toLowerCase().includes(" versus ")
-          ) {
+          } else if (isTitle) {
             title = part;
-          } else if (
-            /[A-Za-z]+\s*\/\s*\d+/.test(part) ||
-            /^\d+\/\d{4}$/.test(part)
-          ) {
+          } else if (isCaseNo) {
             caseNo = part;
-          } else if (
-            part.length > 5 &&
-            !cnr &&
-            !nextDate &&
-            !title &&
-            !caseNo
-          ) {
+          } else if (part.length > 5) {
             if (!court) court = part;
           }
         });

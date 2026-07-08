@@ -20,10 +20,12 @@ jest.mock('../../../DataBase', () => ({
 }));
 
 const mockNavigate = jest.fn();
+const mockReplace = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
   useNavigation: () => ({
     navigate: mockNavigate,
+    replace: mockReplace,
     goBack: jest.fn(),
   }),
   useRoute: () => ({
@@ -37,6 +39,11 @@ jest.mock('react-native-webview', () => {
     WebView: View,
   };
 });
+
+jest.mock('../../../utils/locationService', () => ({
+  getUserState: jest.fn(() => Promise.resolve('Uttar Pradesh')),
+  getGeolocatedState: jest.fn(() => Promise.resolve('Uttar Pradesh')),
+}));
 
 describe('AddCase', () => {
   afterEach(() => {
@@ -85,7 +92,7 @@ describe('AddCase', () => {
     fireEvent.press(saveButton);
     await waitFor(() => {
       expect(db.addCase).toHaveBeenCalled();
-      expect(mockNavigate).toHaveBeenCalledWith('CaseDetails', {
+      expect(mockReplace).toHaveBeenCalledWith('CaseDetails', {
         caseId: 1,
       });
     });

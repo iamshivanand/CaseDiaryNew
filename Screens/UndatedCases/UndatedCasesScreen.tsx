@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useContext } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { formatDate, getLocalDateString } from '../../utils/commonFunctions';
 import * as db from '../../DataBase';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -10,6 +10,9 @@ import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPop
 import { getCurrentUserId } from '../../utils/commonFunctions';
 import { ThemeContext } from '../../Providers/ThemeProvider';
 import { promptClientNotification } from '../../utils/whatsappNotifier';
+import { Ionicons } from '@expo/vector-icons';
+import { exportUndatedCasesToPdf } from '../../utils/pdfExporter';
+import { useAdTrigger } from '../CommonComponents/AdManager';
 
 import { SafeAreaView, Platform } from "react-native";
 
@@ -27,8 +30,10 @@ const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
 const UndatedCasesScreen = () => {
   const { theme } = useContext(ThemeContext);
   const [undatedCases, setUndatedCases] = useState<CaseDataScreen[]>([]);
+  const [rawCases, setRawCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
+  const { showAdWithPreload } = useAdTrigger();
   const [isPopupVisible, setPopupVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
 
@@ -54,6 +59,7 @@ const UndatedCasesScreen = () => {
         priority: c.Priority || 'Low',
       }));
 
+      setRawCases(filteredCases);
       setUndatedCases(mappedCases);
     } catch (error) {
       console.error("Error fetching undated cases:", error);
@@ -110,6 +116,26 @@ const UndatedCasesScreen = () => {
     }
   };
 
+  const handleShareUndatedCases = async () => {
+    if (rawCases.length === 0) {
+      Alert.alert("Empty List", "There are no undated cases to export.");
+      return;
+    }
+    try {
+      await showAdWithPreload("rewarded", async (success) => {
+        if (success) {
+          try {
+            await exportUndatedCasesToPdf(rawCases, navigation);
+          } catch (error) {
+            Alert.alert("Export Failed", "Could not compile the undated cases PDF.");
+          }
+        }
+      });
+    } catch (adError) {
+      console.warn("Ad preloading or display encountered an error:", adError);
+    }
+  };
+
   if (loading) {
     return (
       <View style={[styles.centered, { backgroundColor: theme.colors.background }]}>
@@ -120,6 +146,35 @@ const UndatedCasesScreen = () => {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+      <View style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
+        backgroundColor: theme.colors.cardBackground
+      }}>
+        <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.text }}>Undated Cases</Text>
+        {undatedCases.length > 0 && (
+          <TouchableOpacity 
+            onPress={handleShareUndatedCases}
+            activeOpacity={0.9}
+            style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              backgroundColor: theme.colors.primary, 
+              paddingVertical: 6, 
+              paddingHorizontal: 12, 
+              borderRadius: 20,
+            }}
+          >
+            <Ionicons name="share-social" size={14} color="#FFF" style={{ marginRight: 4 }} />
+            <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>Share List</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       <FlatList
         data={undatedCases}
         keyExtractor={(item) => item.id.toString()}

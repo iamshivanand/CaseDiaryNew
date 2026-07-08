@@ -539,10 +539,16 @@ export const saveDocumentDraft = async (draft: DocumentDraft): Promise<void> => 
 
 export const getDocumentDrafts = async (
   caseId?: number | null,
-  isCustomTemplate?: number | null
+  isCustomTemplate?: number | null,
+  excludeHtml: boolean = false,
+  limit?: number | null,
+  offset?: number | null
 ): Promise<DocumentDraft[]> => {
   const db = await getDb();
-  let query = "SELECT * FROM document_drafts WHERE 1=1";
+  const columns = excludeHtml
+    ? "id, case_id, title, template_type, is_custom_template, created_at, updated_at"
+    : "*";
+  let query = `SELECT ${columns} FROM document_drafts WHERE 1=1`;
   const params: any[] = [];
   if (isCustomTemplate !== undefined && isCustomTemplate !== null) {
     query += " AND is_custom_template = ?";
@@ -557,6 +563,14 @@ export const getDocumentDrafts = async (
     }
   }
   query += " ORDER BY updated_at DESC";
+  if (limit !== undefined && limit !== null) {
+    query += " LIMIT ?";
+    params.push(limit);
+  }
+  if (offset !== undefined && offset !== null) {
+    query += " OFFSET ?";
+    params.push(offset);
+  }
   return db.getAllAsync<DocumentDraft>(query, params);
 };
 

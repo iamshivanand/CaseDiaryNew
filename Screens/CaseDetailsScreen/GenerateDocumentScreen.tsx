@@ -391,7 +391,7 @@ const GenerateDocumentScreen: React.FC = () => {
   useEffect(() => {
     const fetchCustomTemplates = async () => {
       try {
-        const templates = await getDocumentDrafts(null, 1);
+        const templates = await getDocumentDrafts(null, 1, true);
         setCustomTemplates(templates);
       } catch (err) {
         console.error("Failed to load custom templates:", err);
@@ -1745,6 +1745,10 @@ const GenerateDocumentScreen: React.FC = () => {
           numColumns={2}
           contentContainerStyle={{ padding: 10, paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
           ListEmptyComponent={
             <View
               style={{

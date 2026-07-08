@@ -24,6 +24,14 @@ jest.mock("@react-navigation/native", () => ({
   },
 }));
 
+const getMockDateStr = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 // Mock Database methods
 const mockCases = [
   {
@@ -31,7 +39,7 @@ const mockCases = [
     uniqueId: "case-1",
     CaseTitle: "State vs John",
     ClientName: "John",
-    NextDate: new Date().toISOString(), // Today's case
+    NextDate: getMockDateStr(), // Today's case
   },
 ];
 

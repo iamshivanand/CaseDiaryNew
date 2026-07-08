@@ -249,6 +249,12 @@ const DraftsHubScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
+  // Pagination states
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
+  const PAGE_SIZE = 20;
+
   // Attach Modal state
   const [isAttachModalVisible, setIsAttachModalVisible] = useState(false);
   const [selectedDraft, setSelectedDraft] = useState<DocumentDraft | null>(
@@ -305,38 +311,82 @@ const DraftsHubScreen: React.FC = () => {
   };
 
   // Load drafts and templates from SQLite
-  const loadDrafts = async () => {
-    setIsLoading(true);
+  const loadDrafts = async (resetPage: boolean = false) => {
+    const isSearching = searchQuery.trim() !== "";
+    const targetPage = resetPage ? 0 : page;
+
+    if (targetPage === 0) {
+      setIsLoading(true);
+    } else if (!isSearching) {
+      setIsFetchingNextPage(true);
+    }
+
     try {
       if (activeTab === "templates") {
-        // Fetch custom templates from SQLite
-        const results = await db.getDocumentDrafts(null, 1);
-        const combined = [
-          ...BUILT_IN_TEMPLATES,
-          ...results.map((r) => ({ ...r, isBuiltIn: false })),
-        ];
-        setDrafts(combined as any);
-        setFilteredDrafts(combined as any);
+        const limit = isSearching ? null : PAGE_SIZE;
+        const offset = isSearching ? null : targetPage * PAGE_SIZE;
+
+        // Fetch custom templates metadata-only (excludeHtml = true)
+        const results = await db.getDocumentDrafts(null, 1, true, limit, offset);
+        
+        const builtIn = (targetPage === 0 || isSearching) ? BUILT_IN_TEMPLATES : [];
+        const mappedResults = results.map((r) => ({ ...r, isBuiltIn: false }));
+        const combined = [...builtIn, ...mappedResults];
+        
+        if (targetPage === 0 || isSearching) {
+          setDrafts(combined as any);
+          setFilteredDrafts(combined as any);
+        } else {
+          setDrafts((prev) => [...prev, ...combined as any]);
+          setFilteredDrafts((prev) => [...prev, ...combined as any]);
+        }
+        
+        setHasMore(!isSearching && results.length === PAGE_SIZE);
+        if (!isSearching) {
+          setPage(targetPage + 1);
+        }
       } else {
-        // Fetch drafts that are not attached to any case yet (caseId = null) for this hub view
-        const results = await db.getDocumentDrafts(null, 0);
-        setDrafts(results);
-        setFilteredDrafts(results);
+        const limit = isSearching ? null : PAGE_SIZE;
+        const offset = isSearching ? null : targetPage * PAGE_SIZE;
+
+        // Fetch drafts metadata-only (excludeHtml = true)
+        const results = await db.getDocumentDrafts(null, 0, true, limit, offset);
+        
+        if (targetPage === 0 || isSearching) {
+          setDrafts(results);
+          setFilteredDrafts(results);
+        } else {
+          setDrafts((prev) => [...prev, ...results]);
+          setFilteredDrafts((prev) => [...prev, ...results]);
+        }
+        
+        setHasMore(!isSearching && results.length === PAGE_SIZE);
+        if (!isSearching) {
+          setPage(targetPage + 1);
+        }
       }
     } catch (error) {
       console.error("Failed to load drafts from SQLite database:", error);
       Alert.alert("Error", "Could not load drafts from database.");
     } finally {
       setIsLoading(false);
+      setIsFetchingNextPage(false);
     }
   };
 
-  // Reload drafts on focus or tab change
+  const loadMoreDrafts = () => {
+    if (isLoading || isFetchingNextPage || !hasMore || searchQuery.trim() !== "") return;
+    loadDrafts(false);
+  };
+
+  // Reload drafts on focus, tab change, or search changes
   useEffect(() => {
     if (isFocused) {
-      loadDrafts();
+      setPage(0);
+      setHasMore(true);
+      loadDrafts(true);
     }
-  }, [isFocused, activeTab]);
+  }, [isFocused, activeTab, searchQuery]);
 
   // Filter drafts based on search query
   useEffect(() => {
@@ -1012,6 +1062,21 @@ const DraftsHubScreen: React.FC = () => {
           numColumns={2}
           contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
+          onEndReached={loadMoreDrafts}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.primary}
+                style={{ marginVertical: 10 }}
+              />
+            ) : null
+          }
         />
       ) : (
         <FlatList
@@ -1021,6 +1086,21 @@ const DraftsHubScreen: React.FC = () => {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={true}
+          onEndReached={loadMoreDrafts}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.primary}
+                style={{ marginVertical: 10 }}
+              />
+            ) : null
+          }
         />
       )}
 

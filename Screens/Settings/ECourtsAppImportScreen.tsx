@@ -21,8 +21,10 @@ import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { bulkInsertCases } from "../../utils/backupManager";
 import { getCurrentUserId } from "../../utils/commonFunctions";
-import { parseECourtsTxtFile, ParsedTextCase } from "../../utils/ecourtsParser";
+import { parseECourtsTxtFile, ParsedTextCase, checkDuplicateCases } from "../../utils/ecourtsParser";
+import { getDb } from "../../DataBase";
 import ActionButton from "../CommonComponents/ActionButton";
+import { useAdTrigger } from "../CommonComponents/AdManager";
 
 const PLAY_STORE_URL =
   "https://play.google.com/store/apps/details?id=gov.ecourts.ecourtsServices";
@@ -32,6 +34,7 @@ const APP_STORE_URL =
 const ECourtsAppImportScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
   const { t, locale } = useTranslation();
+  const { showAdWithPreload } = useAdTrigger();
 
   const [detectedFile, setDetectedFile] = useState<{
     name: string;
@@ -144,7 +147,7 @@ const ECourtsAppImportScreen: React.FC = () => {
     try {
       setIsScanning(true);
       const text = await FileSystem.readAsStringAsync(detectedFile.uri);
-      processFileText(text);
+      await processFileText(text);
     } catch (err) {
       Alert.alert("Error", "Failed to read the detected file.");
     } finally {
@@ -165,7 +168,7 @@ const ECourtsAppImportScreen: React.FC = () => {
 
       setIsScanning(true);
       const text = await FileSystem.readAsStringAsync(result.assets[0].uri);
-      processFileText(text);
+      await processFileText(text);
     } catch (err) {
       Alert.alert("Error", "Failed to read selected document.");
     } finally {
@@ -173,7 +176,7 @@ const ECourtsAppImportScreen: React.FC = () => {
     }
   };
 
-  const processFileText = (text: string) => {
+  const processFileText = async (text: string) => {
     const parsed = parseECourtsTxtFile(text);
     if (parsed.length === 0) {
       Alert.alert(
@@ -183,8 +186,20 @@ const ECourtsAppImportScreen: React.FC = () => {
           : "Could not find any case records in this file. Please verify the content."
       );
     } else {
-      setScannedCases(parsed);
-      setSelectedIndices(parsed.map((_, idx) => idx));
+      const db = await getDb();
+      const existingCases = await db.getAllAsync<{ CNRNumber: string | null; case_number: string | null; court_name: string | null }>(
+        "SELECT CNRNumber, case_number, court_name FROM Cases"
+      );
+      const marked = checkDuplicateCases(parsed, existingCases);
+      setScannedCases(marked);
+
+      const initialSelected: number[] = [];
+      marked.forEach((c, idx) => {
+        if (!c.alreadyExists) {
+          initialSelected.push(idx);
+        }
+      });
+      setSelectedIndices(initialSelected);
     }
   };
 
@@ -215,69 +230,77 @@ const ECourtsAppImportScreen: React.FC = () => {
       return;
     }
 
-    setIsImporting(true);
-    try {
-      const userId = await getCurrentUserId();
-      const casesToImport = scannedCases.filter((_, idx) =>
-        selectedIndices.includes(idx)
-      );
+    await showAdWithPreload("rewarded", async (adSuccess) => {
+      if (!adSuccess) return;
 
-      const count = await bulkInsertCases(casesToImport, userId);
+      setIsImporting(true);
+      try {
+        const userId = await getCurrentUserId();
+        const casesToImport = scannedCases.filter((_, idx) =>
+          selectedIndices.includes(idx)
+        );
 
-      Alert.alert(
-        locale === "hi" ? "सफलता" : "Success",
-        locale === "hi"
-          ? `${count} केस सफलतापूर्वक डायरी में आयात किए गए।`
-          : `Successfully imported ${count} cases into your diary.`,
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              setScannedCases([]);
-              setSelectedIndices([]);
-              setDetectedFile(null);
-              autoScanDownloads();
+        const count = await bulkInsertCases(casesToImport, userId);
+
+        Alert.alert(
+          locale === "hi" ? "सफलता" : "Success",
+          locale === "hi"
+            ? `${count} केस सफलतापूर्वक डायरी में आयात किए गए।`
+            : `Successfully imported ${count} cases into your diary.`,
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                setScannedCases([]);
+                setSelectedIndices([]);
+                setDetectedFile(null);
+                autoScanDownloads();
+              },
             },
-          },
-        ]
-      );
-    } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "Failed to save cases to case diary.");
-    } finally {
-      setIsImporting(false);
-    }
+          ]
+        );
+      } catch (err) {
+        console.error(err);
+        Alert.alert("Error", "Failed to save cases to case diary.");
+      } finally {
+        setIsImporting(false);
+      }
+    });
   };
 
   const handleImportIndividual = async (item: ParsedTextCase) => {
-    setIsImporting(true);
-    try {
-      const userId = await getCurrentUserId();
-      const count = await bulkInsertCases([item], userId);
+    await showAdWithPreload("rewarded", async (adSuccess) => {
+      if (!adSuccess) return;
 
-      Alert.alert(
-        locale === "hi" ? "सफलता" : "Success",
-        locale === "hi"
-          ? "केस सफलतापूर्वक आयात किया गया।"
-          : "Case successfully imported into your diary.",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              // Remove the imported case from the list
-              setScannedCases((prev) => prev.filter((c) => c !== item));
-              setSelectedIndices((prev) =>
-                prev.filter((idx) => idx < scannedCases.length - 1)
-              );
+      setIsImporting(true);
+      try {
+        const userId = await getCurrentUserId();
+        const count = await bulkInsertCases([item], userId);
+
+        Alert.alert(
+          locale === "hi" ? "सफलता" : "Success",
+          locale === "hi"
+            ? "केस सफलतापूर्वक आयात किया गया।"
+            : "Case successfully imported into your diary.",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // Remove the imported case from the list
+                setScannedCases((prev) => prev.filter((c) => c !== item));
+                setSelectedIndices((prev) =>
+                  prev.filter((idx) => idx < scannedCases.length - 1)
+                );
+              },
             },
-          },
-        ]
-      );
-    } catch (err) {
-      Alert.alert("Error", "Failed to save case.");
-    } finally {
-      setIsImporting(false);
-    }
+          ]
+        );
+      } catch (err) {
+        Alert.alert("Error", "Failed to save case.");
+      } finally {
+        setIsImporting(false);
+      }
+    });
   };
 
   const renderCaseCard = ({
@@ -306,12 +329,22 @@ const ECourtsAppImportScreen: React.FC = () => {
           onPress={() => toggleSelectIndex(index)}
         >
           <View style={styles.cardHeader}>
-            <Text
-              style={[styles.caseTitle, { color: theme.colors.text }]}
-              numberOfLines={2}
-            >
-              {item.CaseTitle}
-            </Text>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text
+                style={[styles.caseTitle, { color: theme.colors.text }]}
+                numberOfLines={2}
+              >
+                {item.CaseTitle}
+              </Text>
+              {item.alreadyExists && (
+                <View style={[styles.badgeContainer, { backgroundColor: theme.colors.warning + "15" }]}>
+                  <Ionicons name="warning-outline" size={14} color={theme.colors.warning} style={{ marginRight: 4 }} />
+                  <Text style={[styles.badgeText, { color: theme.colors.warning }]}>
+                    {locale === "hi" ? "केस पहले से मौजूद है" : "Case Already Exists"}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Ionicons
               name={isSelected ? "checkbox" : "square-outline"}
               size={24}
@@ -869,5 +902,19 @@ const styles = StyleSheet.create({
   importingText: {
     marginTop: 12,
     fontSize: 14,
+  },
+  badgeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: "bold",
   },
 });

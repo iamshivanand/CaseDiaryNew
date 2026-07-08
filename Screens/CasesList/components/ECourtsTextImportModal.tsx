@@ -23,8 +23,11 @@ import { getCurrentUserId } from "../../../utils/commonFunctions";
 import {
   parseECourtsTxtFile,
   ParsedTextCase,
+  checkDuplicateCases,
 } from "../../../utils/ecourtsParser";
+import { getDb } from "../../../DataBase";
 import ActionButton from "../../CommonComponents/ActionButton";
+import { useAdTrigger } from "../../CommonComponents/AdManager";
 
 interface ECourtsTextImportModalProps {
   visible: boolean;
@@ -39,6 +42,7 @@ export const ECourtsTextImportModal: React.FC<ECourtsTextImportModalProps> = ({
 }) => {
   const { theme } = useContext(ThemeContext);
   const { t, locale } = useTranslation();
+  const { showAdWithPreload } = useAdTrigger();
 
   const [activeTab, setActiveTab] = useState<"file" | "paste">("file");
   const [pastedText, setPastedText] = useState("");
@@ -73,8 +77,20 @@ export const ECourtsTextImportModal: React.FC<ECourtsTextImportModalProps> = ({
             : "Could not find any case records in this file. Please verify the content."
         );
       } else {
-        setScannedCases(parsed);
-        setSelectedIndices(parsed.map((_, idx) => idx));
+        const db = await getDb();
+        const existingCases = await db.getAllAsync<{ CNRNumber: string | null; case_number: string | null; court_name: string | null }>(
+          "SELECT CNRNumber, case_number, court_name FROM Cases"
+        );
+        const marked = checkDuplicateCases(parsed, existingCases);
+        setScannedCases(marked);
+
+        const initialSelected: number[] = [];
+        marked.forEach((c, idx) => {
+          if (!c.alreadyExists) {
+            initialSelected.push(idx);
+          }
+        });
+        setSelectedIndices(initialSelected);
       }
     } catch (err) {
       console.error("Error loading file:", err);
@@ -84,7 +100,7 @@ export const ECourtsTextImportModal: React.FC<ECourtsTextImportModalProps> = ({
     }
   };
 
-  const handleScanPastedText = () => {
+  const handleScanPastedText = async () => {
     if (!pastedText.trim()) {
       Alert.alert(
         t("alert_error") || "Error",
@@ -106,8 +122,20 @@ export const ECourtsTextImportModal: React.FC<ECourtsTextImportModalProps> = ({
             : "Could not detect any cases in the pasted text."
         );
       } else {
-        setScannedCases(parsed);
-        setSelectedIndices(parsed.map((_, idx) => idx));
+        const db = await getDb();
+        const existingCases = await db.getAllAsync<{ CNRNumber: string | null; case_number: string | null; court_name: string | null }>(
+          "SELECT CNRNumber, case_number, court_name FROM Cases"
+        );
+        const marked = checkDuplicateCases(parsed, existingCases);
+        setScannedCases(marked);
+
+        const initialSelected: number[] = [];
+        marked.forEach((c, idx) => {
+          if (!c.alreadyExists) {
+            initialSelected.push(idx);
+          }
+        });
+        setSelectedIndices(initialSelected);
       }
     } catch (err) {
       console.error("Error scanning text:", err);
@@ -135,41 +163,44 @@ export const ECourtsTextImportModal: React.FC<ECourtsTextImportModalProps> = ({
       return;
     }
 
-    setIsImporting(true);
-    try {
-      const userId = await getCurrentUserId();
-      const casesToImport = scannedCases.filter((_, idx) =>
-        selectedIndices.includes(idx)
-      );
+    await showAdWithPreload("rewarded", async (adSuccess) => {
+      if (!adSuccess) return;
 
-      const count = await bulkInsertCases(casesToImport, userId);
+      setIsImporting(true);
+      try {
+        const userId = await getCurrentUserId();
+        const casesToImport = scannedCases.filter((_, idx) =>
+          selectedIndices.includes(idx)
+        );
 
-      Alert.alert(
-        locale === "hi" ? "सफलता" : "Success",
-        locale === "hi"
-          ? `${count} केस सफलतापूर्वक आयात किए गए।`
-          : `Successfully imported ${count} cases.`,
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              setScannedCases([]);
-              setSelectedIndices([]);
-              setFileName("");
-              setSelectedFileUri("");
-              setPastedText("");
-              onImportSuccess();
-              onClose();
+        const count = await bulkInsertCases(casesToImport, userId);
+
+        Alert.alert(
+          locale === "hi" ? "सफलता" : "Success",
+          locale === "hi"
+            ? `${count} केस सफलतापूर्वक आयात किए गए।`
+            : `Successfully imported ${count} cases.`,
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                setScannedCases([]);
+                setSelectedIndices([]);
+                setFileName("");
+                setPastedText("");
+                onImportSuccess();
+                onClose();
+              },
             },
-          },
-        ]
-      );
-    } catch (err) {
-      console.error("Error importing cases:", err);
-      Alert.alert("Error", "Failed to save imported cases to database.");
-    } finally {
-      setIsImporting(false);
-    }
+          ]
+        );
+      } catch (err) {
+        console.error("Error importing cases:", err);
+        Alert.alert("Error", "Failed to save imported cases to database.");
+      } finally {
+        setIsImporting(false);
+      }
+    });
   };
 
   const renderCaseItem = ({
@@ -195,12 +226,22 @@ export const ECourtsTextImportModal: React.FC<ECourtsTextImportModalProps> = ({
         onPress={() => toggleSelectIndex(index)}
       >
         <View style={styles.cardHeader}>
-          <Text
-            style={[styles.caseTitleText, { color: theme.colors.text }]}
-            numberOfLines={2}
-          >
-            {item.CaseTitle}
-          </Text>
+          <View style={{ flex: 1, marginRight: 10 }}>
+            <Text
+              style={[styles.caseTitleText, { color: theme.colors.text }]}
+              numberOfLines={2}
+            >
+              {item.CaseTitle}
+            </Text>
+            {item.alreadyExists && (
+              <View style={[styles.badgeContainer, { backgroundColor: theme.colors.warning + "15" }]}>
+                <Ionicons name="warning-outline" size={14} color={theme.colors.warning} style={{ marginRight: 4 }} />
+                <Text style={[styles.badgeText, { color: theme.colors.warning }]}>
+                  {locale === "hi" ? "केस पहले से मौजूद है" : "Case Already Exists"}
+                </Text>
+              </View>
+            )}
+          </View>
           <Ionicons
             name={isSelected ? "checkbox" : "square-outline"}
             size={22}
@@ -618,5 +659,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 12,
+  },
+  badgeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: "bold",
   },
 });

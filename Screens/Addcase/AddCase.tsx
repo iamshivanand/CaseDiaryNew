@@ -98,17 +98,17 @@ const dummyCourtOptionsForAdd: AppDropdownOption[] = [
 
 const formFieldsDefinition: FieldDefinition[] = [
   {
+    name: "CNRNumber",
+    type: "text",
+    placeholder: "Enter CNR Number",
+    label: "CNR Number",
+  },
+  {
     name: "CaseTitle",
     type: "text",
     placeholder: "e.g., State vs. John Doe",
     label: "Case Title*",
     suggestions: true,
-  },
-  {
-    name: "CNRNumber",
-    type: "text",
-    placeholder: "Enter CNR Number",
-    label: "CNR Number",
   },
   {
     name: "case_number",
@@ -274,8 +274,8 @@ const fieldGroups = [
     title: "Client & Core Details",
     icon: "person-outline",
     fields: [
-      "CaseTitle",
       "CNRNumber",
+      "CaseTitle",
       "case_number",
       "session_trial_number",
       "crime_number",
@@ -1308,7 +1308,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       const insertPayload: CaseInsertData = {
         uniqueId: formValues.uniqueId || uniqueIdToUse,
         user_id: userId,
-        CaseTitle: formValues.CaseTitle || null,
+        CaseTitle: formValues.CaseTitle || (formValues.FirstParty && formValues.OppositeParty ? `${formValues.FirstParty} vs. ${formValues.OppositeParty}` : null),
         ClientName: formValues.ClientName || null,
         CNRNumber: formValues.CNRNumber || null,
         court_id: formValues.court_id || null,
@@ -1352,7 +1352,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         if (newCaseId) {
           Alert.alert(t("alert_success"), t("editcase_success_saved"));
           await incrementCaseActionCount();
-          navigation.navigate("CaseDetails", {
+          (navigation as any).replace("CaseDetails", {
             caseId: newCaseId,
           });
           if (insertPayload.NextDate) {

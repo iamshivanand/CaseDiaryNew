@@ -277,7 +277,7 @@ export const bulkInsertCases = async (
         [
           uniqueId,
           userId ?? null,
-          c.CaseTitle || "Untitled Case",
+          c.CaseTitle || (c.FirstParty && c.OppositeParty ? `${c.FirstParty} vs. ${c.OppositeParty}` : "Untitled Case"),
           c.ClientName || null,
           c.OnBehalfOf || null,
           c.CNRNumber || null,

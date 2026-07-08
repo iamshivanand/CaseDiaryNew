@@ -1,4 +1,4 @@
-import { ecourtsParserJS, convertIndianDateToLocal, parseRawECourtsData } from '../ecourtsParser';
+import { ecourtsParserJS, convertIndianDateToLocal, parseRawECourtsData, parseECourtsTxtFile, checkDuplicateCases } from '../ecourtsParser';
 
 describe('ecourtsParser utils', () => {
   describe('convertIndianDateToLocal', () => {
@@ -327,6 +327,90 @@ describe('ecourtsParser utils', () => {
       const payload = JSON.parse(mockPostMessage.mock.calls[0][0]);
       expect(payload.status).toBe('error');
       expect(payload.message).toContain('Query error');
+    });
+  });
+
+  describe('parseECourtsTxtFile', () => {
+    it('should parse legacy character-delimited records correctly', () => {
+      const text = 'UPBR010031532014 | State vs Gopendra | 15-07-2026 | XIII th ADJ';
+      const cases = parseECourtsTxtFile(text);
+      expect(cases.length).toBe(1);
+      expect(cases[0].CNRNumber).toBe('UPBR010031532014');
+      expect(cases[0].CaseTitle).toBe('State vs Gopendra');
+      expect(cases[0].NextDate).toBe('2026-07-15');
+      expect(cases[0].court_name).toBe('XIII th ADJ');
+    });
+
+    it('should parse official eCourts JSON array backup files correctly', () => {
+      const caseObj = {
+        cino: 'UPBR010031532014',
+        type_name: 'Sessions Trial',
+        case_no: '203601003552014',
+        reg_year: 2014,
+        reg_no: 100355,
+        petparty_name: 'state of up',
+        resparty_name: 'Gopendra pal',
+        establishment_name: 'District and Sessions Judge',
+        date_next_list: '2026-07-15',
+        date_last_list: '2026-07-01',
+        court_no_desg_name: 'XIII th ADJ',
+        note: 'Vakalatnama submitted'
+      };
+      const rawText = JSON.stringify([JSON.stringify(caseObj)]);
+      const cases = parseECourtsTxtFile(rawText);
+      expect(cases.length).toBe(1);
+      expect(cases[0].CNRNumber).toBe('UPBR010031532014');
+      expect(cases[0].CaseTitle).toBe('state of up vs. Gopendra pal');
+      expect(cases[0].case_number).toBe('100355/2014');
+      expect(cases[0].court_name).toBe('XIII th ADJ, District and Sessions Judge');
+      expect(cases[0].case_type_name).toBe('Sessions Trial');
+      expect(cases[0].case_year).toBe('2014');
+      expect(cases[0].NextDate).toBe('2026-07-15');
+      expect(cases[0].PreviousDate).toBe('2026-07-01');
+      expect(cases[0].CaseNotes).toBe('Vakalatnama submitted');
+      expect(cases[0].Accussed).toBe('Gopendra pal');
+      expect(cases[0].CaseStatus).toBe('Active');
+    });
+  });
+
+  describe('checkDuplicateCases', () => {
+    const existing = [
+      { CNRNumber: 'UPBR010031532014', case_number: '100355/2014', court_name: 'XIII th ADJ' },
+      { CNRNumber: null, case_number: '55/2020', court_name: 'District Court' }
+    ];
+
+    it('should identify duplicate by matching CNRNumber', () => {
+      const parsed = [
+        { CaseTitle: 'Test case 1', ClientName: 'A', FirstParty: 'A', OppositeParty: 'B', CNRNumber: 'upbr-0100-3153-2014' }
+      ];
+      const result = checkDuplicateCases(parsed, existing);
+      expect(result[0].alreadyExists).toBe(true);
+    });
+
+    it('should identify duplicate by matching case_number and court_name', () => {
+      const parsed = [
+        { CaseTitle: 'Test case 2', ClientName: 'A', FirstParty: 'A', OppositeParty: 'B', case_number: '55 / 2020', court_name: 'District  Court' }
+      ];
+      const result = checkDuplicateCases(parsed, existing);
+      expect(result[0].alreadyExists).toBe(true);
+    });
+
+    it('should not identify as duplicate if CNR is empty or NA', () => {
+      const parsed = [
+        { CaseTitle: 'Test case 3', ClientName: 'A', FirstParty: 'A', OppositeParty: 'B', CNRNumber: 'N/A' },
+        { CaseTitle: 'Test case 4', ClientName: 'A', FirstParty: 'A', OppositeParty: 'B', CNRNumber: '' }
+      ];
+      const result = checkDuplicateCases(parsed, existing);
+      expect(result[0].alreadyExists).toBe(false);
+      expect(result[1].alreadyExists).toBe(false);
+    });
+
+    it('should not identify as duplicate if only case_number matches but court_name differs', () => {
+      const parsed = [
+        { CaseTitle: 'Test case 5', ClientName: 'A', FirstParty: 'A', OppositeParty: 'B', case_number: '55/2020', court_name: 'High Court' }
+      ];
+      const result = checkDuplicateCases(parsed, existing);
+      expect(result[0].alreadyExists).toBe(false);
     });
   });
 });

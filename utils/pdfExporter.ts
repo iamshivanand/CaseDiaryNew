@@ -281,15 +281,15 @@ export const exportDailyCauseListToPdf = async (
               ${c.court_name || "N/A"}<br/>
               <span style="font-size: 10px; color: #555;">${c.JudgeName || ""}</span>
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px; text-align: center;">
-              ${c.PreviousDate ? formatDate(c.PreviousDate) : "N/A"}
-            </td>
             <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px;">
               ${c.CaseStatus || "N/A"}<br/>
               <span style="font-size: 10px; color: #555;">${c.Undersection || ""}</span>
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; width: 220px; height: 50px; background-color: #fafafa;">
-              <!-- Blank column for hand-written notes -->
+            <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px; text-align: center;">
+              ${c.PreviousDate ? formatDate(c.PreviousDate) : "N/A"}
+            </td>
+            <td style="padding: 8px; border: 1px solid #aaa; width: 180px; height: 50px; background-color: #fafafa;">
+              <!-- Blank column for hand-written notes / next date -->
             </td>
           </tr>
         `;
@@ -362,11 +362,11 @@ export const exportDailyCauseListToPdf = async (
             <thead>
               <tr>
                 <th style="width: 5%; text-align: center;">S.No</th>
-                <th style="width: 25%;">Case Details</th>
-                <th style="width: 20%;">Court & Judge</th>
-                <th style="width: 10%; text-align: center;">Prev. Date</th>
+                <th style="width: 30%;">Case Details</th>
+                <th style="width: 25%;">Court & Judge</th>
                 <th style="width: 15%;">Status / Sec</th>
-                <th style="width: 25%;">Courtroom Notes</th>
+                <th style="width: 10%; text-align: center;">Prev. Date</th>
+                <th style="width: 15%;">Note / Next Date</th>
               </tr>
             </thead>
             <tbody>
@@ -380,8 +380,8 @@ export const exportDailyCauseListToPdf = async (
 
     const { uri } = await Print.printToFileAsync({
       html: htmlContent,
-      width: 612,
-      height: 1008,
+      width: 842,
+      height: 595,
     });
 
     const docTitle = `Daily_Cause_List_${titleDate.replace(/[^a-zA-Z0-9]/g, "_")}`;
@@ -540,6 +540,10 @@ export const exportCaseHistoryToPdf = async (
               font-size: 12px;
               text-transform: uppercase;
             }
+            @page {
+              size: landscape;
+              margin: 10mm;
+            }
           </style>
         </head>
         <body>
@@ -580,8 +584,8 @@ export const exportCaseHistoryToPdf = async (
 
     const { uri } = await Print.printToFileAsync({
       html: htmlContent,
-      width: 612,
-      height: 1008,
+      width: 842,
+      height: 595,
     });
 
     const docTitle = `History_${caseDetails.CaseTitle || "Case"}`;
@@ -630,6 +634,187 @@ export const exportCaseHistoryToPdf = async (
     }
   } catch (error) {
     console.error("Failed to export case history to PDF:", error);
+    throw error;
+  }
+};
+
+/**
+ * Exports undated cases list to a structured Landscape PDF for junior advocates.
+ * Includes a blank 'Note / Next Date' column on the right for manual handwriting.
+ */
+export const exportUndatedCasesToPdf = async (
+  cases: any[],
+  navigation?: any
+): Promise<void> => {
+  try {
+    let rowsHtml = "";
+    if (cases.length > 0) {
+      cases.forEach((c, index) => {
+        rowsHtml += `
+          <tr>
+            <td style="padding: 8px; border: 1px solid #aaa; text-align: center; font-size: 11px;">
+              ${index + 1}
+            </td>
+            <td style="padding: 8px; border: 1px solid #aaa; font-size: 12px; font-weight: bold;">
+              ${c.CaseTitle || "No Title"}<br/>
+              <span style="font-size: 10px; color: #555; font-weight: normal;">
+                CNR: ${c.CNRNumber || "N/A"}<br/>
+                Client: ${c.ClientName || "N/A"} (${c.ClientContactNumber || "N/A"})
+              </span>
+            </td>
+            <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px;">
+              ${c.court_name || "N/A"}<br/>
+              <span style="font-size: 10px; color: #555;">${c.JudgeName || ""}</span>
+            </td>
+            <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px;">
+              ${c.CaseStatus || "N/A"}<br/>
+              <span style="font-size: 10px; color: #555;">${c.Undersection || ""}</span>
+            </td>
+            <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px; text-align: center;">
+              ${c.PreviousDate ? formatDate(c.PreviousDate) : "N/A"}
+            </td>
+            <td style="padding: 8px; border: 1px solid #aaa; width: 180px; height: 50px; background-color: #fafafa;">
+              <!-- Blank column for hand-written notes / next date -->
+            </td>
+          </tr>
+        `;
+      });
+    } else {
+      rowsHtml = `
+        <tr>
+          <td colspan="6" style="padding: 20px; text-align: center; color: #666; font-style: italic;">
+            No undated cases found.
+          </td>
+        </tr>
+      `;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <style>
+            @page {
+              size: landscape;
+              margin: 10mm;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              color: #222;
+              line-height: 1.4;
+              padding: 10px;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px double #333;
+              padding-bottom: 8px;
+              margin-bottom: 15px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 22px;
+              text-transform: uppercase;
+            }
+            .header h2 {
+              margin: 5px 0 0 0;
+              font-size: 15px;
+              color: #444;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+            }
+            th {
+              background-color: #eaeaea;
+              color: #111;
+              font-size: 12px;
+              text-align: left;
+              padding: 8px;
+              font-weight: bold;
+              border: 1px solid #aaa;
+              text-transform: uppercase;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Undated Cases List</h1>
+            <h2>Prepared for Junior Advocates</h2>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 5%; text-align: center;">S.No</th>
+                <th style="width: 30%;">Case Details</th>
+                <th style="width: 25%;">Court & Judge</th>
+                <th style="width: 15%;">Status / Sec</th>
+                <th style="width: 10%; text-align: center;">Prev. Date</th>
+                <th style="width: 15%;">Note / Next Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          ${appPromoFooterHtml}
+        </body>
+      </html>
+    `;
+
+    const { uri } = await Print.printToFileAsync({
+      html: htmlContent,
+      width: 842,
+      height: 595,
+    });
+
+    const docTitle = "Undated_Cases_List";
+    if (navigation) {
+      Alert.alert(
+        "Undated Cases List",
+        "Choose an action for this PDF:",
+        [
+          {
+            text: "Open in App",
+            onPress: () => {
+              navigation.navigate("PdfViewer", {
+                pdfUri: uri,
+                title: "Undated Cases List",
+              });
+            },
+          },
+          {
+            text: "Share PDF",
+            onPress: async () => {
+              if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri, {
+                  mimeType: "application/pdf",
+                  dialogTitle: docTitle,
+                  UTI: "com.adobe.pdf",
+                });
+              }
+            },
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+        ]
+      );
+    } else {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: docTitle,
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        console.warn("PDF sharing is not available on this platform.");
+      }
+    }
+  } catch (error) {
+    console.error("Failed to export undated cases list to PDF:", error);
     throw error;
   }
 };
