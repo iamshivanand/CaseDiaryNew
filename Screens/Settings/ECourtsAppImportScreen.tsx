@@ -21,7 +21,8 @@ import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { bulkInsertCases } from "../../utils/backupManager";
 import { getCurrentUserId } from "../../utils/commonFunctions";
-import { parseECourtsTxtFile, ParsedTextCase, checkDuplicateCases } from "../../utils/ecourtsParser";
+import { parseECourtsTxtFile, ParsedTextCase } from "../../utils/ecourtsParser";
+import { checkDuplicateAndDiffCases } from "../../utils/caseMapper";
 import { getDb } from "../../DataBase";
 import ActionButton from "../CommonComponents/ActionButton";
 import { useAdTrigger } from "../CommonComponents/AdManager";
@@ -187,15 +188,20 @@ const ECourtsAppImportScreen: React.FC = () => {
       );
     } else {
       const db = await getDb();
-      const existingCases = await db.getAllAsync<{ CNRNumber: string | null; case_number: string | null; court_name: string | null }>(
-        "SELECT CNRNumber, case_number, court_name FROM Cases"
+      const existingCases = await db.getAllAsync<any>(
+        "SELECT * FROM Cases"
       );
-      const marked = checkDuplicateCases(parsed, existingCases);
-      setScannedCases(marked);
+      const marked = checkDuplicateAndDiffCases(parsed, existingCases);
+      const sorted = [...marked].sort((a, b) => {
+        const scoreA = (!a.alreadyExists || a.hasUpdates) ? 1 : 0;
+        const scoreB = (!b.alreadyExists || b.hasUpdates) ? 1 : 0;
+        return scoreB - scoreA;
+      });
+      setScannedCases(sorted);
 
       const initialSelected: number[] = [];
-      marked.forEach((c, idx) => {
-        if (!c.alreadyExists) {
+      sorted.forEach((c, idx) => {
+        if (!c.alreadyExists || c.hasUpdates) {
           initialSelected.push(idx);
         }
       });
@@ -337,12 +343,21 @@ const ECourtsAppImportScreen: React.FC = () => {
                 {item.CaseTitle}
               </Text>
               {item.alreadyExists && (
-                <View style={[styles.badgeContainer, { backgroundColor: theme.colors.warning + "15" }]}>
-                  <Ionicons name="warning-outline" size={14} color={theme.colors.warning} style={{ marginRight: 4 }} />
-                  <Text style={[styles.badgeText, { color: theme.colors.warning }]}>
-                    {locale === "hi" ? "केस पहले से मौजूद है" : "Case Already Exists"}
-                  </Text>
-                </View>
+                item.hasUpdates ? (
+                  <View style={[styles.badgeContainer, { backgroundColor: "#e67e2215", borderColor: "#e67e22" }]}>
+                    <Ionicons name="sync-outline" size={14} color="#e67e22" style={{ marginRight: 4 }} />
+                    <Text style={[styles.badgeText, { color: "#e67e22" }]}>
+                      {locale === "hi" ? "केस में बदलाव हैं" : "Case Has Updates"}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[styles.badgeContainer, { backgroundColor: theme.colors.warning + "15" }]}>
+                    <Ionicons name="warning-outline" size={14} color={theme.colors.warning} style={{ marginRight: 4 }} />
+                    <Text style={[styles.badgeText, { color: theme.colors.warning }]}>
+                      {locale === "hi" ? "केस पहले से मौजूद है" : "Case Already Exists"}
+                    </Text>
+                  </View>
+                )
               )}
             </View>
             <Ionicons
@@ -408,8 +423,36 @@ const ECourtsAppImportScreen: React.FC = () => {
               <Text
                 style={[styles.hearingDate, { color: theme.colors.primary }]}
               >
-                {item.NextDate}
+                {formatDate(item.NextDate)}
               </Text>
+            </View>
+          )}
+
+          {item.hasUpdates && item.changes && (
+            <View style={{ marginTop: 8, padding: 8, backgroundColor: "#e67e2208", borderRadius: 4, borderWidth: 0.5, borderColor: "#e67e2230" }}>
+              <Text style={{ fontWeight: "bold", fontSize: 12, color: "#e67e22", marginBottom: 4 }}>
+                {locale === "hi" ? "बदलाव पाए गए:" : "Updates Found:"}
+              </Text>
+              {Object.keys(item.changes).map(key => {
+                const change = item.changes![key];
+                let displayKey = key;
+                if (key === "NextDate") displayKey = locale === "hi" ? "अगली तारीख" : "Next Date";
+                else if (key === "PreviousDate") displayKey = locale === "hi" ? "पिछली तारीख" : "Previous Date";
+                else if (key === "CaseNotes") displayKey = locale === "hi" ? "टिप्पणी" : "Notes";
+                else if (key === "court_name") displayKey = locale === "hi" ? "न्यायालय" : "Court";
+                else if (key === "case_type_name") displayKey = locale === "hi" ? "केस का प्रकार" : "Case Type";
+                else if (key === "Undersection") displayKey = locale === "hi" ? "धारा" : "Section";
+                else if (key === "JudgeName") displayKey = locale === "hi" ? "न्यायाधीश" : "Judge";
+                else if (key === "OpposingCounsel") displayKey = locale === "hi" ? "विपक्षी वकील" : "Opposing Counsel";
+                
+                const oldValStr = key.includes("Date") ? formatDate(change.oldValue) : change.oldValue;
+                const newValStr = key.includes("Date") ? formatDate(change.newValue) : change.newValue;
+                return (
+                  <Text key={key} style={{ fontSize: 11, color: theme.colors.text, marginTop: 2 }}>
+                    • {displayKey}: <Text style={{ textDecorationLine: "line-through", color: theme.colors.textSecondary }}>{oldValStr}</Text> ➔ <Text style={{ fontWeight: "bold" }}>{newValStr}</Text>
+                  </Text>
+                );
+              })}
             </View>
           )}
         </TouchableOpacity>

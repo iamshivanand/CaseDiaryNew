@@ -1,4 +1,5 @@
 import { ecourtsParserJS, convertIndianDateToLocal, parseRawECourtsData, parseECourtsTxtFile, checkDuplicateCases } from '../ecourtsParser';
+import { fuzzyMapCaseKeys, checkDuplicateAndDiffCases } from '../caseMapper';
 
 describe('ecourtsParser utils', () => {
   describe('convertIndianDateToLocal', () => {
@@ -411,6 +412,64 @@ describe('ecourtsParser utils', () => {
       ];
       const result = checkDuplicateCases(parsed, existing);
       expect(result[0].alreadyExists).toBe(false);
+    });
+  });
+
+  describe('fuzzyMapCaseKeys', () => {
+    it('should fuzzy match case properties and normalize fields', () => {
+      const raw = {
+        CINO: 'UPBR010031532014',
+        type_name: 'Sessions Trial',
+        district_name: 'Bareilly',
+        state_name: 'Uttar Pradesh',
+        "police-station": 'Baradari',
+        "under-section": '302 IPC',
+        date_next_list: '15-07-2026',
+        "judge-name": 'XIII th ADJ',
+        note: 'Some notes here'
+      };
+
+      const mapped = fuzzyMapCaseKeys(raw);
+      expect(mapped.CNRNumber).toBe('UPBR010031532014');
+      expect(mapped.case_type_name).toBe('Sessions Trial');
+      expect(mapped.district).toBe('Bareilly');
+      expect(mapped.state).toBe('Uttar Pradesh');
+      expect(mapped.policeStationName).toBe('Baradari');
+      expect(mapped.Undersection).toBe('302 IPC');
+      expect(mapped.NextDate).toBe('2026-07-15');
+      expect(mapped.JudgeName).toBe('XIII th ADJ');
+      expect(mapped.CaseNotes).toBe('Some notes here');
+    });
+  });
+
+  describe('checkDuplicateAndDiffCases', () => {
+    const existing = [
+      { id: 1, CNRNumber: 'UPBR010031532014', case_number: '100355/2014', court_name: 'XIII th ADJ', NextDate: '2026-07-15', CaseNotes: 'old note', ClientName: 'Client' }
+    ];
+
+    it('should detect updates when database fields differ from parsed case', () => {
+      const parsed = [
+        { CaseTitle: 'Test', ClientName: 'Client', FirstParty: 'Client', OppositeParty: 'Opposite', CNRNumber: 'UPBR010031532014', NextDate: '2026-07-20', CaseNotes: 'new note' }
+      ];
+
+      const result = checkDuplicateAndDiffCases(parsed, existing);
+      expect(result[0].alreadyExists).toBe(true);
+      expect(result[0].hasUpdates).toBe(true);
+      expect(result[0].dbCaseId).toBe(1);
+      expect(result[0].changes).toBeDefined();
+      expect(result[0].changes?.NextDate).toEqual({ oldValue: '2026-07-15', newValue: '2026-07-20' });
+      expect(result[0].changes?.CaseNotes).toEqual({ oldValue: 'old note', newValue: 'new note' });
+    });
+
+    it('should not detect updates if parsed case fields are identical to database', () => {
+      const parsed = [
+        { CaseTitle: 'Test', ClientName: 'Client', FirstParty: 'Client', OppositeParty: 'Opposite', CNRNumber: 'UPBR010031532014', NextDate: '2026-07-15', CaseNotes: 'old note' }
+      ];
+
+      const result = checkDuplicateAndDiffCases(parsed, existing);
+      expect(result[0].alreadyExists).toBe(true);
+      expect(result[0].hasUpdates).toBe(false);
+      expect(result[0].changes).toBeUndefined();
     });
   });
 });

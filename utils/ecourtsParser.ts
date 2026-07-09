@@ -2,6 +2,7 @@
  * Utility scripts and helpers for parsing public eCourts services data
  * from within the client-side WebView scraper modal.
  */
+import { fuzzyMapCaseKeys } from "./caseMapper";
 
 /**
  * Script injected into the WebView to extract raw DOM tables, headings, and acts.
@@ -481,7 +482,18 @@ export interface ParsedTextCase {
   CaseNotes?: string;
   Accussed?: string;
   CaseStatus?: string;
+  policeStationName?: string;
+  district?: string;
+  state?: string;
+  Undersection?: string;
+  dateFiled?: string;
+  JudgeName?: string;
+  OpposingCounsel?: string;
+  CaseDescription?: string;
   alreadyExists?: boolean;
+  hasUpdates?: boolean;
+  dbCaseId?: number;
+  changes?: Record<string, { oldValue: any; newValue: any }>;
 }
 
 export function checkDuplicateCases(
@@ -541,70 +553,7 @@ export function parseECourtsTxtFile(text: string): ParsedTextCase[] {
           }
 
           if (caseObj) {
-            const petName = caseObj.petparty_name || "";
-            const resName = caseObj.resparty_name || "";
-            let title = "";
-            if (petName && resName) {
-              title = `${petName} vs. ${resName}`;
-            } else {
-              title = petName || resName || caseObj.case_no || "Imported Case";
-            }
-
-            let nextDate = "";
-            if (caseObj.date_next_list) {
-              nextDate = caseObj.date_next_list;
-            }
-
-            let previousDate = "";
-            if (caseObj.date_last_list) {
-              previousDate = caseObj.date_last_list;
-            }
-
-            let court = "";
-            if (caseObj.court_no_desg_name || caseObj.establishment_name) {
-              court = caseObj.court_no_desg_name && caseObj.establishment_name
-                ? `${caseObj.court_no_desg_name}, ${caseObj.establishment_name}`
-                : (caseObj.court_no_desg_name || caseObj.establishment_name || "");
-            }
-
-            let caseNo = "";
-            if (caseObj.reg_no && caseObj.reg_year) {
-              caseNo = `${caseObj.reg_no}/${caseObj.reg_year}`;
-            } else {
-              caseNo = caseObj.case_no || "";
-            }
-
-            let accused = "";
-            const lowerType = (caseObj.type_name || "").toLowerCase();
-            const lowerPet = (petName || "").toLowerCase();
-            if (
-              lowerType.includes("criminal") ||
-              lowerType.includes("trial") ||
-              lowerType.includes("bail") ||
-              lowerType.includes("state") ||
-              lowerPet.includes("state") ||
-              lowerPet.includes("govt") ||
-              lowerPet.includes("sarkar")
-            ) {
-              accused = resName;
-            }
-
-            cases.push({
-              CaseTitle: title,
-              ClientName: petName || "Client",
-              FirstParty: petName || "Client",
-              OppositeParty: resName || "Opposite Party",
-              CNRNumber: caseObj.cino || undefined,
-              case_number: caseNo || undefined,
-              case_year: caseObj.reg_year ? caseObj.reg_year.toString() : undefined,
-              court_name: court || undefined,
-              case_type_name: caseObj.type_name || undefined,
-              NextDate: nextDate || undefined,
-              PreviousDate: previousDate || undefined,
-              CaseNotes: caseObj.note || undefined,
-              Accussed: accused || undefined,
-              CaseStatus: caseObj.date_of_decision ? "Closed" : "Active",
-            });
+            cases.push(fuzzyMapCaseKeys(caseObj));
           }
         }
         if (cases.length > 0) {

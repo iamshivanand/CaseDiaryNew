@@ -246,6 +246,26 @@ export const bulkInsertCases = async (
       const c = cases[i];
       const uniqueId = c.uniqueId || `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
+      let districtId: number | null = null;
+      if (c.district && c.district.trim() !== "") {
+        const distName = c.district.trim();
+        const stateName = c.state ? c.state.trim() : null;
+        
+        const dist = await db.getFirstAsync<{ id: number }>(
+          "SELECT id FROM Districts WHERE LOWER(name) = LOWER(?)",
+          [distName]
+        );
+        if (dist) {
+          districtId = dist.id;
+        } else {
+          const res = await db.runAsync(
+            "INSERT OR IGNORE INTO Districts (name, state, user_id) VALUES (?, ?, ?)",
+            [distName, stateName, userId ?? null]
+          );
+          districtId = res.lastInsertRowId;
+        }
+      }
+
       let policeStationId: number | null = null;
       if (c.policeStationName && c.policeStationName.trim() !== "") {
         const psName = c.policeStationName.trim();
@@ -256,57 +276,103 @@ export const bulkInsertCases = async (
         );
         if (ps) {
           policeStationId = ps.id;
+          if (districtId) {
+            await db.runAsync(
+              "UPDATE PoliceStations SET district_id = ? WHERE id = ? AND district_id IS NULL",
+              [districtId, ps.id]
+            );
+          }
         } else {
           const res = await db.runAsync(
-            "INSERT OR IGNORE INTO PoliceStations (name, user_id) VALUES (?, ?)",
-            [psName, userId ?? null]
+            "INSERT OR IGNORE INTO PoliceStations (name, district_id, user_id) VALUES (?, ?, ?)",
+            [psName, districtId, userId ?? null]
           );
           policeStationId = res.lastInsertRowId;
         }
       }
 
-      await db.runAsync(
-        `INSERT INTO Cases (
-          uniqueId, user_id, CaseTitle, ClientName, OnBehalfOf, CNRNumber,
-          case_number, case_year, court_name, case_type_name, dateFiled,
-          NextDate, PreviousDate, StatuteOfLimitations, crime_number, crime_year,
-          police_station_id, Undersection, FirstParty, OppositeParty, Accussed,
-          ClientContactNumber, JudgeName, OpposingCounsel, CaseStatus, Priority,
-          CaseDescription, CaseNotes, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          uniqueId,
-          userId ?? null,
-          c.CaseTitle || (c.FirstParty && c.OppositeParty ? `${c.FirstParty} vs. ${c.OppositeParty}` : "Untitled Case"),
-          c.ClientName || null,
-          c.OnBehalfOf || null,
-          c.CNRNumber || null,
-          c.case_number || null,
-          c.case_year ? parseInt(c.case_year.toString(), 10) : null,
-          c.court_name || null,
-          c.case_type_name || null,
-          c.dateFiled || null,
-          c.NextDate || null,
-          c.PreviousDate || null,
-          c.StatuteOfLimitations || null,
-          c.crime_number || null,
-          c.crime_year ? parseInt(c.crime_year.toString(), 10) : null,
-          policeStationId,
-          c.Undersection || null,
-          c.FirstParty || null,
-          c.OppositeParty || null,
-          c.Accussed || null,
-          c.ClientContactNumber || null,
-          c.JudgeName || null,
-          c.OpposingCounsel || null,
-          c.CaseStatus || "Open",
-          c.Priority || "Medium",
-          c.CaseDescription || null,
-          c.CaseNotes || null,
-          new Date().toISOString(),
-          new Date().toISOString()
-        ]
-      );
+      if (c.dbCaseId) {
+        // Dynamic UPDATE for existing case updates/merging
+        const updateFields: string[] = [];
+        const updateValues: any[] = [];
+
+        const addUpdateField = (dbCol: string, val: any) => {
+          if (val !== undefined && val !== null) {
+            updateFields.push(`${dbCol} = ?`);
+            updateValues.push(val);
+          }
+        };
+
+        addUpdateField("NextDate", c.NextDate);
+        addUpdateField("PreviousDate", c.PreviousDate);
+        addUpdateField("CaseNotes", c.CaseNotes);
+        addUpdateField("court_name", c.court_name);
+        addUpdateField("case_type_name", c.case_type_name);
+        addUpdateField("Undersection", c.Undersection);
+        addUpdateField("Accussed", c.Accussed);
+        addUpdateField("ClientName", c.ClientName);
+        addUpdateField("CaseStatus", c.CaseStatus);
+        addUpdateField("JudgeName", c.JudgeName);
+        addUpdateField("OpposingCounsel", c.OpposingCounsel);
+        addUpdateField("CaseDescription", c.CaseDescription);
+
+        if (c.policeStationName && policeStationId) {
+          addUpdateField("police_station_id", policeStationId);
+        }
+
+        if (updateFields.length > 0) {
+          updateValues.push(new Date().toISOString());
+          updateValues.push(c.dbCaseId);
+          await db.runAsync(
+            `UPDATE Cases SET ${updateFields.join(", ")}, updated_at = ? WHERE id = ?`,
+            updateValues
+          );
+        }
+      } else {
+        // Standard INSERT query for new cases
+        await db.runAsync(
+          `INSERT INTO Cases (
+            uniqueId, user_id, CaseTitle, ClientName, OnBehalfOf, CNRNumber,
+            case_number, case_year, court_name, case_type_name, dateFiled,
+            NextDate, PreviousDate, StatuteOfLimitations, crime_number, crime_year,
+            police_station_id, Undersection, FirstParty, OppositeParty, Accussed,
+            ClientContactNumber, JudgeName, OpposingCounsel, CaseStatus, Priority,
+            CaseDescription, CaseNotes, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            uniqueId,
+            userId ?? null,
+            c.CaseTitle || (c.FirstParty && c.OppositeParty ? `${c.FirstParty} vs. ${c.OppositeParty}` : "Untitled Case"),
+            c.ClientName || null,
+            c.OnBehalfOf || null,
+            c.CNRNumber || null,
+            c.case_number || null,
+            c.case_year ? parseInt(c.case_year.toString(), 10) : null,
+            c.court_name || null,
+            c.case_type_name || null,
+            c.dateFiled || null,
+            c.NextDate || null,
+            c.PreviousDate || null,
+            c.StatuteOfLimitations || null,
+            c.crime_number || null,
+            c.crime_year ? parseInt(c.crime_year.toString(), 10) : null,
+            policeStationId,
+            c.Undersection || null,
+            c.FirstParty || null,
+            c.OppositeParty || null,
+            c.Accussed || null,
+            c.ClientContactNumber || null,
+            c.JudgeName || null,
+            c.OpposingCounsel || null,
+            c.CaseStatus || "Open",
+            c.Priority || "Medium",
+            c.CaseDescription || null,
+            c.CaseNotes || null,
+            new Date().toISOString(),
+            new Date().toISOString()
+          ]
+        );
+      }
 
       insertCount++;
       if (onProgress) {
