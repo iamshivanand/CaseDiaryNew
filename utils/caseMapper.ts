@@ -99,6 +99,14 @@ export function fuzzyMapCaseKeys(rawCase: Record<string, any>): ParsedTextCase {
   if (result.case_number !== undefined && result.case_number !== null) {
     result.case_number = String(result.case_number);
   }
+  // Ensure district is a string
+  if (result.district !== undefined && result.district !== null) {
+    result.district = String(result.district);
+  }
+  // Ensure state is a string
+  if (result.state !== undefined && result.state !== null) {
+    result.state = String(result.state);
+  }
 
   // Handle default title if missing
   if (!result.CaseTitle) {

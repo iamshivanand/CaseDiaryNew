@@ -45,6 +45,7 @@ export const getAddCaseStyles = (theme: Theme) => StyleSheet.create({
   groupTitle: {
     fontSize: 16,
     fontWeight: 'bold',
+    flex: 1,
   },
   modalOverlay: {
     flex: 1,

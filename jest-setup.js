@@ -204,3 +204,15 @@ jest.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',
   nativeBuildVersion: '1',
 }));
+
+// Mock for expo-camera
+jest.mock('expo-camera', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const CameraView = (props) => React.createElement(View, props);
+  const useCameraPermissions = () => [{ granted: true, status: 'granted' }, jest.fn(() => Promise.resolve({ granted: true }))];
+  return {
+    CameraView,
+    useCameraPermissions,
+  };
+}, { virtual: true });

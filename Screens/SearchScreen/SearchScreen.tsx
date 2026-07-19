@@ -46,13 +46,11 @@ const SearchScreen: React.FC = () => {
         return;
       }
       // 1. Add timeline event
-      if (notes) {
-        await db.addCaseTimelineEvent({
-          case_id: caseId,
-          hearing_date: new Date().toISOString(),
-          notes: notes,
-        });
-      }
+      await db.addCaseTimelineEvent({
+        case_id: caseId,
+        hearing_date: new Date().toISOString(),
+        notes: notes || "",
+      });
 
       // 2. Update case's next hearing date
       await db.updateCase(caseId, {
@@ -109,16 +107,12 @@ const SearchScreen: React.FC = () => {
             data={results}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
-            initialNumToRender={6}
-            maxToRenderPerBatch={4}
-            windowSize={3}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={7}
+            removeClippedSubviews={Platform.OS === 'android'}
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
-            getItemLayout={(data, index) => ({
-              length: 154, // Accurate height of NewCaseCard
-              offset: 154 * index,
-              index,
-            })}
             contentContainerStyle={styles.listContentContainer}
             ListEmptyComponent={() => {
               if (!hasSearched) {

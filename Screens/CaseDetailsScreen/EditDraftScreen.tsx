@@ -4,6 +4,8 @@ import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import React, { useState, useEffect, useRef, useContext } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import ActionButton from "../CommonComponents/ActionButton";
 import {
   View,
   StyleSheet,
@@ -46,7 +48,7 @@ const EditDraftScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<EditDraftScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const styles = getStyles(theme);
 
   const {
@@ -93,6 +95,67 @@ const EditDraftScreen: React.FC = () => {
   const [isVocabularyVisible, setIsVocabularyVisible] = useState(false);
   const [isSignatureListVisible, setIsSignatureListVisible] = useState(false);
   const [vocabSearchQuery, setVocabSearchQuery] = useState("");
+  const [showTour, setShowTour] = useState(false);
+  const [tourStepIndex, setTourStepIndex] = useState(0);
+
+  const tourSteps = [
+    {
+      title: locale === "hi" ? "दस्तावेज़ संपादक मार्गदर्शिका" : "Document Editor Guide",
+      description: locale === "hi"
+        ? "आपका स्वागत है! आइए इस नए लाइव एडिटर की मुख्य विशेषताओं का जल्दी से परिचय लें।"
+        : "Welcome! Let's take a quick tour of the key features in this document editor.",
+      icon: "book-outline",
+    },
+    {
+      title: locale === "hi" ? "लाइव स्वरूपण (Formatting) उपकरण" : "Formatting Tools",
+      description: locale === "hi"
+        ? "बोल्ड, इटैलिक, अंडरलाइन, संरेखण (alignment), और बुलेट/नंबर सूचियों का उपयोग करके अपने दस्तावेज़ को तुरंत स्वरूपित करें।"
+        : "Format your text instantly using Bold, Italic, Underline, alignments, and lists in the formatting toolbar.",
+      icon: "text-outline",
+    },
+    {
+      title: locale === "hi" ? "पेज सेटअप और मार्जिन" : "Page Setup & Margins",
+      description: locale === "hi"
+        ? "पेज साइज (A4 बनाम Legal), फ़ॉन्ट आकार, लाइन स्पेसिंग, और रेड लेज़र मार्जिन लाइनों को आवश्यकतानुसार समायोजित करें।"
+        : "Configure paper size (A4 vs Legal), active fonts, margins, line spacing, and print properties easily.",
+      icon: "settings-outline",
+    },
+    {
+      title: locale === "hi" ? "पेज ब्रेक जोड़ना" : "Insert Page Breaks",
+      description: locale === "hi"
+        ? "नई 'पेज ब्रेक' सुविधा से दस्तावेज़ को अलग-अलग पेजों में विभाजित करें ताकि प्रिंट या पीडीएफ में पेज सही जगह से कटें।"
+        : "Use the new Page Break feature to insert page dividers. The generated PDF will cleanly break the page at these points.",
+      icon: "layers-outline",
+    },
+    {
+      title: locale === "hi" ? "स्मार्ट प्लेसहोल्डर्स" : "Smart Placeholders",
+      description: locale === "hi"
+        ? "दस्तावेज़ में मौजूद [Client Name] जैसे कोष्ठक वाले शब्दों पर केवल एक बार टैप करके उन्हें आसानी से बदलें।"
+        : "Tap on any bracketed text like [Client Name] or lines like _____ to open a quick fill popup and replace them instantly.",
+      icon: "create-outline",
+    },
+    {
+      title: locale === "hi" ? "टेम्पलेट के रूप में सहेजें" : "Save as Template",
+      description: locale === "hi"
+        ? "इस दस्तावेज़ को एक नए कस्टम टेम्पलेट के रूप में सहेजें, ताकि भविष्य में किसी भी केस के लिए इसका पुनः उपयोग किया जा सके!"
+        : "Save your customized drafts as reusable custom templates. Next time, they will automatically fill in details for new cases!",
+      icon: "save-outline",
+    },
+  ];
+
+  useEffect(() => {
+    const checkTourSeen = async () => {
+      try {
+        const seen = await AsyncStorage.getItem("@editor_tour_seen");
+        if (seen !== "true") {
+          setShowTour(true);
+        }
+      } catch (e) {
+        console.warn("AsyncStorage read error", e);
+      }
+    };
+    checkTourSeen();
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -738,6 +801,33 @@ const EditDraftScreen: React.FC = () => {
             >
               <Ionicons
                 name="add-circle-outline"
+                size={18}
+                color={theme.colors.text}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.toolbarButton}
+              onPress={() => triggerFormat("insertPageBreak")}
+              title="Page Break"
+            >
+              <Ionicons
+                name="layers-outline"
+                size={18}
+                color={theme.colors.text}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.toolbarButton}
+              onPress={() => {
+                setTourStepIndex(0);
+                setShowTour(true);
+              }}
+              title="Help Tour"
+            >
+              <Ionicons
+                name="help-circle-outline"
                 size={18}
                 color={theme.colors.text}
               />
@@ -1895,6 +1985,130 @@ const EditDraftScreen: React.FC = () => {
                 </View>
               ))}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Walkthrough Tour Modal */}
+      <Modal
+        visible={showTour}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTour(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { padding: 24, maxWidth: 340 }]}>
+            <View style={{ alignItems: "center", marginBottom: 16 }}>
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: `${theme.colors.primary}15`,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <Ionicons
+                  name={tourSteps[tourStepIndex].icon as any}
+                  size={32}
+                  color={theme.colors.primary}
+                />
+              </View>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "bold",
+                  color: theme.colors.text,
+                  textAlign: "center",
+                  marginBottom: 8,
+                }}
+              >
+                {tourSteps[tourStepIndex].title}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: theme.colors.textSecondary,
+                  textAlign: "center",
+                  lineHeight: 20,
+                }}
+              >
+                {tourSteps[tourStepIndex].description}
+              </Text>
+            </View>
+
+            {/* Pagination Indicators */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "center",
+                gap: 6,
+                marginBottom: 24,
+              }}
+            >
+              {tourSteps.map((_, i) => (
+                <View
+                  key={i}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor:
+                      i === tourStepIndex
+                        ? theme.colors.primary
+                        : `${theme.colors.textSecondary}30`,
+                  }}
+                />
+              ))}
+            </View>
+
+            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+              {tourStepIndex > 0 ? (
+                <View style={{ flex: 1 }}>
+                  <ActionButton
+                    title={locale === "hi" ? "पीछे" : "Back"}
+                    onPress={() => setTourStepIndex((prev) => prev - 1)}
+                    type="secondary"
+                  />
+                </View>
+              ) : (
+                <View style={{ flex: 1 }}>
+                  <ActionButton
+                    title={locale === "hi" ? "छोड़ें" : "Skip"}
+                    onPress={async () => {
+                      try {
+                        await AsyncStorage.setItem("@editor_tour_seen", "true");
+                      } catch (e) {}
+                      setShowTour(false);
+                    }}
+                    type="secondary"
+                  />
+                </View>
+              )}
+
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={
+                    tourStepIndex === tourSteps.length - 1
+                      ? locale === "hi" ? "समाप्त" : "Finish"
+                      : locale === "hi" ? "आगे" : "Next"
+                  }
+                  onPress={async () => {
+                    if (tourStepIndex < tourSteps.length - 1) {
+                      setTourStepIndex((prev) => prev + 1);
+                    } else {
+                      try {
+                        await AsyncStorage.setItem("@editor_tour_seen", "true");
+                      } catch (e) {}
+                      setShowTour(false);
+                    }
+                  }}
+                  type="primary"
+                />
+              </View>
+            </View>
           </View>
         </View>
       </Modal>

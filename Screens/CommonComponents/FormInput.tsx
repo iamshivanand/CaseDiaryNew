@@ -9,12 +9,14 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getFormInputStyles } from "./FormInputStyle";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import SuggestionInput from "./SuggestionsInput";
 import { getHindiCandidates } from "../../utils/transliterationService";
+import * as Contacts from "expo-contacts";
 
 interface FormInputProps extends Omit<TextInputProps, 'onChangeText' | 'value'> {
   label: string;
@@ -28,6 +30,7 @@ interface FormInputProps extends Omit<TextInputProps, 'onChangeText' | 'value'> 
   error?: string | null;
   suggestions?: string[];
   allowTransliteration?: boolean;
+  showContactPicker?: boolean;
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -43,6 +46,7 @@ const FormInput: React.FC<FormInputProps> = ({
   style,
   suggestions,
   allowTransliteration: explicitAllowTransliteration,
+  showContactPicker = false,
   ...rest
 }) => {
   const { theme } = useContext(ThemeContext);
@@ -153,10 +157,41 @@ const FormInput: React.FC<FormInputProps> = ({
     }
   };
 
+  const handleContactPick = async () => {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status === "granted") {
+        const contact = await Contacts.presentContactPickerAsync();
+        if (contact) {
+          const phoneNumbers = contact.phoneNumbers || [];
+          if (phoneNumbers.length > 0) {
+            let selectedNumber = phoneNumbers[0].number || "";
+            // Clean up formatting
+            selectedNumber = selectedNumber
+              .replace(/\s+/g, "")
+              .replace(/-+/g, "")
+              .replace(/\(+/g, "")
+              .replace(/\)+/g, "");
+            if (onChangeText) {
+              onChangeText(selectedNumber);
+            }
+          } else {
+            Alert.alert("No Phone Number", "The selected contact does not have a phone number.");
+          }
+        }
+      } else {
+        Alert.alert("Permission Denied", "Permission to access contacts is required to use this option.");
+      }
+    } catch (e) {
+      console.error("Error picking contact", e);
+      Alert.alert("Error", "Could not load phone contact list.");
+    }
+  };
+
   return (
     <View style={styles.inputContainer}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <Text style={[styles.label, { marginBottom: 0, flex: 1, marginRight: 8 }]} numberOfLines={1} ellipsizeMode="tail">{label}</Text>
+        <Text style={[styles.label, { marginBottom: 0, flex: 1, marginRight: 8 }]}>{label}</Text>
         {allowTransliteration && (
           <TouchableOpacity
             onPress={() => {
@@ -194,23 +229,45 @@ const FormInput: React.FC<FormInputProps> = ({
         )}
       </View>
 
-      <TextInput
-        style={[
-          styles.textInput,
-          multiline ? styles.textInputMultiline : { height: 48 },
-          error ? { borderColor: theme.colors.danger } : {},
-          style,
-        ]}
-        value={value}
-        onChangeText={handleTextChange}
-        placeholder={placeholder}
-        keyboardType={keyboardType}
-        secureTextEntry={secureTextEntry}
-        multiline={multiline}
-        numberOfLines={multiline ? numberOfLines || 4 : 1}
-        placeholderTextColor={theme.colors.textSecondary}
-        {...rest}
-      />
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <TextInput
+          style={[
+            styles.textInput,
+            { flex: 1 },
+            multiline ? styles.textInputMultiline : { height: 48 },
+            error ? { borderColor: theme.colors.danger } : {},
+            style,
+          ]}
+          value={value}
+          onChangeText={handleTextChange}
+          placeholder={placeholder}
+          keyboardType={keyboardType}
+          secureTextEntry={secureTextEntry}
+          multiline={multiline}
+          numberOfLines={multiline ? numberOfLines || 4 : 1}
+          placeholderTextColor={theme.colors.textSecondary}
+          {...rest}
+        />
+        {showContactPicker && (
+          <TouchableOpacity
+            onPress={handleContactPick}
+            style={{
+              paddingHorizontal: 12,
+              backgroundColor: theme.colors.primary + "15",
+              borderRadius: 8,
+              marginLeft: 8,
+              borderWidth: 1,
+              borderColor: theme.colors.primary,
+              height: 48,
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="person-add-outline" size={20} color={theme.colors.primary} />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {isTransliterationActive && candidates.length > 0 && (
         <View style={styles.candidatesContainer}>

@@ -124,6 +124,7 @@ const EditCaseScreen: React.FC = () => {
   const [otherCourt, setOtherCourt] = useState("");
   const [otherCaseType, setOtherCaseType] = useState("");
   const [userId, setUserId] = useState<number | null>(null);
+  const [originalCase, setOriginalCase] = useState<CaseWithDetails | null>(null);
 
   const handleDistrictChange = async (districtId: any, activeUserId?: number | null) => {
     try {
@@ -158,6 +159,7 @@ const EditCaseScreen: React.FC = () => {
       OnBehalfOf: dbCase.OnBehalfOf,
       CNRNumber: dbCase.CNRNumber,
       case_number: dbCase.case_number,
+      case_year: dbCase.case_year !== undefined && dbCase.case_year !== null ? dbCase.case_year.toString() : "",
       court_id: dbCase.court_id,
       court_name: dbCase.court_name,
       case_type_id: dbCase.case_type_id,
@@ -328,6 +330,7 @@ const EditCaseScreen: React.FC = () => {
           const mappedState = mapDbCaseToFormState(fetchedCase);
           mappedState.district_id = initialDistrictId || "";
           setCaseData(mappedState);
+          setOriginalCase(fetchedCase);
 
           await handleDistrictChange(initialDistrictId, activeUserId);
 
@@ -366,200 +369,254 @@ const EditCaseScreen: React.FC = () => {
       Alert.alert(t("editcase_val_error"), t("editcase_val_title_req"));
       return;
     }
-    setIsSaving(true);
-    let overallSuccess = true;
-    const crimeNo = caseData.crime_number && caseData.crime_number.trim() ? caseData.crime_number.trim() : null;
-    const crimeYr = caseData.crime_year && caseData.crime_year.toString().trim() ? parseInt(caseData.crime_year.toString().trim(), 10) : null;
-    try {
-      let courtId = caseData.court_id || null;
-      let courtNameForDb = caseData.court_name || null;
-      if (courtId === "Other") {
-        if (otherCourt.trim()) {
-          const newId = await db.addCourt(otherCourt.trim(), userId);
-          courtId = newId;
-          courtNameForDb = otherCourt.trim();
-        } else {
-          courtId = null;
-        }
-      } else {
-        courtId = courtId ? Number(courtId) : null;
-        const selectedCourtOption = courtOptions.find(
-          (opt) => opt.value === courtId
-        );
-        courtNameForDb = selectedCourtOption?.label || caseData.court_name || null;
-      }
 
-      let caseTypeId = caseData.case_type_id || null;
-      let caseTypeNameForDb = caseData.case_type_name || null;
-      if (caseTypeId === "Other") {
-        if (otherCaseType.trim()) {
-          const newId = await db.addCaseType(otherCaseType.trim(), userId);
-          caseTypeId = newId;
-          caseTypeNameForDb = otherCaseType.trim();
-        } else {
-          caseTypeId = null;
-        }
-      } else {
-        caseTypeId = caseTypeId ? Number(caseTypeId) : null;
-        const selectedCaseTypeOption = caseTypeOptions.find(
-          (opt) => opt.value === caseTypeId
-        );
-        caseTypeNameForDb = selectedCaseTypeOption?.label || caseData.case_type_name || null;
-      }
+    // Validation: Do not allow previously set dates to be cleared
+    const originalDateFiled = originalCase?.dateFiled;
+    const newDateFiled = caseData.FiledDate;
+    if (originalDateFiled && originalDateFiled !== "N/A" && originalDateFiled !== "Invalid Date" && (!newDateFiled || newDateFiled.trim() === "")) {
+      Alert.alert(t("editcase_val_error"), "Date Filed is required and cannot be cleared.");
+      return;
+    }
 
-      let districtId = caseData.district_id || null;
-      if (districtId === "Other") {
-        if (otherDistrict.trim()) {
-          const newId = await db.addDistrict(otherDistrict.trim(), null, userId);
-          districtId = newId;
-        } else {
-          districtId = null;
-        }
-      } else {
-        districtId = districtId ? Number(districtId) : null;
-      }
+    const originalNextDate = originalCase?.NextDate;
+    const newNextDate = caseData.HearingDate;
+    if (originalNextDate && originalNextDate !== "N/A" && originalNextDate !== "Invalid Date" && (!newNextDate || newNextDate.trim() === "")) {
+      Alert.alert(t("editcase_val_error"), "Hearing Date is required and cannot be cleared.");
+      return;
+    }
 
-      let policeStationId = caseData.police_station_id || null;
-      if (policeStationId === "Other") {
-        if (otherPoliceStation.trim()) {
-          const newId = await db.addPoliceStation(otherPoliceStation.trim(), districtId, userId);
-          policeStationId = newId;
-        } else {
-          policeStationId = null;
-        }
-      } else {
-        policeStationId = policeStationId ? Number(policeStationId) : null;
-      }
-
-      const updatePayload: db.CaseUpdateData = {
-        CaseTitle: caseData.CaseTitle,
-        ClientName: caseData.ClientName,
-        OnBehalfOf: caseData.OnBehalfOf,
-        CNRNumber: caseData.CNRNumber,
-        case_number: caseData.case_number,
-        court_id: courtId,
-        court_name: courtNameForDb,
-        case_type_id: caseTypeId,
-        case_type_name: caseTypeNameForDb,
-        dateFiled: caseData.FiledDate || caseData.dateFiled,
-        JudgeName: caseData.JudgeName,
-        OpposingCounsel: caseData.OpposingCounsel,
-        OppositeAdvocate: caseData.OppositeAdvocate,
-        CaseStatus: caseData.Status || caseData.CaseStatus,
-        Priority: caseData.Priority,
-        NextDate: caseData.HearingDate || caseData.NextDate,
-        StatuteOfLimitations: caseData.StatuteOfLimitations,
-        ClosedDate: caseData.ClosedDate,
-        FirstParty: caseData.FirstParty,
-        OppositeParty: caseData.OppositeParty,
-        ClientContactNumber: caseData.ClientContactNumber,
-        Accussed: caseData.Accussed,
-        Undersection: caseData.Undersection,
-        police_station_id: policeStationId,
-        OppAdvocateContactNumber: caseData.OppAdvocateContactNumber,
-        PreviousDate: caseData.PreviousDate,
-        CaseDescription: caseData.CaseDescription,
-        CaseNotes: caseData.CaseNotes,
-        case_year: caseData.case_year ? Number(caseData.case_year) : null,
-        crime_number: crimeNo,
-        crime_year: crimeYr,
-      };
-      Object.keys(updatePayload).forEach((key) => {
-        if (updatePayload[key as keyof db.CaseUpdateData] === undefined)
-          delete updatePayload[key as keyof db.CaseUpdateData];
-      });
-
-      const caseUpdateSuccess = await db.updateCase(
-        caseData.id as number,
-        updatePayload
-      );
-      if (caseUpdateSuccess) {
-        console.log("Case data updated.");
-        // Document processing
-        const newDocsToUpload = documents.filter(
-          (doc) => doc.uri && typeof doc.id === "number" && doc.id > 1000000
-        );
-        for (const newDoc of newDocsToUpload) {
-          /* ... db.uploadCaseDocument ... */
-          try {
-            const uploadedDocId = await db.uploadCaseDocument({
-              caseId: caseData.id as number,
-              originalFileName: newDoc.fileName,
-              fileType: newDoc.fileType || "application/octet-stream",
-              fileUri: newDoc.uri as string,
-              fileSize: newDoc.fileSize,
-              userId: userId,
-            });
-            if (!uploadedDocId) overallSuccess = false;
-          } catch (e) {
-            overallSuccess = false;
-            console.error("Doc upload error", e);
+    const executeSave = async (extraEvents: TimelineEvent[] = []) => {
+      setIsSaving(true);
+      let overallSuccess = true;
+      const crimeNo = caseData.crime_number && caseData.crime_number.trim() ? caseData.crime_number.trim() : null;
+      const crimeYr = caseData.crime_year && caseData.crime_year.toString().trim() ? parseInt(caseData.crime_year.toString().trim(), 10) : null;
+      try {
+        let courtId = caseData.court_id || null;
+        let courtNameForDb = caseData.court_name || null;
+        if (courtId === "Other") {
+          if (otherCourt.trim()) {
+            const newId = await db.addCourt(otherCourt.trim(), userId);
+            courtId = newId;
+            courtNameForDb = otherCourt.trim();
+          } else {
+            courtId = null;
           }
-        }
-        // Timeline processing
-        for (const event of timelineEvents) {
-          if (typeof caseData.id !== "number") continue; // Should not happen here
-          if (event._status === "new" && event._clientSideId) {
-            try {
-              const newEventData: db.TimelineEventInsertData = {
-                case_id: caseData.id,
-                event_date: event.date,
-                description: event.description,
-                user_id: userId,
-              };
-              await db.addTimelineEvent(newEventData);
-            } catch (e) {
-              overallSuccess = false;
-              console.error("Timeline add error", e);
-            }
-          } else if (
-            event._status === "modified" &&
-            typeof event.id === "number"
-          ) {
-            try {
-              await db.updateTimelineEvent(event.id, {
-                event_date: event.date,
-                description: event.description,
-              });
-            } catch (e) {
-              overallSuccess = false;
-              console.error("Timeline update error", e);
-            }
-          } else if (
-            event._status === "deleted" &&
-            typeof event.id === "number"
-          ) {
-            try {
-              await db.deleteTimelineEvent(event.id);
-            } catch (e) {
-              overallSuccess = false;
-              console.error("Timeline delete error", e);
-            }
-          }
-        }
-        if (typeof caseData.id === "number") {
-          await loadDocuments(caseData.id); // Refresh docs
-          await loadTimelineEvents(caseData.id); // Refresh timeline
-        }
-        if (overallSuccess) {
-          Alert.alert(t("alert_success"), t("editcase_success_saved"));
-          navigation.goBack();
         } else {
-          Alert.alert(
-            t("editcase_partial_success"),
-            t("editcase_partial_success_desc")
+          courtId = courtId ? Number(courtId) : null;
+          const selectedCourtOption = courtOptions.find(
+            (opt) => opt.value === courtId
           );
+          courtNameForDb = selectedCourtOption?.label || caseData.court_name || null;
         }
-      } else {
+
+        let caseTypeId = caseData.case_type_id || null;
+        let caseTypeNameForDb = caseData.case_type_name || null;
+        if (caseTypeId === "Other") {
+          if (otherCaseType.trim()) {
+            const newId = await db.addCaseType(otherCaseType.trim(), userId);
+            caseTypeId = newId;
+            caseTypeNameForDb = otherCaseType.trim();
+          } else {
+            caseTypeId = null;
+          }
+        } else {
+          caseTypeId = caseTypeId ? Number(caseTypeId) : null;
+          const selectedCaseTypeOption = caseTypeOptions.find(
+            (opt) => opt.value === caseTypeId
+          );
+          caseTypeNameForDb = selectedCaseTypeOption?.label || caseData.case_type_name || null;
+        }
+
+        let districtId = caseData.district_id || null;
+        if (districtId === "Other") {
+          if (otherDistrict.trim()) {
+            const newId = await db.addDistrict(otherDistrict.trim(), null, userId);
+            districtId = newId;
+          } else {
+            districtId = null;
+          }
+        } else {
+          districtId = districtId ? Number(districtId) : null;
+        }
+
+        let policeStationId = caseData.police_station_id || null;
+        if (policeStationId === "Other") {
+          if (otherPoliceStation.trim()) {
+            const newId = await db.addPoliceStation(otherPoliceStation.trim(), districtId, userId);
+            policeStationId = newId;
+          } else {
+            policeStationId = null;
+          }
+        } else {
+          policeStationId = policeStationId ? Number(policeStationId) : null;
+        }
+
+        const updatePayload: db.CaseUpdateData = {
+          CaseTitle: caseData.CaseTitle,
+          ClientName: caseData.ClientName,
+          OnBehalfOf: caseData.OnBehalfOf,
+          CNRNumber: caseData.CNRNumber,
+          case_number: caseData.case_number,
+          court_id: courtId,
+          court_name: courtNameForDb,
+          case_type_id: caseTypeId,
+          case_type_name: caseTypeNameForDb,
+          dateFiled: caseData.FiledDate,
+          JudgeName: caseData.JudgeName,
+          OpposingCounsel: caseData.OpposingCounsel,
+          OppositeAdvocate: caseData.OppositeAdvocate,
+          CaseStatus: caseData.Status || caseData.CaseStatus,
+          Priority: caseData.Priority,
+          NextDate: caseData.HearingDate,
+          StatuteOfLimitations: caseData.StatuteOfLimitations,
+          ClosedDate: caseData.ClosedDate,
+          FirstParty: caseData.FirstParty,
+          OppositeParty: caseData.OppositeParty,
+          ClientContactNumber: caseData.ClientContactNumber,
+          Accussed: caseData.Accussed,
+          Undersection: caseData.Undersection,
+          police_station_id: policeStationId,
+          district_id: districtId,
+          OppAdvocateContactNumber: caseData.OppAdvocateContactNumber,
+          PreviousDate: caseData.PreviousDate,
+          CaseDescription: caseData.CaseDescription,
+          CaseNotes: caseData.CaseNotes,
+          case_year: caseData.case_year ? Number(caseData.case_year) : null,
+          crime_number: crimeNo,
+          crime_year: crimeYr,
+        };
+        Object.keys(updatePayload).forEach((key) => {
+          if (updatePayload[key as keyof db.CaseUpdateData] === undefined)
+            delete updatePayload[key as keyof db.CaseUpdateData];
+        });
+
+        const caseUpdateSuccess = await db.updateCase(
+          caseData.id as number,
+          updatePayload
+        );
+        if (caseUpdateSuccess) {
+          console.log("Case data updated.");
+          // Document processing
+          const newDocsToUpload = documents.filter(
+            (doc) => doc.uri && typeof doc.id === "number" && doc.id > 1000000
+          );
+          for (const newDoc of newDocsToUpload) {
+            try {
+              const uploadedDocId = await db.uploadCaseDocument({
+                caseId: caseData.id as number,
+                originalFileName: newDoc.fileName,
+                fileType: newDoc.fileType || "application/octet-stream",
+                fileUri: newDoc.uri as string,
+                fileSize: newDoc.fileSize,
+                userId: userId,
+              });
+              if (!uploadedDocId) overallSuccess = false;
+            } catch (e) {
+              overallSuccess = false;
+              console.error("Doc upload error", e);
+            }
+          }
+          // Timeline processing
+          const allTimelineEvents = [...timelineEvents, ...extraEvents];
+          for (const event of allTimelineEvents) {
+            if (typeof caseData.id !== "number") continue;
+            if (event._status === "new" && event._clientSideId) {
+              try {
+                const newEventData: db.CaseTimelineInsertData = {
+                  case_id: caseData.id,
+                  hearing_date: event.date,
+                  notes: event.description,
+                  user_id: userId,
+                };
+                await db.addCaseTimelineEvent(newEventData);
+              } catch (e) {
+                overallSuccess = false;
+                console.error("Timeline add error", e);
+              }
+            } else if (
+              event._status === "modified" &&
+              typeof event.id === "number"
+            ) {
+              try {
+                await db.updateCaseTimelineEvent(event.id, {
+                  hearing_date: event.date,
+                  notes: event.description,
+                });
+              } catch (e) {
+                overallSuccess = false;
+                console.error("Timeline update error", e);
+              }
+            } else if (
+              event._status === "deleted" &&
+              typeof event.id === "number"
+            ) {
+              try {
+                await db.deleteCaseTimelineEvent(event.id);
+              } catch (e) {
+                overallSuccess = false;
+                console.error("Timeline delete error", e);
+              }
+            }
+          }
+          if (typeof caseData.id === "number") {
+            await loadDocuments(caseData.id); // Refresh docs
+            await loadTimelineEvents(caseData.id); // Refresh timeline
+          }
+          if (overallSuccess) {
+            Alert.alert(t("alert_success"), t("editcase_success_saved"));
+            navigation.goBack();
+          } else {
+            Alert.alert(
+              t("editcase_partial_success"),
+              t("editcase_partial_success_desc")
+            );
+          }
+        } else {
+          overallSuccess = false;
+          Alert.alert(t("alert_error"), t("editcase_err_save_details"));
+        }
+      } catch (error) {
         overallSuccess = false;
-        Alert.alert(t("alert_error"), t("editcase_err_save_details"));
+        console.error("Error saving case:", error);
+        Alert.alert(t("alert_error"), t("editcase_err_general"));
+      } finally {
+        setIsSaving(false);
       }
-    } catch (error) {
-      overallSuccess = false;
-      console.error("Error saving case:", error);
-      Alert.alert(t("alert_error"), t("editcase_err_general"));
-    } finally {
-      setIsSaving(false);
+    };
+
+    // Check if hearing date changed but no new timeline event was added
+    const isHearingDateChanged = originalCase?.NextDate && caseData.HearingDate !== originalCase.NextDate;
+    const hasNewTimelineEvent = timelineEvents.some((event) => event._status === "new");
+
+    if (isHearingDateChanged && !hasNewTimelineEvent) {
+      Alert.alert(
+        "No Timeline Notes Added",
+        "You updated the next hearing date without adding any notes for today's hearing. Would you like to proceed or go back to add notes?",
+        [
+          {
+            text: "Go Back",
+            style: "cancel",
+          },
+          {
+            text: "Proceed",
+            style: "destructive",
+            onPress: () => {
+              // Add a default blank timeline event for this date change
+              const tempEvent: TimelineEvent = {
+                _clientSideId: uuidv4(),
+                id: `temp_${uuidv4()}`,
+                case_id: caseData.id as number,
+                date: new Date().toISOString(),
+                description: "",
+                _status: "new",
+              };
+              executeSave([tempEvent]);
+            },
+          },
+        ]
+      );
+    } else {
+      executeSave();
     }
   };
 
@@ -795,9 +852,9 @@ const EditCaseScreen: React.FC = () => {
   return (
     /* ... JSX for the screen ... */
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.screen}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 20}
     >
       <ScrollView
         style={styles.scrollView}
@@ -865,6 +922,7 @@ const EditCaseScreen: React.FC = () => {
               handleInputChange("ClientContactNumber", text)
             }
             keyboardType="phone-pad"
+            showContactPicker
           />
           <DropdownPicker
             label={t("field_case_type")}
@@ -920,6 +978,18 @@ const EditCaseScreen: React.FC = () => {
             label={t("field_opposing_counsel")}
             value={caseData.OpposingCounsel || ""}
             onChangeText={(text) => handleInputChange("OpposingCounsel", text)}
+          />
+          <FormInput
+            label="Opposing Advocate"
+            value={caseData.OppositeAdvocate || ""}
+            onChangeText={(text) => handleInputChange("OppositeAdvocate", text)}
+          />
+          <FormInput
+            label="Opposing Advocate Contact No."
+            value={caseData.OppAdvocateContactNumber || ""}
+            onChangeText={(text) => handleInputChange("OppAdvocateContactNumber", text)}
+            keyboardType="phone-pad"
+            showContactPicker
           />
           <DropdownPicker
             label={t("field_status")}

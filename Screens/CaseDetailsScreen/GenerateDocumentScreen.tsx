@@ -31,6 +31,8 @@ import {
   getDocumentDrafts,
   DocumentDraft,
   saveDocumentDraft,
+  getUserProfile,
+  getDb,
 } from "../../DataBase";
 import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
@@ -81,6 +83,13 @@ const categories = [
 ];
 
 const BUILT_IN_TEMPLATES = [
+  {
+    id: "built_in_blank_page",
+    template_type: "blank_page",
+    title: "Blank Template (Start from Scratch)",
+    category: "common",
+    isBuiltIn: true,
+  },
   {
     id: "built_in_vakalatnama",
     template_type: "vakalatnama",
@@ -224,6 +233,7 @@ const BUILT_IN_TEMPLATES = [
 ];
 
 const documentTypeColors: { [key: string]: string } = {
+  blank_page: "#6B7280",
   vakalatnama: "#10B981", // Emerald/Green
   adjournment: "#3B82F6", // Blue
   bail: "#F59E0B", // Amber
@@ -253,6 +263,12 @@ interface DocumentTypeOption {
 }
 
 const documentTypeOptions: DocumentTypeOption[] = [
+  // General / Blank
+  {
+    label: "Blank Template (Start from Scratch)",
+    value: "blank_page",
+    category: "common",
+  },
   // Civil (CPC)
   { label: "Plaint (Civil Suit)", value: "plaint", category: "civil" },
   {
@@ -376,6 +392,13 @@ const GenerateDocumentScreen: React.FC = () => {
   const [templateSearchQuery, setTemplateSearchQuery] = useState("");
   const [selectedTemplateCategory, setSelectedTemplateCategory] =
     useState("all");
+  const [categoriesList, setCategoriesList] = useState([
+    { label: locale === "hi" ? "सभी श्रेणियां" : "All Categories", value: "all" },
+    { label: locale === "hi" ? "सिविल (CPC)" : "Civil (CPC)", value: "civil" },
+    { label: locale === "hi" ? "क्रिमिनल (CrPC)" : "Criminal (CrPC)", value: "criminal" },
+    { label: locale === "hi" ? "कमर्शियल / ADR" : "Commercial / ADR", value: "commercial" },
+    { label: locale === "hi" ? "सामान्य दस्तावेज़" : "Common Docs", value: "common" },
+  ]);
 
   const [isTransitionFinished, setIsTransitionFinished] = useState(
     process.env.NODE_ENV === "test"
@@ -404,6 +427,9 @@ const GenerateDocumentScreen: React.FC = () => {
     if (route.params?.templateType) {
       setDocumentType(route.params.templateType);
       setIsTemplateSelected(true);
+      if (route.params.templateType === "blank_page") {
+        setActiveTab("preview");
+      }
       if (route.params.draftId) {
         const fetchDraftHtml = async () => {
           try {
@@ -437,6 +463,67 @@ const GenerateDocumentScreen: React.FC = () => {
   const [pageSize, setPageSize] = useState<"a4" | "legal">("legal");
   const [toolbarMode, setToolbarMode] = useState<"format" | "legal">("format");
   const [isVocabularyVisible, setIsVocabularyVisible] = useState(false);
+  const [showTour, setShowTour] = useState(false);
+  const [tourStepIndex, setTourStepIndex] = useState(0);
+
+  const tourSteps = [
+    {
+      title: locale === "hi" ? "दस्तावेज़ संपादक मार्गदर्शिका" : "Document Editor Guide",
+      description: locale === "hi"
+        ? "आपका स्वागत है! आइए इस नए लाइव एडिटर की मुख्य विशेषताओं का जल्दी से परिचय लें।"
+        : "Welcome! Let's take a quick tour of the key features in this document editor.",
+      icon: "book-outline",
+    },
+    {
+      title: locale === "hi" ? "लाइव स्वरूपण (Formatting) उपकरण" : "Formatting Tools",
+      description: locale === "hi"
+        ? "बोल्ड, इटैलिक, अंडरलाइन, संरेखण (alignment), और बुलेट/नंबर सूचियों का उपयोग करके अपने दस्तावेज़ को तुरंत स्वरूपित करें।"
+        : "Format your text instantly using Bold, Italic, Underline, alignments, and lists in the formatting toolbar.",
+      icon: "text-outline",
+    },
+    {
+      title: locale === "hi" ? "पेज सेटअप और मार्जिन" : "Page Setup & Margins",
+      description: locale === "hi"
+        ? "पेज साइज (A4 बनाम Legal), फ़ॉन्ट आकार, लाइन स्पेसिंग, और रेड लेज़र मार्जिन लाइनों को आवश्यकतानुसार समायोजित करें।"
+        : "Configure paper size (A4 vs Legal), active fonts, margins, line spacing, and print properties easily.",
+      icon: "settings-outline",
+    },
+    {
+      title: locale === "hi" ? "पेज ब्रेक जोड़ना" : "Insert Page Breaks",
+      description: locale === "hi"
+        ? "नई 'पेज ब्रेक' सुविधा से दस्तावेज़ को अलग-अलग पेजों में विभाजित करें ताकि प्रिंट या पीडीएफ में पेज सही जगह से कटें।"
+        : "Use the new Page Break feature to insert page dividers. The generated PDF will cleanly break the page at these points.",
+      icon: "layers-outline",
+    },
+    {
+      title: locale === "hi" ? "स्मार्ट प्लेसहोल्डर्स" : "Smart Placeholders",
+      description: locale === "hi"
+        ? "दस्तावेज़ में मौजूद [Client Name] जैसे कोष्ठक वाले शब्दों पर केवल एक बार टैप करके उन्हें आसानी से बदलें।"
+        : "Tap on any bracketed text like [Client Name] or lines like _____ to open a quick fill popup and replace them instantly.",
+      icon: "create-outline",
+    },
+    {
+      title: locale === "hi" ? "टेम्पलेट के रूप में सहेजें" : "Save as Template",
+      description: locale === "hi"
+        ? "इस दस्तावेज़ को एक नए कस्टम टेम्पलेट के रूप में सहेजें, ताकि भविष्य में किसी भी केस के लिए इसका पुनः उपयोग किया जा सके!"
+        : "Save your customized drafts as reusable custom templates. Next time, they will automatically fill in details for new cases!",
+      icon: "save-outline",
+    },
+  ];
+
+  useEffect(() => {
+    const checkTourSeen = async () => {
+      try {
+        const seen = await AsyncStorage.getItem("@editor_tour_seen");
+        if (seen !== "true") {
+          setShowTour(true);
+        }
+      } catch (e) {
+        console.warn("AsyncStorage read error", e);
+      }
+    };
+    checkTourSeen();
+  }, []);
   const [isSignatureListVisible, setIsSignatureListVisible] = useState(false);
   const [vocabSearchQuery, setVocabSearchQuery] = useState("");
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
@@ -523,7 +610,11 @@ const GenerateDocumentScreen: React.FC = () => {
             setHtmlContent("");
           }
           setIsTemplateSelected(true);
-          setActiveTab("fields");
+          if (item.template_type === "blank_page") {
+            setActiveTab("preview");
+          } else {
+            setActiveTab("fields");
+          }
         }}
       >
         <View
@@ -751,6 +842,9 @@ const GenerateDocumentScreen: React.FC = () => {
         case "caveat":
           label = t("docgen_opt_caveat");
           break;
+        case "blank_page":
+          label = t("docgen_opt_blank_page");
+          break;
         case "adjournment":
           label = t("docgen_opt_adjournment");
           break;
@@ -902,6 +996,49 @@ const GenerateDocumentScreen: React.FC = () => {
         if (cachedName) setAdvocateName(cachedName);
         if (cachedEnrollment) setAdvocateEnrollment(cachedEnrollment);
         if (cachedAddress) setAdvocateAddress(cachedAddress);
+
+        // Load lawyer's actual profile details to prioritize categories
+        const userIdVal = await AsyncStorage.getItem("@user_id");
+        if (userIdVal) {
+          const parsedUserId = parseInt(userIdVal, 10);
+          const dbInstance = await getDb();
+          const profile = await getUserProfile(dbInstance, parsedUserId);
+          if (profile && profile.practiceAreas && profile.practiceAreas.length > 0) {
+            const practiceAreasLower = profile.practiceAreas.map((p: string) => p.toLowerCase());
+            let matchedCategory: string | null = null;
+            for (const area of practiceAreasLower) {
+              if (area.includes("civil")) {
+                matchedCategory = "civil";
+                break;
+              } else if (area.includes("criminal")) {
+                matchedCategory = "criminal";
+                break;
+              } else if (area.includes("commercial") || area.includes("adr") || area.includes("arbitration") || area.includes("corporate")) {
+                matchedCategory = "commercial";
+                break;
+              }
+            }
+
+            if (matchedCategory) {
+              setSelectedTemplateCategory(matchedCategory);
+
+              // Reorder categoriesList to prioritize lawyer's matching category
+              const baseCategories = [
+                { label: locale === "hi" ? "सभी श्रेणियां" : "All Categories", value: "all" },
+                { label: locale === "hi" ? "सिविल (CPC)" : "Civil (CPC)", value: "civil" },
+                { label: locale === "hi" ? "क्रिमिनल (CrPC)" : "Criminal (CrPC)", value: "criminal" },
+                { label: locale === "hi" ? "कमर्शियल / ADR" : "Commercial / ADR", value: "commercial" },
+                { label: locale === "hi" ? "सामान्य दस्तावेज़" : "Common Docs", value: "common" },
+              ];
+
+              const matchedItem = baseCategories.find((c) => c.value === matchedCategory);
+              if (matchedItem) {
+                const rest = baseCategories.filter((c) => c.value !== matchedCategory);
+                setCategoriesList([matchedItem, ...rest]);
+              }
+            }
+          }
+        }
       } catch (error) {
         console.error("Failed to load details for document generator:", error);
       } finally {
@@ -983,6 +1120,21 @@ const GenerateDocumentScreen: React.FC = () => {
         return interpolateCustomHtml(selectedTpl.html_content);
       }
       return "";
+    }
+
+    if (documentType === "blank_page") {
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<p><br></p>
+</body>
+</html>`;
     }
 
     if (documentType === "vakalatnama") {
@@ -1704,7 +1856,7 @@ const GenerateDocumentScreen: React.FC = () => {
               borderBottomColor: theme.colors.border,
             }}
           >
-            {categories.map((cat) => {
+            {categoriesList.map((cat) => {
               const isSelected = selectedTemplateCategory === cat.value;
               return (
                 <TouchableOpacity
@@ -1783,58 +1935,60 @@ const GenerateDocumentScreen: React.FC = () => {
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       {/* Tab Selectors */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === "fields" && styles.activeTabButton,
-          ]}
-          onPress={() => handleTabChange("fields")}
-        >
-          <Ionicons
-            name="create-outline"
-            size={18}
-            color={
-              activeTab === "fields"
-                ? theme.colors.primary
-                : theme.colors.textSecondary
-            }
-          />
-          <Text
+      {documentType !== "blank_page" && (
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
             style={[
-              styles.tabText,
-              activeTab === "fields" && styles.activeTabText,
+              styles.tabButton,
+              activeTab === "fields" && styles.activeTabButton,
             ]}
+            onPress={() => handleTabChange("fields")}
           >
-            {locale === "hi" ? "फ़ॉर्म इनटेक" : "Form Intake"}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === "preview" && styles.activeTabButton,
-          ]}
-          onPress={() => handleTabChange("preview")}
-        >
-          <Ionicons
-            name="create"
-            size={18}
-            color={
-              activeTab === "preview"
-                ? theme.colors.primary
-                : theme.colors.textSecondary
-            }
-          />
-          <Text
+            <Ionicons
+              name="create-outline"
+              size={18}
+              color={
+                activeTab === "fields"
+                  ? theme.colors.primary
+                  : theme.colors.textSecondary
+              }
+            />
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "fields" && styles.activeTabText,
+              ]}
+            >
+              {locale === "hi" ? "फ़ॉर्म इनटेक" : "Form Intake"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[
-              styles.tabText,
-              activeTab === "preview" && styles.activeTabText,
+              styles.tabButton,
+              activeTab === "preview" && styles.activeTabButton,
             ]}
+            onPress={() => handleTabChange("preview")}
           >
-            {locale === "hi" ? "लाइव एडिटर" : "Live Editor"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+            <Ionicons
+              name="create"
+              size={18}
+              color={
+                activeTab === "preview"
+                  ? theme.colors.primary
+                  : theme.colors.textSecondary
+              }
+            />
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "preview" && styles.activeTabText,
+              ]}
+            >
+              {locale === "hi" ? "लाइव एडिटर" : "Live Editor"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {activeTab === "fields" ? (
         <ScrollView
@@ -2796,6 +2950,31 @@ const GenerateDocumentScreen: React.FC = () => {
               >
                 <Ionicons
                   name="add-circle-outline"
+                  size={18}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ padding: 8 }}
+                onPress={() => triggerFormat("insertPageBreak")}
+              >
+                <Ionicons
+                  name="layers-outline"
+                  size={18}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ padding: 8 }}
+                onPress={() => {
+                  setTourStepIndex(0);
+                  setShowTour(true);
+                }}
+              >
+                <Ionicons
+                  name="help-circle-outline"
                   size={18}
                   color={theme.colors.text}
                 />
@@ -4205,6 +4384,130 @@ const GenerateDocumentScreen: React.FC = () => {
           </Modal>
         </View>
       )}
+
+      {/* Walkthrough Tour Modal */}
+      <Modal
+        visible={showTour}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTour(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { padding: 24, maxWidth: 340 }]}>
+            <View style={{ alignItems: "center", marginBottom: 16 }}>
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: `${theme.colors.primary}15`,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <Ionicons
+                  name={tourSteps[tourStepIndex].icon as any}
+                  size={32}
+                  color={theme.colors.primary}
+                />
+              </View>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "bold",
+                  color: theme.colors.text,
+                  textAlign: "center",
+                  marginBottom: 8,
+                }}
+              >
+                {tourSteps[tourStepIndex].title}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: theme.colors.textSecondary,
+                  textAlign: "center",
+                  lineHeight: 20,
+                }}
+              >
+                {tourSteps[tourStepIndex].description}
+              </Text>
+            </View>
+
+            {/* Pagination Indicators */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "center",
+                gap: 6,
+                marginBottom: 24,
+              }}
+            >
+              {tourSteps.map((_, i) => (
+                <View
+                  key={i}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor:
+                      i === tourStepIndex
+                        ? theme.colors.primary
+                        : `${theme.colors.textSecondary}30`,
+                  }}
+                />
+              ))}
+            </View>
+
+            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+              {tourStepIndex > 0 ? (
+                <View style={{ flex: 1 }}>
+                  <ActionButton
+                    title={locale === "hi" ? "पीछे" : "Back"}
+                    onPress={() => setTourStepIndex((prev) => prev - 1)}
+                    type="secondary"
+                  />
+                </View>
+              ) : (
+                <View style={{ flex: 1 }}>
+                  <ActionButton
+                    title={locale === "hi" ? "छोड़ें" : "Skip"}
+                    onPress={async () => {
+                      try {
+                        await AsyncStorage.setItem("@editor_tour_seen", "true");
+                      } catch (e) {}
+                      setShowTour(false);
+                    }}
+                    type="secondary"
+                  />
+                </View>
+              )}
+
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={
+                    tourStepIndex === tourSteps.length - 1
+                      ? locale === "hi" ? "समाप्त" : "Finish"
+                      : locale === "hi" ? "आगे" : "Next"
+                  }
+                  onPress={async () => {
+                    if (tourStepIndex < tourSteps.length - 1) {
+                      setTourStepIndex((prev) => prev + 1);
+                    } else {
+                      try {
+                        await AsyncStorage.setItem("@editor_tour_seen", "true");
+                      } catch (e) {}
+                      setShowTour(false);
+                    }
+                  }}
+                  type="primary"
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };

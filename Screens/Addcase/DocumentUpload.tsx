@@ -304,6 +304,25 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
           {t("doc_btn_capture")}
         </Button>
       </View>
+      <View
+        style={{
+          paddingHorizontal: 4,
+          marginBottom: 8,
+        }}
+      >
+        <Button
+          mode="contained"
+          onPress={() => navigation.navigate("PdfScanner", { caseId })}
+          style={{
+            backgroundColor: "#10B981",
+            justifyContent: "center",
+          }}
+          icon="camera-enhance"
+          labelStyle={{ fontSize: 12 }}
+        >
+          Scan to PDF
+        </Button>
+      </View>
       {loading && documents.length === 0 ? (
         <ActivityIndicator animating size="large" style={styles.loader} />
       ) : (

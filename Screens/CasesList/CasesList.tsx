@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Platform,
 } from "react-native"; // Removed Dimensions, ScrollView
 
 import { ECourtsTextImportModal } from "./components/ECourtsTextImportModal";
@@ -194,13 +195,11 @@ const CasesList = () => {
           return;
         }
         // 1. Add timeline event
-        if (notes) {
-          await addCaseTimelineEvent({
-            case_id: caseId,
-            hearing_date: new Date().toISOString(),
-            notes,
-          });
-        }
+        await addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: new Date().toISOString(),
+          notes: notes || "",
+        });
 
         // 2. Update case's next hearing date
         await updateCase(
@@ -365,18 +364,14 @@ const CasesList = () => {
         data={cases}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
-        initialNumToRender={6}
-        maxToRenderPerBatch={4}
-        windowSize={3}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS === 'android'}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         refreshing={isRefreshing}
         onRefresh={handleRefresh}
-        getItemLayout={(data, index) => ({
-          length: 154, // Accurate height of memoized NewCaseCard (padding + margins + buttons)
-          offset: 154 * index,
-          index,
-        })}
         ListEmptyComponent={
           !isLoading ? (
             <View style={styles.emptyListContainer}>

@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, TextInput, Alert, Platform, StatusBar } from 'react-native';
 import PrimaryButton from './components/PrimaryButton';
 import InputField from './components/InputField';
 import { OnboardingContext } from '../../Providers/OnboardingProvider';
@@ -40,9 +40,32 @@ const PracticeAreasScreen = ({ navigation }) => {
     );
   };
 
+  const handleSkipAll = async () => {
+    console.log('Skip to dashboard pressed from PracticeAreasScreen');
+    try {
+      const db = await getDb();
+      const userId = await addUser(onboardingData.fullName || 'User', onboardingData.email || '');
+      if (userId) {
+        await updateUserProfile(db, userId, onboardingData);
+        await AsyncStorage.setItem('@onboarding_complete', 'true');
+        await AsyncStorage.setItem('@user_id', userId.toString());
+        emitter.emit('onboardingComplete');
+      }
+    } catch (error) {
+      console.error('Error completing onboarding during skip:', error);
+    }
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Text style={[styles.stepText, { color: theme.colors.textSecondary }]}>{t('onboarding_step_4_of_4')}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 10 : 0 }]}>
+      <TouchableOpacity 
+        style={{ position: 'absolute', top: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 15 : 20, right: 20, zIndex: 10 }}
+        onPress={handleSkipAll}
+      >
+        <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 16 }}>{t('btn_skip')}</Text>
+      </TouchableOpacity>
+
+      <Text style={[styles.stepText, { color: theme.colors.textSecondary, marginTop: 40 }]}>{t('onboarding_step_4_of_4')}</Text>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <Text style={[styles.title, { color: theme.colors.text }]}>{t('onboarding_select_areas')}</Text>
         <View style={styles.grid}>

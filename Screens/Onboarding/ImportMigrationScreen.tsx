@@ -21,6 +21,7 @@ import { parseCSV, bulkInsertCases } from '../../utils/backupManager';
 import { emitter } from '../../utils/event-emitter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addUser } from '../../DataBase';
+import { parseECourtsTxtFile } from '../../utils/ecourtsParser';
 
 interface RouteParams {
   isFromOnboarding?: boolean;
@@ -59,13 +60,15 @@ const ImportMigrationScreen: React.FC = () => {
   const [mappings, setMappings] = useState<{ [key: string]: string }>({});
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [successCount, setSuccessCount] = useState(0);
+  const [isTxtImport, setIsTxtImport] = useState(false);
 
   // File picker handler
   const handleSelectFile = async () => {
     setLoadingFile(true);
+    setIsTxtImport(false);
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/comma-separated-values', 'text/csv', 'application/json'],
+        type: ['text/comma-separated-values', 'text/csv', 'application/json', 'text/plain'],
         copyToCacheDirectory: true,
       });
 
@@ -80,6 +83,17 @@ const ImportMigrationScreen: React.FC = () => {
 
       let parsedHeaders: string[] = [];
       let rows: any[] = [];
+
+      if (fileName.endsWith('.txt')) {
+        const parsed = parseECourtsTxtFile(content);
+        if (parsed.length === 0) {
+          throw new Error("Could not find any case records in this file. Please verify the content.");
+        }
+        setParsedRows(parsed);
+        setIsTxtImport(true);
+        setStep(2);
+        return;
+      }
 
       if (fileName.endsWith('.json')) {
         const json = JSON.parse(content);
@@ -136,8 +150,8 @@ const ImportMigrationScreen: React.FC = () => {
 
   // Perform import
   const handleStartImport = async () => {
-    // Validate required mappings
-    if (mappings['CaseTitle'] === 'none') {
+    // Validate required mappings if not TXT import
+    if (!isTxtImport && mappings['CaseTitle'] === 'none') {
       Alert.alert(t("alert_warning"), "Case Title must be mapped to proceed.");
       return;
     }
@@ -159,16 +173,22 @@ const ImportMigrationScreen: React.FC = () => {
       }
 
       // Map rows according to the chosen mappings
-      const casesToImport = parsedRows.map(row => {
-        const mappedCase: any = {};
-        TARGET_FIELDS.forEach(field => {
-          const sourceHeader = mappings[field.key];
-          if (sourceHeader && sourceHeader !== 'none') {
-            mappedCase[field.key] = row[sourceHeader];
-          }
+      let casesToImport = [];
+      if (isTxtImport) {
+        // eCourts text is already fully parsed into internal object fields
+        casesToImport = parsedRows;
+      } else {
+        casesToImport = parsedRows.map(row => {
+          const mappedCase: any = {};
+          TARGET_FIELDS.forEach(field => {
+            const sourceHeader = mappings[field.key];
+            if (sourceHeader && sourceHeader !== 'none') {
+              mappedCase[field.key] = row[sourceHeader];
+            }
+          });
+          return mappedCase;
         });
-        return mappedCase;
-      });
+      }
 
       // Insert cases
       const count = await bulkInsertCases(casesToImport, userId, (curr, tot) => {
@@ -192,14 +212,13 @@ const ImportMigrationScreen: React.FC = () => {
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.content}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>{t("import_title")}</Text>
-
+        
         {/* STEP 1: UPLOAD FILE */}
         {step === 1 && (
           <View style={styles.stepContainer}>
             <Ionicons name="document-text-outline" size={80} color={theme.colors.primary} style={styles.icon} />
             <Text style={[styles.description, { color: theme.colors.textSecondary }]}>
-              Import case diary records from a CSV/spreadsheet or JSON file easily. APPs database entries will be added to your current database.
+              Import case diary records from a CSV, JSON, or eCourts (.txt) file easily. Database entries will be added to your current database.
             </Text>
 
             {loadingFile ? (
@@ -218,33 +237,45 @@ const ImportMigrationScreen: React.FC = () => {
         {/* STEP 2: MAPPING WIZARD */}
         {step === 2 && (
           <View style={styles.stepContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{t("import_step_mapping")}</Text>
-            <Text style={[styles.description, { color: theme.colors.textSecondary, marginBottom: 16 }]}>
-              {t("import_mapping_desc")}
-            </Text>
-
-            {/* Field list */}
-            {TARGET_FIELDS.map(field => (
-              <View key={field.key} style={[styles.mappingRow, { borderBottomColor: theme.colors.border }]}>
-                <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>{field.label}</Text>
-                <View style={[styles.pickerContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.cardBackground }]}>
-                  <Picker
-                    selectedValue={mappings[field.key]}
-                    onValueChange={(val) => setMappings({ ...mappings, [field.key]: val })}
-                    style={{ color: theme.colors.text }}
-                    dropdownIconColor={theme.colors.textSecondary}
-                  >
-                    <Picker.Item label="-- None / Optional --" value="none" color={theme.colors.text} style={{ backgroundColor: theme.colors.cardBackground }} />
-                    {headers.map(h => (
-                      <Picker.Item key={h} label={h} value={h} color={theme.colors.text} style={{ backgroundColor: theme.colors.cardBackground }} />
-                    ))}
-                  </Picker>
-                </View>
+            {isTxtImport ? (
+              <View style={{ alignItems: 'center', width: '100%' }}>
+                <Ionicons name="shield-checkmark-outline" size={80} color={theme.colors.success} style={styles.icon} />
+                <Text style={[styles.sectionTitle, { color: theme.colors.text, marginTop: 12 }]}>eCourts Data Ready</Text>
+                <Text style={[styles.description, { color: theme.colors.textSecondary, marginBottom: 24, paddingHorizontal: 10 }]}>
+                  We found {parsedRows.length} cases in your eCourts text backup. They will be imported directly with their titles, CNR numbers, dates, and court names. No manual mapping is required.
+                </Text>
               </View>
-            ))}
+            ) : (
+              <>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{t("import_step_mapping")}</Text>
+                <Text style={[styles.description, { color: theme.colors.textSecondary, marginBottom: 16 }]}>
+                  {t("import_mapping_desc")}
+                </Text>
+
+                {/* Field list */}
+                {TARGET_FIELDS.map(field => (
+                  <View key={field.key} style={[styles.mappingRow, { borderBottomColor: theme.colors.border }]}>
+                    <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>{field.label}</Text>
+                    <View style={[styles.pickerContainer, { borderColor: theme.colors.border, backgroundColor: theme.colors.cardBackground }]}>
+                      <Picker
+                        selectedValue={mappings[field.key]}
+                        onValueChange={(val) => setMappings({ ...mappings, [field.key]: val })}
+                        style={{ color: theme.colors.text }}
+                        dropdownIconColor={theme.colors.textSecondary}
+                      >
+                        <Picker.Item label="-- None / Optional --" value="none" color={theme.colors.text} style={{ backgroundColor: theme.colors.cardBackground }} />
+                        {headers.map(h => (
+                          <Picker.Item key={h} label={h} value={h} color={theme.colors.text} style={{ backgroundColor: theme.colors.cardBackground }} />
+                        ))}
+                      </Picker>
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
 
             {/* Row 1 preview */}
-            {parsedRows.length > 0 && (
+            {parsedRows.length > 0 && !isTxtImport && (
               <View style={[styles.previewCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
                 <Text style={[styles.previewTitle, { color: theme.colors.text }]}>{t("import_mapping_preview")}</Text>
                 {Object.keys(mappings).map(key => {
@@ -258,6 +289,26 @@ const ImportMigrationScreen: React.FC = () => {
                   }
                   return null;
                 })}
+              </View>
+            )}
+
+            {/* Basic eCourts preview */}
+            {parsedRows.length > 0 && isTxtImport && (
+              <View style={[styles.previewCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border, width: '100%' }]}>
+                <Text style={[styles.previewTitle, { color: theme.colors.text }]}>Preview of First Case</Text>
+                <Text style={[styles.previewText, { color: theme.colors.textSecondary }]}>
+                  <Text style={{ fontWeight: 'bold', color: theme.colors.text }}>Title:</Text> {parsedRows[0].CaseTitle || 'N/A'}
+                </Text>
+                {parsedRows[0].CNRNumber && (
+                  <Text style={[styles.previewText, { color: theme.colors.textSecondary }]}>
+                    <Text style={{ fontWeight: 'bold', color: theme.colors.text }}>CNR:</Text> {parsedRows[0].CNRNumber}
+                  </Text>
+                )}
+                {parsedRows[0].NextDate && (
+                  <Text style={[styles.previewText, { color: theme.colors.textSecondary }]}>
+                    <Text style={{ fontWeight: 'bold', color: theme.colors.text }}>Next Hearing:</Text> {parsedRows[0].NextDate}
+                  </Text>
+                )}
               </View>
             )}
 

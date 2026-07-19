@@ -19,7 +19,7 @@ import {
 import { useTranslation } from "../../../Providers/LanguageProvider";
 import { ThemeContext } from "../../../Providers/ThemeProvider";
 import { bulkInsertCases } from "../../../utils/backupManager";
-import { getCurrentUserId } from "../../../utils/commonFunctions";
+import { getCurrentUserId, formatDate } from "../../../utils/commonFunctions";
 import {
   parseECourtsTxtFile,
   ParsedTextCase,

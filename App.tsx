@@ -155,48 +155,49 @@ function AppContent() {
         await getDb();
         console.log("Database initialized successfully from App.tsx");
 
-        // Check for updates (Option 2 - Remote Version Check)
-        let isUpdateForced = false;
-        try {
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Timeout")), 3000)
-          );
-          const response = (await Promise.race([
-            fetch("https://gangwar-shiv.github.io/app-version.json"),
-            timeoutPromise,
-          ])) as Response;
+        // Check for updates asynchronously (does not block startup)
+        const runUpdateCheck = async () => {
+          try {
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("Timeout")), 3000)
+            );
+            const response = (await Promise.race([
+              fetch("https://gangwar-shiv.github.io/app-version.json"),
+              timeoutPromise,
+            ])) as Response;
 
-          if (response.ok) {
-            const data = await response.json();
-            const localVersion =
-              Application.nativeApplicationVersion || "1.0.0";
+            if (response.ok) {
+              const data = await response.json();
+              const localVersion =
+                Application.nativeApplicationVersion || "1.0.0";
 
-            const minRequired =
-              Platform.OS === "ios"
-                ? data.minIosVersion
-                : data.minAndroidVersion;
-            const latestAvailable =
-              Platform.OS === "ios"
-                ? data.latestIosVersion
-                : data.latestAndroidVersion;
+              const minRequired =
+                Platform.OS === "ios"
+                  ? data.minIosVersion
+                  : data.minAndroidVersion;
+              const latestAvailable =
+                Platform.OS === "ios"
+                  ? data.latestIosVersion
+                  : data.latestAndroidVersion;
 
-            if (data.playStoreUrl) setPlayStoreUrl(data.playStoreUrl);
-            if (data.appStoreUrl) setAppStoreUrl(data.appStoreUrl);
-            if (data.releaseNotes) setReleaseNotes(data.releaseNotes);
-            setLatestVersion(latestAvailable);
+              if (data.playStoreUrl) setPlayStoreUrl(data.playStoreUrl);
+              if (data.appStoreUrl) setAppStoreUrl(data.appStoreUrl);
+              if (data.releaseNotes) setReleaseNotes(data.releaseNotes);
+              setLatestVersion(latestAvailable);
 
-            if (isVersionOlder(localVersion, minRequired)) {
-              setForceUpdate(true);
-              setUpdateModalVisible(true);
-              isUpdateForced = true;
-            } else if (isVersionOlder(localVersion, latestAvailable)) {
-              setForceUpdate(false);
-              setUpdateModalVisible(true);
+              if (isVersionOlder(localVersion, minRequired)) {
+                setForceUpdate(true);
+                setUpdateModalVisible(true);
+              } else if (isVersionOlder(localVersion, latestAvailable)) {
+                setForceUpdate(false);
+                setUpdateModalVisible(true);
+              }
             }
+          } catch (fetchErr) {
+            console.warn("Failed to fetch remote app version data in background:", fetchErr);
           }
-        } catch (fetchErr) {
-          console.warn("Failed to fetch remote app version data:", fetchErr);
-        }
+        };
+        runUpdateCheck();
 
         // Initialize Ads SDK
         await mobileAds().initialize();
@@ -293,7 +294,19 @@ function AppContent() {
           "Failed to initialize database or ads from App.tsx:",
           error
         );
-        setSplashscreenVisible(false);
+        Alert.alert(
+          "Initialization Error",
+          "Failed to initialize database connection. Please check your storage space and try again.",
+          [
+            {
+              text: "Retry",
+              onPress: () => {
+                setLoading(true);
+                initialize();
+              },
+            },
+          ]
+        );
       } finally {
         setLoading(false);
       }

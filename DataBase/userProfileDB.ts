@@ -1,6 +1,7 @@
 // DataBase/userProfileDB.ts
 import * as SQLite from "expo-sqlite";
 import { LawyerProfileData } from "../Types/appTypes";
+import { safeJsonParse } from "../utils/jsonUtils";
 
 export const CREATE_LAWYER_PROFILES_TABLE = `
 CREATE TABLE IF NOT EXISTS LawyerProfiles (
@@ -34,13 +35,22 @@ export const getUserProfile = async (
     [userId]
   );
   if (result) {
+    const parseJSON = (str: string | null, fallback: any) => {
+      if (!str) return fallback;
+      try {
+        return JSON.parse(str);
+      } catch (e) {
+        console.error("JSON parsing error in userProfileDB:", e);
+        return fallback;
+      }
+    };
     return {
       ...result,
-      practiceAreas: JSON.parse(result.practiceAreas || "[]"),
-      contactInfo: JSON.parse(result.contactInfo || "{}"),
-      languages: JSON.parse(result.languages || "[]"),
-      stats: JSON.parse(result.stats || "{}"),
-      recentActivity: JSON.parse(result.recentActivity || "[]"),
+      practiceAreas: parseJSON(result.practiceAreas, []),
+      contactInfo: parseJSON(result.contactInfo, {}),
+      languages: parseJSON(result.languages, []),
+      stats: parseJSON(result.stats, {}),
+      recentActivity: parseJSON(result.recentActivity, []),
     };
   }
   return null;
@@ -51,6 +61,9 @@ export const updateUserProfile = async (
   userId: number,
   profileData: any
 ): Promise<void> => {
+  if (userId === undefined || userId === null || isNaN(userId)) {
+    throw new Error("Cannot update profile: invalid userId.");
+  }
   const avatarUrl = profileData.avatarUrl;
   const designation = profileData.designation;
   const practiceAreas = profileData.practiceAreas;
@@ -65,10 +78,21 @@ export const updateUserProfile = async (
     ? profileData.experience 
     : (profileData.stats && profileData.stats.yearsOfPractice !== undefined ? profileData.stats.yearsOfPractice : 0);
 
+  // Retrieve existing stats to compare yearsOfPractice
+  const existing = await db.getFirstAsync<{ stats: string }>(
+    "SELECT stats FROM LawyerProfiles WHERE user_id = ?",
+    [userId]
+  );
+  const oldStats = safeJsonParse<any>(existing?.stats || null, {});
+
+  const newYears = typeof experience === 'string' ? parseInt(experience, 10) : (experience || 0);
+  const oldYears = oldStats.yearsOfPractice !== undefined ? oldStats.yearsOfPractice : -1;
+
   const stats = {
-    yearsOfPractice: typeof experience === 'string' ? parseInt(experience, 10) : (experience || 0),
-    yearsOfPracticeLastUpdated: (profileData.stats && profileData.stats.yearsOfPracticeLastUpdated) 
-      || new Date().toISOString(),
+    yearsOfPractice: newYears,
+    yearsOfPracticeLastUpdated: newYears === oldYears 
+      ? (oldStats.yearsOfPracticeLastUpdated || new Date().toISOString())
+      : new Date().toISOString(),
   };
 
   const contactInfo = {
@@ -77,20 +101,51 @@ export const updateUserProfile = async (
     address,
   };
 
-  await db.runAsync(
-    `INSERT OR REPLACE INTO LawyerProfiles (
-      user_id, avatarUrl, designation, practiceAreas, aboutMe, contactInfo, languages, stats, name
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      userId,
-      avatarUrl,
-      designation,
-      JSON.stringify(practiceAreas),
-      aboutMe,
-      JSON.stringify(contactInfo),
-      JSON.stringify(languages),
-      JSON.stringify(stats),
-      fullName,
-    ]
-  );
+  const practiceAreasStr = Array.isArray(practiceAreas) ? JSON.stringify(practiceAreas) : JSON.stringify([]);
+  const contactInfoStr = JSON.stringify(contactInfo);
+  const languagesStr = Array.isArray(languages) ? JSON.stringify(languages) : JSON.stringify([]);
+  const statsStr = JSON.stringify(stats);
+
+  if (existing) {
+    await db.runAsync(
+      `UPDATE LawyerProfiles SET 
+        avatarUrl = ?, 
+        designation = ?, 
+        practiceAreas = ?, 
+        aboutMe = ?, 
+        contactInfo = ?, 
+        languages = ?, 
+        stats = ?, 
+        name = ?
+      WHERE user_id = ?`,
+      [
+        avatarUrl,
+        designation,
+        practiceAreasStr,
+        aboutMe,
+        contactInfoStr,
+        languagesStr,
+        statsStr,
+        fullName,
+        userId,
+      ]
+    );
+  } else {
+    await db.runAsync(
+      `INSERT INTO LawyerProfiles (
+        user_id, avatarUrl, designation, practiceAreas, aboutMe, contactInfo, languages, stats, name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        avatarUrl,
+        designation,
+        practiceAreasStr,
+        aboutMe,
+        contactInfoStr,
+        languagesStr,
+        statsStr,
+        fullName,
+      ]
+    );
+  }
 };

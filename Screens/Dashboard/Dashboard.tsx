@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform, Pressable } from 'react-native';
 import { format } from 'date-fns';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { getDb, getUserProfile } from '../../DataBase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeContext } from '../../Providers/ThemeProvider';
@@ -78,47 +78,62 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 
 const QuickActionButton = ({ icon, text, onPress, color }) => {
   const { theme } = useContext(ThemeContext);
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
+
   return (
     <Pressable 
-      style={({ pressed }) => [
-        styles.quickAction, 
-        { 
-          backgroundColor: theme.colors.cardBackground,
-          borderColor: theme.dark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.04)",
-          borderWidth: 1,
-          transform: [{ scale: pressed ? 0.96 : 1 }],
-          opacity: pressed ? 0.96 : 1,
-          overflow: "hidden", // Clip absolute watermark within rounded borders
-        }
-      ]} 
+      onPressIn={() => { scale.value = withSpring(0.93, { damping: 15, stiffness: 200 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
       onPress={onPress}
+      style={{ flex: 1, minWidth: '45%', margin: 6 }}
     >
-      {/* Subtle Background Watermark Icon */}
-      <Ionicons 
-        name={icon} 
-        size={64} 
-        color={color} 
-        style={{
-          position: "absolute",
-          right: -10,
-          bottom: -10,
-          opacity: theme.dark ? 0.06 : 0.03,
-        }} 
-      />
+      <Animated.View
+        style={[
+          styles.quickAction, 
+          { 
+            backgroundColor: theme.colors.cardBackground,
+            borderColor: theme.dark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.04)",
+            borderWidth: 1,
+            overflow: "hidden", // Clip absolute watermark within rounded borders
+            margin: 0,
+            width: "100%",
+          },
+          animatedStyle
+        ]}
+      >
+        {/* Subtle Background Watermark Icon */}
+        <Ionicons 
+          name={icon} 
+          size={64} 
+          color={color} 
+          style={{
+            position: "absolute",
+            right: -10,
+            bottom: -10,
+            opacity: theme.dark ? 0.06 : 0.03,
+          }} 
+        />
 
-      <View style={{
-        width: 48,
-        height: 48,
-        borderRadius: 14,
-        backgroundColor: `${color}12`,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-        zIndex: 2,
-      }}>
-        <Ionicons name={icon} size={24} color={color} />
-      </View>
-      <Text style={[styles.quickActionText, { color: theme.colors.text, zIndex: 2 }]} numberOfLines={2}>{text}</Text>
+        <View style={{
+          width: 48,
+          height: 48,
+          borderRadius: 14,
+          backgroundColor: `${color}12`,
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginBottom: 10,
+          zIndex: 2,
+        }}>
+          <Ionicons name={icon} size={24} color={color} />
+        </View>
+        <Text style={[styles.quickActionText, { color: theme.colors.text, zIndex: 2 }]} numberOfLines={2}>{text}</Text>
+      </Animated.View>
     </Pressable>
   );
 };
@@ -126,19 +141,31 @@ const QuickActionButton = ({ icon, text, onPress, color }) => {
 import SectionHeader from '../CommonComponents/SectionHeader';
 
 const QuickActionsGrid = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { t } = useTranslation();
+
+  const actions = [
+    { icon: "add-circle", text: t("dash_add_case"), onPress: () => navigation.navigate('AddCase' as any), color: "#00CC44" },
+    { icon: "folder-open", text: t("dash_view_all_cases"), onPress: () => navigation.navigate('AllCases' as any), color: "#007BFF" },
+    { icon: "briefcase", text: t("dash_drafts_hub") || "Document Hub", onPress: () => navigation.navigate('DraftsHub' as any), color: "#8B5CF6" },
+    { icon: "camera", text: "PDF Scanner", onPress: () => navigation.navigate('PdfScanner' as any), color: "#EC4899" },
+    { icon: "calendar", text: t("dash_yesterdays_cases"), onPress: () => navigation.navigate('YesterdaysCases' as any), color: "#007BFF" },
+    { icon: "alert-circle", text: t("dash_undated_cases"), onPress: () => navigation.navigate('UndatedCases' as any), color: "#FF6B00" },
+  ];
 
   return (
     <View>
       <SectionHeader title={t("dash_quick_actions")} />
-      <View style={styles.quickActionsContainer}>
-        <QuickActionButton icon="add-circle" text={t("dash_add_case")} onPress={() => navigation.navigate('AddCase' as any)} color="#00CC44" />
-        <QuickActionButton icon="folder-open" text={t("dash_view_all_cases")} onPress={() => navigation.navigate('AllCases' as any)} color="#007BFF" />
-        <QuickActionButton icon="document-text" text={t("dash_draft_docs")} onPress={() => navigation.navigate('GenerateDocument' as any)} color="#8B5CF6" />
-        <QuickActionButton icon="briefcase" text={t("dash_drafts_hub")} onPress={() => navigation.navigate('DraftsHub' as any)} color="#EC4899" />
-        <QuickActionButton icon="calendar" text={t("dash_yesterdays_cases")} onPress={() => navigation.navigate('YesterdaysCases' as any)} color="#007BFF" />
-        <QuickActionButton icon="alert-circle" text={t("dash_undated_cases")} onPress={() => navigation.navigate('UndatedCases' as any)} color="#FF6B00" />
+      <View style={[styles.quickActionsContainer, { flexWrap: "wrap", flexDirection: "row" }]}>
+        {actions.map((action, index) => (
+          <Animated.View
+            key={action.text}
+            entering={FadeInDown.delay(index * 60).springify().damping(12)}
+            style={{ width: '50%' }}
+          >
+            <QuickActionButton {...action} />
+          </Animated.View>
+        ))}
       </View>
     </View>
   );
@@ -158,7 +185,7 @@ import { useAdTrigger } from '../CommonComponents/AdManager';
 // ---- Stats Section ----
 const StatsSection = () => {
   const { theme } = useContext(ThemeContext);
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { t } = useTranslation();
   const [totalCases, setTotalCases] = useState(0);
   const [upcomingHearings, setUpcomingHearings] = useState(0);
@@ -201,14 +228,36 @@ const StatsSection = () => {
     <View style={{ marginBottom: 24 }}>
       <SectionHeader title={t('dash_overview') || 'Overview'} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        {statCards.map((card) => (
-          <TouchableOpacity
-            key={card.label}
-            onPress={card.onPress}
-            activeOpacity={0.85}
-            style={{
-              flex: 1,
-              marginHorizontal: 4,
+        {statCards.map((card, index) => (
+          <StatCardButton key={card.label} card={card} theme={theme} index={index} />
+        ))}
+      </View>
+    </View>
+  );
+};
+
+const StatCardButton = ({ card, theme, index }) => {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
+
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(index * 100).springify().damping(12)}
+      style={{ flex: 1, marginHorizontal: 4 }}
+    >
+      <Pressable
+        onPressIn={() => { scale.value = withSpring(0.95, { damping: 15, stiffness: 200 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
+        onPress={card.onPress}
+        style={{ width: "100%" }}
+      >
+        <Animated.View
+          style={[
+            {
               backgroundColor: theme.colors.cardBackground,
               borderRadius: 14,
               padding: 16,
@@ -220,29 +269,30 @@ const StatsSection = () => {
               shadowOpacity: 0.05,
               shadowRadius: 6,
               elevation: 2,
-            }}
-          >
-            <View style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              backgroundColor: `${card.color}15`,
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginBottom: 8,
-            }}>
-              <Ionicons name={card.icon as any} size={22} color={card.color} />
-            </View>
-            <Text style={{ fontSize: 26, fontWeight: '800', color: theme.colors.text }}>
-              {card.value}
-            </Text>
-            <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2, textAlign: 'center' }}>
-              {card.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
+            },
+            animatedStyle
+          ]}
+        >
+          <View style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            backgroundColor: `${card.color}15`,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 8,
+          }}>
+            <Ionicons name={card.icon as any} size={22} color={card.color} />
+          </View>
+          <Text style={{ fontSize: 26, fontWeight: '800', color: theme.colors.text }}>
+            {card.value}
+          </Text>
+          <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2, textAlign: 'center' }}>
+            {card.label}
+          </Text>
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
   );
 };
 
@@ -262,7 +312,7 @@ const TodaysCasesSection = () => {
   const { t } = useTranslation();
   const [todaysCases, setTodaysCases] = useState<CaseDataScreen[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { showAdWithPreload } = useAdTrigger();
   const [isPopupVisible, setPopupVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
@@ -311,13 +361,11 @@ const TodaysCasesSection = () => {
         return;
       }
       // 1. Add timeline event
-      if (notes) {
-        await db.addCaseTimelineEvent({
-          case_id: caseId,
-          hearing_date: new Date().toISOString(),
-          notes: notes,
-        });
-      }
+      await db.addCaseTimelineEvent({
+        case_id: caseId,
+        hearing_date: new Date().toISOString(),
+        notes: notes || "",
+      });
 
       // 2. Update case's next hearing date
       await db.updateCase(caseId, {

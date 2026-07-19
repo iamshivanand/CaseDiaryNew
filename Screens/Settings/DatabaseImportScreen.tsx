@@ -298,9 +298,6 @@ const DatabaseImportScreen: React.FC = () => {
             <View style={styles.iconBackground}>
               <Ionicons name="cloud-upload" size={64} color={theme.colors.primary} />
             </View>
-            <Text style={styles.stageTitle}>
-              {locale === 'en' ? 'Import Database Backup' : 'डेटाबेस बैकअप आयात करें'}
-            </Text>
             <Text style={styles.stageDesc}>
               {locale === 'en'
                 ? 'Select a previously exported database backup file (.db) to preview its contents and choose how to restore your case logs.'

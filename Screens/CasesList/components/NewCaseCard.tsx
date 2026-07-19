@@ -1,6 +1,7 @@
 import { useNavigation } from "@react-navigation/native";
 import React, { useContext } from "react";
 import { StyleSheet, Text, Pressable, View } from "react-native";
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { CaseDataScreen } from "../../../Types/appTypes";
 import { formatDate } from "../../../utils/commonFunctions";
 import { ThemeContext } from "../../../Providers/ThemeProvider";
@@ -42,6 +43,14 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
   const { title, client, status, nextHearing, lastUpdate, previousHearing, id, priority } =
     caseDetails;
   const navigation = useNavigation();
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
+
   const handleUpdatePress = () => {
     if (onUpdateHearingPress) {
       onUpdateHearingPress(caseDetails);
@@ -54,20 +63,24 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
 
   return (
     <Pressable
-      style={({ pressed }) => [
-        styles.card,
-        {
-          backgroundColor: theme.colors.cardBackground,
-          borderColor: theme.colors.border,
-          borderWidth: 1,
-          transform: [{ scale: pressed ? 0.98 : 1 }],
-          opacity: pressed ? 0.98 : 1,
-        },
-      ]}
+      onPressIn={() => { scale.value = withSpring(0.97, { damping: 15, stiffness: 200 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
       onPress={() =>
         navigation.navigate("CaseDetails", { caseId: id })
       }
+      style={{ width: "100%" }}
     >
+      <Animated.View
+        style={[
+          styles.card,
+          {
+            backgroundColor: theme.colors.cardBackground,
+            borderColor: theme.colors.border,
+            borderWidth: 1,
+          },
+          animatedStyle,
+        ]}
+      >
       {/* Visual Priority Indicator Accent Bar on the Left */}
       <View
         style={[
@@ -81,7 +94,7 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
       />
       <View style={styles.cardContent}>
         <View style={styles.headerContainer}>
-          <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={2}>
+          <Text style={[styles.title, { color: theme.colors.text }]}>
             {title}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -168,7 +181,8 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
           <Text style={styles.updateButtonText}>Update Hearing</Text>
         </Pressable>
       </View>
-    </Pressable>
+    </Animated.View>
+  </Pressable>
   );
 };
 

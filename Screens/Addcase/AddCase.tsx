@@ -13,6 +13,7 @@ import {
   Modal,
   ActivityIndicator,
   TouchableOpacity,
+  KeyboardAvoidingView,
 } from "react-native";
 import * as Animatable from "react-native-animatable";
 import { v4 as uuidv4 } from "uuid";
@@ -209,6 +210,19 @@ const formFieldsDefinition: FieldDefinition[] = [
     suggestions: true,
   },
   {
+    name: "OppositeAdvocate",
+    type: "text",
+    placeholder: "Enter Opposing Advocate's Name",
+    label: "Opposing Advocate",
+    suggestions: true,
+  },
+  {
+    name: "OppAdvocateContactNumber",
+    type: "text",
+    placeholder: "Enter Opposing Advocate's Contact No.",
+    label: "Opposing Advocate Contact No.",
+  },
+  {
     name: "Status",
     type: "select",
     label: "Case Status",
@@ -256,6 +270,13 @@ const formFieldsDefinition: FieldDefinition[] = [
     suggestions: true,
   },
   {
+    name: "OnBehalfOf",
+    type: "text",
+    placeholder: "Enter On Behalf Of",
+    label: "On Behalf Of",
+    suggestions: true,
+  },
+  {
     name: "CaseDescription",
     type: "multiline",
     placeholder: "Provide a brief summary...",
@@ -297,7 +318,10 @@ const fieldGroups = [
       "OppositeParty",
       "JudgeName",
       "OpposingCounsel",
+      "OppositeAdvocate",
+      "OppAdvocateContactNumber",
       "Accussed",
+      "OnBehalfOf",
     ],
   },
   {
@@ -366,6 +390,12 @@ const getFieldLabelKey = (fieldName: string): string => {
       return "field_client_contact";
     case "Accussed":
       return "field_accused";
+    case "OnBehalfOf":
+      return "field_on_behalf_of";
+    case "OppositeAdvocate":
+      return "field_opposite_advocate";
+    case "OppAdvocateContactNumber":
+      return "field_opp_advocate_contact";
     case "Undersection":
       return "field_under_section";
     case "district_id":
@@ -421,6 +451,12 @@ const getFieldPlaceholderKey = (fieldName: string): string => {
       return "placeholder_client_contact";
     case "Accussed":
       return "placeholder_accused";
+    case "OnBehalfOf":
+      return "placeholder_on_behalf_of";
+    case "OppositeAdvocate":
+      return "placeholder_opposite_advocate";
+    case "OppAdvocateContactNumber":
+      return "placeholder_opp_advocate_contact";
     case "Undersection":
       return "placeholder_under_section";
     case "district_id":
@@ -551,6 +587,10 @@ const FormFieldRenderer: React.FC<{
           }
           maxLength={fieldConfig.maxLength}
           keyboardType={fieldConfig.keyboardType as any}
+          showContactPicker={
+            fieldName === "ClientContactNumber" ||
+            fieldName === "OppAdvocateContactNumber"
+          }
         />
       );
     case "multiline":
@@ -1376,12 +1416,17 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.scrollViewStyle}
-        contentContainerStyle={styles.scrollContentContainerStyle}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 20}
       >
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollViewStyle}
+          contentContainerStyle={styles.scrollContentContainerStyle}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.formScreenContainer}>
           <Formik
             initialValues={prepareFormInitialValues()}
@@ -1575,6 +1620,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           </Formik>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {isLocked && (
         <Modal visible={isLocked} transparent animationType="fade">

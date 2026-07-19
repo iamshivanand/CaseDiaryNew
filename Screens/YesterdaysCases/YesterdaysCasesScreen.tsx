@@ -87,13 +87,11 @@ const YesterdaysCasesScreen = () => {
         return;
       }
       // 1. Add timeline event
-      if (notes) {
-        await db.addCaseTimelineEvent({
-          case_id: caseId,
-          hearing_date: new Date().toISOString(),
-          notes: notes,
-        });
-      }
+      await db.addCaseTimelineEvent({
+        case_id: caseId,
+        hearing_date: new Date().toISOString(),
+        notes: notes || "",
+      });
 
       // 2. Update case's next hearing date
       await db.updateCase(caseId, {

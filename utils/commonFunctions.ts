@@ -50,3 +50,48 @@ export function parseLocalDate(dateString: string): Date | null {
     return isNaN(date.getTime()) ? null : date;
   }
 }
+
+export function normalizeDateToYYYYMMDD(val: any): string | null {
+  if (!val) return null;
+  if (val instanceof Date) {
+    return getLocalDateString(val);
+  }
+  if (typeof val !== "string") return null;
+  const trimmed = val.trim();
+  if (trimmed === "" || trimmed === "N/A") return null;
+  
+  // If already YYYY-MM-DD (e.g. 2024-12-25)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  
+  // If YYYY-MM-DD... (with ISO suffix, e.g. 2024-12-25T00:00:00)
+  if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) {
+    return trimmed.split('T')[0];
+  }
+  
+  // If DD-MM-YYYY or DD/MM/YYYY
+  const parts = trimmed.split(/[-/]/);
+  if (parts.length === 3) {
+    if (parts[2].length === 4) {
+      // DD-MM-YYYY
+      const [day, month, year] = parts;
+      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    } else if (parts[0].length === 4) {
+      // YYYY-MM-DD
+      const [year, month, day] = parts;
+      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    }
+  }
+  
+  // Fallback to new Date parsing
+  try {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      return getLocalDateString(d);
+    }
+  } catch (e) {
+    // Ignore
+  }
+  
+  return trimmed;
+}
+

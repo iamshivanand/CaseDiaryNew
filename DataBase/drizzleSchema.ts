@@ -60,6 +60,7 @@ export const Cases = sqliteTable('Cases', {
   crime_number: text('crime_number'),
   crime_year: integer('crime_year'),
   police_station_id: integer('police_station_id').references(() => PoliceStations.id, { onDelete: 'set null' }),
+  district_id: integer('district_id').references(() => Districts.id, { onDelete: 'set null' }),
   Undersection: text('Undersection'),
 
   FirstParty: text('FirstParty'),

@@ -321,9 +321,7 @@ const SettingsScreen = () => {
     <View
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
-      <Title style={[styles.title, { color: theme.colors.text }]}>
-        {t("settings_title")}
-      </Title>
+      
 
       <List.Section style={styles.listSection}>
         <List.Subheader style={{ color: theme.colors.textSecondary }}>

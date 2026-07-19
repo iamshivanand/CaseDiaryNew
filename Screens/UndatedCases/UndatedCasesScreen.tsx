@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useContext } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { formatDate, getLocalDateString } from '../../utils/commonFunctions';
+import { formatDate, getLocalDateString, normalizeDateToYYYYMMDD } from '../../utils/commonFunctions';
 import * as db from '../../DataBase';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { CaseData, CaseDataScreen } from '../../Types/appTypes';
@@ -43,9 +43,9 @@ const UndatedCasesScreen = () => {
       const todayStr = getLocalDateString(new Date());
 
       const filteredCases = allCases.filter(c => {
-        if (!c.NextDate || c.NextDate === 'N/A' || c.NextDate === '') return true;
-        const caseDate = c.NextDate.split('T')[0];
-        return caseDate < todayStr;
+        const normalized = normalizeDateToYYYYMMDD(c.NextDate);
+        if (!normalized) return true;
+        return normalized < todayStr;
       });
 
       const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
@@ -91,13 +91,11 @@ const UndatedCasesScreen = () => {
         return;
       }
       // 1. Add timeline event
-      if (notes) {
-        await db.addCaseTimelineEvent({
-          case_id: caseId,
-          hearing_date: new Date().toISOString(),
-          notes: notes,
-        });
-      }
+      await db.addCaseTimelineEvent({
+        case_id: caseId,
+        hearing_date: new Date().toISOString(),
+        notes: notes || "",
+      });
 
       // 2. Update case's next hearing date
       await db.updateCase(caseId, {

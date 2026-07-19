@@ -37,6 +37,7 @@ import ManageLookupCategoryScreen from "./Screens/Settings/ManageLookupCategoryS
 import SettingsScreen from "./Screens/Settings/SettingsScreen";
 import UndatedCasesScreen from "./Screens/UndatedCases/UndatedCasesScreen";
 import YesterdaysCasesScreen from "./Screens/YesterdaysCases/YesterdaysCasesScreen";
+import PdfScannerScreen from "./Screens/Dashboard/PdfScannerScreen";
 
 // Import ParamList types
 import {
@@ -68,7 +69,9 @@ const HomeStack = () => {
         headerTintColor: theme.colors.text,
         headerTitleStyle: {
           fontWeight: "bold",
+          fontSize: 16,
         },
+        headerTitleAllowFontScaling: false,
       }}
     >
       {/* Default to true for this stack */}
@@ -129,7 +132,7 @@ const HomeStack = () => {
       <HomeStackNav.Screen
         name="DraftsHub"
         component={DraftsHubScreen}
-        options={{ title: "Drafts Hub" }}
+        options={{ title: "Document Hub" }}
       />
       <HomeStackNav.Screen
         name="EditDraft"
@@ -151,6 +154,11 @@ const HomeStack = () => {
         component={PdfViewerScreen}
         options={{ title: "PDF Viewer" }}
       />
+      <HomeStackNav.Screen
+        name="PdfScanner"
+        component={PdfScannerScreen}
+        options={{ headerShown: false }}
+      />
     </HomeStackNav.Navigator>
   );
 };
@@ -168,7 +176,9 @@ const SearchStack = () => {
         headerTintColor: theme.colors.text,
         headerTitleStyle: {
           fontWeight: "bold",
+          fontSize: 16,
         },
+        headerTitleAllowFontScaling: false,
       }}
     >
       <SearchStackNav.Screen
@@ -205,7 +215,9 @@ const CalendarStack = () => {
         headerTintColor: theme.colors.text,
         headerTitleStyle: {
           fontWeight: "bold",
+          fontSize: 16,
         },
+        headerTitleAllowFontScaling: false,
       }}
     >
       <CalendarStackNav.Screen
@@ -242,7 +254,9 @@ const ProfileStack = () => {
         headerTintColor: theme.colors.text,
         headerTitleStyle: {
           fontWeight: "bold",
+          fontSize: 16,
         },
+        headerTitleAllowFontScaling: false,
       }}
     >
       <ProfileStackNav.Screen name="ProfileScreen" component={ProfileScreen} />
@@ -342,6 +356,8 @@ const Appro: React.FC = () => {
             "GenerateDocument",
             "DraftsHub",
             "DatabaseImportScreen",
+            "PdfScanner",
+            "PdfViewer",
           ];
           const shouldHide = hideTabsOn.includes(routeName);
 

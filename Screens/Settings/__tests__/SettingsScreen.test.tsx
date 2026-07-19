@@ -49,7 +49,6 @@ describe('SettingsScreen', () => {
 
   it('should render all settings sections and buttons', () => {
     const { getByText } = renderWithProviders();
-    expect(getByText('App Settings')).toBeTruthy();
     expect(getByText('Personalization')).toBeTruthy();
     expect(getByText('App Theme')).toBeTruthy();
     expect(getByText('App Language')).toBeTruthy();

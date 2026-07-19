@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   Platform,
+  Alert,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import ActionButton from "../../CommonComponents/ActionButton";
@@ -30,8 +31,29 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleSave = () => {
-    onSave(notes, nextHearingDate);
-    onClose();
+    if (!notes.trim()) {
+      Alert.alert(
+        "No Notes Entered",
+        "You haven't entered any notes for today's hearing. Would you like to proceed or go back to write notes?",
+        [
+          {
+            text: "Go Back",
+            style: "cancel",
+          },
+          {
+            text: "Proceed",
+            style: "destructive",
+            onPress: () => {
+              onSave(notes, nextHearingDate);
+              onClose();
+            },
+          },
+        ]
+      );
+    } else {
+      onSave(notes, nextHearingDate);
+      onClose();
+    }
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {

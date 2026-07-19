@@ -83,6 +83,9 @@ const CaseDetailsScreen: React.FC = () => {
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [customReminderText, setCustomReminderText] = useState("");
+  const [showEditNotesModal, setShowEditNotesModal] = useState(false);
+  const [editingTimelineEvent, setEditingTimelineEvent] = useState<TimelineEvent | null>(null);
+  const [editedNotesText, setEditedNotesText] = useState("");
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -335,6 +338,41 @@ const CaseDetailsScreen: React.FC = () => {
     setShowReminderModal(false);
   };
 
+  const handleEditTimelineNotes = (event: TimelineEvent) => {
+    setEditingTimelineEvent(event);
+    setEditedNotesText(event.description || "");
+    setShowEditNotesModal(true);
+  };
+
+  const handleSaveTimelineNotes = async () => {
+    if (!editingTimelineEvent) return;
+    try {
+      const eventId = parseInt(editingTimelineEvent.id.toString(), 10);
+      if (isNaN(eventId)) {
+        Alert.alert(t("alert_error"), "Invalid timeline event ID.");
+        return;
+      }
+      const success = await db.updateCaseTimelineEvent(eventId, {
+        notes: editedNotesText,
+      });
+      if (success) {
+        Alert.alert(t("alert_success"), "Notes updated successfully.");
+        if (caseId) {
+          const caseIdToLoad = parseInt(caseId.toString(), 10);
+          await loadDocumentsAndTimeline(caseIdToLoad);
+        }
+        setShowEditNotesModal(false);
+        setEditingTimelineEvent(null);
+        setEditedNotesText("");
+      } else {
+        Alert.alert(t("alert_error"), "Failed to update notes.");
+      }
+    } catch (error) {
+      console.error("Error updating timeline event notes:", error);
+      Alert.alert(t("alert_error"), "Failed to update notes due to database error.");
+    }
+  };
+
   const handleGenerateDocument = () => {
     if (!caseDetails) return;
     // @ts-ignore
@@ -533,9 +571,11 @@ const CaseDetailsScreen: React.FC = () => {
                 alignItems: "center",
                 justifyContent: "space-between",
                 marginBottom: 12,
+                flexWrap: "wrap",
+                gap: 8,
               }}
             >
-              <Text style={[styles.clientName, { marginBottom: 0 }]}>
+              <Text style={[styles.clientName, { marginBottom: 0, flex: 1, flexWrap: "wrap", marginRight: 8 }]}>
                 {t("casedetails_client_prefix")}
                 {caseDetails.ClientName}
               </Text>
@@ -720,6 +760,23 @@ const CaseDetailsScreen: React.FC = () => {
                   {caseDetails.OpposingCounsel || "N/A"}
                 </Text>
               </View>
+              {caseDetails.OppositeAdvocate ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Opposite Advocate:</Text>
+                  <Text style={styles.detailValue}>{caseDetails.OppositeAdvocate}</Text>
+                </View>
+              ) : null}
+              {caseDetails.OppAdvocateContactNumber ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Opp. Adv. Contact:</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.detailValue}>{caseDetails.OppAdvocateContactNumber} </Text>
+                    <TouchableOpacity onPress={() => Linking.openURL(`tel:${caseDetails.OppAdvocateContactNumber}`)}>
+                      <Ionicons name="call" size={16} color="#0284C7" style={{ marginLeft: 6 }} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : null}
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>
                   {t("field_client_contact")}:
@@ -853,7 +910,13 @@ const CaseDetailsScreen: React.FC = () => {
           </View>
         );
       case "timelineEvent":
-        return <TimelineEventItem event={item.data} isLast={item.isLast} />;
+        return (
+          <TimelineEventItem
+            event={item.data}
+            isLast={item.isLast}
+            onEditNotes={handleEditTimelineNotes}
+          />
+        );
       case "noTimelineEvents":
         return (
           <View style={styles.timelineSection}>
@@ -930,6 +993,48 @@ const CaseDetailsScreen: React.FC = () => {
                 {t("alert_cancel")}
               </Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {/* Modal for editing timeline event notes */}
+      <Modal
+        visible={showEditNotesModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditNotesModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Update Notes for Past Date</Text>
+            <TextInput
+              style={styles.reminderInput}
+              multiline
+              numberOfLines={6}
+              value={editedNotesText}
+              onChangeText={setEditedNotesText}
+              placeholder="Add details about what happened during this hearing..."
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={t("alert_cancel") || "Cancel"}
+                  onPress={() => {
+                    setShowEditNotesModal(false);
+                    setEditingTimelineEvent(null);
+                    setEditedNotesText("");
+                  }}
+                  type="secondary"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={t("btn_save_changes") || "Save"}
+                  onPress={handleSaveTimelineNotes}
+                  type="primary"
+                />
+              </View>
+            </View>
           </View>
         </View>
       </Modal>

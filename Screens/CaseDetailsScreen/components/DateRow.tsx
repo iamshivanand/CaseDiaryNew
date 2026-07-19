@@ -45,7 +45,7 @@ const DateRow: React.FC<DateRowProps> = ({ label, dateString, iconName }) => {
     <View style={styles.rowContainer}>
       <Icon name={iconName} size={18} style={styles.icon} />
       <Text style={styles.label}>{label}:</Text>
-      <Text style={valueStyle}>{displayDate}</Text>
+      <Text style={[valueStyle, { flex: 1, flexWrap: 'wrap' }]}>{displayDate}</Text>
     </View>
   );
 };

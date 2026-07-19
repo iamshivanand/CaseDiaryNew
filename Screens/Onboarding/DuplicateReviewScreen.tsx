@@ -138,7 +138,6 @@ const DuplicateReviewScreen: React.FC = () => {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>{t("duplicate_title")}</Text>
         <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
           {duplicatePairs.length > 0 ? t("duplicate_desc") : t("duplicate_no_found")}
         </Text>

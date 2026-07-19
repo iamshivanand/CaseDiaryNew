@@ -42,6 +42,7 @@ export type HomeStackParamList = {
   ImportMigration: { isFromOnboarding?: boolean };
   DuplicateReview: undefined;
   PdfViewer: { pdfUri: string; title: string };
+  PdfScanner: { caseId?: number };
 };
 
 // Stack for the "Search" Tab

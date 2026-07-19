@@ -7,8 +7,8 @@ export type CaseTimelineInsertData = Omit<CaseTimelineRow, 'id' | 'created_at' |
 // Add a new timeline event
 export const addCaseTimelineEvent = async (eventData: CaseTimelineInsertData): Promise<number | null> => {
   const db = await getDb();
-  if (!eventData.case_id || !eventData.hearing_date || !eventData.notes) {
-    throw new Error("Case ID, hearing date, and notes are required for a timeline event.");
+  if (!eventData.case_id || !eventData.hearing_date) {
+    throw new Error("Case ID and hearing date are required for a timeline event.");
   }
 
   const fields = Object.keys(eventData).join(", ");
@@ -34,6 +34,40 @@ export const getCaseTimelineEventsByCaseId = async (caseId: number): Promise<Cas
     return await db.getAllAsync<CaseTimelineRow>(sql, [caseId]);
   } catch (error) {
     console.error(`Error fetching case timeline events for case ID ${caseId}:`, error);
+    throw error;
+  }
+};
+
+export const updateCaseTimelineEvent = async (id: number, data: { hearing_date?: string; notes?: string }): Promise<boolean> => {
+  const db = await getDb();
+  const fields: string[] = [];
+  const values: any[] = [];
+  if (data.hearing_date !== undefined) {
+    fields.push("hearing_date = ?");
+    values.push(data.hearing_date);
+  }
+  if (data.notes !== undefined) {
+    fields.push("notes = ?");
+    values.push(data.notes);
+  }
+  if (fields.length === 0) return false;
+  values.push(id);
+  try {
+    const result = await db.runAsync(`UPDATE CaseTimeline SET ${fields.join(", ")}, updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = ?`, values);
+    return result.changes > 0;
+  } catch (error) {
+    console.error(`Error updating timeline event ID ${id}:`, error);
+    throw error;
+  }
+};
+
+export const deleteCaseTimelineEvent = async (id: number): Promise<boolean> => {
+  const db = await getDb();
+  try {
+    const result = await db.runAsync("DELETE FROM CaseTimeline WHERE id = ?", [id]);
+    return result.changes > 0;
+  } catch (error) {
+    console.error(`Error deleting timeline event ID ${id}:`, error);
     throw error;
   }
 };

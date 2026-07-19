@@ -52,6 +52,46 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
     }
     #editor p {
       margin: 0 0 12px 0;
+      font-family: inherit;
+      font-size: inherit;
+      line-height: inherit;
+      color: inherit;
+    }
+    hr.page-break {
+      border: none;
+      border-top: 2px dashed #ca8a04;
+      height: 1px;
+      margin: 32px 0;
+      position: relative;
+      overflow: visible;
+      user-select: none;
+      -webkit-user-modify: read-only;
+    }
+    hr.page-break::after {
+      content: "PAGE BREAK";
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #fcf9f2; /* matches paper color */
+      padding: 0 12px;
+      font-size: 10px;
+      font-weight: bold;
+      color: #ca8a04;
+      letter-spacing: 2px;
+    }
+    @media print {
+      hr.page-break {
+        page-break-after: always;
+        break-after: page;
+        border: none;
+        height: 0;
+        margin: 0;
+        visibility: hidden;
+      }
+      hr.page-break::after {
+        display: none;
+      }
     }
     ul, ol {
       margin: 0 0 12px 20px;
@@ -117,6 +157,9 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
 
     // Auto-focus on load
     editor.focus();
+    try {
+      document.execCommand('defaultParagraphSeparator', false, 'p');
+    } catch (e) {}
 
     // Command runner
     function execCmd(command, value = null) {
@@ -147,6 +190,9 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
             sendStateToRN();
           } else if (data.command === 'insertHTML') {
             insertHTMLAtCursor(data.value);
+            sendStateToRN();
+          } else if (data.command === 'insertPageBreak') {
+            insertHTMLAtCursor('<hr class="page-break" /><p><br></p>');
             sendStateToRN();
           } else if (data.command === 'toggleLegalList') {
             const selection = window.getSelection();

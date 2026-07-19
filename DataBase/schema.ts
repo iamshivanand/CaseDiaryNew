@@ -112,6 +112,7 @@ export interface Case {
   OpposingCounsel?: string | null;  // Name of the opposing counsel
   OppositeAdvocate?: string | null; // Often same as OpposingCounsel, or specific advocate name
   OppAdvocateContactNumber?: string | null; // Contact for opposing counsel
+  district_id?: number | null;      // Direct district ID for custom/non-police station cases
 
   // Case Status & Management
   CaseStatus?: string | null;       // Current status (e.g., "Open", "In Progress", "Closed", "Appealed")
@@ -254,6 +255,7 @@ CREATE TABLE IF NOT EXISTS Cases (
   crime_number TEXT,
   crime_year INTEGER,
   police_station_id INTEGER,
+  district_id INTEGER,
   Undersection TEXT,
 
   -- Parties
@@ -281,8 +283,7 @@ CREATE TABLE IF NOT EXISTS Cases (
   updated_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
 
   FOREIGN KEY (user_id) REFERENCES Users(id) ON DELETE CASCADE,
-  -- FOREIGN KEY (court_id) REFERENCES Courts(id) ON DELETE SET NULL, -- FK constraint explicitly removed
-  -- FOREIGN KEY (case_type_id) REFERENCES CaseTypes(id) ON DELETE SET NULL, -- FK constraint explicitly removed
+  FOREIGN KEY (district_id) REFERENCES Districts(id) ON DELETE SET NULL,
   FOREIGN KEY (police_station_id) REFERENCES PoliceStations(id) ON DELETE SET NULL
 );`;
 
@@ -376,8 +377,13 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
       await db.execAsync("ALTER TABLE Cases ADD COLUMN session_trial_number TEXT;");
       console.log("Migration: Added column session_trial_number to Cases table successfully.");
     }
+    const hasDistrictId = tableInfo.some(col => col.name === 'district_id');
+    if (!hasDistrictId) {
+      await db.execAsync("ALTER TABLE Cases ADD COLUMN district_id INTEGER;");
+      console.log("Migration: Added column district_id to Cases table successfully.");
+    }
   } catch (migrationError) {
-    console.error("Error migrating Cases table for session_trial_number:", migrationError);
+    console.error("Error migrating Cases table:", migrationError);
   }
   
   // Create indexes on Cases table for O(log N) query lookup speed
@@ -400,6 +406,48 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   sanitizeLookupTable(db, 'CaseTypes', 'case_type_id', ['user_id']);
   sanitizeLookupTable(db, 'Courts', 'court_id', ['user_id']);
   sanitizeLookupTable(db, 'PoliceStations', 'police_station_id', ['district_id', 'user_id']);
+
+  // Migrate existing date strings stored in DD-MM-YYYY format to YYYY-MM-DD
+  try {
+    const casesToMigrate = await db.getAllAsync<{ id: number, NextDate: string | null, PreviousDate: string | null, dateFiled: string | null, StatuteOfLimitations: string | null }>(
+      "SELECT id, NextDate, PreviousDate, dateFiled, StatuteOfLimitations FROM Cases WHERE " +
+      "NextDate LIKE '__-__-____' OR PreviousDate LIKE '__-__-____' OR dateFiled LIKE '__-__-____' OR StatuteOfLimitations LIKE '__-__-____';"
+    );
+    for (const c of casesToMigrate) {
+      const updates: string[] = [];
+      const params: any[] = [];
+      
+      const convert = (dateStr: string | null) => {
+        if (dateStr && /^\d{2}-\d{2}-\d{4}$/.test(dateStr.trim())) {
+          const [day, month, year] = dateStr.trim().split('-');
+          return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+        }
+        return null;
+      };
+
+      const newNext = convert(c.NextDate);
+      if (newNext) { updates.push("NextDate = ?"); params.push(newNext); }
+      
+      const newPrev = convert(c.PreviousDate);
+      if (newPrev) { updates.push("PreviousDate = ?"); params.push(newPrev); }
+      
+      const newFiled = convert(c.dateFiled);
+      if (newFiled) { updates.push("dateFiled = ?"); params.push(newFiled); }
+      
+      const newSol = convert(c.StatuteOfLimitations);
+      if (newSol) { updates.push("StatuteOfLimitations = ?"); params.push(newSol); }
+
+      if (updates.length > 0) {
+        params.push(c.id);
+        await db.runAsync(`UPDATE Cases SET ${updates.join(', ')} WHERE id = ?`, params);
+      }
+    }
+    if (casesToMigrate.length > 0) {
+      console.log(`Migration: Converted ${casesToMigrate.length} cases from DD-MM-YYYY to YYYY-MM-DD date format.`);
+    }
+  } catch (migrationError) {
+    console.error("Error migrating case dates format:", migrationError);
+  }
 
   console.log("Database schema initialized.");
 };

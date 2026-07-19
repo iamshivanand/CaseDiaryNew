@@ -34,13 +34,13 @@ export const createRewardedAd = () => {
   try {
     rewardedAd = RewardedAd.createForAdRequest(rewardedAdUnitId, { requestNonPersonalizedAdsOnly: true });
     
-    const unsubL = rewardedAd.addAdEventListener(AdEventType.LOADED, () => {
+    const unsubL = rewardedAd.addAdEventListener(RewardedAdEventType.LOADED, () => {
       isRewardedAdLoading = false;
       unsubL();
       unsubE();
     });
     
-    const unsubE = rewardedAd.addAdEventListener(AdEventType.ERROR, (err) => {
+    const unsubE = rewardedAd.addAdEventListener(RewardedAdEventType.ERROR, (err) => {
       isRewardedAdLoading = false;
       console.warn("Rewarded ad failed to load, recreating instance:", err);
       unsubL();
@@ -211,6 +211,11 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
     // 3. Check if already loaded
     const targetAd = adType === "rewarded" ? rewardedAd : interstitialAd;
+    if (!targetAd) {
+      console.warn(`Ad instance for ${adType} is null. Falling back gracefully.`);
+      onComplete(true);
+      return;
+    }
     if (targetAd.loaded) {
       triggerShow(adType);
       return;
@@ -232,12 +237,15 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }, 1000);
 
     // Load Ad and listen to events
-    const unsubLoaded = targetAd.addAdEventListener(AdEventType.LOADED, () => {
+    const loadEvent = adType === "rewarded" ? RewardedAdEventType.LOADED : AdEventType.LOADED;
+    const errorEvent = adType === "rewarded" ? RewardedAdEventType.ERROR : AdEventType.ERROR;
+
+    const unsubLoaded = targetAd.addAdEventListener(loadEvent as any, () => {
       cleanUpAdRequest();
       triggerShow(adType);
     });
 
-    const unsubError = targetAd.addAdEventListener(AdEventType.ERROR, (error) => {
+    const unsubError = targetAd.addAdEventListener(errorEvent as any, (error) => {
       console.warn(`Ad failed to load (${adType}):`, error);
       if (timerRef.current) clearInterval(timerRef.current);
       setShowSkip(true);
@@ -272,7 +280,9 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     const targetAd = adType === "rewarded" ? rewardedAd : interstitialAd;
     let rewardEarned = false;
 
-    const unsubClosed = targetAd.addAdEventListener(AdEventType.CLOSED, () => {
+    const closedEvent = adType === "rewarded" ? RewardedAdEventType.CLOSED : AdEventType.CLOSED;
+
+    const unsubClosed = targetAd.addAdEventListener(closedEvent as any, () => {
       unsubClosed();
       // Re-initialize and preload for next use
       if (adType === "rewarded") {
@@ -319,7 +329,7 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         }
       );
       // Clean reward listener after close
-      targetAd.addAdEventListener(AdEventType.CLOSED, () => unsubReward());
+      targetAd.addAdEventListener(closedEvent as any, () => unsubReward());
     }
 
     try {

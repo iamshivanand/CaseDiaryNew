@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import * as Application from "expo-application";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import {
   getDb,
@@ -56,25 +57,23 @@ const ProfileScreen: React.FC = () => {
       const fetchProfile = async () => {
         console.log("Fetching profile data...");
         const db = await getDb();
-        const userId = await AsyncStorage.getItem("@user_id");
-        console.log("User ID from AsyncStorage:", userId);
-        if (userId) {
-          const parsedUserId = parseInt(userId, 10);
-          const profile = await getUserProfile(db, parsedUserId);
-          console.log("Profile data from DB:", profile);
-          // getTotalCases and getUpcomingHearings call getDb() internally — no db arg
-          const totalCases = await getTotalCases(parsedUserId);
-          const upcomingHearings = await getUpcomingHearings(parsedUserId);
-          if (profile) {
-            setProfileData({
-              ...profile,
-              stats: {
-                ...profile.stats,
-                totalCases,
-                upcomingHearings,
-              },
-            });
-          }
+        const userIdVal = await AsyncStorage.getItem("@user_id");
+        console.log("User ID from AsyncStorage:", userIdVal);
+        const parsedUserId = userIdVal ? parseInt(userIdVal, 10) : 1;
+        const profile = await getUserProfile(db, parsedUserId);
+        console.log("Profile data from DB:", profile);
+        // getTotalCases and getUpcomingHearings call getDb() internally — no db arg
+        const totalCases = await getTotalCases(parsedUserId);
+        const upcomingHearings = await getUpcomingHearings(parsedUserId);
+        if (profile) {
+          setProfileData({
+            ...profile,
+            stats: {
+              ...profile.stats,
+              totalCases,
+              upcomingHearings,
+            },
+          });
         }
       };
       fetchProfile();
@@ -157,10 +156,24 @@ const ProfileScreen: React.FC = () => {
     
     try {
       const dbInstance = await getDb();
-      const userId = await AsyncStorage.getItem("@user_id");
-      if (userId) {
-        await updateUserProfile(dbInstance, parseInt(userId, 10), updatedProfile);
+      const userIdVal = await AsyncStorage.getItem("@user_id");
+      const userId = userIdVal ? parseInt(userIdVal, 10) : 1;
+      await updateUserProfile(dbInstance, userId, updatedProfile);
+      
+      // Sync temp states immediately so the view doesn't revert to stale temp states
+      setTempAvatarUri(updatedProfile.avatarUrl);
+      setTempName(updatedProfile.name);
+      setTempDesignation(updatedProfile.designation);
+      setTempPracticeAreas(updatedProfile.practiceAreas.join(", "));
+      setTempAboutMe(updatedProfile.aboutMe);
+      setTempEmail(updatedProfile.contactInfo.email);
+      setTempPhone(updatedProfile.contactInfo.phone);
+      setTempAddress(updatedProfile.contactInfo.address);
+      setTempLanguages(updatedProfile.languages.join(", "));
+      if (updatedProfile.stats && updatedProfile.stats.yearsOfPractice !== undefined) {
+        setTempYearsOfPractice(Number(updatedProfile.stats.yearsOfPractice).toString());
       }
+      
       setIsEditing(false);
       Alert.alert("Success", "Profile updated successfully.");
     } catch (error) {
@@ -360,15 +373,14 @@ const ProfileScreen: React.FC = () => {
       </View>
 
       {selectedTab === "Profile" && (
-        <View style={{ paddingHorizontal: 16, marginVertical: 12 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-            <Text style={{ fontSize: 14, fontWeight: "600", color: theme.colors.text }}>Profile Completeness</Text>
-            <Text style={{ fontSize: 14, fontWeight: "bold", color: theme.colors.primary }}>{completeness}%</Text>
+        <View style={styles.completenessContainer}>
+          <View style={styles.completenessRow}>
+            <Text style={[styles.completenessLabel, { color: theme.colors.text }]}>Profile Completeness</Text>
+            <Text style={[styles.completenessValue, { color: theme.colors.primary }]}>{completeness}%</Text>
           </View>
-          <View style={{ height: 8, backgroundColor: theme.colors.border || "#E5E7EB", borderRadius: 4, overflow: "hidden" }}>
-            <View style={{ width: `${completeness}%`, height: "100%", backgroundColor: theme.colors.primary }} />
+          <View style={[styles.progressBarBackground, { backgroundColor: theme.colors.border || "#E5E7EB" }]}>
+            <View style={[styles.progressBarFill, { width: `${completeness}%`, backgroundColor: theme.colors.primary }]} />
           </View>
-
         </View>
       )}
 
@@ -379,6 +391,12 @@ const ProfileScreen: React.FC = () => {
       />
 
       <View style={styles.tabContentContainer}>{renderTabContent()}</View>
+
+      <View style={styles.versionContainer}>
+        <Text style={[styles.versionText, { color: theme.colors.textSecondary || "#6B7280" }]}>
+          App Version: {Application.nativeApplicationVersion || "1.0.0"} ({Application.nativeBuildVersion || "1"})
+        </Text>
+      </View>
     </ScrollView>
   );
 };
@@ -419,6 +437,39 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  completenessContainer: {
+    paddingHorizontal: 16,
+    marginVertical: 12,
+  },
+  completenessRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  completenessLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  completenessValue: {
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  progressBarBackground: {
+    height: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+  },
+  versionContainer: {
+    alignItems: "center",
+    marginVertical: 24,
+  },
+  versionText: {
+    fontSize: 12,
+    fontWeight: "500",
   },
 });
 

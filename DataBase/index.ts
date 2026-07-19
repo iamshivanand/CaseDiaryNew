@@ -128,11 +128,34 @@ export const getFullDocumentPath = (storedFileName: string | null | undefined): 
   if (!storedFileName) return null; return DOCUMENTS_DIRECTORY + storedFileName;
 };
 
+export interface ScannedPdfRow {
+  id: number;
+  case_id: number;
+  stored_filename: string;
+  original_display_name: string;
+  file_type?: string | null;
+  file_size?: number | null;
+  created_at: string;
+  CaseTitle?: string | null;
+}
+
+export const getAllScannedPdfs = async (): Promise<ScannedPdfRow[]> => {
+  const db = await getDb();
+  const sql = `
+    SELECT cd.*, c.CaseTitle
+    FROM CaseDocuments cd
+    LEFT JOIN Cases c ON cd.case_id = c.id
+    WHERE cd.stored_filename LIKE '%.pdf' OR cd.file_type LIKE '%pdf%'
+    ORDER BY cd.created_at DESC
+  `;
+  return db.getAllAsync<ScannedPdfRow>(sql);
+};
+
 // --- CRUD Operations for Cases ---
 export type CaseInsertData = Omit<CaseRow, 'id' | 'created_at' | 'updated_at'>;
 export type CaseUpdateData = Partial<Omit<CaseRow, 'id' | 'uniqueId' | 'created_at' | 'updated_at'>>;
 
-import { formatDate, getLocalDateString } from '../utils/commonFunctions';
+import { formatDate, getLocalDateString, normalizeDateToYYYYMMDD } from '../utils/commonFunctions';
 
 export const addCase = async (caseData: CaseInsertData): Promise<number | null> => {
   const drizzleDb = await getDrizzleDb(); if (!caseData.uniqueId) throw new Error("uniqueId is required.");
@@ -141,7 +164,7 @@ export const addCase = async (caseData: CaseInsertData): Promise<number | null> 
     if (Object.prototype.hasOwnProperty.call(caseData, key)) {
       const typedKey = key as keyof CaseInsertData;
       if (key === 'NextDate' || key === 'PreviousDate' || key === 'dateFiled' || key === 'StatuteOfLimitations') {
-        validCaseData[typedKey] = caseData[typedKey] ? formatDate(caseData[typedKey]) : null;
+        validCaseData[typedKey] = normalizeDateToYYYYMMDD(caseData[typedKey]);
       } else if (caseData[typedKey] !== undefined) {
         validCaseData[typedKey] = caseData[typedKey];
       }
@@ -180,9 +203,17 @@ export const getCases = async (
   }
 ): Promise<CaseWithDetails[]> => {
   const db = await getDb();
-  let sql = `SELECT c.*, ps.name as policeStationName, d.name as districtName FROM Cases c
+  let sql = `SELECT c.id, c.uniqueId, c.user_id, c.CaseTitle, c.ClientName, c.OnBehalfOf, c.CNRNumber,
+                    c.case_number, c.case_year, c.session_trial_number, c.court_id, c.court_name,
+                    c.case_type_id, c.case_type_name, c.dateFiled, c.NextDate, c.PreviousDate,
+                    c.StatuteOfLimitations, c.crime_number, c.crime_year, c.police_station_id,
+                    c.district_id, c.Undersection, c.FirstParty, c.OppositeParty, c.Accussed,
+                    c.ClientContactNumber, c.JudgeName, c.OpposingCounsel, c.OppositeAdvocate,
+                    c.OppAdvocateContactNumber, c.CaseStatus, c.Priority, c.created_at, c.updated_at,
+                    ps.name as policeStationName, d.name as districtName 
+             FROM Cases c
              LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
-             LEFT JOIN Districts d ON ps.district_id = d.id`;
+             LEFT JOIN Districts d ON c.district_id = d.id`;
   
   const whereClauses: string[] = [];
   const params: any[] = [];
@@ -257,7 +288,7 @@ export const getCaseById = async (id: number, userId?: number | null): Promise<C
   const db = await getDb();
   let sql = `SELECT c.*, ps.name as policeStationName, d.name as districtName FROM Cases c
              LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
-             LEFT JOIN Districts d ON ps.district_id = d.id
+             LEFT JOIN Districts d ON c.district_id = d.id
              WHERE c.id = ?`;
   const params: any[] = [id];
   if (userId != null) {
@@ -281,7 +312,7 @@ export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?:
     if (Object.prototype.hasOwnProperty.call(data, key)) {
       const typedKey = key as keyof CaseUpdateData;
       if (key === 'NextDate' || key === 'PreviousDate' || key === 'dateFiled' || key === 'StatuteOfLimitations') {
-        validUpdateData[typedKey] = data[typedKey] ? formatDate(data[typedKey]) : null;
+        validUpdateData[typedKey] = normalizeDateToYYYYMMDD(data[typedKey]);
       } else if (data[typedKey] !== undefined) {
         validUpdateData[typedKey] = data[typedKey];
       }
@@ -362,7 +393,7 @@ export const searchCases = async (
         SELECT c.*, ps.name as policeStationName, d.name as districtName
         FROM Cases c
         LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
-        LEFT JOIN Districts d ON ps.district_id = d.id
+        LEFT JOIN Districts d ON c.district_id = d.id
         WHERE (
             c.uniqueId LIKE ? OR c.CaseTitle LIKE ? OR c.ClientName LIKE ? OR c.CNRNumber LIKE ? OR
             c.case_number LIKE ? OR c.court_name LIKE ? OR c.case_type_name LIKE ? OR

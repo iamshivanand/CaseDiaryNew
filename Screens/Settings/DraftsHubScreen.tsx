@@ -17,6 +17,7 @@ import {
   Modal,
   TextInput,
   Dimensions,
+  ScrollView,
 } from "react-native";
 
 import * as db from "../../DataBase";
@@ -52,6 +53,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_vakalatnama",
     template_type: "vakalatnama",
     title: "Vakalatnama",
+    category: "common",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -59,6 +61,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_adjournment",
     template_type: "adjournment",
     title: "Adjournment Application",
+    category: "common",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -66,6 +69,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_bail",
     template_type: "bail",
     title: "Bail Application",
+    category: "criminal",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -73,6 +77,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_affidavit",
     template_type: "affidavit",
     title: "Affidavit",
+    category: "common",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -80,6 +85,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_written_statement",
     template_type: "written_statement",
     title: "Written Statement",
+    category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -87,6 +93,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_legal_notice",
     template_type: "legal_notice",
     title: "Legal Notice",
+    category: "common",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -94,6 +101,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_caveat",
     template_type: "caveat",
     title: "Caveat Petition",
+    category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -101,6 +109,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_injunction",
     template_type: "injunction",
     title: "Temporary Injunction",
+    category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -108,6 +117,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_plaint",
     template_type: "plaint",
     title: "Plaint (Civil Suit)",
+    category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -115,6 +125,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_rejoinder",
     template_type: "rejoinder",
     title: "Replication / Rejoinder",
+    category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -122,6 +133,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_execution",
     template_type: "execution",
     title: "Execution Petition",
+    category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -129,6 +141,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_anticipatory_bail",
     template_type: "anticipatory_bail",
     title: "Anticipatory Bail",
+    category: "criminal",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -136,6 +149,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_private_complaint",
     template_type: "private_complaint",
     title: "Private Complaint",
+    category: "criminal",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -143,6 +157,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_fir_quashing",
     template_type: "fir_quashing",
     title: "FIR Quashing Petition",
+    category: "criminal",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -150,6 +165,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_exemption",
     template_type: "exemption",
     title: "Exemption Application",
+    category: "common",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -157,6 +173,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_cheque_bounce",
     template_type: "cheque_bounce",
     title: "Cheque Bounce Notice",
+    category: "commercial",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -164,6 +181,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_arbitration_sec9",
     template_type: "arbitration_sec9",
     title: "Arbitration Sec 9",
+    category: "commercial",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -171,6 +189,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_consumer_complaint",
     template_type: "consumer_complaint",
     title: "Consumer Complaint",
+    category: "commercial",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -178,6 +197,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_rent_agreement",
     template_type: "rent_agreement",
     title: "Rent Agreement",
+    category: "commercial",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -185,6 +205,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_power_of_attorney",
     template_type: "power_of_attorney",
     title: "Power of Attorney",
+    category: "commercial",
     is_custom_template: 0,
     isBuiltIn: true,
   },
@@ -237,6 +258,49 @@ const getTemplateLabel = (type: string): string => {
   }
 };
 
+const getCategoryForTemplateType = (type: string): string => {
+  switch (type) {
+    case "plaint":
+    case "written_statement":
+    case "caveat":
+    case "injunction":
+    case "rejoinder":
+    case "execution":
+      return "civil";
+
+    case "bail":
+    case "anticipatory_bail":
+    case "private_complaint":
+    case "fir_quashing":
+      return "criminal";
+
+    case "cheque_bounce":
+    case "arbitration_sec9":
+    case "consumer_complaint":
+    case "rent_agreement":
+    case "power_of_attorney":
+      return "commercial";
+
+    case "vakalatnama":
+    case "adjournment":
+    case "affidavit":
+    case "exemption":
+    case "legal_notice":
+      return "common";
+
+    default:
+      return "common";
+  }
+};
+
+const categories = [
+  { label: "All Categories", value: "all" },
+  { label: "Civil (CPC)", value: "civil" },
+  { label: "Criminal (CrPC)", value: "criminal" },
+  { label: "Commercial / ADR", value: "commercial" },
+  { label: "Common Docs", value: "common" },
+];
+
 const DraftsHubScreen: React.FC = () => {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
@@ -247,6 +311,7 @@ const DraftsHubScreen: React.FC = () => {
   const [drafts, setDrafts] = useState<DocumentDraft[]>([]);
   const [filteredDrafts, setFilteredDrafts] = useState<DocumentDraft[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
 
   // Pagination states
@@ -384,24 +449,34 @@ const DraftsHubScreen: React.FC = () => {
     if (isFocused) {
       setPage(0);
       setHasMore(true);
+      setSelectedCategory("all");
       loadDrafts(true);
     }
   }, [isFocused, activeTab, searchQuery]);
 
-  // Filter drafts based on search query
+  // Filter drafts based on search query and category
   useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredDrafts(drafts);
-    } else {
+    let filtered = drafts;
+
+    if (activeTab === "templates" && selectedCategory !== "all") {
+      filtered = filtered.filter((item) => {
+        // @ts-ignore
+        const cat = item.category || getCategoryForTemplateType(item.template_type);
+        return cat === selectedCategory;
+      });
+    }
+
+    if (searchQuery.trim() !== "") {
       const query = searchQuery.toLowerCase();
-      const filtered = drafts.filter(
+      filtered = filtered.filter(
         (draft) =>
           draft.title.toLowerCase().includes(query) ||
           getTemplateLabel(draft.template_type).toLowerCase().includes(query)
       );
-      setFilteredDrafts(filtered);
     }
-  }, [searchQuery, drafts]);
+
+    setFilteredDrafts(filtered);
+  }, [searchQuery, drafts, activeTab, selectedCategory]);
 
   // Load cases from Database for Attach Modal
   const loadCases = async () => {
@@ -1017,6 +1092,51 @@ const DraftsHubScreen: React.FC = () => {
           )}
         </View>
       </View>
+
+      {activeTab === "templates" && (
+        <View style={{ height: 48, backgroundColor: theme.colors.cardBackground, borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              gap: 8,
+            }}
+          >
+            {categories.map((cat) => {
+              const isSelected = selectedCategory === cat.value;
+              return (
+                <TouchableOpacity
+                  key={cat.value}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 20,
+                    backgroundColor: isSelected
+                      ? theme.colors.primary
+                      : `${theme.colors.border}40`,
+                    height: 28,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                  onPress={() => setSelectedCategory(cat.value)}
+                >
+                  <Text
+                    style={{
+                      color: isSelected ? "#ffffff" : theme.colors.text,
+                      fontSize: 12,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
 
       {isLoading ? (
         <View style={styles.centered}>

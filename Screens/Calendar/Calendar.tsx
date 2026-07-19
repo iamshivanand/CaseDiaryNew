@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import React, { useState, useCallback, useContext } from "react";
-import { formatDate, getLocalDateString, parseLocalDate } from "../../utils/commonFunctions";
+import { formatDate, getLocalDateString, parseLocalDate, normalizeDateToYYYYMMDD } from "../../utils/commonFunctions";
 import {
   ScrollView,
   StyleSheet,
@@ -44,8 +44,7 @@ const CalendarScreen: React.FC<Props> = () => {
   const getResultFromDate = async (date: string) => {
     const allCases = await db.getCases();
     const filteredCases = allCases.filter(c => {
-      if (!c.NextDate) return false;
-      const caseDate = c.NextDate.split('T')[0];
+      const caseDate = normalizeDateToYYYYMMDD(c.NextDate);
       return caseDate === date;
     });
 
@@ -56,7 +55,7 @@ const CalendarScreen: React.FC<Props> = () => {
   const fetchAllDates = async () => {
     const allCases = await db.getCases();
     const datesArray = allCases
-      .map((item) => item.NextDate ? item.NextDate.split('T')[0] : null)
+      .map((item) => normalizeDateToYYYYMMDD(item.NextDate))
       .filter(Boolean);
 
     const formattedDates = datesArray.reduce((acc: any, date) => {
@@ -96,13 +95,11 @@ const CalendarScreen: React.FC<Props> = () => {
         return;
       }
       // 1. Add timeline event
-      if (notes) {
-        await db.addCaseTimelineEvent({
-          case_id: caseId,
-          hearing_date: new Date().toISOString(),
-          notes: notes,
-        });
-      }
+      await db.addCaseTimelineEvent({
+        case_id: caseId,
+        hearing_date: new Date().toISOString(),
+        notes: notes || "",
+      });
 
       // 2. Update case's next hearing date
       await db.updateCase(caseId, {
