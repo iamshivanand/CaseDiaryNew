@@ -239,9 +239,24 @@ const EditCaseScreen: React.FC = () => {
   useEffect(() => {
     const caseIdToLoad = initialCaseIdFromRoute;
     navigation.setOptions({
-      title: route.params?.initialCaseData?.CaseTitle
-        ? `${t("editcase_header_edit")}: ${route.params.initialCaseData.CaseTitle}`
-        : t("editcase_header_title"),
+      headerTitle: () => (
+        <View style={{ width: 220, alignItems: "center" }}>
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: "bold",
+              color: theme.colors.text,
+              textAlign: "center",
+            }}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {route.params?.initialCaseData?.CaseTitle
+              ? `${t("editcase_header_edit")}: ${route.params.initialCaseData.CaseTitle}`
+              : t("editcase_header_title")}
+          </Text>
+        </View>
+      ),
     });
 
     const fetchAllData = async () => {
@@ -335,7 +350,22 @@ const EditCaseScreen: React.FC = () => {
           await handleDistrictChange(initialDistrictId, activeUserId);
 
           navigation.setOptions({
-            title: `${t("editcase_header_edit")}: ${fetchedCase.CaseTitle || "Case"}`,
+            headerTitle: () => (
+              <View style={{ width: 220, alignItems: "center" }}>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "bold",
+                    color: theme.colors.text,
+                    textAlign: "center",
+                  }}
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                >
+                  {`${t("editcase_header_edit")}: ${fetchedCase.CaseTitle || "Case"}`}
+                </Text>
+              </View>
+            ),
           });
           await Promise.all([
             loadDocuments(caseIdToLoad),

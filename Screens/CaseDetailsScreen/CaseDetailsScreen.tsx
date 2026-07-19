@@ -89,9 +89,24 @@ const CaseDetailsScreen: React.FC = () => {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: caseDetails?.CaseTitle || t("casedetails_header_title"),
+      headerTitle: () => (
+        <View style={{ width: 220, alignItems: "center" }}>
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: "bold",
+              color: theme.colors.text,
+              textAlign: "center",
+            }}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {caseDetails?.CaseTitle || t("casedetails_header_title")}
+          </Text>
+        </View>
+      ),
     });
-  }, [navigation, caseDetails, t]);
+  }, [navigation, caseDetails, t, theme]);
 
   const loadCaseDetails = useCallback(async (caseId: number) => {
     console.log("Loading case details for caseId:", caseId);
