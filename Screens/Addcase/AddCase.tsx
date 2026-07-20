@@ -45,6 +45,7 @@ import {
   DropdownOption as AppDropdownOption,
   caseStatusOptions,
   priorityOptions,
+  caseStageOptions,
 } from "../../Types/appTypes";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { convertIndianDateToLocal } from "../../utils/ecourtsParser";
@@ -288,6 +289,25 @@ const formFieldsDefinition: FieldDefinition[] = [
     placeholder: "Add any private notes...",
     label: "Internal Notes",
   },
+  {
+    name: "case_stage",
+    type: "picker",
+    placeholder: "Select Case Stage",
+    label: "Case Stage",
+    options: caseStageOptions,
+  },
+  {
+    name: "total_fee",
+    type: "number",
+    placeholder: "Enter Total Agreed Fee (₹)",
+    label: "Total Fee (₹)",
+  },
+  {
+    name: "fee_paid",
+    type: "number",
+    placeholder: "Enter Fee Paid to Date (₹)",
+    label: "Fee Paid (₹)",
+  },
 ];
 
 const fieldGroups = [
@@ -334,6 +354,11 @@ const fieldGroups = [
       "HearingDate",
       "StatuteOfLimitations",
     ],
+  },
+  {
+    title: "Stage & Fee Details",
+    icon: "cash-outline",
+    fields: ["case_stage", "total_fee", "fee_paid"],
   },
   {
     title: "Description & Notes",
@@ -519,6 +544,8 @@ const getGroupTitleKey = (title: string): string => {
       return "addcase_group_parties_court";
     case "Dates & Priorities":
       return "addcase_group_dates_priorities";
+    case "Stage & Fee Details":
+      return "addcase_group_stage_fee";
     case "Description & Notes":
       return "addcase_group_desc_notes";
     default:
@@ -568,14 +595,19 @@ const FormFieldRenderer: React.FC<{
   };
 
   switch (fieldConfig.type) {
+    case "number":
     case "text":
       return (
         <FormInput
           {...commonInputProps}
-          value={values[fieldName] || ""}
+          value={
+            values[fieldName] !== undefined && values[fieldName] !== null
+              ? String(values[fieldName])
+              : ""
+          }
           placeholder={translatedPlaceholder}
           onChangeText={(text) => {
-            if (fieldName === "crime_year") {
+            if (fieldConfig.type === "number" || fieldName === "crime_year") {
               const sanitized = text.replace(/[^0-9]/g, "");
               setFieldValue(fieldName, sanitized);
             } else {
@@ -586,7 +618,7 @@ const FormFieldRenderer: React.FC<{
             fieldConfig.suggestions ? suggestions[fieldName] || [] : undefined
           }
           maxLength={fieldConfig.maxLength}
-          keyboardType={fieldConfig.keyboardType as any}
+          keyboardType={fieldConfig.type === "number" ? "numeric" : (fieldConfig.keyboardType as any)}
           showContactPicker={
             fieldName === "ClientContactNumber" ||
             fieldName === "OppAdvocateContactNumber"
@@ -604,6 +636,7 @@ const FormFieldRenderer: React.FC<{
           numberOfLines={4}
         />
       );
+    case "picker":
     case "select":
       let selectOpts = [];
       if (fieldConfig.name === "police_station_id") {
@@ -1306,6 +1339,13 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           CaseDescription: changedFields.CaseDescription,
         }),
         ...(changedFields.CaseNotes && { CaseNotes: changedFields.CaseNotes }),
+        ...(changedFields.case_stage && { case_stage: changedFields.case_stage }),
+        ...(changedFields.total_fee !== undefined && {
+          total_fee: typeof changedFields.total_fee === 'string' ? parseFloat(changedFields.total_fee) : changedFields.total_fee,
+        }),
+        ...(changedFields.fee_paid !== undefined && {
+          fee_paid: typeof changedFields.fee_paid === 'string' ? parseFloat(changedFields.fee_paid) : changedFields.fee_paid,
+        }),
       };
       Object.keys(updatePayload).forEach((key) => {
         const K = key as keyof CaseUpdateData;
@@ -1381,6 +1421,9 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         NextDate: formValues.HearingDate || null,
         CaseDescription: formValues.CaseDescription || null,
         CaseNotes: formValues.CaseNotes || null,
+        case_stage: formValues.case_stage || null,
+        total_fee: formValues.total_fee ? parseFloat(formValues.total_fee as any) : 0,
+        fee_paid: formValues.fee_paid ? parseFloat(formValues.fee_paid as any) : 0,
       };
 
       console.log(
@@ -1522,7 +1565,8 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
                       .filter(
                         (f) =>
                           group.fields.includes(f.name) &&
-                          f.name !== "crime_year"
+                          f.name !== "crime_year" &&
+                          f.name !== "fee_paid"
                       )
                       .map((fieldConfig) => {
                         if (fieldConfig.name === "crime_number") {
@@ -1568,6 +1612,79 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
                                   caseTypeOptions={caseTypeOptions}
                                 />
                               </View>
+                            </View>
+                          );
+                        }
+                        if (fieldConfig.name === "total_fee") {
+                          const feePaidConfig = formFieldsDefinition.find(
+                            (f) => f.name === "fee_paid"
+                          )!;
+                          const totFee = parseFloat(formikProps.values.total_fee as any) || 0;
+                          const pdFee = parseFloat(formikProps.values.fee_paid as any) || 0;
+                          const balance = Math.max(0, totFee - pdFee);
+
+                          return (
+                            <View key="fee_section">
+                              <View
+                                style={{ flexDirection: "row", gap: 12 }}
+                                onLayout={(event) => {
+                                  fieldLayouts.current[fieldConfig.name] =
+                                    event.nativeEvent.layout.y;
+                                  fieldLayouts.current[feePaidConfig.name] =
+                                    event.nativeEvent.layout.y;
+                                }}
+                              >
+                                <View style={{ flex: 1 }}>
+                                  <FormFieldRenderer
+                                    fieldConfig={fieldConfig}
+                                    formik={formikProps}
+                                    otherValues={otherValues}
+                                    setOtherValue={setOtherValue}
+                                    suggestions={suggestions}
+                                    policeStationOptions={policeStationOptions}
+                                    districtOptions={districtOptions}
+                                    onDistrictChange={handleDistrictChange}
+                                    courtOptions={courtOptions}
+                                    caseTypeOptions={caseTypeOptions}
+                                  />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                  <FormFieldRenderer
+                                    fieldConfig={feePaidConfig}
+                                    formik={formikProps}
+                                    otherValues={otherValues}
+                                    setOtherValue={setOtherValue}
+                                    suggestions={suggestions}
+                                    policeStationOptions={policeStationOptions}
+                                    districtOptions={districtOptions}
+                                    onDistrictChange={handleDistrictChange}
+                                    courtOptions={courtOptions}
+                                    caseTypeOptions={caseTypeOptions}
+                                  />
+                                </View>
+                              </View>
+                              {totFee > 0 && (
+                                <View style={{
+                                  flexDirection: 'row',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  backgroundColor: balance > 0 ? '#FEF2F2' : '#F0FDF4',
+                                  borderColor: balance > 0 ? '#FCA5A5' : '#86EFAC',
+                                  borderWidth: 1,
+                                  borderRadius: 10,
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 10,
+                                  marginTop: 4,
+                                  marginBottom: 12,
+                                }}>
+                                  <Text style={{ fontSize: 13, fontWeight: '600', color: balance > 0 ? '#991B1B' : '#166534' }}>
+                                    Pending Balance:
+                                  </Text>
+                                  <Text style={{ fontSize: 14, fontWeight: '700', color: balance > 0 ? '#DC2626' : '#16A34A' }}>
+                                    ₹{balance.toLocaleString('en-IN')}
+                                  </Text>
+                                </View>
+                              )}
                             </View>
                           );
                         }

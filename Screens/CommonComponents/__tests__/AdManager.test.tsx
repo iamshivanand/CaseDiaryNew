@@ -59,6 +59,9 @@ jest.mock("react-native-google-mobile-ads", () => {
       CLOSED: "closed",
     },
     RewardedAdEventType: {
+      LOADED: "rewarded_loaded",
+      ERROR: "rewarded_error",
+      CLOSED: "rewarded_closed",
       EARNED_REWARD: "earned_reward",
     },
   };
@@ -172,8 +175,8 @@ describe("AdManager", () => {
 
     // Simulate ad loaded event
     act(() => {
-      if (global.rewardedListeners["loaded"]) {
-        global.rewardedListeners["loaded"]();
+      if (global.rewardedListeners["rewarded_loaded"]) {
+        global.rewardedListeners["rewarded_loaded"]();
       }
     });
 

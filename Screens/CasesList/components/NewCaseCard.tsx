@@ -63,8 +63,8 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
 
   return (
     <Pressable
-      onPressIn={() => { scale.value = withSpring(0.97, { damping: 15, stiffness: 200 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
+      onPressIn={() => { scale.value = withSpring(0.97, { damping: 25, stiffness: 400, mass: 0.4 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 25, stiffness: 400, mass: 0.4 }); }}
       onPress={() =>
         navigation.navigate("CaseDetails", { caseId: id })
       }

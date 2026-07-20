@@ -20,10 +20,13 @@ export const promptClientNotification = async (
       return;
     }
 
-    const clientPhone = caseDetails.ClientContactNumber.replace(/\D/g, "");
+    let clientPhone = caseDetails.ClientContactNumber.replace(/\D/g, "");
     if (!clientPhone) {
       console.log(`promptClientNotification: Sanitized contact number is empty. Skipping.`);
       return;
+    }
+    if (clientPhone.length === 10) {
+      clientPhone = `91${clientPhone}`;
     }
 
     // 2. Resolve advocate name
@@ -47,8 +50,10 @@ export const promptClientNotification = async (
       advocateName = "Advocate";
     }
 
-    // 3. Resolve user language/locale templates
+    // 3. Resolve user language/locale templates or custom template
     const lang = (await AsyncStorage.getItem("@user_language")) || "en";
+    const customTemplate = await AsyncStorage.getItem("@whatsapp_custom_template");
+
     const clientName = caseDetails.ClientName || "Client";
     const caseTitle = caseDetails.CaseTitle || "Legal Matter";
     const caseNumber = caseDetails.case_number || "N/A";
@@ -56,7 +61,16 @@ export const promptClientNotification = async (
     const dateFormatted = nextHearingDate ? formatDate(nextHearingDate) : (caseDetails.NextDate ? formatDate(caseDetails.NextDate) : "N/A");
 
     let message = "";
-    if (lang === "hi") {
+    if (customTemplate && customTemplate.trim()) {
+      message = customTemplate
+        .replace(/{client_name}/g, clientName)
+        .replace(/{case_title}/g, caseTitle)
+        .replace(/{case_number}/g, caseNumber)
+        .replace(/{court_name}/g, courtName)
+        .replace(/{hearing_date}/g, dateFormatted)
+        .replace(/{advocate_name}/g, advocateName)
+        .replace(/{notes}/g, notes && notes.trim() ? notes.trim() : "");
+    } else if (lang === "hi") {
       message = `प्रिय ${clientName},\n\nयह आपके केस "${caseTitle}" (केस संख्या: ${caseNumber}) के संबंध में एक अनुस्मारक है, जो कि न्यायालय ${courtName} में ${dateFormatted} को सुनवाई के लिए सूचीबद्ध है।\n\nकृपया उपस्थित रहें। यदि आपके कोई प्रश्न हैं तो हमें बताएं।`;
       if (notes && notes.trim()) {
         message += `\n\nविवरण: ${notes.trim()}`;

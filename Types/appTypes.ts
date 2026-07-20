@@ -50,6 +50,9 @@ export interface CaseData {
   CaseStatus?: string | null; // From schema.ts, general status string
   Status?: string | null; // Specifically for the dropdown (Open, In Progress, Closed etc.)
   Priority?: string | null; // Requested dropdown: High, Medium, Low
+  case_stage?: string | null; // Stage: Framing of Charges, Evidence, Arguments, etc.
+  total_fee?: number | null; // Total agreed fee
+  fee_paid?: number | null; // Collected fee
   PreviousDate?: string | null; // ISO8601 "YYYY-MM-DD"
   NextDate?: string | null; // ISO8601 "YYYY-MM-DD" (Can be "Hearing Date")
   FiledDate?: string | null; // Explicit field for form, maps to dateFiled
@@ -121,6 +124,16 @@ export const priorityOptions: DropdownOption[] = [
   { label: "High", value: "High" },
   { label: "Medium", value: "Medium" },
   { label: "Low", value: "Low" },
+];
+
+export const caseStageOptions: DropdownOption[] = [
+  { label: "Framing of Charges", value: "Framing of Charges" },
+  { label: "Plaintiff/Prosecution Evidence", value: "Plaintiff/Prosecution Evidence" },
+  { label: "Cross Examination", value: "Cross Examination" },
+  { label: "Defendant/Defence Evidence", value: "Defendant/Defence Evidence" },
+  { label: "Final Arguments", value: "Final Arguments" },
+  { label: "Order / Judgment Reserved", value: "Order / Judgment Reserved" },
+  { label: "Execution / Compliance", value: "Execution / Compliance" },
 ];
 
 // Lookup type options (examples, assuming these would be populated from the database)

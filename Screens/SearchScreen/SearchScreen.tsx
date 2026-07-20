@@ -34,7 +34,7 @@ const SearchScreen: React.FC = () => {
     setPopupVisible(true);
   }, []);
 
-  const handleSaveHearing = useCallback(async (notes: string, nextHearingDate: Date, userId: number) => {
+  const handleSaveHearing = useCallback(async (notes: string, nextHearingDate: Date, userId: number, feeReceivedToday?: number) => {
     if (!selectedCase || !selectedCase.id) return;
     const caseId = parseInt(selectedCase.id.toString(), 10);
     if (isNaN(caseId)) return;
@@ -45,16 +45,23 @@ const SearchScreen: React.FC = () => {
         console.error("Case not found");
         return;
       }
+      const feeNote = feeReceivedToday && feeReceivedToday > 0 
+        ? ` [Fee Received: ₹${feeReceivedToday.toLocaleString('en-IN')}]` 
+        : "";
+      const finalNotes = (notes || "") + feeNote;
+
       // 1. Add timeline event
       await db.addCaseTimelineEvent({
         case_id: caseId,
         hearing_date: new Date().toISOString(),
-        notes: notes || "",
+        notes: finalNotes.trim(),
       });
 
-      // 2. Update case's next hearing date
+      // 2. Update case's next hearing date and fee_paid
+      const updatedFeePaid = (caseExists.fee_paid || 0) + (feeReceivedToday || 0);
       await db.updateCase(caseId, {
         NextDate: getLocalDateString(nextHearingDate),
+        ...(feeReceivedToday && feeReceivedToday > 0 ? { fee_paid: updatedFeePaid } : {}),
       }, userId);
 
       // 3. Refresh list from page 0
@@ -137,8 +144,8 @@ const SearchScreen: React.FC = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
-          onSave={async (notes, nextHearingDate) =>
-            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId())
+          onSave={async (notes, nextHearingDate, feeReceivedToday) =>
+            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId(), feeReceivedToday)
           }
         />
       )}

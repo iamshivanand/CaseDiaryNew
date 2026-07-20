@@ -26,12 +26,16 @@ import {
   Modal,
   TextInput,
   ScrollView,
+  Animated as RNAnimated,
 } from "react-native";
+
+import Animated, { FadeInDown } from "react-native-reanimated";
 
 import DateRow from "./components/DateRow";
 import DocumentCard from "./components/DocumentCard";
 import StatusBadge from "./components/StatusBadge";
 import TimelineEventItem from "./components/TimelineEventItem";
+import UpdateHearingPopup from "./components/UpdateHearingPopup";
 import * as db from "../../DataBase";
 import { getCaseTimelineEventsByCaseId, getCaseById } from "../../DataBase";
 import { useTranslation } from "../../Providers/LanguageProvider";
@@ -43,7 +47,7 @@ import {
   TimelineEvent,
 } from "../../Types/appTypes";
 import { HomeStackParamList } from "../../Types/navigationtypes";
-import { formatDate } from "../../utils/commonFunctions";
+import { formatDate, getCurrentUserId } from "../../utils/commonFunctions";
 import {
   exportCaseToPdf,
   exportCaseHistoryToPdf,
@@ -68,6 +72,126 @@ type ListItemType =
   | { type: "noTimelineEvents" }
   | { type: "loadingDocuments" };
 
+const SkeletonItem: React.FC<{ style: any }> = ({ style }) => {
+  const opacity = React.useRef(new RNAnimated.Value(0.4)).current;
+
+  React.useEffect(() => {
+    const pulse = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(opacity, {
+          toValue: 0.85,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+        RNAnimated.timing(opacity, {
+          toValue: 0.4,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [opacity]);
+
+  return (
+    <RNAnimated.View
+      style={[{ backgroundColor: "#E2E8F0", borderRadius: 8 }, style, { opacity }]}
+    />
+  );
+};
+
+const CaseDetailsSkeleton: React.FC<{ theme: Theme }> = ({ theme }) => (
+  <ScrollView
+    showsVerticalScrollIndicator={false}
+    style={{ flex: 1, backgroundColor: theme.colors.background }}
+    contentContainerStyle={{ padding: 16 }}
+  >
+    {/* Skeleton Card 1: Case Spotlight */}
+    <View
+      style={{
+        backgroundColor: theme.colors.cardBackground,
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        marginBottom: 16,
+      }}
+    >
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 12 }}>
+        <SkeletonItem style={{ width: "65%", height: 22 }} />
+        <SkeletonItem style={{ width: 60, height: 22, borderRadius: 12 }} />
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 14 }}>
+        <SkeletonItem style={{ width: "45%", height: 16 }} />
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          <SkeletonItem style={{ width: 60, height: 18, borderRadius: 8 }} />
+          <SkeletonItem style={{ width: 60, height: 18, borderRadius: 8 }} />
+        </View>
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 8,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+          paddingTop: 12,
+        }}
+      >
+        <SkeletonItem style={{ flex: 1, height: 40, borderRadius: 10 }} />
+        <SkeletonItem style={{ flex: 1, height: 40, borderRadius: 10 }} />
+        <SkeletonItem style={{ flex: 1, height: 40, borderRadius: 10 }} />
+      </View>
+    </View>
+
+    {/* Skeleton Card 2: Hearing & Fee Spotlight */}
+    <View
+      style={{
+        backgroundColor: theme.colors.cardBackground,
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        marginBottom: 16,
+      }}
+    >
+      <SkeletonItem style={{ width: "55%", height: 18, marginBottom: 12 }} />
+      <SkeletonItem style={{ width: "100%", height: 50, borderRadius: 12, marginBottom: 10 }} />
+      <SkeletonItem style={{ width: "100%", height: 40, borderRadius: 10, marginBottom: 14 }} />
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+        <SkeletonItem style={{ flex: 1, height: 44, borderRadius: 10 }} />
+        <SkeletonItem style={{ flex: 1, height: 44, borderRadius: 10 }} />
+        <SkeletonItem style={{ flex: 1, height: 44, borderRadius: 10 }} />
+      </View>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <SkeletonItem style={{ flex: 1, height: 40, borderRadius: 10 }} />
+        <SkeletonItem style={{ flex: 1, height: 40, borderRadius: 10 }} />
+      </View>
+    </View>
+
+    {/* Skeleton Accordions */}
+    {[1, 2, 3, 4].map((i) => (
+      <View
+        key={i}
+        style={{
+          backgroundColor: theme.colors.cardBackground,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+          marginBottom: 12,
+          padding: 14,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <SkeletonItem style={{ width: "50%", height: 18 }} />
+        <SkeletonItem style={{ width: 22, height: 22, borderRadius: 11 }} />
+      </View>
+    ))}
+  </ScrollView>
+);
+
 const CaseDetailsScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<CaseDetailsScreenRouteProp>();
@@ -86,6 +210,30 @@ const CaseDetailsScreen: React.FC = () => {
   const [showEditNotesModal, setShowEditNotesModal] = useState(false);
   const [editingTimelineEvent, setEditingTimelineEvent] = useState<TimelineEvent | null>(null);
   const [editedNotesText, setEditedNotesText] = useState("");
+
+  // Fee, Hearing & Accordion States
+  const [showFeeModal, setShowFeeModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showUpdateHearingModal, setShowUpdateHearingModal] = useState(false);
+  const [editingTotalFee, setEditingTotalFee] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentNote, setPaymentNote] = useState("");
+
+  // Accordion Sections State
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    court: true,       // Default expanded
+    identifiers: false,
+    parties: false,
+    notes: false,
+    documents: true,   // Default expanded
+  });
+
+  const toggleSection = (sectionKey: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey],
+    }));
+  };
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -388,6 +536,107 @@ const CaseDetailsScreen: React.FC = () => {
     }
   };
 
+  const handleSaveTotalFee = async () => {
+    if (!caseDetails || !caseDetails.id) return;
+    const caseIdToUpdate = parseInt(caseDetails.id.toString(), 10);
+    const newTotalFee = editingTotalFee.trim() ? parseFloat(editingTotalFee.trim()) : 0;
+    try {
+      await db.updateCase(caseIdToUpdate, { total_fee: newTotalFee });
+      setShowFeeModal(false);
+      await loadCaseDetails(caseIdToUpdate);
+      Alert.alert(t("alert_success"), "Total agreed fee updated successfully.");
+    } catch (e) {
+      console.error("Failed to update total fee:", e);
+      Alert.alert(t("alert_error"), "Failed to update total fee.");
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!caseDetails || !caseDetails.id) return;
+    const caseIdToUpdate = parseInt(caseDetails.id.toString(), 10);
+    const amount = paymentAmount.trim() ? parseFloat(paymentAmount.trim()) : 0;
+    if (amount <= 0) {
+      Alert.alert(t("alert_warning"), "Please enter a valid payment amount.");
+      return;
+    }
+    try {
+      const updatedFeePaid = (caseDetails.fee_paid || 0) + amount;
+      await db.updateCase(caseIdToUpdate, { fee_paid: updatedFeePaid });
+      const noteStr = paymentNote.trim() ? ` [${paymentNote.trim()}]` : "";
+      await db.addCaseTimelineEvent({
+        case_id: caseIdToUpdate,
+        hearing_date: new Date().toISOString(),
+        notes: `Fee Payment Received: ₹${amount.toLocaleString('en-IN')}${noteStr}`,
+      });
+      setShowPaymentModal(false);
+      setPaymentAmount("");
+      setPaymentNote("");
+      await loadCaseDetails(caseIdToUpdate);
+      await loadDocumentsAndTimeline(caseIdToUpdate);
+      Alert.alert(t("alert_success"), `Payment of ₹${amount.toLocaleString('en-IN')} recorded successfully.`);
+    } catch (e) {
+      console.error("Failed to record payment:", e);
+      Alert.alert(t("alert_error"), "Failed to record payment.");
+    }
+  };
+
+  const getRelativeHearingTag = (dateStr?: string) => {
+    if (!dateStr) return null;
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const hearingDate = new Date(dateStr);
+      hearingDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((hearingDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+      if (diffDays === 0) return { label: "TODAY", bg: "#DCFCE7", text: "#15803D" };
+      if (diffDays === 1) return { label: "TOMORROW", bg: "#FEF3C7", text: "#D97706" };
+      if (diffDays > 1) return { label: `IN ${diffDays} DAYS`, bg: "#E0F2FE", text: "#0284C7" };
+      return { label: `${Math.abs(diffDays)} DAYS AGO`, bg: "#FEE2E2", text: "#B91C1C" };
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const handleSaveHearingUpdate = async (notes: string, nextHearingDate: Date, feeReceivedToday?: number) => {
+    if (!caseDetails || !caseDetails.id) return;
+    const caseIdToUpdate = parseInt(caseDetails.id.toString(), 10);
+    try {
+      const uId = await getCurrentUserId();
+      const caseExists = await db.getCaseById(caseIdToUpdate);
+      if (!caseExists) return;
+
+      const feeNote = feeReceivedToday && feeReceivedToday > 0 
+        ? ` [Fee Received: ₹${feeReceivedToday.toLocaleString('en-IN')}]` 
+        : "";
+      const finalNotes = (notes || "") + feeNote;
+
+      await db.addCaseTimelineEvent({
+        case_id: caseIdToUpdate,
+        hearing_date: new Date().toISOString(),
+        notes: finalNotes.trim(),
+      });
+
+      const year = nextHearingDate.getFullYear();
+      const month = String(nextHearingDate.getMonth() + 1).padStart(2, "0");
+      const day = String(nextHearingDate.getDate()).padStart(2, "0");
+      const formattedNextDate = `${year}-${month}-${day}`;
+
+      const updatedFeePaid = (caseDetails.fee_paid || 0) + (feeReceivedToday || 0);
+      await db.updateCase(caseIdToUpdate, {
+        NextDate: formattedNextDate,
+        ...(feeReceivedToday && feeReceivedToday > 0 ? { fee_paid: updatedFeePaid } : {}),
+      }, uId);
+
+      setShowUpdateHearingModal(false);
+      await loadCaseDetails(caseIdToUpdate);
+      await loadDocumentsAndTimeline(caseIdToUpdate);
+      Alert.alert(t("alert_success"), "Hearing date updated successfully.");
+    } catch (e) {
+      console.error("Failed to update hearing date:", e);
+      Alert.alert(t("alert_error"), "Failed to update hearing date.");
+    }
+  };
+
   const handleGenerateDocument = () => {
     if (!caseDetails) return;
     // @ts-ignore
@@ -529,6 +778,40 @@ const CaseDetailsScreen: React.FC = () => {
     }
   };
 
+  const handleShareDocument = async (doc: Document) => {
+    if (!doc.stored_filename) return;
+    const localPath = db.getFullDocumentPath(doc.stored_filename);
+    if (localPath && (await Sharing.isAvailableAsync())) {
+      await Sharing.shareAsync(localPath);
+    } else {
+      Alert.alert(t("alert_warning"), "Sharing unavailable for this document.");
+    }
+  };
+
+  const handleDeleteDocument = async (doc: Document) => {
+    Alert.alert(
+      "Delete Document",
+      `Are you sure you want to delete ${doc.fileName}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              if (doc.id) {
+                await db.deleteDocument(parseInt(doc.id.toString(), 10));
+                if (caseId) loadDocumentsAndTimeline(caseId);
+              }
+            } catch (err) {
+              Alert.alert(t("alert_error"), "Failed to delete document.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const listData: ListItemType[] = [];
   listData.push({ type: "summary", data: caseDetails });
 
@@ -570,354 +853,699 @@ const CaseDetailsScreen: React.FC = () => {
   const renderListItem = ({ item }: { item: ListItemType }) => {
     switch (item.type) {
       case "summary":
-        if (!caseDetails) {
-          return (
-            <View style={styles.centered}>
-              <ActivityIndicator size="large" />
-            </View>
-          );
+        if (!caseDetails || isLoading) {
+          return <CaseDetailsSkeleton theme={theme} />;
         }
+        const relTag = getRelativeHearingTag(caseDetails.NextDate);
+        const totFee = caseDetails.total_fee || 0;
+        const pdFee = caseDetails.fee_paid || 0;
+        const balFee = Math.max(0, totFee - pdFee);
+        const pctPaid = totFee > 0 ? Math.min(100, Math.round((pdFee / totFee) * 100)) : 0;
+
         return (
-          <View style={styles.summarySection}>
-            <Text style={styles.mainCaseTitle}>{caseDetails.CaseTitle}</Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 12,
-                flexWrap: "wrap",
-                gap: 8,
-              }}
-            >
-              <Text style={[styles.clientName, { marginBottom: 0, flex: 1, flexWrap: "wrap", marginRight: 8 }]}>
-                {t("casedetails_client_prefix")}
-                {caseDetails.ClientName}
-              </Text>
-              {caseDetails.ClientContactNumber ? (
-                <View style={{ flexDirection: "row" }}>
-                  <TouchableOpacity
-                    onPress={handlePhoneCall}
-                    activeOpacity={0.85}
-                    style={{
-                      padding: 8,
-                      backgroundColor: "#E0F2FE",
-                      borderRadius: 20,
-                      marginRight: 8,
-                    }}
-                  >
-                    <Ionicons name="call" size={20} color="#0284C7" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleWhatsAppChat}
-                    activeOpacity={0.85}
-                    style={{
-                      padding: 8,
-                      backgroundColor: "#DCFCE7",
-                      borderRadius: 20,
-                      marginRight: 8,
-                    }}
-                  >
-                    <Ionicons name="logo-whatsapp" size={20} color="#15803D" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleOpenReminderModal}
-                    activeOpacity={0.85}
-                    style={{
-                      padding: 8,
-                      backgroundColor: "#FEF3C7",
-                      borderRadius: 20,
-                    }}
-                  >
-                    <Ionicons
-                      name="chatbubble-ellipses"
-                      size={20}
-                      color="#D97706"
-                    />
-                  </TouchableOpacity>
+          <View style={{ padding: 16, backgroundColor: theme.colors.background }}>
+            {/* CARD 1: HERO CASE & CLIENT SPOTLIGHT (STRICT GEOMETRIC ALIGNMENT) */}
+            <Animated.View entering={FadeInDown.duration(400)} style={{
+              backgroundColor: theme.colors.cardBackground,
+              borderRadius: 16,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              marginBottom: 16,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 8,
+              elevation: 2,
+            }}>
+              {/* ROW 1: Case Title & Status Badge (Geometrically Aligned Header) */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <Text style={{ fontSize: 20, fontWeight: "700", color: theme.colors.text, lineHeight: 26 }} numberOfLines={2}>
+                    {caseDetails.CaseTitle}
+                  </Text>
                 </View>
-              ) : null}
-            </View>
-            <StatusBadge status={caseDetails.CaseStatus} />
-            <DateRow
-              label={t("field_hearing_date")}
-              dateString={formatDate(caseDetails.NextDate)}
-              iconName="gavel"
-            />
-            <DateRow
-              label={t("casedetails_prev_hearing")}
-              dateString={formatDate(caseDetails.PreviousDate)}
-              iconName="history"
-            />
-            <DateRow
-              label={t("casedetails_last_update")}
-              dateString={formatDate(caseDetails.updated_at)}
-              iconName="update"
-            />
-            <View style={styles.detailsContainer}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {t("field_case_number")}:
-                </Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.case_number || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t("field_case_year")}:</Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.case_year || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t("field_court_name")}:</Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.court_name || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t("field_case_type")}:</Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.case_type_name || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t("field_cnr_number")}:</Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.CNRNumber || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {t("field_crime_number")}:
-                </Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.crime_number || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t("field_crime_year")}:</Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.crime_year || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t("field_district")}:</Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.districtName || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {t("field_police_station")}:
-                </Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.policeStationName || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t("field_filed_date")}:</Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.dateFiled
-                    ? formatDate(new Date(caseDetails.dateFiled))
-                    : "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t("field_judge_name")}:</Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.JudgeName || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {t("field_on_behalf_of")}:
-                </Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.OnBehalfOf || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {t("field_first_party")}:
-                </Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.FirstParty || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {t("field_opposite_party")}:
-                </Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.OppositeParty || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t("field_accused")}:</Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.Accussed || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {t("field_under_section")}:
-                </Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.Undersection || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {t("field_opposing_counsel")}:
-                </Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.OpposingCounsel || "N/A"}
-                </Text>
-              </View>
-              {caseDetails.OppositeAdvocate ? (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Opposite Advocate:</Text>
-                  <Text style={styles.detailValue}>{caseDetails.OppositeAdvocate}</Text>
+                <View style={{ marginTop: 2 }}>
+                  <StatusBadge status={caseDetails.CaseStatus} />
                 </View>
-              ) : null}
-              {caseDetails.OppAdvocateContactNumber ? (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Opp. Adv. Contact:</Text>
+              </View>
+
+              {/* ROW 2: Client Name & Stage/Priority Badges (Strict Horizontal Line) */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
+                  <Ionicons name="person-circle" size={22} color={theme.colors.primary} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text }} numberOfLines={1}>
+                    {t("casedetails_client_prefix")}{caseDetails.ClientName}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {caseDetails.case_stage ? (
+                    <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, borderColor: '#C7D2FE' }}>
+                      <Text style={{ color: '#4F46E5', fontWeight: '700', fontSize: 11 }}>{caseDetails.case_stage}</Text>
+                    </View>
+                  ) : null}
+                  {caseDetails.Priority ? (
+                    <View style={{ backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, borderColor: '#FCA5A5' }}>
+                      <Text style={{ color: '#DC2626', fontWeight: '700', fontSize: 11 }}>{getTranslatedPriority(caseDetails.Priority)}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+
+              {/* ROW 3: CLIENT QUICK CONTACT GRID (ALWAYS VISIBLE - 3 EQUAL 1/3-WIDTH COLUMNS) */}
+              <View style={{ flexDirection: 'row', gap: 8, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 12 }}>
+                <TouchableOpacity
+                  onPress={handlePhoneCall}
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    height: 40,
+                    backgroundColor: caseDetails.ClientContactNumber ? '#E0F2FE' : '#F3F4F6',
+                    borderRadius: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: caseDetails.ClientContactNumber ? '#BAE6FD' : '#E5E7EB',
+                  }}
+                >
+                  <Ionicons name="call" size={15} color={caseDetails.ClientContactNumber ? '#0284C7' : '#9CA3AF'} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: caseDetails.ClientContactNumber ? '#0284C7' : '#6B7280' }}>Call</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleWhatsAppChat}
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    height: 40,
+                    backgroundColor: caseDetails.ClientContactNumber ? '#DCFCE7' : '#F3F4F6',
+                    borderRadius: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: caseDetails.ClientContactNumber ? '#BBF7D0' : '#E5E7EB',
+                  }}
+                >
+                  <Ionicons name="logo-whatsapp" size={15} color={caseDetails.ClientContactNumber ? '#15803D' : '#9CA3AF'} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: caseDetails.ClientContactNumber ? '#15803D' : '#6B7280' }}>WhatsApp</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleOpenReminderModal}
+                  activeOpacity={0.8}
+                  style={{
+                    flex: 1,
+                    height: 40,
+                    backgroundColor: '#FEF3C7',
+                    borderRadius: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: '#FDE68A',
+                  }}
+                >
+                  <Ionicons name="chatbubble-ellipses" size={15} color="#D97706" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#D97706' }}>Reminder</Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+
+            {/* CARD 2: NEXT HEARING & RETAINER FINANCIAL DASHBOARD */}
+            <Animated.View entering={FadeInDown.delay(100).duration(400)} style={{
+              backgroundColor: theme.colors.cardBackground,
+              borderRadius: 16,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              marginBottom: 16,
+            }}>
+              {/* HEARING SPOTLIGHT SECTION */}
+              <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={styles.detailValue}>{caseDetails.OppAdvocateContactNumber} </Text>
-                    <TouchableOpacity onPress={() => Linking.openURL(`tel:${caseDetails.OppAdvocateContactNumber}`)}>
-                      <Ionicons name="call" size={16} color="#0284C7" style={{ marginLeft: 6 }} />
-                    </TouchableOpacity>
+                    <Ionicons name="calendar" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.text }}>Next Hearing Spotlight</Text>
+                  </View>
+                  {relTag && (
+                    <View style={{ backgroundColor: relTag.bg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: relTag.text }}>{relTag.label}</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={{ backgroundColor: theme.colors.card || '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 10 }}>
+                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 2 }}>Hearing Date</Text>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>{formatDate(caseDetails.NextDate)}</Text>
+                  {caseDetails.PreviousDate && (
+                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 4 }}>
+                      Previous Hearing: {formatDate(caseDetails.PreviousDate)}
+                    </Text>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => setShowUpdateHearingModal(true)}
+                  activeOpacity={0.85}
+                  style={{
+                    backgroundColor: theme.colors.primary,
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="calendar-outline" size={18} color="#FFF" style={{ marginRight: 6 }} />
+                  <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>Update Next Hearing Date</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* RETAINER FEE SECTION */}
+              <View style={{ borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                  <Ionicons name="wallet-outline" size={20} color="#16A34A" style={{ marginRight: 8 }} />
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.text }}>Fee & Retainer Hub</Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+                  <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F8FAFC', padding: 10, borderRadius: 10 }}>
+                    <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Agreed Fee</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text, marginTop: 2 }}>₹{totFee.toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View style={{ flex: 1, backgroundColor: '#F0FDF4', padding: 10, borderRadius: 10 }}>
+                    <Text style={{ fontSize: 11, color: '#166534' }}>Collected</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#16A34A', marginTop: 2 }}>₹{pdFee.toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View style={{ flex: 1, backgroundColor: balFee > 0 ? '#FEF2F2' : '#F0FDF4', padding: 10, borderRadius: 10 }}>
+                    <Text style={{ fontSize: 11, color: balFee > 0 ? '#991B1B' : '#166534' }}>Balance</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: balFee > 0 ? '#DC2626' : '#16A34A', marginTop: 2 }}>₹{balFee.toLocaleString('en-IN')}</Text>
                   </View>
                 </View>
-              ) : null}
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {t("field_client_contact")}:
-                </Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.ClientContactNumber || "N/A"}
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  {t("field_statute_of_limitations")}:
-                </Text>
-                <Text style={styles.detailValue}>
-                  {caseDetails.StatuteOfLimitations
-                    ? formatDate(new Date(caseDetails.StatuteOfLimitations))
-                    : "N/A"}
-                </Text>
-              </View>
-              {caseDetails.CaseStatus === "Closed" &&
-                caseDetails.ClosedDate && (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>
-                      {t("field_date_closed")}:
-                    </Text>
-                    <Text style={styles.detailValue}>
-                      {formatDate(new Date(caseDetails.ClosedDate))}
+
+                {totFee > 0 && (
+                  <View style={{ marginBottom: 12 }}>
+                    <View style={{ height: 6, width: '100%', backgroundColor: '#E5E7EB', borderRadius: 3, overflow: 'hidden' }}>
+                      <View style={{ height: '100%', width: `${pctPaid}%`, backgroundColor: '#16A34A' }} />
+                    </View>
+                    <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'right', marginTop: 4 }}>
+                      {pctPaid}% Paid ({balFee > 0 ? `₹${balFee.toLocaleString('en-IN')} pending` : 'Fully settled'})
                     </Text>
                   </View>
                 )}
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t("field_priority")}:</Text>
-                <Text style={styles.detailValue}>
-                  {getTranslatedPriority(caseDetails.Priority)}
-                </Text>
+
+                {/* 2 EQUAL-WIDTH ACTION BUTTONS */}
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => setShowPaymentModal(true)}
+                    activeOpacity={0.85}
+                    style={{ flex: 1, backgroundColor: '#16A34A', paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Ionicons name="add-circle-outline" size={18} color="#FFF" style={{ marginRight: 6 }} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFF' }}>Record Payment</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEditingTotalFee(caseDetails.total_fee != null ? String(caseDetails.total_fee) : "");
+                      setShowFeeModal(true);
+                    }}
+                    activeOpacity={0.85}
+                    style={{ flex: 1, backgroundColor: '#EEF2FF', paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#C7D2FE' }}
+                  >
+                    <Ionicons name="create-outline" size={18} color="#4F46E5" style={{ marginRight: 6 }} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#4F46E5' }}>Edit Fee</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
+            </Animated.View>
+
+            {/* 4. EXPANDABLE ACCORDIONS (INLINE ON SCREEN) */}
+
+            {/* Accordion 1: Court & Jurisdiction (Default Expanded) */}
+            <View style={{
+              backgroundColor: theme.colors.cardBackground,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              marginBottom: 12,
+              overflow: "hidden",
+            }}>
+              <TouchableOpacity
+                onPress={() => toggleSection('court')}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: 14,
+                  backgroundColor: theme.colors.card || "#F8FAFC",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <Ionicons name="business-outline" size={20} color={theme.colors.primary} style={{ marginRight: 10 }} />
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: theme.colors.text }}>Court & Jurisdiction</Text>
+                  <View style={{ backgroundColor: "#EEF2FF", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: "#4F46E5" }}>6 Details</Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name={expandedSections.court ? "chevron-up-circle" : "chevron-down-circle"}
+                  size={22}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {expandedSections.court && (
+                <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
+                  <View style={{ gap: 10 }}>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Court Name</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.court_name || "N/A"}</Text>
+                    </View>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Judge Name</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.JudgeName || "N/A"}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>District</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.districtName || "N/A"}</Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Police Station</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.policeStationName || "N/A"}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Date Filed</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>
+                          {caseDetails.dateFiled ? formatDate(new Date(caseDetails.dateFiled)) : "N/A"}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Statute of Limitations</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>
+                          {caseDetails.StatuteOfLimitations ? formatDate(new Date(caseDetails.StatuteOfLimitations)) : "N/A"}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
             </View>
-            <Text style={styles.detailLabel}>
-              {t("field_case_description")}:
-            </Text>
-            <Text style={styles.detailValue}>
-              {caseDetails.CaseDescription || "N/A"}
-            </Text>
-            <Text style={styles.detailLabel}>{t("field_case_notes")}:</Text>
-            <View
-              style={{
-                maxHeight: 180,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                borderRadius: 8,
-                backgroundColor: theme.colors.inputBackground,
-                padding: 10,
-                marginTop: 6,
-                marginBottom: 12,
-              }}
-            >
-              <ScrollView nestedScrollEnabled>
-                <Text
-                  style={[
-                    styles.detailValue,
-                    { marginTop: 0, paddingBottom: 0 },
-                  ]}
-                >
-                  {caseDetails.CaseNotes || "N/A"}
-                </Text>
-              </ScrollView>
+
+            {/* Accordion 2: Case Identifiers & Sections */}
+            <View style={{
+              backgroundColor: theme.colors.cardBackground,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              marginBottom: 12,
+              overflow: "hidden",
+            }}>
+              <TouchableOpacity
+                onPress={() => toggleSection('identifiers')}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: 14,
+                  backgroundColor: theme.colors.card || "#F8FAFC",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <Ionicons name="journal-outline" size={20} color={theme.colors.primary} style={{ marginRight: 10 }} />
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: theme.colors.text }}>Case Numbers & Sections</Text>
+                </View>
+                <Ionicons
+                  name={expandedSections.identifiers ? "chevron-up-circle" : "chevron-down-circle"}
+                  size={22}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {expandedSections.identifiers && (
+                <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
+                  <View style={{ gap: 10 }}>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>CNR Number</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text, marginTop: 2 }}>{caseDetails.CNRNumber || "N/A"}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Case Number</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.case_number || "N/A"}</Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Case Year</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.case_year || "N/A"}</Text>
+                      </View>
+                    </View>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Session / Trial Number</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.session_trial_number || "N/A"}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Crime Number</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.crime_number || "N/A"}</Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Crime Year</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.crime_year || "N/A"}</Text>
+                      </View>
+                    </View>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Under Section / IPC / CrPC</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.Undersection || "N/A"}</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
             </View>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                marginTop: 12,
-              }}
-            >
-              <View style={{ width: "48%" }}>
-                <ActionButton
-                  title={t("btn_edit_case")}
+
+            {/* Accordion 3: Parties & Representation */}
+            <View style={{
+              backgroundColor: theme.colors.cardBackground,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              marginBottom: 12,
+              overflow: "hidden",
+            }}>
+              <TouchableOpacity
+                onPress={() => toggleSection('parties')}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: 14,
+                  backgroundColor: theme.colors.card || "#F8FAFC",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <Ionicons name="people-outline" size={20} color={theme.colors.primary} style={{ marginRight: 10 }} />
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: theme.colors.text }}>Parties & Advocates</Text>
+                </View>
+                <Ionicons
+                  name={expandedSections.parties ? "chevron-up-circle" : "chevron-down-circle"}
+                  size={22}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {expandedSections.parties && (
+                <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
+                  <View style={{ gap: 10 }}>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Petitioner / First Party</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.FirstParty || "N/A"}</Text>
+                    </View>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Respondent / Opposite Party</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.OppositeParty || "N/A"}</Text>
+                    </View>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Accused Name</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.Accussed || "N/A"}</Text>
+                    </View>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>On Behalf Of</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.OnBehalfOf || "N/A"}</Text>
+                    </View>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Opposing Counsel / Advocate</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.OpposingCounsel || caseDetails.OppositeAdvocate || "N/A"}</Text>
+                    </View>
+                    {caseDetails.OppAdvocateContactNumber ? (
+                      <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View>
+                          <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Opp. Advocate Contact</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.OppAdvocateContactNumber}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => Linking.openURL(`tel:${caseDetails.OppAdvocateContactNumber}`)} style={{ backgroundColor: '#E0F2FE', padding: 8, borderRadius: 20 }}>
+                          <Ionicons name="call" size={18} color="#0284C7" />
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Accordion 4: Case Notes & Description */}
+            <View style={{
+              backgroundColor: theme.colors.cardBackground,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              marginBottom: 16,
+              overflow: "hidden",
+            }}>
+              <TouchableOpacity
+                onPress={() => toggleSection('notes')}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: 14,
+                  backgroundColor: theme.colors.card || "#F8FAFC",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <Ionicons name="reader-outline" size={20} color={theme.colors.primary} style={{ marginRight: 10 }} />
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: theme.colors.text }}>Case Notes & Description</Text>
+                </View>
+                <Ionicons
+                  name={expandedSections.notes ? "chevron-up-circle" : "chevron-down-circle"}
+                  size={22}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {expandedSections.notes && (
+                <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
+                  <View style={{ gap: 10 }}>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 4 }}>Case Description</Text>
+                      <Text style={{ fontSize: 13, color: theme.colors.text, lineHeight: 18 }}>{caseDetails.CaseDescription || "N/A"}</Text>
+                    </View>
+                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 4 }}>Internal Case Notes</Text>
+                      <Text style={{ fontSize: 13, color: theme.colors.text, lineHeight: 18 }}>{caseDetails.CaseNotes || "N/A"}</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* ACCORDION 5: DOCUMENTS & ATTACHMENTS */}
+            <View style={{
+              backgroundColor: theme.colors.cardBackground,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              marginBottom: 16,
+              overflow: "hidden",
+            }}>
+              <TouchableOpacity
+                onPress={() => toggleSection('documents')}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: 14,
+                  backgroundColor: theme.colors.card || "#F8FAFC",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <Ionicons name="folder-open-outline" size={20} color={theme.colors.primary} style={{ marginRight: 10 }} />
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: theme.colors.text }}>Documents & Attachments</Text>
+                  <View style={{ backgroundColor: "#EEF2FF", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: "#4F46E5" }}>{documents.length} Files</Text>
+                  </View>
+                </View>
+                <Ionicons
+                  name={expandedSections.documents ? "chevron-up-circle" : "chevron-down-circle"}
+                  size={22}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {expandedSections.documents && (
+                <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
+                  {/* Upload Dropzone */}
+                  <DocumentUpload
+                    caseId={caseId}
+                    onDocumentUploaded={() => caseId && loadDocumentsAndTimeline(caseId)}
+                  />
+
+                  {/* ATTACHED DOCUMENTS LIST (DocHub Template Card Style) */}
+                  <View style={{ marginTop: 14 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: theme.colors.textSecondary, marginBottom: 10, letterSpacing: 0.5 }}>
+                      ATTACHED DOCUMENTS ({documents.length})
+                    </Text>
+
+                    {documents.length === 0 ? (
+                      <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 14, borderRadius: 10, alignItems: 'center' }}>
+                        <Ionicons name="document-text-outline" size={24} color={theme.colors.textSecondary} style={{ marginBottom: 4 }} />
+                        <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>No documents attached yet.</Text>
+                      </View>
+                    ) : (
+                      documents.map((doc) => {
+                        const isPdf = doc.fileName?.toLowerCase().endsWith('.pdf');
+                        const isImg = doc.fileName?.toLowerCase().match(/\.(jpg|jpeg|png|webp)$/);
+                        return (
+                          <View
+                            key={doc.id}
+                            style={{
+                              backgroundColor: theme.colors.card || '#F8FAFC',
+                              borderRadius: 12,
+                              padding: 12,
+                              marginBottom: 10,
+                              borderWidth: 1,
+                              borderColor: theme.colors.border,
+                            }}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                              <View style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 10,
+                                backgroundColor: isPdf ? '#FEF2F2' : isImg ? '#F0FDF4' : '#EEF2FF',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginRight: 10,
+                              }}>
+                                <Ionicons
+                                  name={isPdf ? "document-text" : isImg ? "image" : "document"}
+                                  size={18}
+                                  color={isPdf ? "#DC2626" : isImg ? "#16A34A" : "#4F46E5"}
+                                />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.text }} numberOfLines={1}>
+                                  {doc.fileName || "Document"}
+                                </Text>
+                                <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2 }}>
+                                  {doc.uploaded_at ? formatDate(new Date(doc.uploaded_at)) : 'Recently attached'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* DOCUMENT QUICK ACTION TRIPLETS (OPEN, SHARE, DELETE) */}
+                            <View style={{ flexDirection: 'row', gap: 8, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 10 }}>
+                              <TouchableOpacity
+                                onPress={() => handleDocumentInteraction(doc)}
+                                activeOpacity={0.8}
+                                style={{ flex: 1, backgroundColor: '#EEF2FF', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                <Ionicons name="eye-outline" size={14} color="#4F46E5" style={{ marginRight: 4 }} />
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#4F46E5' }}>Open</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                onPress={() => handleShareDocument(doc)}
+                                activeOpacity={0.8}
+                                style={{ flex: 1, backgroundColor: '#DCFCE7', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                <Ionicons name="share-outline" size={14} color="#15803D" style={{ marginRight: 4 }} />
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#15803D' }}>Share</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                onPress={() => handleDeleteDocument(doc)}
+                                activeOpacity={0.8}
+                                style={{ flex: 1, backgroundColor: '#FEF2F2', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                <Ionicons name="trash-outline" size={14} color="#DC2626" style={{ marginRight: 4 }} />
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>Delete</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* CARD 3: CASE MANAGEMENT ACTIONS HUB */}
+            <View style={{
+              backgroundColor: theme.colors.cardBackground,
+              borderRadius: 16,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              marginBottom: 16,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                <Ionicons name="settings-outline" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.text }}>Case Management Actions</Text>
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+                <TouchableOpacity
                   onPress={handleEditCase}
-                  type="primary"
-                />
-              </View>
-              <View style={{ width: "48%" }}>
-                <ActionButton
-                  title={t("btn_export_pdf")}
+                  activeOpacity={0.8}
+                  style={{ flex: 1, backgroundColor: '#EEF2FF', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#C7D2FE' }}
+                >
+                  <Ionicons name="create-outline" size={16} color="#4F46E5" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#4F46E5' }}>Edit Case</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   onPress={handleExportPdf}
-                  type="secondary"
-                />
+                  activeOpacity={0.8}
+                  style={{ flex: 1, backgroundColor: '#E0F2FE', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#BAE6FD' }}
+                >
+                  <Ionicons name="document-text-outline" size={16} color="#0284C7" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#0284C7' }}>Export PDF</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                marginTop: 12,
-              }}
-            >
-              <View style={{ width: "48%" }}>
-                <ActionButton
-                  title={t("btn_share_history")}
+
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                <TouchableOpacity
                   onPress={handleShareHistory}
-                  type="secondary"
-                />
-              </View>
-              <View style={{ width: "48%" }}>
-                <ActionButton
-                  title={t("btn_generate_document")}
+                  activeOpacity={0.8}
+                  style={{ flex: 1, backgroundColor: '#DCFCE7', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#BBF7D0' }}
+                >
+                  <Ionicons name="share-social-outline" size={16} color="#15803D" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#15803D' }}>Share History</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   onPress={handleGenerateDocument}
-                  type="dashed"
-                />
+                  activeOpacity={0.8}
+                  style={{ flex: 1, backgroundColor: '#F3E8FF', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E9D5FF' }}
+                >
+                  <Ionicons name="sparkles-outline" size={16} color="#7E22CE" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#7E22CE' }}>Generate Court Document</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-            <View style={{ marginTop: 12 }}>
-              <ActionButton
-                title={t("btn_delete_case") || "🗑️  Delete Case"}
+
+              <TouchableOpacity
                 onPress={handleDeleteCase}
-                type="danger"
-              />
+                activeOpacity={0.8}
+                style={{ backgroundColor: '#FEF2F2', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FCA5A5' }}
+              >
+                <Ionicons name="trash-outline" size={16} color="#DC2626" style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>Delete Case Record</Text>
+              </TouchableOpacity>
             </View>
           </View>
         );
       case "documentsHeader":
-        return (
-          <View style={styles.documentsSection}>
-            <SectionHeader title={t("casedetails_sec_documents")} />
-            <DocumentUpload caseId={caseId} />
-          </View>
-        );
+        return null;
       case "timelineHeader":
         return (
           <View style={styles.timelineSection}>
@@ -944,6 +1572,10 @@ const CaseDetailsScreen: React.FC = () => {
         return null;
     }
   };
+
+  if (isLoading || !caseDetails) {
+    return <CaseDetailsSkeleton theme={theme} />;
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -1053,6 +1685,117 @@ const CaseDetailsScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Edit Total Fee Modal */}
+      <Modal
+        visible={showFeeModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFeeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Total Agreed Fee</Text>
+            <TextInput
+              style={[styles.reminderInput, { minHeight: 48, height: 48, marginBottom: 16 }]}
+              keyboardType="numeric"
+              value={editingTotalFee}
+              onChangeText={setEditingTotalFee}
+              placeholder="Enter Total Agreed Fee (₹)"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={t("alert_cancel") || "Cancel"}
+                  onPress={() => setShowFeeModal(false)}
+                  type="secondary"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={t("btn_save_changes") || "Save"}
+                  onPress={handleSaveTotalFee}
+                  type="primary"
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Record Payment Modal */}
+      <Modal
+        visible={showPaymentModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaymentModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Record Fee Payment</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              {[1000, 2000, 5000, 10000].map((amt) => (
+                <TouchableOpacity
+                  key={amt}
+                  onPress={() => setPaymentAmount(String(amt))}
+                  style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151' }}>+ ₹{amt.toLocaleString('en-IN')}</Text>
+                </TouchableOpacity>
+              ))}
+              {caseDetails && (caseDetails.total_fee || 0) > (caseDetails.fee_paid || 0) && (
+                <TouchableOpacity
+                  onPress={() => setPaymentAmount(String((caseDetails.total_fee || 0) - (caseDetails.fee_paid || 0)))}
+                  style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#15803D' }}>
+                    Full Balance (₹{((caseDetails.total_fee || 0) - (caseDetails.fee_paid || 0)).toLocaleString('en-IN')})
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <TextInput
+              style={[styles.reminderInput, { minHeight: 48, height: 48, marginBottom: 12 }]}
+              keyboardType="numeric"
+              value={paymentAmount}
+              onChangeText={setPaymentAmount}
+              placeholder="Amount Received (₹)"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+            <TextInput
+              style={[styles.reminderInput, { minHeight: 44, height: 44, marginBottom: 16 }]}
+              value={paymentNote}
+              onChangeText={setPaymentNote}
+              placeholder="Payment Note (e.g. Cash / GPay / Advance)"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={t("alert_cancel") || "Cancel"}
+                  onPress={() => setShowPaymentModal(false)}
+                  type="secondary"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title="Record Payment"
+                  onPress={handleRecordPayment}
+                  type="primary"
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Update Hearing Popup */}
+      <UpdateHearingPopup
+        visible={showUpdateHearingModal}
+        onClose={() => setShowUpdateHearingModal(false)}
+        onSave={handleSaveHearingUpdate}
+      />
     </View>
   );
 };

@@ -209,7 +209,8 @@ export const getCases = async (
                     c.StatuteOfLimitations, c.crime_number, c.crime_year, c.police_station_id,
                     c.district_id, c.Undersection, c.FirstParty, c.OppositeParty, c.Accussed,
                     c.ClientContactNumber, c.JudgeName, c.OpposingCounsel, c.OppositeAdvocate,
-                    c.OppAdvocateContactNumber, c.CaseStatus, c.Priority, c.created_at, c.updated_at,
+                    c.OppAdvocateContactNumber, c.CaseStatus, c.Priority, c.case_stage, c.total_fee, c.fee_paid,
+                    c.created_at, c.updated_at,
                     ps.name as policeStationName, d.name as districtName 
              FROM Cases c
              LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
@@ -258,8 +259,20 @@ export const getCases = async (
 
     if (searchQuery && searchQuery.trim() !== '') {
       const escapedQuery = `%${searchQuery.trim()}%`;
-      whereClauses.push("(c.CaseTitle LIKE ? OR c.ClientName LIKE ? OR c.case_number LIKE ?)");
-      params.push(escapedQuery, escapedQuery, escapedQuery);
+      whereClauses.push(
+        "(c.CaseTitle LIKE ? OR c.ClientName LIKE ? OR c.case_number LIKE ? OR c.CNRNumber LIKE ? OR c.FirstParty LIKE ? OR c.OppositeParty LIKE ? OR c.crime_number LIKE ? OR c.session_trial_number LIKE ? OR EXISTS (SELECT 1 FROM CaseTimelineEvents cte WHERE cte.case_id = c.id AND cte.notes LIKE ?))"
+      );
+      params.push(
+        escapedQuery,
+        escapedQuery,
+        escapedQuery,
+        escapedQuery,
+        escapedQuery,
+        escapedQuery,
+        escapedQuery,
+        escapedQuery,
+        escapedQuery
+      );
     }
   }
 

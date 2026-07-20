@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Platform,
   Alert,
+  ScrollView,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import ActionButton from "../../CommonComponents/ActionButton";
@@ -17,7 +18,7 @@ import { ThemeContext } from "../../../Providers/ThemeProvider";
 interface UpdateHearingPopupProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (notes: string, nextHearingDate: Date) => void;
+  onSave: (notes: string, nextHearingDate: Date, feeReceivedToday?: number) => void;
 }
 
 const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
@@ -27,10 +28,12 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
 }) => {
   const { theme } = useContext(ThemeContext);
   const [notes, setNotes] = useState("");
+  const [feeToday, setFeeToday] = useState("");
   const [nextHearingDate, setNextHearingDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleSave = () => {
+    const feeNum = feeToday.trim() ? parseFloat(feeToday.trim()) : 0;
     if (!notes.trim()) {
       Alert.alert(
         "No Notes Entered",
@@ -44,14 +47,14 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
             text: "Proceed",
             style: "destructive",
             onPress: () => {
-              onSave(notes, nextHearingDate);
+              onSave(notes, nextHearingDate, feeNum);
               onClose();
             },
           },
         ]
       );
     } else {
-      onSave(notes, nextHearingDate);
+      onSave(notes, nextHearingDate, feeNum);
       onClose();
     }
   };
@@ -62,11 +65,51 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
     setNextHearingDate(currentDate);
   };
 
+  const quickOutcomeChips = [
+    "Adjourned",
+    "Arguments Heard",
+    "Order Reserved",
+    "Interim Relief Granted",
+    "Evidence Recorded",
+  ];
+
+  const handleSelectChip = (chip: string) => {
+    if (notes.trim()) {
+      setNotes(`${notes.trim()} - ${chip}`);
+    } else {
+      setNotes(chip);
+    }
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
         <View style={[styles.popup, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
           <Text style={[styles.title, { color: theme.colors.text }]}>Update Hearing</Text>
+
+          <View style={{ marginBottom: 12 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: "row", gap: 8 }}>
+              {quickOutcomeChips.map((chip, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => handleSelectChip(chip)}
+                  style={{
+                    backgroundColor: `${theme.colors.primary}15`,
+                    borderWidth: 1,
+                    borderColor: theme.colors.primary,
+                    borderRadius: 16,
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: theme.colors.primary }}>
+                    + {chip}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
           
           <TextInput
             style={[
@@ -82,6 +125,23 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
             value={notes}
             onChangeText={setNotes}
             multiline
+          />
+
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.colors.inputBackground,
+                color: theme.colors.text,
+                borderColor: theme.colors.border,
+                minHeight: 44,
+              },
+            ]}
+            placeholder="Fee Received Today (₹) (Optional)"
+            placeholderTextColor={theme.colors.textSecondary}
+            value={feeToday}
+            onChangeText={setFeeToday}
+            keyboardType="numeric"
           />
 
           <TouchableOpacity

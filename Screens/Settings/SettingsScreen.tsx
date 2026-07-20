@@ -41,6 +41,25 @@ const SettingsScreen = () => {
   const [advAddress, setAdvAddress] = useState("");
   const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
 
+  // Custom WhatsApp template states
+  const [customWaTemplate, setCustomWaTemplate] = useState("");
+  const [showWaTemplateModal, setShowWaTemplateModal] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("@whatsapp_custom_template").then((val) => {
+      if (val) setCustomWaTemplate(val);
+    });
+  }, []);
+
+  const handleSaveWaTemplate = async () => {
+    await AsyncStorage.setItem("@whatsapp_custom_template", customWaTemplate);
+    setShowWaTemplateModal(false);
+    Alert.alert(
+      locale === "en" ? "Saved" : "सहेजा गया",
+      locale === "en" ? "WhatsApp message template updated." : "व्हाट्सएप संदेश टेम्पलेट अपडेट किया गया।"
+    );
+  };
+
   useEffect(() => {
     const loadNotifSettings = async () => {
       try {
@@ -371,6 +390,32 @@ const SettingsScreen = () => {
             />
           )}
           onPress={selectLanguage}
+          titleStyle={{ color: theme.colors.text }}
+          descriptionStyle={{ color: theme.colors.textSecondary }}
+          style={styles.listItem}
+        />
+        <Divider
+          style={[styles.divider, { backgroundColor: theme.colors.border }]}
+        />
+
+        <List.Item
+          title="WhatsApp Message Template"
+          description={customWaTemplate ? "Customized" : "Default Template"}
+          left={(props) => (
+            <List.Icon
+              {...props}
+              icon="whatsapp"
+              color="#25D366"
+            />
+          )}
+          right={(props) => (
+            <List.Icon
+              {...props}
+              icon="chevron-right"
+              color={theme.colors.textSecondary}
+            />
+          )}
+          onPress={() => setShowWaTemplateModal(true)}
           titleStyle={{ color: theme.colors.text }}
           descriptionStyle={{ color: theme.colors.textSecondary }}
           style={styles.listItem}
@@ -755,6 +800,50 @@ const SettingsScreen = () => {
                   </Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showWaTemplateModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowWaTemplateModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text, marginBottom: 6 }}>
+              WhatsApp Message Template
+            </Text>
+            <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 12 }}>
+              {"Supported tags: {client_name}, {case_title}, {case_number}, {court_name}, {hearing_date}, {advocate_name}, {notes}"}
+            </Text>
+            <TextInput
+              style={{
+                backgroundColor: theme.colors.inputBackground,
+                color: theme.colors.text,
+                borderColor: theme.colors.border,
+                borderWidth: 1,
+                borderRadius: 8,
+                padding: 12,
+                minHeight: 120,
+                textAlignVertical: 'top',
+                marginBottom: 16,
+              }}
+              multiline
+              placeholder="Dear {client_name}, your case {case_title} is listed on {hearing_date} in {court_name}..."
+              placeholderTextColor={theme.colors.textSecondary}
+              value={customWaTemplate}
+              onChangeText={setCustomWaTemplate}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
+              <TouchableOpacity onPress={() => setShowWaTemplateModal(false)} style={{ paddingVertical: 10, paddingHorizontal: 16 }}>
+                <Text style={{ color: theme.colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleSaveWaTemplate} style={{ backgroundColor: theme.colors.primary, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8 }}>
+                <Text style={{ color: '#FFF', fontWeight: '600' }}>Save</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>

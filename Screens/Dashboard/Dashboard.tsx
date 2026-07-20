@@ -8,6 +8,7 @@ import { ThemeContext } from '../../Providers/ThemeProvider';
 import { useTranslation } from '../../Providers/LanguageProvider';
 import { mapCaseDbToScreen } from '../../utils/caseMapper';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { promptClientNotification } from '../../utils/whatsappNotifier';
 
 const WelcomeCard = () => {
@@ -73,8 +74,6 @@ const WelcomeCard = () => {
     </LinearGradient>
   );
 };
-
-import Ionicons from "react-native-vector-icons/Ionicons";
 
 const QuickActionButton = ({ icon, text, onPress, color }) => {
   const { theme } = useContext(ThemeContext);
@@ -160,7 +159,7 @@ const QuickActionsGrid = () => {
         {actions.map((action, index) => (
           <Animated.View
             key={action.text}
-            entering={FadeInDown.delay(index * 60).springify().damping(12)}
+            entering={FadeInDown.delay(index * 30).springify().damping(20).stiffness(300)}
             style={{ width: '50%' }}
           >
             <QuickActionButton {...action} />
@@ -181,6 +180,68 @@ import { getCurrentUserId, formatDate, getLocalDateString } from '../../utils/co
 import { exportDailyCauseListToPdf } from '../../utils/pdfExporter';
 import { Alert } from 'react-native';
 import { useAdTrigger } from '../CommonComponents/AdManager';
+
+const BackupReminderBanner = () => {
+  const navigation = useNavigation<any>();
+  const [showBanner, setShowBanner] = useState(false);
+
+  useEffect(() => {
+    const checkBackupStatus = async () => {
+      try {
+        const lastBackup = await AsyncStorage.getItem('@last_backup_timestamp');
+        if (!lastBackup) {
+          setShowBanner(true);
+          return;
+        }
+        const lastDate = new Date(lastBackup);
+        const now = new Date();
+        const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 3600 * 24));
+        if (diffDays >= 7) {
+          setShowBanner(true);
+        }
+      } catch (e) {
+        console.warn('Failed to check backup timestamp:', e);
+      }
+    };
+    checkBackupStatus();
+  }, []);
+
+  const handleBackupNow = async () => {
+    await AsyncStorage.setItem('@last_backup_timestamp', new Date().toISOString());
+    setShowBanner(false);
+    navigation.navigate('Settings' as any);
+  };
+
+  if (!showBanner) return null;
+
+  return (
+    <View style={{
+      backgroundColor: '#FEF3C7',
+      borderColor: '#F59E0B',
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+        <Ionicons name="shield-checkmark" size={24} color="#D97706" style={{ marginRight: 10 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontWeight: '700', fontSize: 13, color: '#92400E' }}>Weekly Backup Reminder</Text>
+          <Text style={{ fontSize: 12, color: '#B45309' }}>Keep your cases safe. Export a local backup now.</Text>
+        </View>
+      </View>
+      <TouchableOpacity
+        onPress={handleBackupNow}
+        style={{ backgroundColor: '#D97706', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+      >
+        <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 12 }}>Backup</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 // ---- Stats Section ----
 const StatsSection = () => {
@@ -226,6 +287,7 @@ const StatsSection = () => {
 
   return (
     <View style={{ marginBottom: 24 }}>
+      <BackupReminderBanner />
       <SectionHeader title={t('dash_overview') || 'Overview'} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         {statCards.map((card, index) => (
@@ -246,12 +308,12 @@ const StatCardButton = ({ card, theme, index }) => {
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 100).springify().damping(12)}
+      entering={FadeInDown.delay(index * 30).springify().damping(20).stiffness(300)}
       style={{ flex: 1, marginHorizontal: 4 }}
     >
       <Pressable
-        onPressIn={() => { scale.value = withSpring(0.95, { damping: 15, stiffness: 200 }); }}
-        onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 200 }); }}
+        onPressIn={() => { scale.value = withSpring(0.95, { damping: 25, stiffness: 400, mass: 0.4 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 25, stiffness: 400, mass: 0.4 }); }}
         onPress={card.onPress}
         style={{ width: "100%" }}
       >
@@ -298,7 +360,7 @@ const StatCardButton = ({ card, theme, index }) => {
 
 const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
   return (
-    <Animated.View entering={FadeInDown.delay(index * 100)}>
+    <Animated.View entering={FadeInDown.delay(index * 30).springify().damping(20).stiffness(300)}>
       <NewCaseCard
         caseDetails={caseDetails}
         onUpdateHearingPress={onUpdateHearingPress}
@@ -349,7 +411,7 @@ const TodaysCasesSection = () => {
     setPopupVisible(true);
   };
 
-  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number) => {
+  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number, feeReceivedToday?: number) => {
     if (!selectedCase || !selectedCase.id) return;
     const caseId = parseInt(selectedCase.id.toString(), 10);
     if(isNaN(caseId)) return;
@@ -360,16 +422,23 @@ const TodaysCasesSection = () => {
         console.error("Case not found");
         return;
       }
+      const feeNote = feeReceivedToday && feeReceivedToday > 0 
+        ? ` [Fee Received: ₹${feeReceivedToday.toLocaleString('en-IN')}]` 
+        : "";
+      const finalNotes = (notes || "") + feeNote;
+
       // 1. Add timeline event
       await db.addCaseTimelineEvent({
         case_id: caseId,
         hearing_date: new Date().toISOString(),
-        notes: notes || "",
+        notes: finalNotes.trim(),
       });
 
-      // 2. Update case's next hearing date
+      // 2. Update case's next hearing date and fee_paid
+      const updatedFeePaid = (caseExists.fee_paid || 0) + (feeReceivedToday || 0);
       await db.updateCase(caseId, {
         NextDate: getLocalDateString(nextHearingDate),
+        ...(feeReceivedToday && feeReceivedToday > 0 ? { fee_paid: updatedFeePaid } : {}),
       }, userId);
 
       // 3. Refresh the list
@@ -401,7 +470,6 @@ const TodaysCasesSection = () => {
               const caseDate = c.NextDate.split('T')[0];
               return caseDate === today;
             });
-
             await exportDailyCauseListToPdf(filteredDbCases, todayStr);
           } catch (error) {
             Alert.alert("Export Failed", "Could not compile the daily cause list PDF.");
@@ -471,8 +539,8 @@ const TodaysCasesSection = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
-          onSave={async (notes, nextHearingDate) =>
-            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId())
+          onSave={async (notes, nextHearingDate, feeReceivedToday) =>
+            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId(), feeReceivedToday)
           }
         />
       )}

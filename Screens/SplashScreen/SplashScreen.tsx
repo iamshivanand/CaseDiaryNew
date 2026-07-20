@@ -22,24 +22,24 @@ const SplashScreen = () => {
 
   useEffect(() => {
     // 1. Logo container scales up with spring bounce
-    logoScale.value = withSpring(1, { damping: 12, stiffness: 90 });
+    logoScale.value = withSpring(1, { damping: 18, stiffness: 250, mass: 0.5 });
     
     // 2. Ripple ring effect scaling out
-    ringScale.value = withTiming(1.4, { duration: 1500 });
+    ringScale.value = withTiming(1.4, { duration: 1000 });
     ringOpacity.value = withSequence(
-      withTiming(0.6, { duration: 400 }),
-      withTiming(0, { duration: 1100 })
+      withTiming(0.6, { duration: 300 }),
+      withTiming(0, { duration: 700 })
     );
 
     // 3. Gavel rotation strike animation
     gavelRotate.value = withDelay(
-      350,
-      withSpring(0, { damping: 8, stiffness: 80 })
+      200,
+      withSpring(0, { damping: 14, stiffness: 220, mass: 0.5 })
     );
 
     // 4. Text slide-up & fade-in animations
-    textOpacity.value = withDelay(600, withTiming(1, { duration: 800 }));
-    textTranslateY.value = withDelay(600, withSpring(0, { damping: 12, stiffness: 100 }));
+    textOpacity.value = withDelay(350, withTiming(1, { duration: 400 }));
+    textTranslateY.value = withDelay(350, withSpring(0, { damping: 16, stiffness: 220, mass: 0.5 }));
   }, []);
 
   const logoAnimatedStyle = useAnimatedStyle(() => {

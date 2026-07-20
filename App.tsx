@@ -219,16 +219,14 @@ function AppContent() {
         if (!isPremium && isOnboarded) {
           let adShownOrFailed = false;
 
+          let unsubLoaded: (() => void) | null = null;
+          let unsubError: (() => void) | null = null;
+          let unsubClosed: (() => void) | null = null;
+
           const cleanup = () => {
-            try {
-              unsubLoaded();
-            } catch (e) {}
-            try {
-              unsubError();
-            } catch (e) {}
-            try {
-              unsubClosed();
-            } catch (e) {}
+            if (typeof unsubLoaded === "function") unsubLoaded();
+            if (typeof unsubError === "function") unsubError();
+            if (typeof unsubClosed === "function") unsubClosed();
           };
 
           const showOpenAd = () => {
@@ -259,7 +257,7 @@ function AppContent() {
             }
           }, 1000);
 
-          const unsubLoaded = appOpenAd.addAdEventListener(
+          unsubLoaded = appOpenAd.addAdEventListener(
             AdEventType.LOADED,
             () => {
               clearTimeout(timeoutId);
@@ -267,7 +265,7 @@ function AppContent() {
             }
           );
 
-          const unsubError = appOpenAd.addAdEventListener(
+          unsubError = appOpenAd.addAdEventListener(
             AdEventType.ERROR,
             (error) => {
               clearTimeout(timeoutId);
@@ -277,7 +275,7 @@ function AppContent() {
             }
           );
 
-          const unsubClosed = appOpenAd.addAdEventListener(
+          unsubClosed = appOpenAd.addAdEventListener(
             AdEventType.CLOSED,
             () => {
               cleanup();

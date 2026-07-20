@@ -117,6 +117,11 @@ export interface Case {
   // Case Status & Management
   CaseStatus?: string | null;       // Current status (e.g., "Open", "In Progress", "Closed", "Appealed")
   Priority?: string | null;         // Priority (e.g., "High", "Medium", "Low")
+  case_stage?: string | null;       // Legal stage (e.g., "Framing of Charges", "Evidence", "Arguments")
+
+  // Financials
+  total_fee?: number | null;        // Total agreed advocate fee
+  fee_paid?: number | null;         // Fee collected to date
 
   // Descriptions & Notes
   CaseDescription?: string | null;  // Detailed description of the case
@@ -273,6 +278,11 @@ CREATE TABLE IF NOT EXISTS Cases (
   -- Case Status & Management
   CaseStatus TEXT,
   Priority TEXT,
+  case_stage TEXT,
+
+  -- Financials
+  total_fee REAL DEFAULT 0,
+  fee_paid REAL DEFAULT 0,
 
   -- Descriptions & Notes
   CaseDescription TEXT,
@@ -381,6 +391,21 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
     if (!hasDistrictId) {
       await db.execAsync("ALTER TABLE Cases ADD COLUMN district_id INTEGER;");
       console.log("Migration: Added column district_id to Cases table successfully.");
+    }
+    const hasTotalFee = tableInfo.some(col => col.name === 'total_fee');
+    if (!hasTotalFee) {
+      await db.execAsync("ALTER TABLE Cases ADD COLUMN total_fee REAL DEFAULT 0;");
+      console.log("Migration: Added column total_fee to Cases table successfully.");
+    }
+    const hasFeePaid = tableInfo.some(col => col.name === 'fee_paid');
+    if (!hasFeePaid) {
+      await db.execAsync("ALTER TABLE Cases ADD COLUMN fee_paid REAL DEFAULT 0;");
+      console.log("Migration: Added column fee_paid to Cases table successfully.");
+    }
+    const hasCaseStage = tableInfo.some(col => col.name === 'case_stage');
+    if (!hasCaseStage) {
+      await db.execAsync("ALTER TABLE Cases ADD COLUMN case_stage TEXT;");
+      console.log("Migration: Added column case_stage to Cases table successfully.");
     }
   } catch (migrationError) {
     console.error("Error migrating Cases table:", migrationError);

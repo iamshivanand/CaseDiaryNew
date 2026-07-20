@@ -29,12 +29,13 @@ export type DocumentUploadRouteParams = {
   caseId?: number; // For existing cases
 };
 
-type DocumentUploadScreenRouteProp = RouteProp<
-  { Documents: DocumentUploadRouteParams },
-  "Documents"
->;
+export type DocumentUploadProps = {
+  caseId: number;
+  showList?: boolean;
+  onDocumentUploaded?: () => void;
+};
 
-const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
+const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, showList = false, onDocumentUploaded }) => {
   const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
   const navigation = useNavigation<any>();
@@ -48,7 +49,6 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
 
   const loadDocuments = useCallback(async () => {
     if (!caseId) {
-      // If no caseId, it's a new case, no documents to load from DB yet
       setDocuments([]);
       setLoading(false);
       return;
@@ -74,8 +74,8 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
   const handlePickAndUploadDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*", // Allow all file types, or specify (e.g., 'application/pdf', 'image/*')
-        copyToCacheDirectory: true, // Important for expo-file-system to access it reliably
+        type: "*/*",
+        copyToCacheDirectory: true,
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) {
@@ -90,22 +90,22 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
 
       setIsUploading(true);
 
-      // Determine fileType more reliably if possible, asset.mimeType might be good
       const fileType =
         asset.mimeType || asset.name?.split(".").pop() || "unknown";
 
       const uploadedDocId = await db.uploadCaseDocument({
         originalFileName: asset.name || `document_${Date.now()}`,
         fileType,
-        fileUri: asset.uri, // Use asset.uri which is a local cache URI
+        fileUri: asset.uri,
         caseId,
-        userId: MOCK_CURRENT_USER_ID, // Pass current user ID
+        userId: MOCK_CURRENT_USER_ID,
         fileSize: asset.size,
       });
 
       if (uploadedDocId) {
         Alert.alert(t("alert_success"), t("doc_success_upload"));
-        loadDocuments(); // Refresh list
+        loadDocuments();
+        if (onDocumentUploaded) onDocumentUploaded();
       } else {
         Alert.alert(t("alert_error"), t("doc_err_upload"));
       }
@@ -162,6 +162,7 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
       if (uploadedDocId) {
         Alert.alert(t("alert_success"), t("doc_success_upload"));
         loadDocuments();
+        if (onDocumentUploaded) onDocumentUploaded();
       } else {
         Alert.alert(t("alert_error"), t("doc_err_upload"));
       }
@@ -323,30 +324,32 @@ const DocumentUpload: React.FC<{ caseId: number }> = ({ caseId }) => {
           Scan to PDF
         </Button>
       </View>
-      {loading && documents.length === 0 ? (
-        <ActivityIndicator animating size="large" style={styles.loader} />
-      ) : (
-        <FlatList
-          data={documents}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
-          ItemSeparatorComponent={() => (
-            <Divider style={{ backgroundColor: theme.colors.border }} />
-          )}
-          ListEmptyComponent={
-            !loading ? (
-              <Text
-                style={[
-                  styles.emptyText,
-                  { color: theme.colors.textSecondary },
-                ]}
-              >
-                {t("doc_no_documents")}
-              </Text>
-            ) : null
-          }
-          contentContainerStyle={styles.listContentContainer}
-        />
+      {showList && (
+        loading && documents.length === 0 ? (
+          <ActivityIndicator animating size="large" style={styles.loader} />
+        ) : (
+          <FlatList
+            data={documents}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id.toString()}
+            ItemSeparatorComponent={() => (
+              <Divider style={{ backgroundColor: theme.colors.border }} />
+            )}
+            ListEmptyComponent={
+              !loading ? (
+                <Text
+                  style={[
+                    styles.emptyText,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  {t("doc_no_documents")}
+                </Text>
+              ) : null
+            }
+            contentContainerStyle={styles.listContentContainer}
+          />
+        )
       )}
     </View>
   );

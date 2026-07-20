@@ -34,7 +34,7 @@ describe("UpdateHearingPopup", () => {
     const saveButton = getByText("Save");
     fireEvent.press(saveButton);
 
-    expect(onSave).toHaveBeenCalledWith("Test notes", expect.any(Date));
+    expect(onSave).toHaveBeenCalledWith("Test notes", expect.any(Date), expect.anything());
   });
 
   it("calls onClose when cancel is pressed", () => {

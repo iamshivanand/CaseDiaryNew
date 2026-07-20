@@ -75,6 +75,9 @@ export const Cases = sqliteTable('Cases', {
 
   CaseStatus: text('CaseStatus'),
   Priority: text('Priority'),
+  case_stage: text('case_stage'),
+  total_fee: integer('total_fee'),
+  fee_paid: integer('fee_paid'),
 
   CaseDescription: text('CaseDescription'),
   CaseNotes: text('CaseNotes'),

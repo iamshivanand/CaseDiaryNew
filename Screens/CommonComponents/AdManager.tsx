@@ -34,17 +34,23 @@ export const createRewardedAd = () => {
   try {
     rewardedAd = RewardedAd.createForAdRequest(rewardedAdUnitId, { requestNonPersonalizedAdsOnly: true });
     
-    const unsubL = rewardedAd.addAdEventListener(RewardedAdEventType.LOADED, () => {
+    let unsubL: (() => void) | null = null;
+    let unsubE: (() => void) | null = null;
+
+    const cleanup = () => {
+      if (typeof unsubL === "function") unsubL();
+      if (typeof unsubE === "function") unsubE();
+    };
+
+    unsubL = rewardedAd.addAdEventListener(RewardedAdEventType.LOADED, () => {
       isRewardedAdLoading = false;
-      unsubL();
-      unsubE();
+      cleanup();
     });
     
-    const unsubE = rewardedAd.addAdEventListener(RewardedAdEventType.ERROR, (err) => {
+    unsubE = rewardedAd.addAdEventListener(RewardedAdEventType.ERROR, (err) => {
       isRewardedAdLoading = false;
       console.warn("Rewarded ad failed to load, recreating instance:", err);
-      unsubL();
-      unsubE();
+      cleanup();
       createRewardedAd(); // Recreate immediately on error
     });
   } catch (e) {
@@ -56,17 +62,23 @@ export const createInterstitialAd = () => {
   try {
     interstitialAd = InterstitialAd.createForAdRequest(interstitialAdUnitId, { requestNonPersonalizedAdsOnly: true });
     
-    const unsubL = interstitialAd.addAdEventListener(AdEventType.LOADED, () => {
+    let unsubL: (() => void) | null = null;
+    let unsubE: (() => void) | null = null;
+
+    const cleanup = () => {
+      if (typeof unsubL === "function") unsubL();
+      if (typeof unsubE === "function") unsubE();
+    };
+
+    unsubL = interstitialAd.addAdEventListener(AdEventType.LOADED, () => {
       isInterstitialAdLoading = false;
-      unsubL();
-      unsubE();
+      cleanup();
     });
     
-    const unsubE = interstitialAd.addAdEventListener(AdEventType.ERROR, (err) => {
+    unsubE = interstitialAd.addAdEventListener(AdEventType.ERROR, (err) => {
       isInterstitialAdLoading = false;
       console.warn("Interstitial ad failed to load, recreating instance:", err);
-      unsubL();
-      unsubE();
+      cleanup();
       createInterstitialAd(); // Recreate immediately on error
     });
   } catch (e) {

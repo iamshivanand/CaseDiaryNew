@@ -312,9 +312,10 @@ const TabIcon = ({
   const scale = useSharedValue(1);
 
   useEffect(() => {
-    scale.value = withSpring(focused ? 1.25 : 1.0, {
-      damping: 15,
-      stiffness: 150,
+    scale.value = withSpring(focused ? 1.2 : 1.0, {
+      damping: 20,
+      stiffness: 350,
+      mass: 0.4,
     });
   }, [focused]);
 

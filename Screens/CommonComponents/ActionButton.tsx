@@ -40,12 +40,12 @@ const ActionButton: React.FC<ActionButtonProps> = ({
 
   const handlePressIn = () => {
     if (!disabled && !loading) {
-      scale.value = withSpring(0.96, { damping: 10, stiffness: 200 });
+      scale.value = withSpring(0.96, { damping: 25, stiffness: 400, mass: 0.4 });
     }
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1.0, { damping: 10, stiffness: 200 });
+    scale.value = withSpring(1.0, { damping: 25, stiffness: 400, mass: 0.4 });
   };
 
   let buttonStyleConfig;
