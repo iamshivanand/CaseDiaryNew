@@ -1,7 +1,7 @@
 // Screens/Settings/DraftsHubScreen.tsx
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation, useIsFocused } from "@react-navigation/native";
+import { useNavigation, useIsFocused, useRoute } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
@@ -49,6 +49,14 @@ const documentTypeColors: { [key: string]: string } = {
 };
 
 const BUILT_IN_TEMPLATES = [
+  {
+    id: "built_in_blank_page",
+    template_type: "blank_page",
+    title: "Blank Custom Document",
+    category: "common",
+    is_custom_template: 0,
+    isBuiltIn: true,
+  },
   {
     id: "built_in_vakalatnama",
     template_type: "vakalatnama",
@@ -213,6 +221,8 @@ const BUILT_IN_TEMPLATES = [
 
 const getTemplateLabel = (type: string): string => {
   switch (type) {
+    case "blank_page":
+      return "Blank Document";
     case "vakalatnama":
       return "Vakalatnama";
     case "adjournment":
@@ -303,6 +313,7 @@ const categories = [
 
 const DraftsHubScreen: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute<any>();
   const isFocused = useIsFocused();
   const { theme } = useContext(ThemeContext);
   const styles = getStyles(theme);
@@ -330,24 +341,53 @@ const DraftsHubScreen: React.FC = () => {
   const [caseSearchQuery, setCaseSearchQuery] = useState("");
   const [isAttaching, setIsAttaching] = useState(false);
 
-  const getFormattedHtmlForPrint = (html: string) => {
-    let font = "'Times New Roman', Georgia, serif";
+  // Auto-open attach modal if navigated from Export screen with action = "attach"
+  useEffect(() => {
+    if (isFocused && route.params?.action === "attach" && route.params?.draftId) {
+      const attachId = route.params.draftId;
+      db.getDocumentDraftById(attachId).then((found) => {
+        if (found) {
+          openAttachModal(found);
+        }
+      });
+    }
+  }, [isFocused, route.params]);
+
+  const getFormattedHtmlForPrint = (rawHtml?: string) => {
+    const html = rawHtml || "<div><p>Document Content</p></div>";
+    let font = "Times New Roman";
     let lineHeight = "1.6";
-    let stampMargin = 0;
+    let pageSize: "a4" | "legal" = "legal";
+    let topMargin = 24;
+    let bottomMargin = 24;
+    let leftMargin = 55;
+    let rightMargin = 24;
+    let letterheadSpace = 0;
     let cleanedHtml = html;
 
-    const metadataMatch = html.match(/<!-- CD_LAYOUT:(.*?) -->/);
+    const metadataMatch = html ? html.match(/<!-- CD_LAYOUT:(.*?) -->/) : null;
     if (metadataMatch) {
       try {
         const layout = JSON.parse(metadataMatch[1]);
         if (layout.font) font = layout.font;
         if (layout.lineHeight) lineHeight = layout.lineHeight;
-        if (layout.stampMargin !== undefined) stampMargin = layout.stampMargin;
-        cleanedHtml = html.replace(/<!-- CD_LAYOUT:(.*?) -->/, "");
+        if (layout.pageSize) pageSize = layout.pageSize;
+        if (layout.topMargin !== undefined) topMargin = layout.topMargin;
+        if (layout.bottomMargin !== undefined) bottomMargin = layout.bottomMargin;
+        if (layout.leftMargin !== undefined) leftMargin = layout.leftMargin;
+        if (layout.rightMargin !== undefined) rightMargin = layout.rightMargin;
+        if (layout.letterheadSpace !== undefined) letterheadSpace = layout.letterheadSpace;
+        cleanedHtml = html.replace(/<!-- CD_LAYOUT:(.*?) -->/g, "");
       } catch (e) {
         console.error("Failed to parse layout metadata in DraftsHub:", e);
       }
     }
+
+    const effectiveTopMargin = (topMargin || 24) + (letterheadSpace || 0);
+    const pageCssSize = pageSize === "legal" ? "8.5in 14in" : "A4 portrait";
+    const cleanBodyHtml = cleanedHtml
+      .replace(/<div id="red-margin-line".*?<\/div>/g, "")
+      .replace(/<div id="margin-guide-overlay".*?<\/div>/g, "");
 
     return `
       <!DOCTYPE html>
@@ -355,21 +395,84 @@ const DraftsHubScreen: React.FC = () => {
       <head>
         <meta charset="utf-8" />
         <style>
-          body {
-            font-family: ${font};
+          @page {
+            size: ${pageCssSize};
+            margin: 0;
+          }
+          html, body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+            color: #000000;
+            font-family: '${font}', 'Times New Roman', serif;
+            font-size: 13pt;
             line-height: ${lineHeight};
-            padding-top: ${stampMargin}px;
-            padding-left: 30px;
-            padding-right: 30px;
-            color: #1f2937;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          body {
+            padding-top: ${effectiveTopMargin}px;
+            padding-bottom: ${bottomMargin || 24}px;
+            padding-left: ${leftMargin || 55}px;
+            padding-right: ${rightMargin || 24}px;
+            box-sizing: border-box;
           }
           p {
-            margin: 0 0 12px 0;
+            margin-top: 0;
+            margin-bottom: 12pt;
+            text-align: justify;
+            text-justify: inter-word;
+            word-wrap: break-word;
+          }
+          p.court-header, .court-header {
+            text-align: center !important;
+            font-weight: bold;
+            margin-bottom: 14pt;
+          }
+          p.title, .title {
+            text-align: center !important;
+            font-weight: bold;
+            font-size: 15pt;
+            margin-top: 14pt;
+            margin-bottom: 14pt;
+          }
+          p.case-details, .case-details {
+            text-align: center !important;
+            margin-bottom: 12pt;
+          }
+          p.section-title, .section-title {
+            font-weight: bold;
+            margin-top: 14pt;
+            margin-bottom: 6pt;
+          }
+          hr.page-break {
+            display: block;
+            page-break-before: always;
+            break-before: page;
+            border: none;
+            height: 0;
+            margin: 0;
+          }
+          .page-margin-guide, #red-margin-line, #margin-guide-overlay {
+            display: none !important;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12pt;
+          }
+          th, td {
+            border: 1px solid #000;
+            padding: 6pt;
+            text-align: left;
+          }
+          .interactive-shape {
+            page-break-inside: avoid;
           }
         </style>
       </head>
       <body>
-        ${cleanedHtml}
+        ${cleanBodyHtml}
       </body>
       </html>
     `;
@@ -414,8 +517,8 @@ const DraftsHubScreen: React.FC = () => {
         const limit = isSearching ? null : PAGE_SIZE;
         const offset = isSearching ? null : targetPage * PAGE_SIZE;
 
-        // Fetch drafts metadata-only (excludeHtml = true)
-        const results = await db.getDocumentDrafts(null, 0, true, limit, offset);
+        // Fetch drafts metadata-only (excludeHtml = true), passing undefined for caseId to get all drafts
+        const results = await db.getDocumentDrafts(undefined, 0, true, limit, offset);
         
         if (targetPage === 0 || isSearching) {
           setDrafts(results);
@@ -505,15 +608,57 @@ const DraftsHubScreen: React.FC = () => {
     }
   }, [caseSearchQuery, cases]);
 
+  // Open PDF directly in PdfViewer
+  const handleOpenPdf = async (draft: DocumentDraft) => {
+    try {
+      setIsLoading(true);
+      let content = draft.html_content;
+      if (!content && draft.id) {
+        const fullDraft = await db.getDocumentDraftById(draft.id);
+        if (fullDraft) {
+          content = fullDraft.html_content;
+        }
+      }
+      const rawHtml = content || "";
+      const formattedHtml = getFormattedHtmlForPrint(rawHtml);
+      const isLegal = rawHtml.includes('"pageSize":"legal"');
+      const { uri } = await Print.printToFileAsync({
+        html: formattedHtml,
+        width: isLegal ? 612 : 595,
+        height: isLegal ? 1008 : 842,
+      });
+
+      setIsLoading(false);
+      // @ts-ignore
+      navigation.navigate("PdfViewer", {
+        pdfUri: uri,
+        title: draft.title || "PDF Document",
+      });
+    } catch (error) {
+      setIsLoading(false);
+      console.error("Error opening PDF draft:", error);
+      Alert.alert("Error", "Failed to open PDF document.");
+    }
+  };
+
   // View/Share Draft (Compiles HTML on-the-fly to PDF)
   const handleShareDraft = async (draft: DocumentDraft) => {
     try {
       setIsLoading(true);
-      const formattedHtml = getFormattedHtmlForPrint(draft.html_content);
+      let content = draft.html_content;
+      if (!content && draft.id) {
+        const fullDraft = await db.getDocumentDraftById(draft.id);
+        if (fullDraft) {
+          content = fullDraft.html_content;
+        }
+      }
+      const rawHtml = content || "";
+      const formattedHtml = getFormattedHtmlForPrint(rawHtml);
+      const isLegal = rawHtml.includes('"pageSize":"legal"');
       const { uri } = await Print.printToFileAsync({
         html: formattedHtml,
-        width: 612,
-        height: 1008,
+        width: isLegal ? 612 : 595,
+        height: isLegal ? 1008 : 842,
       });
 
       setIsLoading(false);
@@ -554,6 +699,10 @@ const DraftsHubScreen: React.FC = () => {
 
   // Delete Draft
   const handleDeleteDraft = (draft: DocumentDraft) => {
+    if ((draft as any).isBuiltIn) {
+      Alert.alert("Notice", "Standard built-in templates cannot be deleted.");
+      return;
+    }
     Alert.alert(
       "Confirm Delete",
       `Are you sure you want to permanently delete this ${activeTab === "templates" ? "template" : "draft"}?`,
@@ -564,11 +713,17 @@ const DraftsHubScreen: React.FC = () => {
           style: "destructive",
           onPress: async () => {
             try {
+              setIsLoading(true);
+              // Optimistically update local state immediately so item vanishes right away
+              setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
+              setFilteredDrafts((prev) => prev.filter((d) => d.id !== draft.id));
               await db.deleteDocumentDraft(draft.id);
-              loadDrafts();
+              await loadDrafts(true);
             } catch (error) {
               console.error("Error deleting draft:", error);
               Alert.alert("Error", "Failed to delete the draft document.");
+            } finally {
+              setIsLoading(false);
             }
           },
         },
@@ -593,19 +748,28 @@ const DraftsHubScreen: React.FC = () => {
       const userIdStr = await AsyncStorage.getItem("@user_id");
       const userId = userIdStr ? parseInt(userIdStr, 10) : null;
 
-      // 1. Compile PDF dynamically to a temp file
-      const formattedHtml = getFormattedHtmlForPrint(
-        selectedDraft.html_content
-      );
+      // 1. Fetch full draft with html_content if missing
+      let htmlContent = selectedDraft.html_content;
+      if (!htmlContent && selectedDraft.id) {
+        const fullDraft = await db.getDocumentDraftById(selectedDraft.id);
+        if (fullDraft) {
+          htmlContent = fullDraft.html_content;
+        }
+      }
+      const rawHtml = htmlContent || "<div><p>Document Content</p></div>";
+
+      // 2. Compile PDF dynamically to a temp file using exact court page specs
+      const formattedHtml = getFormattedHtmlForPrint(rawHtml);
+      const isLegal = rawHtml.includes('"pageSize":"legal"');
       const { uri } = await Print.printToFileAsync({
         html: formattedHtml,
-        width: 612,
-        height: 1008,
+        width: isLegal ? 612 : 595,
+        height: isLegal ? 1008 : 842,
       });
       const fileInfo = await FileSystem.getInfoAsync(uri);
       const fileSize = fileInfo.exists ? fileInfo.size : null;
 
-      // 2. Upload/Save PDF copy in Case attachments
+      // 3. Upload/Save PDF copy in Case attachments
       const successId = await db.uploadCaseDocument({
         originalFileName: `${getTemplateLabel(selectedDraft.template_type)}_${Date.now()}.pdf`,
         fileType: "application/pdf",
@@ -616,18 +780,52 @@ const DraftsHubScreen: React.FC = () => {
       });
 
       if (successId) {
-        // 3. Associate the editable draft in SQLite with this case
+        // 4. Associate the editable draft in SQLite with this case
         await db.saveDocumentDraft({
           ...selectedDraft,
+          html_content: rawHtml,
           case_id: selectedCase.id,
           updated_at: new Date().toISOString(),
         });
 
+        // 5. Optimistically update local state so the case badge renders live immediately
+        const updatedCaseTitle = selectedCase.CaseTitle || selectedCase.ClientName;
+        const updatedCaseId = selectedCase.id;
+        const updatedClientName = selectedCase.ClientName;
+        const updatedCaseNumber = selectedCase.case_number;
+
+        setDrafts((prev) =>
+          prev.map((d) =>
+            d.id === selectedDraft.id
+              ? {
+                  ...d,
+                  case_id: updatedCaseId,
+                  case_title: updatedCaseTitle,
+                  client_name: updatedClientName,
+                  case_number: updatedCaseNumber,
+                }
+              : d
+          )
+        );
+        setFilteredDrafts((prev) =>
+          prev.map((d) =>
+            d.id === selectedDraft.id
+              ? {
+                  ...d,
+                  case_id: updatedCaseId,
+                  case_title: updatedCaseTitle,
+                  client_name: updatedClientName,
+                  case_number: updatedCaseNumber,
+                }
+              : d
+          )
+        );
+
         setIsAttachModalVisible(false);
         Alert.alert(
           "Success",
-          `Document successfully attached to case: ${selectedCase.CaseTitle || selectedCase.ClientName}`,
-          [{ text: "OK", onPress: () => loadDrafts() }]
+          `Document successfully attached to case: ${updatedCaseTitle}`,
+          [{ text: "OK", onPress: () => loadDrafts(true) }]
         );
       } else {
         Alert.alert("Error", "Could not copy document to case files.");
@@ -767,6 +965,19 @@ const DraftsHubScreen: React.FC = () => {
             <Text style={styles.draftTitle} numberOfLines={2}>
               {item.title}
             </Text>
+
+            {(item.case_title || item.client_name) ? (
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, marginBottom: 4 }}>
+                <Ionicons name="briefcase-outline" size={13} color={theme.colors.primary} style={{ marginRight: 4 }} />
+                <Text
+                  style={{ fontSize: 11, fontWeight: "600", color: theme.colors.primary, flex: 1 }}
+                  numberOfLines={1}
+                >
+                  Case: {item.case_title || item.client_name} {item.case_number ? `(${item.case_number})` : ""}
+                </Text>
+              </View>
+            ) : null}
+
             <View style={styles.badgeRow}>
               <View
                 style={[styles.typeBadge, { backgroundColor: `${color}20` }]}
@@ -781,6 +992,23 @@ const DraftsHubScreen: React.FC = () => {
         </View>
 
         <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, { borderColor: theme.colors.border }]}
+            onPress={() => handleOpenPdf(item)}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="eye-outline"
+              size={16}
+              color={theme.colors.primary}
+            />
+            <Text
+              style={[styles.actionBtnText, { color: theme.colors.primary }]}
+            >
+              Open PDF
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.actionBtn, { borderColor: theme.colors.border }]}
             // @ts-ignore

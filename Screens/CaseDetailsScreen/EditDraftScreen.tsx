@@ -3,6 +3,7 @@ import { Ionicons, FontAwesome } from "@expo/vector-icons";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import * as ImagePicker from "expo-image-picker";
 import React, { useState, useEffect, useRef, useContext } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ActionButton from "../CommonComponents/ActionButton";
@@ -16,6 +17,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
   Text,
   Modal,
   ScrollView,
@@ -29,6 +31,15 @@ import { ThemeContext } from "../../Providers/ThemeProvider";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { LEGAL_VOCABULARY } from "../../utils/legalVocabulary";
 import { getOfflineEditorHtml } from "../../utils/offlineEditorTemplate";
+import { extractTextFromImages } from "../../utils/ocrService";
+import { extractLegalEntities, ExtractedLegalEntities } from "../../utils/legalNerService";
+import { speechRecognitionService } from "../../utils/speechRecognitionService";
+import { legalAutocompleteService } from "../../utils/legalAutocompleteService";
+import { PlaceholderBottomSheet } from "./components/PlaceholderBottomSheet";
+import { SignatureCanvasModal } from "./components/SignatureCanvasModal";
+import { LegalAutocompleteBar } from "./components/LegalAutocompleteBar";
+import { TableConfigModal } from "./components/TableConfigModal";
+import { ElementContextModal } from "./components/ElementContextModal";
 
 type EditDraftScreenRouteProp = RouteProp<HomeStackParamList, "EditDraft">;
 
@@ -48,7 +59,7 @@ const EditDraftScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<EditDraftScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
-  const { t, locale } = useTranslation();
+  const { t, locale, setLocale } = useTranslation();
   const styles = getStyles(theme);
 
   const {
@@ -80,6 +91,12 @@ const EditDraftScreen: React.FC = () => {
     unorderedList: false,
   });
 
+  const [docStats, setDocStats] = useState({
+    wordCount: 0,
+    charCount: 0,
+    estimatedPages: 1,
+  });
+
   // Page setup state
   const [font, setFont] = useState("Times New Roman");
   const [lineHeight, setLineHeight] = useState("1.6");
@@ -88,7 +105,21 @@ const EditDraftScreen: React.FC = () => {
   const [leftMargin, setLeftMargin] = useState(55);
   const [rightMargin, setRightMargin] = useState(24);
   const [letterheadSpace, setLetterheadSpace] = useState(0);
+  const [unitMode, setUnitMode] = useState<"in" | "mm" | "px">("in");
   const [isPageSetupVisible, setIsPageSetupVisible] = useState(false);
+  const [docDraftLanguage, setDocDraftLanguage] = useState<"en" | "hi">("en");
+
+  const formatMarginValue = (px: number, mode: "in" | "mm" | "px"): string => {
+    if (mode === "in") return `${(px / 96).toFixed(2)} in`;
+    if (mode === "mm") return `${Math.round((px / 96) * 25.4)} mm`;
+    return `${Math.round(px)} px`;
+  };
+
+  const getMarginStepPx = (mode: "in" | "mm" | "px"): number => {
+    if (mode === "in") return 9.6;
+    if (mode === "mm") return 3.78;
+    return 5;
+  };
   const [pageSize, setPageSize] = useState<"a4" | "legal">("legal");
   const [toolbarMode, setToolbarMode] = useState<"format" | "legal">("format");
   const [isTransitionFinished, setIsTransitionFinished] = useState(false);
@@ -97,6 +128,21 @@ const EditDraftScreen: React.FC = () => {
   const [vocabSearchQuery, setVocabSearchQuery] = useState("");
   const [showTour, setShowTour] = useState(false);
   const [tourStepIndex, setTourStepIndex] = useState(0);
+
+  // New Offline AI & UI state variables
+  const [placeholderModalVisible, setPlaceholderModalVisible] = useState(false);
+  const [activePlaceholderLabel, setActivePlaceholderLabel] = useState("");
+  const [activePlaceholderClean, setActivePlaceholderClean] = useState("");
+  const [signatureModalVisible, setSignatureModalVisible] = useState(false);
+  const [extractedEntities, setExtractedEntities] = useState<ExtractedLegalEntities | null>(null);
+  const [showEntitiesCard, setShowEntitiesCard] = useState(false);
+  const [isDictating, setIsDictating] = useState(false);
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
+  const [isRibbonCollapsed, setIsRibbonCollapsed] = useState(false);
+  const [tableConfigModalVisible, setTableConfigModalVisible] = useState(false);
+  const [elementContextModalVisible, setElementContextModalVisible] = useState(false);
+  const [selectedElementType, setSelectedElementType] = useState<"table" | "signature" | null>(null);
+  const [shapeModalVisible, setShapeModalVisible] = useState(false);
 
   const tourSteps = [
     {
@@ -295,6 +341,17 @@ const EditDraftScreen: React.FC = () => {
 
   // Handle formatted command triggers
   const triggerFormat = (command: string, value: string | null = null) => {
+    // Optimistic state toggle for instant active button highlight UI
+    if (command === "bold") setEditorState((prev) => ({ ...prev, bold: !prev.bold }));
+    if (command === "italic") setEditorState((prev) => ({ ...prev, italic: !prev.italic }));
+    if (command === "underline") setEditorState((prev) => ({ ...prev, underline: !prev.underline }));
+    if (command === "justifyLeft") setEditorState((prev) => ({ ...prev, alignLeft: true, alignCenter: false, alignRight: false, alignJustify: false }));
+    if (command === "justifyCenter") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: true, alignRight: false, alignJustify: false }));
+    if (command === "justifyRight") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: false, alignRight: true, alignJustify: false }));
+    if (command === "justifyFull") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: false, alignRight: false, alignJustify: true }));
+    if (command === "insertUnorderedList") setEditorState((prev) => ({ ...prev, unorderedList: !prev.unorderedList, orderedList: false }));
+    if (command === "insertOrderedList") setEditorState((prev) => ({ ...prev, orderedList: !prev.orderedList, unorderedList: false }));
+
     postMessageToWebView({
       type: "exec",
       command,
@@ -307,8 +364,32 @@ const EditDraftScreen: React.FC = () => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
 
-      if (data.type === "state") {
+      if (data.type === "openPlaceholderModal") {
+        setActivePlaceholderLabel(data.label || "");
+        setActivePlaceholderClean(data.cleanLabel || "");
+        setPlaceholderModalVisible(true);
+      } else if (data.type === "openElementContextModal") {
+        setSelectedElementType(data.elementType || "table");
+        setElementContextModalVisible(true);
+      } else if (data.type === "state") {
         setEditorState(data.state);
+        if (data.stats) {
+          setDocStats(data.stats);
+          if (data.stats.text) {
+            const entities = extractLegalEntities(data.stats.text);
+            setExtractedEntities(entities);
+
+            // Compute predictive autocomplete suggestions from last typed word/phrase
+            const words = data.stats.text.trim().split(/\s+/);
+            const lastWord = words.length > 0 ? words[words.length - 1] : "";
+            if (lastWord.length >= 2) {
+              const matches = legalAutocompleteService.getSuggestions(lastWord, 5);
+              setAutocompleteSuggestions(matches);
+            } else {
+              setAutocompleteSuggestions([]);
+            }
+          }
+        }
       } else if (data.type === "save") {
         setHasUnsavedChanges(false);
         if (saveCallbackRef.current) {
@@ -323,155 +404,416 @@ const EditDraftScreen: React.FC = () => {
     }
   };
 
-  // Trigger Save Process
-  const handleSave = () => {
-    setIsSaving(true);
-    // Request latest HTML from WebView contenteditable
-    postMessageToWebView({ type: "requestSave" });
+  // 1. Scan-to-Editor OCR Action with Choice Modal (Camera / Gallery / Multi-Page Scanner)
+  const handleScanToEditorOcr = () => {
+    Alert.alert(
+      "Scan & Extract Text (OCR)",
+      "Choose how to attach or scan document photo:",
+      [
+        {
+          text: "📷 Take Photo",
+          onPress: () => processOcrFromSource("camera"),
+        },
+        {
+          text: "🖼️ Pick from Gallery",
+          onPress: () => processOcrFromSource("gallery"),
+        },
+        {
+          text: "📄 Multi-Page Scanner",
+          onPress: () => processOcrFromSource("scanner"),
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]
+    );
+  };
 
-    // Define the actual saving routine to execute once HTML is received asynchronously
-    saveCallbackRef.current = async (html) => {
-      try {
-        const idToSave = draftId || uuidv4();
-        const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, stampMargin })} -->`;
-        const contentWithMetadata = metadataComment + html;
+  const processOcrFromSource = async (source: "camera" | "gallery" | "scanner") => {
+    let scannedUris: string[] = [];
+    try {
+      setIsLoading(true);
 
-        // Ask advocate where/how they want to save
-        Alert.alert(
-          "Save Draft",
-          "Choose how you want to save this document:",
-          [
-            {
-              text: caseId
-                ? "Save to current Case"
-                : "Save as Standalone Draft",
-              onPress: async () => {
-                await saveDocumentDraft({
-                  id: idToSave,
-                  case_id: caseId || null,
-                  title,
-                  template_type: templateType,
-                  html_content: contentWithMetadata,
-                  is_custom_template: 0,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                });
-                Alert.alert("Success", "Draft saved successfully.", [
-                  { text: "OK", onPress: () => navigation.goBack() },
-                ]);
-                setIsSaving(false);
-              },
-            },
-            {
-              text: "Save as Reusable Template",
-              onPress: async () => {
-                await saveDocumentDraft({
-                  id: idToSave,
-                  case_id: null,
-                  title: `${title} (Template)`,
-                  template_type: templateType,
-                  html_content: contentWithMetadata,
-                  is_custom_template: 1,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                });
-                Alert.alert("Success", "Custom template saved successfully.", [
-                  { text: "OK", onPress: () => navigation.goBack() },
-                ]);
-                setIsSaving(false);
-              },
-            },
-            {
-              text: "Cancel",
-              style: "cancel",
-              onPress: () => setIsSaving(false),
-            },
-          ]
-        );
-      } catch (err) {
-        console.error("Error saving draft to SQLite database:", err);
-        Alert.alert("Error", "Could not write draft to SQLite.");
-        setIsSaving(false);
+      if (source === "scanner") {
+        try {
+          const DocumentScanner = require("react-native-document-scanner-plugin").default;
+          const result = await DocumentScanner.scanDocument({
+            croppedImageQuality: 100,
+            maxNumDocuments: 10,
+          });
+          if (result && result.scannedImages && Array.isArray(result.scannedImages)) {
+            scannedUris = result.scannedImages;
+          }
+        } catch (scanErr) {
+          console.warn("Native DocumentScanner error/cancel:", scanErr);
+        }
+      } else if (source === "camera") {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status === "granted") {
+          const pickerResult = await ImagePicker.launchCameraAsync({
+            quality: 1.0,
+            allowsEditing: true,
+          });
+          if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets[0]?.uri) {
+            scannedUris = [pickerResult.assets[0].uri];
+          }
+        } else {
+          Alert.alert("Permission Required", "Camera permission is required to take photo for OCR.");
+        }
+      } else if (source === "gallery") {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status === "granted") {
+          const pickerResult = await ImagePicker.launchImageLibraryAsync({
+            quality: 1.0,
+            allowsMultipleSelection: true,
+            selectionLimit: 5,
+          });
+          if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets.length > 0) {
+            scannedUris = pickerResult.assets.map((asset) => asset.uri);
+          }
+        } else {
+          Alert.alert("Permission Required", "Gallery permission is required to select photos for OCR.");
+        }
       }
-    };
+
+      if (scannedUris.length > 0) {
+        const extractedText = await extractTextFromImages(scannedUris);
+        if (extractedText && extractedText.trim().length > 0) {
+          const cleanParagraphs = extractedText
+            .split("\n\n")
+            .filter((p) => p.trim().length > 0)
+            .map((p) => `<p>${p.trim()}</p>`)
+            .join("");
+          triggerFormat("insertHTML", cleanParagraphs);
+          Alert.alert("OCR Complete", "Extracted text inserted directly into document editor.");
+        } else {
+          Alert.alert("OCR Result", "No readable text could be extracted from the document photo.");
+        }
+      }
+    } catch (err) {
+      console.error("Error in processOcrFromSource:", err);
+      Alert.alert("OCR Error", "Could not extract text from document photo.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 2. Offline Voice Dictation Toggle
+  const toggleVoiceDictation = async () => {
+    if (isDictating) {
+      await speechRecognitionService.stopListening();
+      setIsDictating(false);
+    } else {
+      setIsDictating(true);
+      const dictationLocale = locale === "hi" ? "hi-IN" : "en-IN";
+      const started = await speechRecognitionService.startListening(dictationLocale, {
+        onStart: () => setIsDictating(true),
+        onResult: (text) => {
+          if (text) {
+            triggerFormat("insertText", text + " ");
+          }
+        },
+        onError: (err) => {
+          setIsDictating(false);
+          Alert.alert("Dictation Error", err || "Speech recognition error");
+        },
+        onEnd: () => setIsDictating(false),
+      });
+      if (!started) {
+        setIsDictating(false);
+      }
+    }
+  };
+
+  // 3. Update Placeholder Value Handler
+  const handleApplyPlaceholderValue = (originalLabel: string, newValue: string) => {
+    postMessageToWebView({
+      type: "exec",
+      command: "replacePlaceholderValue",
+      label: originalLabel,
+      value: newValue,
+    });
+  };
+
+  // 4. Insert Advocate Signature Stamp Handler
+  const handleSelectSignature = (imageUri: string) => {
+    postMessageToWebView({
+      type: "exec",
+      command: "insertSignature",
+      value: imageUri,
+    });
+  };
+
+  // 5. Insert Court Table Handler
+  const handleInsertTable = (rows: number = 3, cols: number = 3) => {
+    postMessageToWebView({
+      type: "exec",
+      command: "insertTable",
+      rows,
+      cols,
+    });
+  };
+
+  // 6. Delete Selected Table / Signature Element Handler
+  const handleDeleteSelectedElement = () => {
+    postMessageToWebView({
+      type: "exec",
+      command: "deleteSelectedElement",
+    });
+  };
+
+  // Helper to fetch latest HTML from WebView with automatic 200ms fallback
+  const getLatestHtml = (): Promise<string> => {
+    return new Promise((resolve) => {
+      let resolved = false;
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          saveCallbackRef.current = null;
+          resolve(initialHtml || "");
+        }
+      }, 200);
+
+      saveCallbackRef.current = (html: string) => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          saveCallbackRef.current = null;
+          resolve(html || initialHtml || "");
+        }
+      };
+
+      postMessageToWebView({ type: "requestSave" });
+    });
+  };
+
+  // Trigger Save Process
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const html = await getLatestHtml();
+      const idToSave = draftId || uuidv4();
+      const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, stampMargin })} -->`;
+      const contentWithMetadata = metadataComment + html;
+
+      // Ask advocate where/how they want to save
+      Alert.alert(
+        "Save Draft",
+        "Choose how you want to save this document:",
+        [
+          {
+            text: caseId
+              ? "Save to current Case"
+              : "Save as Standalone Draft",
+            onPress: async () => {
+              await saveDocumentDraft({
+                id: idToSave,
+                case_id: caseId || null,
+                title,
+                template_type: templateType,
+                html_content: contentWithMetadata,
+                is_custom_template: 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+              Alert.alert("Success", "Draft saved successfully.", [
+                { text: "OK", onPress: () => navigation.goBack() },
+              ]);
+              setIsSaving(false);
+            },
+          },
+          {
+            text: "Save as Reusable Template",
+            onPress: async () => {
+              await saveDocumentDraft({
+                id: idToSave,
+                case_id: null,
+                title: `${title} (Template)`,
+                template_type: templateType,
+                html_content: contentWithMetadata,
+                is_custom_template: 1,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+              Alert.alert("Success", "Custom template saved successfully.", [
+                { text: "OK", onPress: () => navigation.goBack() },
+              ]);
+              setIsSaving(false);
+            },
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => setIsSaving(false),
+          },
+        ]
+      );
+    } catch (err) {
+      console.error("Error saving draft to SQLite database:", err);
+      Alert.alert("Error", "Could not write draft to SQLite.");
+      setIsSaving(false);
+    }
   };
 
   // Print/Share PDF
-  const handlePrintShare = () => {
+  const handlePrintShare = async () => {
     setIsExporting(true);
-    postMessageToWebView({ type: "requestSave" });
+    try {
+      const html = await getLatestHtml();
+      const effectiveTopMargin = (topMargin || 24) + (letterheadSpace || 0);
+      const pageCssSize = pageSize === "legal" ? "8.5in 14in" : "A4 portrait";
+      const cleanBodyHtml = html
+        .replace(/<!-- CD_LAYOUT:(.*?) -->/g, "")
+        .replace(/<div id="red-margin-line".*?<\/div>/g, "")
+        .replace(/<div id="margin-guide-overlay".*?<\/div>/g, "");
 
-    saveCallbackRef.current = async (html) => {
-      try {
-        const formattedHtmlForPrint = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8" />
-            <style>
-              body {
-                font-family: ${font};
-                line-height: ${lineHeight};
-                padding-top: ${stampMargin}px;
-                padding-left: 30px;
-                padding-right: 30px;
-                color: #1f2937;
-              }
-              p {
-                margin: 0 0 12px 0;
-              }
-            </style>
-          </head>
-          <body>
-            ${html}
-          </body>
-          </html>
-        `;
-        const { uri } = await Print.printToFileAsync({
-          html: formattedHtmlForPrint,
-          width: 612,
-          height: 1008,
-        });
+      const formattedHtmlForPrint = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            @page {
+              size: ${pageCssSize};
+              margin: 0;
+            }
+            html, body {
+              margin: 0;
+              padding: 0;
+              background: #ffffff;
+              color: #000000;
+              font-family: '${font}', 'Times New Roman', serif;
+              font-size: 13pt;
+              line-height: ${lineHeight};
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            body {
+              padding-top: ${effectiveTopMargin}px;
+              padding-bottom: ${bottomMargin || 24}px;
+              padding-left: ${leftMargin || 55}px;
+              padding-right: ${rightMargin || 24}px;
+              box-sizing: border-box;
+            }
+            p {
+              margin-top: 0;
+              margin-bottom: 12pt;
+              text-align: justify;
+              text-justify: inter-word;
+              word-wrap: break-word;
+            }
+            p.court-header, .court-header {
+              text-align: center !important;
+              font-weight: bold;
+              margin-bottom: 14pt;
+            }
+            p.title, .title {
+              text-align: center !important;
+              font-weight: bold;
+              font-size: 15pt;
+              margin-top: 14pt;
+              margin-bottom: 14pt;
+            }
+            p.case-details, .case-details {
+              text-align: center !important;
+              margin-bottom: 12pt;
+            }
+            p.section-title, .section-title {
+              font-weight: bold;
+              margin-top: 14pt;
+              margin-bottom: 6pt;
+            }
+            hr.page-break {
+              display: block;
+              page-break-before: always;
+              break-before: page;
+              border: none;
+              height: 0;
+              margin: 0;
+            }
+            .page-margin-guide, #red-margin-line, #margin-guide-overlay {
+              display: none !important;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 12pt;
+            }
+            th, td {
+              border: 1px solid #000;
+              padding: 6pt;
+              text-align: left;
+            }
+            .interactive-shape {
+              page-break-inside: avoid;
+            }
+          </style>
+        </head>
+        <body>
+          ${cleanBodyHtml}
+        </body>
+        </html>
+      `;
+      const isLegal = pageSize === "legal";
+      const { uri } = await Print.printToFileAsync({
+        html: formattedHtmlForPrint,
+        width: isLegal ? 612 : 595,
+        height: isLegal ? 1008 : 842,
+      });
 
-        setIsExporting(false);
-        Alert.alert(
-          title || "Draft Document",
-          "Choose an action for this PDF:",
-          [
-            {
-              text: "Open in App",
-              onPress: () => {
-                // @ts-ignore
-                navigation.navigate("PdfViewer", {
-                  pdfUri: uri,
-                  title: title || "Draft",
+      setIsExporting(false);
+      Alert.alert(
+        title || "Draft Document",
+        "Choose an action for this PDF:",
+        [
+          {
+            text: "Open in App",
+            onPress: () => {
+              // @ts-ignore
+              navigation.navigate("PdfViewer", {
+                pdfUri: uri,
+                title: title || "Draft",
+              });
+            },
+          },
+          {
+            text: "Share PDF",
+            onPress: async () => {
+              if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri, {
+                  mimeType: "application/pdf",
+                  dialogTitle: title,
+                  UTI: "com.adobe.pdf",
                 });
-              },
+              }
             },
-            {
-              text: "Share PDF",
-              onPress: async () => {
-                if (await Sharing.isAvailableAsync()) {
-                  await Sharing.shareAsync(uri, {
-                    mimeType: "application/pdf",
-                    dialogTitle: title,
-                    UTI: "com.adobe.pdf",
-                  });
-                }
-              },
+          },
+          {
+            text: "Link to Case",
+            onPress: () => {
+              // @ts-ignore
+              navigation.navigate("DraftsHub", { draftId: draftId, action: "attach" });
             },
-            {
-              text: "Cancel",
-              style: "cancel",
+          },
+          {
+            text: "Go to Document Hub",
+            onPress: () => {
+              // @ts-ignore
+              navigation.navigate("DraftsHub");
             },
-          ]
-        );
-      } catch (error) {
-        setIsExporting(false);
-        console.error("Error generating PDF in editor screen:", error);
-        Alert.alert("Error", "Failed to print or share PDF.");
-      }
-    };
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+        ]
+      );
+    } catch (error) {
+      setIsExporting(false);
+      console.error("Error generating PDF in editor screen:", error);
+      Alert.alert("Error", "Failed to print or share PDF.");
+    }
   };
 
   if (isLoading || !isTransitionFinished) {
@@ -506,7 +848,29 @@ const EditDraftScreen: React.FC = () => {
 
         <View style={styles.headerRightActions}>
           <TouchableOpacity
-            style={[styles.headerButton, { marginRight: 12 }]}
+            style={[styles.headerButton, { marginRight: 6 }]}
+            onPress={() => triggerFormat("undo")}
+            title="Undo"
+          >
+            <Ionicons
+              name="arrow-undo-outline"
+              size={20}
+              color={theme.colors.text}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerButton, { marginRight: 8 }]}
+            onPress={() => triggerFormat("redo")}
+            title="Redo"
+          >
+            <Ionicons
+              name="arrow-redo-outline"
+              size={20}
+              color={theme.colors.text}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerButton, { marginRight: 8 }]}
             onPress={() => setIsPageSetupVisible(true)}
           >
             <Ionicons
@@ -531,7 +895,7 @@ const EditDraftScreen: React.FC = () => {
             )}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.headerButton, { marginLeft: 12 }]}
+            style={[styles.headerButton, { marginLeft: 8 }]}
             onPress={handleSave}
             disabled={isSaving}
           >
@@ -548,61 +912,237 @@ const EditDraftScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Live Document HUD Bar */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: theme.colors.cardBackground,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+          paddingHorizontal: 12,
+          paddingVertical: 5,
+        }}
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ alignItems: "center", gap: 8 }}
+        >
+          {/* Word Count Badge */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: `${theme.colors.primary}12`,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 12,
+            }}
+          >
+            <Ionicons
+              name="document-text-outline"
+              size={13}
+              color={theme.colors.primary}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "600",
+                color: theme.colors.primary,
+              }}
+            >
+              {docStats.wordCount} {t ? t("Words") || "Words" : "Words"}
+            </Text>
+          </View>
+
+          {/* Page Count Badge */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: `${theme.colors.primary}12`,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 12,
+            }}
+          >
+            <Ionicons
+              name="layers-outline"
+              size={13}
+              color={theme.colors.primary}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "600",
+                color: theme.colors.primary,
+              }}
+            >
+              ~{docStats.estimatedPages} {docStats.estimatedPages === 1 ? "Page" : "Pages"}
+            </Text>
+          </View>
+
+          {/* Paper Format Badge */}
+          <TouchableOpacity
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: `${theme.colors.textSecondary}15`,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 12,
+            }}
+            onPress={() => setIsPageSetupVisible(true)}
+          >
+            <Ionicons
+              name="easel-outline"
+              size={13}
+              color={theme.colors.text}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "600",
+                color: theme.colors.text,
+              }}
+            >
+              {pageSize === "legal" ? "Legal Paper" : "A4 Paper"}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Inline Live Document Language Switcher (English / Hindi Document Drafting) */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: theme.colors.inputBackground,
+              borderRadius: 12,
+              padding: 2,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 10,
+                backgroundColor: docDraftLanguage === "en" ? theme.colors.primary : "transparent",
+              }}
+              onPress={() => {
+                setDocDraftLanguage("en");
+                postMessageToWebView({ type: "setEditorLanguage", lang: "en" });
+              }}
+              testID="lang-en-btn"
+            >
+              <Text style={{ fontSize: 11, fontWeight: "bold", color: docDraftLanguage === "en" ? "#ffffff" : theme.colors.textSecondary }}>
+                EN
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 10,
+                backgroundColor: docDraftLanguage === "hi" ? theme.colors.primary : "transparent",
+              }}
+              onPress={() => {
+                setDocDraftLanguage("hi");
+                postMessageToWebView({ type: "setEditorLanguage", lang: "hi" });
+              }}
+              testID="lang-hi-btn"
+            >
+              <Text style={{ fontSize: 11, fontWeight: "bold", color: docDraftLanguage === "hi" ? "#ffffff" : theme.colors.textSecondary }}>
+                हिंदी
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Auto-saved Status Badge */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              paddingHorizontal: 6,
+              paddingVertical: 3,
+            }}
+          >
+            <View
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: hasUnsavedChanges ? "#f59e0b" : "#10b981",
+                marginRight: 5,
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 11,
+                color: theme.colors.textSecondary,
+                fontWeight: "500",
+              }}
+            >
+              {hasUnsavedChanges ? "Editing..." : "Saved"}
+            </Text>
+          </View>
+        </ScrollView>
+      </View>
+
       {/* Editor Body */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <WebView
-          ref={webViewRef}
-          source={{ html: getOfflineEditorHtml(htmlContent) }}
-          onMessage={handleMessage}
-          style={styles.webView}
-          originWhitelist={["*"]}
-          javaScriptEnabled
-          domStorageEnabled
-          onLoadEnd={() => {
-            postMessageToWebView({ type: "load", html: htmlContent });
-            applyLayoutSettings(
-              font,
-              lineHeight,
-              pageSize,
-              topMargin,
-              bottomMargin,
-              leftMargin,
-              rightMargin,
-              letterheadSpace
-            );
-          }}
-          onShouldStartLoadWithRequest={() => false} // Do not navigate out
-        />
-
-        {/* Toolbar Mode Switcher */}
+        {/* Top Ribbon Segmented Control Switcher */}
         <View
           style={{
             flexDirection: "row",
             backgroundColor: theme.colors.cardBackground,
-            borderTopWidth: 1,
-            borderTopColor: theme.colors.border,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.colors.border,
             paddingHorizontal: 12,
-            paddingTop: 8,
-            paddingBottom: 2,
+            paddingVertical: 6,
             justifyContent: "space-between",
             alignItems: "center",
           }}
         >
-          <View style={{ flexDirection: "row", gap: 8 }}>
+          {/* Segmented Control Container */}
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: theme.colors.inputBackground,
+              borderRadius: 20,
+              padding: 3,
+              gap: 2,
+              alignItems: "center",
+            }}
+          >
             <TouchableOpacity
               style={{
-                paddingVertical: 4,
-                paddingHorizontal: 12,
-                borderRadius: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: 5,
+                paddingHorizontal: 14,
+                borderRadius: 16,
                 backgroundColor:
                   toolbarMode === "format"
                     ? theme.colors.primary
                     : "transparent",
               }}
-              onPress={() => setToolbarMode("format")}
+              onPress={() => {
+                if (toolbarMode === "format") {
+                  setIsRibbonCollapsed((prev) => !prev);
+                } else {
+                  setToolbarMode("format");
+                  setIsRibbonCollapsed(false);
+                }
+              }}
+              testID="tab-formatting-btn"
             >
               <Text
                 style={{
@@ -610,24 +1150,51 @@ const EditDraftScreen: React.FC = () => {
                   fontWeight: "bold",
                   color:
                     toolbarMode === "format"
-                      ? "#fff"
+                      ? "#ffffff"
                       : theme.colors.textSecondary,
                 }}
               >
                 {t ? t("Formatting") || "Formatting" : "Formatting"}
               </Text>
+              <Ionicons
+                name={
+                  toolbarMode === "format"
+                    ? isRibbonCollapsed
+                      ? "chevron-forward"
+                      : "chevron-down"
+                    : "chevron-forward"
+                }
+                size={12}
+                color={
+                  toolbarMode === "format"
+                    ? "#ffffff"
+                    : theme.colors.textSecondary
+                }
+                style={{ marginLeft: 4 }}
+              />
             </TouchableOpacity>
+
             <TouchableOpacity
               style={{
-                paddingVertical: 4,
-                paddingHorizontal: 12,
-                borderRadius: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: 5,
+                paddingHorizontal: 14,
+                borderRadius: 16,
                 backgroundColor:
                   toolbarMode === "legal"
                     ? theme.colors.primary
                     : "transparent",
               }}
-              onPress={() => setToolbarMode("legal")}
+              onPress={() => {
+                if (toolbarMode === "legal") {
+                  setIsRibbonCollapsed((prev) => !prev);
+                } else {
+                  setToolbarMode("legal");
+                  setIsRibbonCollapsed(false);
+                }
+              }}
+              testID="tab-legal-assist-btn"
             >
               <Text
                 style={{
@@ -635,30 +1202,53 @@ const EditDraftScreen: React.FC = () => {
                   fontWeight: "bold",
                   color:
                     toolbarMode === "legal"
-                      ? "#fff"
+                      ? "#ffffff"
                       : theme.colors.textSecondary,
                 }}
               >
                 {t ? t("Legal Assist") || "Legal Assist" : "Legal Assist"}
               </Text>
+              <Ionicons
+                name={
+                  toolbarMode === "legal"
+                    ? isRibbonCollapsed
+                      ? "chevron-forward"
+                      : "chevron-down"
+                    : "chevron-forward"
+                }
+                size={12}
+                color={
+                  toolbarMode === "legal"
+                    ? "#ffffff"
+                    : theme.colors.textSecondary
+                }
+                style={{ marginLeft: 4 }}
+              />
             </TouchableOpacity>
           </View>
+
           <Text
             style={{
               fontSize: 11,
               color: theme.colors.textSecondary,
-              fontWeight: "500",
+              fontWeight: "600",
             }}
           >
             {pageSize === "legal"
-              ? "Legal Size (Double-Spaced)"
-              : "A4 Size (1.5 Spaced)"}
+              ? "Legal Paper"
+              : "A4 Paper"}
           </Text>
         </View>
 
-        {/* Dynamic Native Formatting Toolbar */}
-        {toolbarMode === "format" ? (
-          <View style={styles.toolbar}>
+        {/* Dynamic Native Formatting Ribbon */}
+        {!isRibbonCollapsed && (
+          toolbarMode === "format" ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.toolbarScroll}
+            contentContainerStyle={styles.toolbarContent}
+          >
             <TouchableOpacity
               style={[
                 styles.toolbarButton,
@@ -806,15 +1396,78 @@ const EditDraftScreen: React.FC = () => {
               />
             </TouchableOpacity>
 
+            <View style={styles.divider} />
+
+            {/* Scan-to-Editor OCR Button */}
             <TouchableOpacity
               style={styles.toolbarButton}
-              onPress={() => triggerFormat("insertPageBreak")}
-              title="Page Break"
+              onPress={handleScanToEditorOcr}
+              title="Scan Document OCR"
+              testID="scan-to-editor-btn"
             >
               <Ionicons
-                name="layers-outline"
+                name="scan-outline"
+                size={18}
+                color={theme.colors.primary}
+              />
+            </TouchableOpacity>
+
+            {/* Offline SpeechRecognizer Dictation Button */}
+            <TouchableOpacity
+              style={[
+                styles.toolbarButton,
+                isDictating && { backgroundColor: theme.colors.error || "#ef4444" },
+              ]}
+              onPress={toggleVoiceDictation}
+              title="Voice Dictation"
+              testID="voice-dictation-btn"
+            >
+              <Ionicons
+                name={isDictating ? "mic" : "mic-outline"}
+                size={18}
+                color={isDictating ? "#ffffff" : theme.colors.text}
+              />
+            </TouchableOpacity>
+
+            {/* Insert Court Table Button */}
+            <TouchableOpacity
+              style={styles.toolbarButton}
+              onPress={() => setTableConfigModalVisible(true)}
+              title="Insert Table"
+              testID="insert-table-btn"
+            >
+              <Ionicons
+                name="grid-outline"
                 size={18}
                 color={theme.colors.text}
+              />
+            </TouchableOpacity>
+
+            {/* Advocate Signature Stamp Button */}
+            <TouchableOpacity
+              style={styles.toolbarButton}
+              onPress={() => setSignatureModalVisible(true)}
+              title="Attach Signature Stamp"
+              testID="attach-signature-btn"
+            >
+              <Ionicons
+                name="ribbon-outline"
+                size={18}
+                color={theme.colors.text}
+              />
+            </TouchableOpacity>
+
+            {/* Insert Interactive Shape & Legal Stamp Button */}
+            <TouchableOpacity
+              style={styles.toolbarButton}
+              onPress={() => setShapeModalVisible(true)}
+              title="Insert Geometry Shape / Legal Stamp"
+              testID="insert-shape-btn"
+            >
+              <Ionicons
+                name="shapes-outline"
+                size={18}
+                color={theme.colors.primary}
               />
             </TouchableOpacity>
 
@@ -832,7 +1485,7 @@ const EditDraftScreen: React.FC = () => {
                 color={theme.colors.text}
               />
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         ) : (
           <ScrollView
             horizontal
@@ -846,8 +1499,8 @@ const EditDraftScreen: React.FC = () => {
             }}
             style={{
               backgroundColor: theme.colors.inputBackground,
-              borderTopWidth: 1,
-              borderTopColor: theme.colors.border,
+              borderBottomWidth: 1,
+              borderBottomColor: theme.colors.border,
               width: "100%",
               maxHeight: 50,
             }}
@@ -1048,8 +1701,40 @@ const EditDraftScreen: React.FC = () => {
                 {t ? t("Next") || "Next" : "Next"}
               </Text>
             </TouchableOpacity>
-          </ScrollView>
-        )}
+            </ScrollView>
+          ))}
+
+        {/* Full Height Editor Canvas */}
+        <WebView
+          ref={webViewRef}
+          source={{ html: getOfflineEditorHtml(htmlContent) }}
+          onMessage={handleMessage}
+          style={{ flex: 1 }}
+          originWhitelist={["*"]}
+          javaScriptEnabled
+          domStorageEnabled
+          onLoadEnd={() => {
+            postMessageToWebView({ type: "load", html: htmlContent });
+            applyLayoutSettings(
+              font,
+              lineHeight,
+              pageSize,
+              topMargin,
+              bottomMargin,
+              leftMargin,
+              rightMargin,
+              letterheadSpace
+            );
+          }}
+          onShouldStartLoadWithRequest={() => false}
+        />
+
+        {/* Predictive Legal Phrase Autocomplete Bar */}
+        <LegalAutocompleteBar
+          suggestions={autocompleteSuggestions}
+          theme={theme}
+          onSelectSuggestion={(phrase) => triggerFormat("insertText", phrase + " ")}
+        />
       </KeyboardAvoidingView>
 
       {/* Page Setup Customization Modal */}
@@ -1080,7 +1765,12 @@ const EditDraftScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalForm}>
+            <ScrollView
+              style={{ maxHeight: 380 }}
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={{ paddingBottom: 16 }}
+            >
+              <View style={styles.modalForm}>
               {/* Font Selection */}
               <Text
                 style={[
@@ -1230,6 +1920,52 @@ const EditDraftScreen: React.FC = () => {
                 })}
               </View>
 
+              {/* Unit System Selector (Inches / MM / Pixels) */}
+              <Text
+                style={[
+                  styles.modalLabel,
+                  {
+                    color: theme.colors.textSecondary,
+                    marginTop: 16,
+                    marginBottom: 8,
+                  },
+                ]}
+              >
+                Measurement Unit System
+              </Text>
+              <View style={styles.optionGroup}>
+                {[
+                  { label: "Inches (in)", value: "in" },
+                  { label: "Millimeters (mm)", value: "mm" },
+                  { label: "Pixels (px)", value: "px" },
+                ].map((item) => {
+                  const isSelected = unitMode === item.value;
+                  return (
+                    <TouchableOpacity
+                      key={item.label}
+                      style={[
+                        styles.optionButton,
+                        { borderColor: theme.colors.border },
+                        isSelected && {
+                          backgroundColor: theme.colors.primary,
+                          borderColor: theme.colors.primary,
+                        },
+                      ]}
+                      onPress={() => setUnitMode(item.value as any)}
+                    >
+                      <Text
+                        style={[
+                          styles.optionText,
+                          { color: isSelected ? "#ffffff" : theme.colors.text },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
               {/* Margins Steppers Selection */}
               <Text
                 style={[
@@ -1277,7 +2013,8 @@ const EditDraftScreen: React.FC = () => {
                       backgroundColor: theme.colors.cardBackground,
                     }}
                     onPress={() => {
-                      const v = Math.max(0, topMargin - 5);
+                      const step = getMarginStepPx(unitMode);
+                      const v = Math.max(0, topMargin - step);
                       setTopMargin(v);
                       applyLayoutSettings(
                         font,
@@ -1299,14 +2036,14 @@ const EditDraftScreen: React.FC = () => {
                   </TouchableOpacity>
                   <Text
                     style={{
-                      width: 60,
+                      width: 76,
                       textAlign: "center",
                       fontWeight: "bold",
                       color: theme.colors.text,
                       fontSize: 12,
                     }}
                   >
-                    {topMargin} px
+                    {formatMarginValue(topMargin, unitMode)}
                   </Text>
                   <TouchableOpacity
                     style={{
@@ -1320,7 +2057,8 @@ const EditDraftScreen: React.FC = () => {
                       backgroundColor: theme.colors.cardBackground,
                     }}
                     onPress={() => {
-                      const v = Math.min(200, topMargin + 5);
+                      const step = getMarginStepPx(unitMode);
+                      const v = Math.min(200, topMargin + step);
                       setTopMargin(v);
                       applyLayoutSettings(
                         font,
@@ -1370,7 +2108,8 @@ const EditDraftScreen: React.FC = () => {
                       backgroundColor: theme.colors.cardBackground,
                     }}
                     onPress={() => {
-                      const v = Math.max(20, leftMargin - 5);
+                      const step = getMarginStepPx(unitMode);
+                      const v = Math.max(20, leftMargin - step);
                       setLeftMargin(v);
                       applyLayoutSettings(
                         font,
@@ -1392,14 +2131,14 @@ const EditDraftScreen: React.FC = () => {
                   </TouchableOpacity>
                   <Text
                     style={{
-                      width: 60,
+                      width: 76,
                       textAlign: "center",
                       fontWeight: "bold",
                       color: theme.colors.text,
                       fontSize: 12,
                     }}
                   >
-                    {leftMargin} px
+                    {formatMarginValue(leftMargin, unitMode)}
                   </Text>
                   <TouchableOpacity
                     style={{
@@ -1413,7 +2152,8 @@ const EditDraftScreen: React.FC = () => {
                       backgroundColor: theme.colors.cardBackground,
                     }}
                     onPress={() => {
-                      const v = Math.min(200, leftMargin + 5);
+                      const step = getMarginStepPx(unitMode);
+                      const v = Math.min(200, leftMargin + step);
                       setLeftMargin(v);
                       applyLayoutSettings(
                         font,
@@ -1463,7 +2203,8 @@ const EditDraftScreen: React.FC = () => {
                       backgroundColor: theme.colors.cardBackground,
                     }}
                     onPress={() => {
-                      const v = Math.max(0, rightMargin - 5);
+                      const step = getMarginStepPx(unitMode);
+                      const v = Math.max(0, rightMargin - step);
                       setRightMargin(v);
                       applyLayoutSettings(
                         font,
@@ -1485,14 +2226,14 @@ const EditDraftScreen: React.FC = () => {
                   </TouchableOpacity>
                   <Text
                     style={{
-                      width: 60,
+                      width: 76,
                       textAlign: "center",
                       fontWeight: "bold",
                       color: theme.colors.text,
                       fontSize: 12,
                     }}
                   >
-                    {rightMargin} px
+                    {formatMarginValue(rightMargin, unitMode)}
                   </Text>
                   <TouchableOpacity
                     style={{
@@ -1506,7 +2247,8 @@ const EditDraftScreen: React.FC = () => {
                       backgroundColor: theme.colors.cardBackground,
                     }}
                     onPress={() => {
-                      const v = Math.min(200, rightMargin + 5);
+                      const step = getMarginStepPx(unitMode);
+                      const v = Math.min(200, rightMargin + step);
                       setRightMargin(v);
                       applyLayoutSettings(
                         font,
@@ -1556,7 +2298,8 @@ const EditDraftScreen: React.FC = () => {
                       backgroundColor: theme.colors.cardBackground,
                     }}
                     onPress={() => {
-                      const v = Math.max(0, bottomMargin - 5);
+                      const step = getMarginStepPx(unitMode);
+                      const v = Math.max(0, bottomMargin - step);
                       setBottomMargin(v);
                       applyLayoutSettings(
                         font,
@@ -1578,14 +2321,14 @@ const EditDraftScreen: React.FC = () => {
                   </TouchableOpacity>
                   <Text
                     style={{
-                      width: 60,
+                      width: 76,
                       textAlign: "center",
                       fontWeight: "bold",
                       color: theme.colors.text,
                       fontSize: 12,
                     }}
                   >
-                    {bottomMargin} px
+                    {formatMarginValue(bottomMargin, unitMode)}
                   </Text>
                   <TouchableOpacity
                     style={{
@@ -1599,7 +2342,8 @@ const EditDraftScreen: React.FC = () => {
                       backgroundColor: theme.colors.cardBackground,
                     }}
                     onPress={() => {
-                      const v = Math.min(200, bottomMargin + 5);
+                      const step = getMarginStepPx(unitMode);
+                      const v = Math.min(200, bottomMargin + step);
                       setBottomMargin(v);
                       applyLayoutSettings(
                         font,
@@ -1649,7 +2393,8 @@ const EditDraftScreen: React.FC = () => {
                       backgroundColor: theme.colors.cardBackground,
                     }}
                     onPress={() => {
-                      const v = Math.max(0, letterheadSpace - 10);
+                      const step = getMarginStepPx(unitMode);
+                      const v = Math.max(0, letterheadSpace - step * 2);
                       setLetterheadSpace(v);
                       applyLayoutSettings(
                         font,
@@ -1671,14 +2416,14 @@ const EditDraftScreen: React.FC = () => {
                   </TouchableOpacity>
                   <Text
                     style={{
-                      width: 60,
+                      width: 76,
                       textAlign: "center",
                       fontWeight: "bold",
                       color: theme.colors.text,
                       fontSize: 12,
                     }}
                   >
-                    {letterheadSpace} px
+                    {formatMarginValue(letterheadSpace, unitMode)}
                   </Text>
                   <TouchableOpacity
                     style={{
@@ -1692,7 +2437,8 @@ const EditDraftScreen: React.FC = () => {
                       backgroundColor: theme.colors.cardBackground,
                     }}
                     onPress={() => {
-                      const v = Math.min(300, letterheadSpace + 10);
+                      const step = getMarginStepPx(unitMode);
+                      const v = Math.min(300, letterheadSpace + step * 2);
                       setLetterheadSpace(v);
                       applyLayoutSettings(
                         font,
@@ -1710,22 +2456,23 @@ const EditDraftScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
               </View>
+            </View>
+          </ScrollView>
 
-              <TouchableOpacity
-                style={[
-                  styles.modalSaveButton,
-                  { backgroundColor: theme.colors.primary },
-                ]}
-                onPress={() => setIsPageSetupVisible(false)}
-              >
+            <TouchableOpacity
+              style={[
+                styles.modalSaveButton,
+                { backgroundColor: theme.colors.primary },
+              ]}
+              onPress={() => setIsPageSetupVisible(false)}
+            >
                 <Text style={{ color: "#ffffff", fontWeight: "bold" }}>
                   {t ? t("Done") || "Done" : "Done"}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
       {/* Signature Modal */}
       <Modal
@@ -1801,6 +2548,62 @@ const EditDraftScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Insert Geometry Shape / Legal Stamp Modal */}
+      <Modal
+        visible={shapeModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShapeModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                Insert Geometry Shape / Legal Stamp
+              </Text>
+              <TouchableOpacity onPress={() => setShapeModalVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 12, paddingVertical: 12 }}>
+              {[
+                { title: "⏹️ Rectangle / Stamp Box", desc: "Standard bordered box for custom notes or fee seals", value: "rect" },
+                { title: "🏷️ Court Fee Stamp Frame", desc: "Double-bordered ₹10/₹100 Fee Stamp placeholder box", value: "stamp" },
+                { title: "⭕ Advocate Round Seal", desc: "Circular stamp frame for Advocate office / Notary seal", value: "circle" },
+                { title: "➡️ Process Arrow", desc: "Legal chronology flowchart process arrow node", value: "arrow" },
+              ].map((item) => (
+                <TouchableOpacity
+                  key={item.value}
+                  style={{
+                    padding: 14,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.inputBackground,
+                  }}
+                  onPress={() => {
+                    setShapeModalVisible(false);
+                    postMessageToWebView({
+                      type: "exec",
+                      command: "insertShape",
+                      value: item.value,
+                    });
+                  }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: "bold", color: theme.colors.text, marginBottom: 2 }}>
+                    {item.title}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>
+                    {item.desc}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
       </Modal>
@@ -2112,6 +2915,41 @@ const EditDraftScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Native Placeholder Fill Modal */}
+      <PlaceholderBottomSheet
+        visible={placeholderModalVisible}
+        placeholderLabel={activePlaceholderLabel}
+        cleanLabel={activePlaceholderClean}
+        theme={theme}
+        onApply={handleApplyPlaceholderValue}
+        onClose={() => setPlaceholderModalVisible(false)}
+      />
+
+      {/* Advocate Digital Signature Stamp Modal */}
+      <SignatureCanvasModal
+        visible={signatureModalVisible}
+        theme={theme}
+        onSelectSignature={handleSelectSignature}
+        onClose={() => setSignatureModalVisible(false)}
+      />
+
+      {/* Table Custom Rows & Columns Configuration Modal */}
+      <TableConfigModal
+        visible={tableConfigModalVisible}
+        theme={theme}
+        onInsertTable={handleInsertTable}
+        onClose={() => setTableConfigModalVisible(false)}
+      />
+
+      {/* Selected Element Context Menu (Delete Table / Signature) */}
+      <ElementContextModal
+        visible={elementContextModalVisible}
+        elementType={selectedElementType}
+        theme={theme}
+        onDeleteElement={handleDeleteSelectedElement}
+        onClose={() => setElementContextModalVisible(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -2133,7 +2971,8 @@ const getStyles = (theme: any) =>
     header: {
       flexDirection: "row",
       alignItems: "center",
-      height: 56,
+      height: (Platform.OS === "android" ? (StatusBar.currentHeight || 24) : 0) + 56,
+      paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 24) : 0,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
       backgroundColor: theme.colors.cardBackground,
@@ -2162,25 +3001,36 @@ const getStyles = (theme: any) =>
       flex: 1,
       backgroundColor: "#ffffff",
     },
-    toolbar: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      height: 52,
+    toolbarScroll: {
       borderTopWidth: 1,
       borderTopColor: theme.colors.border,
       backgroundColor: theme.colors.cardBackground,
-      paddingHorizontal: 16,
+      maxHeight: 52,
+    },
+    toolbarContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 8,
     },
     toolbarButton: {
-      width: 32,
-      height: 32,
-      borderRadius: 4,
+      width: 36,
+      height: 36,
+      borderRadius: 8,
       justifyContent: "center",
       alignItems: "center",
     },
     activeToolbarButton: {
       backgroundColor: theme.colors.primary,
+      borderRadius: 8,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+      elevation: 3,
+      borderWidth: 1.5,
+      borderColor: "#ffffff",
     },
     divider: {
       width: 1,

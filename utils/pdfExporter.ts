@@ -267,28 +267,23 @@ export const exportDailyCauseListToPdf = async (
       cases.forEach((c, index) => {
         rowsHtml += `
           <tr>
-            <td style="padding: 8px; border: 1px solid #aaa; text-align: center; font-size: 11px;">
+            <td style="padding: 4px 5px; border: 1px solid #777; text-align: center; font-size: 10px; font-weight: bold;">
               ${index + 1}
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; font-size: 12px; font-weight: bold;">
-              ${c.CaseTitle || "No Title"}<br/>
-              <span style="font-size: 10px; color: #555; font-weight: normal;">
-                CNR: ${c.CNRNumber || "N/A"}<br/>
-                Client: ${c.ClientName || "N/A"} (${c.ClientContactNumber || "N/A"})
-              </span>
+            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10.5px;">
+              <strong style="color: #000;">${c.CaseTitle || "No Title"}</strong> ${c.case_number ? `(${c.case_number})` : ""}<br/>
+              <span style="font-size: 9.5px; color: #444;">Client: ${c.ClientName || "N/A"} | CNR: ${c.CNRNumber || "N/A"}</span>
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px;">
-              ${c.court_name || "N/A"}<br/>
-              <span style="font-size: 10px; color: #555;">${c.JudgeName || ""}</span>
+            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px;">
+              ${c.court_name || "N/A"} ${c.JudgeName ? `[${c.JudgeName}]` : ""}
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px;">
-              ${c.CaseStatus || "N/A"}<br/>
-              <span style="font-size: 10px; color: #555;">${c.Undersection || ""}</span>
+            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px;">
+              ${c.CaseStatus || "N/A"} ${c.Undersection ? `(${c.Undersection})` : ""}
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px; text-align: center;">
+            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px; text-align: center;">
               ${c.PreviousDate ? formatDate(c.PreviousDate) : "N/A"}
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; width: 180px; height: 50px; background-color: #fafafa;">
+            <td style="padding: 4px 5px; border: 1px solid #777; width: 140px; height: 26px; background-color: #fafafa;">
               <!-- Blank column for hand-written notes / next date -->
             </td>
           </tr>
@@ -652,28 +647,23 @@ export const exportUndatedCasesToPdf = async (
       cases.forEach((c, index) => {
         rowsHtml += `
           <tr>
-            <td style="padding: 8px; border: 1px solid #aaa; text-align: center; font-size: 11px;">
+            <td style="padding: 4px 5px; border: 1px solid #777; text-align: center; font-size: 10px; font-weight: bold;">
               ${index + 1}
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; font-size: 12px; font-weight: bold;">
-              ${c.CaseTitle || "No Title"}<br/>
-              <span style="font-size: 10px; color: #555; font-weight: normal;">
-                CNR: ${c.CNRNumber || "N/A"}<br/>
-                Client: ${c.ClientName || "N/A"} (${c.ClientContactNumber || "N/A"})
-              </span>
+            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10.5px;">
+              <strong style="color: #000;">${c.CaseTitle || "No Title"}</strong> ${c.case_number ? `(${c.case_number})` : ""}<br/>
+              <span style="font-size: 9.5px; color: #444;">Client: ${c.ClientName || "N/A"} | CNR: ${c.CNRNumber || "N/A"}</span>
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px;">
-              ${c.court_name || "N/A"}<br/>
-              <span style="font-size: 10px; color: #555;">${c.JudgeName || ""}</span>
+            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px;">
+              ${c.court_name || "N/A"} ${c.JudgeName ? `[${c.JudgeName}]` : ""}
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px;">
-              ${c.CaseStatus || "N/A"}<br/>
-              <span style="font-size: 10px; color: #555;">${c.Undersection || ""}</span>
+            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px;">
+              ${c.CaseStatus || "N/A"} ${c.Undersection ? `(${c.Undersection})` : ""}
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; font-size: 11px; text-align: center;">
+            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px; text-align: center;">
               ${c.PreviousDate ? formatDate(c.PreviousDate) : "N/A"}
             </td>
-            <td style="padding: 8px; border: 1px solid #aaa; width: 180px; height: 50px; background-color: #fafafa;">
+            <td style="padding: 4px 5px; border: 1px solid #777; width: 140px; height: 26px; background-color: #fafafa;">
               <!-- Blank column for hand-written notes / next date -->
             </td>
           </tr>

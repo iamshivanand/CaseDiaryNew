@@ -62,6 +62,15 @@ import {
 } from "../../utils/documentTemplates";
 import { LEGAL_VOCABULARY } from "../../utils/legalVocabulary";
 import { getOfflineEditorHtml } from "../../utils/offlineEditorTemplate";
+import { extractTextFromImages } from "../../utils/ocrService";
+import { extractLegalEntities, ExtractedLegalEntities } from "../../utils/legalNerService";
+import { speechRecognitionService } from "../../utils/speechRecognitionService";
+import { legalAutocompleteService } from "../../utils/legalAutocompleteService";
+import { PlaceholderBottomSheet } from "./components/PlaceholderBottomSheet";
+import { SignatureCanvasModal } from "./components/SignatureCanvasModal";
+import { LegalAutocompleteBar } from "./components/LegalAutocompleteBar";
+import { TableConfigModal } from "./components/TableConfigModal";
+import { ElementContextModal } from "./components/ElementContextModal";
 import ActionButton from "../CommonComponents/ActionButton";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 import FormInput from "../CommonComponents/FormInput";
@@ -76,6 +85,7 @@ const DRAFTS_DIRECTORY = FileSystem.documentDirectory + "drafts/";
 
 const categories = [
   { label: "All Categories", value: "all" },
+  { label: "Reusable Templates", value: "reusable" },
   { label: "Civil (CPC)", value: "civil" },
   { label: "Criminal (CrPC)", value: "criminal" },
   { label: "Commercial / ADR", value: "commercial" },
@@ -86,8 +96,8 @@ const BUILT_IN_TEMPLATES = [
   {
     id: "built_in_blank_page",
     template_type: "blank_page",
-    title: "Blank Template (Start from Scratch)",
-    category: "common",
+    title: "Blank Canvas (Start from Scratch)",
+    category: "reusable",
     isBuiltIn: true,
   },
   {
@@ -370,7 +380,7 @@ const GenerateDocumentScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<GenerateDocumentScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
-  const { t, locale } = useTranslation();
+  const { t, locale, setLocale } = useTranslation();
   const styles = getStyles(theme);
   const { showAdWithPreload } = useAdTrigger();
 
@@ -459,7 +469,20 @@ const GenerateDocumentScreen: React.FC = () => {
   const [leftMargin, setLeftMargin] = useState(55);
   const [rightMargin, setRightMargin] = useState(24);
   const [letterheadSpace, setLetterheadSpace] = useState(0);
+  const [unitMode, setUnitMode] = useState<"in" | "mm" | "px">("in");
   const [isPageSetupVisible, setIsPageSetupVisible] = useState(false);
+
+  const formatMarginValue = (px: number, mode: "in" | "mm" | "px"): string => {
+    if (mode === "in") return `${(px / 96).toFixed(2)} in`;
+    if (mode === "mm") return `${Math.round((px / 96) * 25.4)} mm`;
+    return `${Math.round(px)} px`;
+  };
+
+  const getMarginStepPx = (mode: "in" | "mm" | "px"): number => {
+    if (mode === "in") return 9.6;
+    if (mode === "mm") return 3.78;
+    return 5;
+  };
   const [pageSize, setPageSize] = useState<"a4" | "legal">("legal");
   const [toolbarMode, setToolbarMode] = useState<"format" | "legal">("format");
   const [isVocabularyVisible, setIsVocabularyVisible] = useState(false);
@@ -530,6 +553,12 @@ const GenerateDocumentScreen: React.FC = () => {
   const [customTemplateTitle, setCustomTemplateTitle] = useState("");
   const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
 
+  const [docStats, setDocStats] = useState({
+    wordCount: 0,
+    charCount: 0,
+    estimatedPages: 1,
+  });
+
   const [editorState, setEditorState] = useState({
     bold: false,
     italic: false,
@@ -542,14 +571,35 @@ const GenerateDocumentScreen: React.FC = () => {
     unorderedList: false,
   });
 
-  const getFilteredTemplates = () => {
+  // Offline AI & UI State Variables
+  const [placeholderModalVisible, setPlaceholderModalVisible] = useState(false);
+  const [activePlaceholderLabel, setActivePlaceholderLabel] = useState("");
+  const [activePlaceholderClean, setActivePlaceholderClean] = useState("");
+  const [signatureModalVisible, setSignatureModalVisible] = useState(false);
+  const [extractedEntities, setExtractedEntities] = useState<ExtractedLegalEntities | null>(null);
+  const [isDictating, setIsDictating] = useState(false);
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
+  const [isRibbonCollapsed, setIsRibbonCollapsed] = useState(false);
+  const [tableConfigModalVisible, setTableConfigModalVisible] = useState(false);
+  const [elementContextModalVisible, setElementContextModalVisible] = useState(false);
+  const [selectedElementType, setSelectedElementType] = useState<"table" | "signature" | null>(null);
+  const [shapeModalVisible, setShapeModalVisible] = useState(false);
+
+  const filteredTemplates = React.useMemo(() => {
     const combined = [
-      ...BUILT_IN_TEMPLATES,
+      {
+        id: "built_in_blank_page",
+        template_type: "blank_page",
+        title: "Blank Canvas (Start from Scratch)",
+        category: "reusable",
+        isBuiltIn: true,
+      },
+      ...BUILT_IN_TEMPLATES.filter((t) => t.id !== "built_in_blank_page"),
       ...customTemplates.map((t) => ({
         id: t.id,
         template_type: t.template_type,
         title: t.title,
-        category: "common",
+        category: "reusable",
         isBuiltIn: false,
       })),
     ];
@@ -565,17 +615,20 @@ const GenerateDocumentScreen: React.FC = () => {
     }
 
     if (selectedTemplateCategory !== "all") {
-      filtered = filtered.filter(
-        (t) => t.category === selectedTemplateCategory
+      filtered = filtered.filter((t) =>
+        selectedTemplateCategory === "reusable"
+          ? t.category === "reusable" || !t.isBuiltIn
+          : t.category === selectedTemplateCategory
       );
     }
 
     return filtered;
-  };
+  }, [customTemplates, templateSearchQuery, selectedTemplateCategory]);
 
-  const renderTemplateCardItem = ({ item }: { item: any }) => {
-    const color =
-      documentTypeColors[item.template_type] || theme.colors.primary;
+  const renderTemplateCardItem = React.useCallback(
+    ({ item }: { item: any }) => {
+      const color =
+        documentTypeColors[item.template_type] || theme.colors.primary;
     return (
       <TouchableOpacity
         style={{
@@ -726,7 +779,7 @@ const GenerateDocumentScreen: React.FC = () => {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [theme]);
 
   const webViewRef = React.useRef<WebView>(null);
   const saveCallbackRef = React.useRef<((html: string) => void) | null>(null);
@@ -737,6 +790,25 @@ const GenerateDocumentScreen: React.FC = () => {
     webViewRef.current?.injectJavaScript(
       `window.handleRNMessage('${escaped}'); void(0);`
     );
+  };
+
+  const triggerFormat = (command: string, value: string | null = null) => {
+    // Optimistic state toggle for instant active button highlight UI
+    if (command === "bold") setEditorState((prev) => ({ ...prev, bold: !prev.bold }));
+    if (command === "italic") setEditorState((prev) => ({ ...prev, italic: !prev.italic }));
+    if (command === "underline") setEditorState((prev) => ({ ...prev, underline: !prev.underline }));
+    if (command === "justifyLeft") setEditorState((prev) => ({ ...prev, alignLeft: true, alignCenter: false, alignRight: false, alignJustify: false }));
+    if (command === "justifyCenter") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: true, alignRight: false, alignJustify: false }));
+    if (command === "justifyRight") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: false, alignRight: true, alignJustify: false }));
+    if (command === "justifyFull") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: false, alignRight: false, alignJustify: true }));
+    if (command === "insertUnorderedList") setEditorState((prev) => ({ ...prev, unorderedList: !prev.unorderedList, orderedList: false }));
+    if (command === "insertOrderedList") setEditorState((prev) => ({ ...prev, orderedList: !prev.orderedList, unorderedList: false }));
+
+    postMessageToWebView({
+      type: "exec",
+      command,
+      value,
+    });
   };
 
   const applyLayoutSettings = (
@@ -762,19 +834,34 @@ const GenerateDocumentScreen: React.FC = () => {
     });
   };
 
-  const triggerFormat = (command: string, value: string | null = null) => {
-    postMessageToWebView({
-      type: "exec",
-      command,
-      value,
-    });
-  };
-
   const handleEditorMessage = async (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === "state") {
+      if (data.type === "openPlaceholderModal") {
+        setActivePlaceholderLabel(data.label || "");
+        setActivePlaceholderClean(data.cleanLabel || "");
+        setPlaceholderModalVisible(true);
+      } else if (data.type === "openElementContextModal") {
+        setSelectedElementType(data.elementType || "table");
+        setElementContextModalVisible(true);
+      } else if (data.type === "state") {
         setEditorState(data.state);
+        if (data.stats) {
+          setDocStats(data.stats);
+          if (data.stats.text) {
+            const entities = extractLegalEntities(data.stats.text);
+            setExtractedEntities(entities);
+
+            const words = data.stats.text.trim().split(/\s+/);
+            const lastWord = words.length > 0 ? words[words.length - 1] : "";
+            if (lastWord.length >= 2) {
+              const matches = legalAutocompleteService.getSuggestions(lastWord, 5);
+              setAutocompleteSuggestions(matches);
+            } else {
+              setAutocompleteSuggestions([]);
+            }
+          }
+        }
       } else if (data.type === "change") {
         setIsRichTextModified(true);
       } else if (data.type === "save") {
@@ -788,6 +875,96 @@ const GenerateDocumentScreen: React.FC = () => {
     } catch (e) {
       console.error("Error parsing message from webview:", e);
     }
+  };
+
+  // Actions for Live Editor features
+  const handleScanToEditorOcr = async () => {
+    try {
+      let scannedUris: string[] = [];
+      try {
+        const DocumentScanner = require("react-native-document-scanner-plugin").default;
+        const { scannedImages } = await DocumentScanner.scanDocument({
+          croppedImageQuality: 100,
+          maxNumDocuments: 10,
+        });
+        if (scannedImages) scannedUris = scannedImages;
+      } catch (scanErr) {
+        console.warn("Native DocumentScanner unavailable:", scanErr);
+      }
+
+      if (scannedUris.length > 0) {
+        setIsLoading(true);
+        const extractedText = await extractTextFromImages(scannedUris);
+        if (extractedText) {
+          triggerFormat("insertHTML", `<p>${extractedText.replace(/\n\n/g, "</p><p>")}</p>`);
+          Alert.alert("OCR Complete", "Extracted document text inserted directly into editor.");
+        }
+        setIsLoading(false);
+      }
+    } catch (err) {
+      console.error("Error in handleScanToEditorOcr:", err);
+      setIsLoading(false);
+      Alert.alert("OCR Error", "Could not extract text from scanned document.");
+    }
+  };
+
+  const toggleVoiceDictation = async () => {
+    if (isDictating) {
+      await speechRecognitionService.stopListening();
+      setIsDictating(false);
+    } else {
+      setIsDictating(true);
+      const dictationLocale = locale === "hi" ? "hi-IN" : "en-IN";
+      const started = await speechRecognitionService.startListening(dictationLocale, {
+        onStart: () => setIsDictating(true),
+        onResult: (text) => {
+          if (text) {
+            triggerFormat("insertText", text + " ");
+          }
+        },
+        onError: (err) => {
+          setIsDictating(false);
+          Alert.alert("Dictation Error", err || "Speech recognition error");
+        },
+        onEnd: () => setIsDictating(false),
+      });
+      if (!started) {
+        setIsDictating(false);
+      }
+    }
+  };
+
+  const handleApplyPlaceholderValue = (originalLabel: string, newValue: string) => {
+    postMessageToWebView({
+      type: "exec",
+      command: "replacePlaceholderValue",
+      label: originalLabel,
+      value: newValue,
+    });
+  };
+
+  const handleSelectSignature = (imageUri: string) => {
+    postMessageToWebView({
+      type: "exec",
+      command: "insertSignature",
+      value: imageUri,
+    });
+  };
+
+  const handleInsertTable = (rows: number = 3, cols: number = 3) => {
+    postMessageToWebView({
+      type: "exec",
+      command: "insertTable",
+      rows,
+      cols,
+    });
+  };
+
+  const handleDeleteSelectedElement = () => {
+    postMessageToWebView({
+      type: "exec",
+      command: "deleteSelectedElement",
+    });
   };
 
   const handleTabChange = (newTab: "fields" | "preview") => {
@@ -817,8 +994,56 @@ const GenerateDocumentScreen: React.FC = () => {
   };
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: t("docgen_header_title") });
-  }, [navigation, t]);
+    navigation.setOptions({
+      title:
+        activeTab === "preview"
+          ? locale === "hi"
+            ? "लाइव एडिटर"
+            : "Live Editor"
+          : t("docgen_header_title"),
+      headerRight: () =>
+        documentType !== "blank_page" ? (
+          <TouchableOpacity
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: `${theme.colors.primary}18`,
+              borderWidth: 1,
+              borderColor: `${theme.colors.primary}40`,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 16,
+              marginRight: 8,
+            }}
+            onPress={() =>
+              handleTabChange(activeTab === "fields" ? "preview" : "fields")
+            }
+          >
+            <Ionicons
+              name={activeTab === "fields" ? "create-outline" : "list-outline"}
+              size={14}
+              color={theme.colors.primary}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "bold",
+                color: theme.colors.primary,
+              }}
+            >
+              {activeTab === "fields"
+                ? locale === "hi"
+                  ? "लाइव एडिटर"
+                  : "Live Editor"
+                : locale === "hi"
+                  ? "फ़ॉर्म इनपुट"
+                  : "Form Input"}
+            </Text>
+          </TouchableOpacity>
+        ) : null,
+    });
+  }, [navigation, t, activeTab, documentType, theme, locale]);
 
   const getTranslatedDocTypes = () => {
     return documentTypeOptions.map((opt) => {
@@ -1107,11 +1332,12 @@ const GenerateDocumentScreen: React.FC = () => {
   };
 
   // Compile document properties
-  const getInterpolatedHtml = (): string => {
+  const getInterpolatedHtml = (targetLang?: "en" | "hi"): string => {
     const parties =
       caseTitle ||
       `${clientName || "Petitioner"} vs ${oppositePartyName || "Respondent"}`;
-    const isHindi = outputLanguage === "hi";
+    const langToUse = targetLang || outputLanguage;
+    const isHindi = langToUse === "hi";
 
     if (documentType.startsWith("custom_")) {
       const customId = documentType.replace("custom_", "");
@@ -1542,36 +1768,107 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
         await cacheAdvocateProfile();
 
         try {
-          const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin })} -->`;
+          const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, pageSize, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace })} -->`;
+          const effectiveTopMargin = (topMargin || 24) + (letterheadSpace || 0);
+          const pageCssSize = pageSize === "legal" ? "8.5in 14in" : "A4 portrait";
+          const cleanBodyHtml = html
+            .replace(/<!-- CD_LAYOUT:(.*?) -->/g, "")
+            .replace(/<div id="red-margin-line".*?<\/div>/g, "")
+            .replace(/<div id="margin-guide-overlay".*?<\/div>/g, "");
+
           const formattedHtml = `
             <!DOCTYPE html>
             <html>
             <head>
               <meta charset="utf-8" />
               <style>
-                body {
-                  font-family: ${font};
+                @page {
+                  size: ${pageCssSize};
+                  margin: 0;
+                }
+                html, body {
+                  margin: 0;
+                  padding: 0;
+                  background: #ffffff;
+                  color: #000000;
+                  font-family: '${font}', 'Times New Roman', serif;
+                  font-size: 13pt;
                   line-height: ${lineHeight};
-                  padding-top: ${topMargin}px;
-                  padding-left: 30px;
-                  padding-right: 30px;
-                  color: #1f2937;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                body {
+                  padding-top: ${effectiveTopMargin}px;
+                  padding-bottom: ${bottomMargin || 24}px;
+                  padding-left: ${leftMargin || 55}px;
+                  padding-right: ${rightMargin || 24}px;
+                  box-sizing: border-box;
                 }
                 p {
-                  margin: 0 0 12px 0;
+                  margin-top: 0;
+                  margin-bottom: 12pt;
+                  text-align: justify;
+                  text-justify: inter-word;
+                  word-wrap: break-word;
+                }
+                p.court-header, .court-header {
+                  text-align: center !important;
+                  font-weight: bold;
+                  margin-bottom: 14pt;
+                }
+                p.title, .title {
+                  text-align: center !important;
+                  font-weight: bold;
+                  font-size: 15pt;
+                  margin-top: 14pt;
+                  margin-bottom: 14pt;
+                }
+                p.case-details, .case-details {
+                  text-align: center !important;
+                  margin-bottom: 12pt;
+                }
+                p.section-title, .section-title {
+                  font-weight: bold;
+                  margin-top: 14pt;
+                  margin-bottom: 6pt;
+                }
+                hr.page-break {
+                  display: block;
+                  page-break-before: always;
+                  break-before: page;
+                  border: none;
+                  height: 0;
+                  margin: 0;
+                }
+                .page-margin-guide, #red-margin-line, #margin-guide-overlay {
+                  display: none !important;
+                }
+                table {
+                  width: 100%;
+                  border-collapse: collapse;
+                  margin-bottom: 12pt;
+                }
+                th, td {
+                  border: 1px solid #000;
+                  padding: 6pt;
+                  text-align: left;
+                }
+                .interactive-shape {
+                  page-break-inside: avoid;
                 }
               </style>
             </head>
             <body>
-              ${html.replace(/<!-- CD_LAYOUT:(.*?) -->/, "")}
+              ${cleanBodyHtml}
             </body>
             </html>
           `;
 
+          const isLegal = pageSize === "legal";
           const { uri } = await Print.printToFileAsync({
             html: formattedHtml,
-            width: 612,
-            height: 1008,
+            width: isLegal ? 612 : 595,
+            height: isLegal ? 1008 : 842,
           });
 
           if (caseId) {
@@ -1601,6 +1898,13 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                         UTI: "com.adobe.pdf",
                       });
                     }
+                  },
+                },
+                {
+                  text: "Go to Document Hub",
+                  onPress: () => {
+                    // @ts-ignore
+                    navigation.navigate("DraftsHub");
                   },
                 },
                 {
@@ -1685,6 +1989,13 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                   },
                 },
                 {
+                  text: "Link to Case",
+                  onPress: () => {
+                    // @ts-ignore
+                    navigation.navigate("DraftsHub", { draftId: draftId, action: "attach" });
+                  },
+                },
+                {
                   text: t("docgen_alert_go_drafts"),
                   onPress: () => {
                     // @ts-ignore
@@ -1709,20 +2020,44 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
     });
   };
 
+  // Helper to fetch latest HTML from WebView with automatic 200ms fallback
+  const getLatestHtml = (): Promise<string> => {
+    return new Promise((resolve) => {
+      let resolved = false;
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          saveCallbackRef.current = null;
+          resolve(htmlContent || getInterpolatedHtml());
+        }
+      }, 200);
+
+      saveCallbackRef.current = (html: string) => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          saveCallbackRef.current = null;
+          resolve(html || htmlContent || getInterpolatedHtml());
+        }
+      };
+
+      postMessageToWebView({ type: "requestSave" });
+    });
+  };
+
   const handleGeneratePdf = async () => {
     try {
+      let html = "";
       if (activeTab === "preview" && webViewRef.current) {
-        postMessageToWebView({ type: "requestSave" });
-        saveCallbackRef.current = async (html) => {
-          setHtmlContent(html);
-          await executePdfExport(html);
-        };
+        html = await getLatestHtml();
       } else {
-        const html = getInterpolatedHtml();
-        await executePdfExport(html);
+        html = getInterpolatedHtml();
       }
+      setHtmlContent(html);
+      await executePdfExport(html);
     } catch (e) {
-      console.error("DEBUG handleGeneratePdf error:", e);
+      console.error("Error in handleGeneratePdf:", e);
+      Alert.alert(t("alert_error") || "Error", "Failed to export PDF.");
     }
   };
 
@@ -1891,7 +2226,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
 
         {/* Grid List */}
         <FlatList
-          data={getFilteredTemplates()}
+          data={filteredTemplates}
           renderItem={renderTemplateCardItem}
           keyExtractor={(item) => item.id}
           numColumns={2}
@@ -1934,62 +2269,6 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
       style={{ flex: 1 }}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
-      {/* Tab Selectors */}
-      {documentType !== "blank_page" && (
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === "fields" && styles.activeTabButton,
-            ]}
-            onPress={() => handleTabChange("fields")}
-          >
-            <Ionicons
-              name="create-outline"
-              size={18}
-              color={
-                activeTab === "fields"
-                  ? theme.colors.primary
-                  : theme.colors.textSecondary
-              }
-            />
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "fields" && styles.activeTabText,
-              ]}
-            >
-              {locale === "hi" ? "फ़ॉर्म इनटेक" : "Form Intake"}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tabButton,
-              activeTab === "preview" && styles.activeTabButton,
-            ]}
-            onPress={() => handleTabChange("preview")}
-          >
-            <Ionicons
-              name="create"
-              size={18}
-              color={
-                activeTab === "preview"
-                  ? theme.colors.primary
-                  : theme.colors.textSecondary
-              }
-            />
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "preview" && styles.activeTabText,
-              ]}
-            >
-              {locale === "hi" ? "लाइव एडिटर" : "Live Editor"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {activeTab === "fields" ? (
         <ScrollView
           style={styles.screen}
@@ -2519,223 +2798,231 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
       ) : (
         /* Dynamic Rich-Text preview and formatting workspace */
         <View style={{ flex: 1 }}>
-          <WebView
-            ref={webViewRef}
-            source={{ html: getOfflineEditorHtml(htmlContent) }}
-            onMessage={handleEditorMessage}
-            style={{ flex: 1 }}
-            originWhitelist={["*"]}
-            javaScriptEnabled
-            domStorageEnabled
-            onLoadEnd={() => {
-              postMessageToWebView({ type: "load", html: htmlContent });
-              applyLayoutSettings(
-                font,
-                lineHeight,
-                pageSize,
-                topMargin,
-                bottomMargin,
-                leftMargin,
-                rightMargin,
-                letterheadSpace
-              );
-            }}
-            onShouldStartLoadWithRequest={() => false}
-          />
-
-          {/* Form Actions Overlay */}
+          {/* Live Document HUD Bar with Undo / Redo */}
           <View
             style={{
               flexDirection: "row",
-              justifyContent: "space-between",
-              padding: 12,
+              alignItems: "center",
               backgroundColor: theme.colors.cardBackground,
-              borderTopWidth: 1,
-              borderTopColor: theme.colors.border,
+              borderBottomWidth: 1,
+              borderBottomColor: theme.colors.border,
+              paddingHorizontal: 12,
+              paddingVertical: 5,
             }}
           >
-            <TouchableOpacity
-              style={{
-                flex: 1,
-                backgroundColor: theme.colors.primary,
-                borderRadius: 8,
-                paddingVertical: 12,
-                justifyContent: "center",
-                alignItems: "center",
-                marginRight: 6,
-                flexDirection: "row",
-              }}
-              onPress={() => {
-                postMessageToWebView({ type: "requestSave" });
-                saveCallbackRef.current = async (html) => {
-                  setHtmlContent(html);
-                  const boilerplateChanged = checkIfBoilerplateChanged(html);
-
-                  const saveDraftRoutine = async () => {
-                    try {
-                      setIsSavingTemplate(true);
-                      const idToSave = uuidv4();
-                      const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace })} -->`;
-                      const title = `${getFullDocTypesList().find((o) => o.value === documentType)?.label || "Draft"} - ${clientName || "Case"}`;
-
-                      await saveDocumentDraft({
-                        id: idToSave,
-                        case_id: caseId ? Number(caseId) : null,
-                        title,
-                        template_type: documentType,
-                        html_content: metadataComment + html,
-                        is_custom_template: 0,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                      });
-
-                      Alert.alert(
-                        locale === "hi" ? "सफलता" : "Success",
-                        locale === "hi"
-                          ? "ड्राफ्ट सफलतापूर्वक सहेजा गया।"
-                          : "Draft saved successfully.",
-                        [{ text: "OK", onPress: () => navigation.goBack() }]
-                      );
-                    } catch (err) {
-                      console.error("Failed to save draft:", err);
-                      Alert.alert("Error", "Could not save draft to database.");
-                    } finally {
-                      setIsSavingTemplate(false);
-                    }
-                  };
-
-                  if (boilerplateChanged) {
-                    Alert.alert(
-                      locale === "hi"
-                        ? "टेम्पलेट सहेजें?"
-                        : "Save Custom Template?",
-                      locale === "hi"
-                        ? "आपने इस टेम्पलेट के मूल पाठ में बदलाव किया है। क्या आप इसे भविष्य के दस्तावेज़ों के लिए एक कस्टम टेम्पलेट के रूप में सहेजना चाहेंगे?"
-                        : "You have modified the boilerplate text of this template. Would you like to save this as a custom reusable template for future documents?",
-                      [
-                        {
-                          text:
-                            locale === "hi"
-                              ? "हाँ, टेम्पलेट सहेजें"
-                              : "Yes, Save as Template",
-                          onPress: () => {
-                            setCustomTemplateTitle("");
-                            setIsSaveModalVisible(true);
-                          },
-                        },
-                        {
-                          text:
-                            locale === "hi"
-                              ? "नहीं, केवल ड्राफ्ट"
-                              : "No, Just Save Draft",
-                          onPress: saveDraftRoutine,
-                        },
-                        {
-                          text: locale === "hi" ? "रद्द करें" : "Cancel",
-                          style: "cancel",
-                        },
-                      ]
-                    );
-                  } else {
-                    await saveDraftRoutine();
-                  }
-                };
-              }}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ alignItems: "center", gap: 8 }}
             >
-              <Ionicons
-                name="save-outline"
-                size={16}
-                color="#fff"
-                style={{ marginRight: 6 }}
-              />
-              <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 13 }}>
-                {locale === "hi" ? "ड्राफ्ट सहेजें" : "Save Draft"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{
-                flex: 1,
-                backgroundColor: theme.colors.cardBackground,
-                borderColor: theme.colors.primary,
-                borderWidth: 1,
-                borderRadius: 8,
-                paddingVertical: 12,
-                justifyContent: "center",
-                alignItems: "center",
-                marginRight: 6,
-                flexDirection: "row",
-              }}
-              onPress={() => setIsPageSetupVisible(true)}
-            >
-              <Ionicons
-                name="settings-outline"
-                size={16}
-                color={theme.colors.primary}
-                style={{ marginRight: 6 }}
-              />
-              <Text
+              {/* Undo Button */}
+              <TouchableOpacity
                 style={{
-                  color: theme.colors.primary,
-                  fontWeight: "bold",
-                  fontSize: 13,
+                  padding: 4,
+                  paddingHorizontal: 6,
+                  borderRadius: 6,
+                  backgroundColor: `${theme.colors.border}40`,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+                onPress={() => triggerFormat("undo")}
+              >
+                <Ionicons
+                  name="arrow-undo-outline"
+                  size={15}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              {/* Redo Button */}
+              <TouchableOpacity
+                style={{
+                  padding: 4,
+                  paddingHorizontal: 6,
+                  borderRadius: 6,
+                  backgroundColor: `${theme.colors.border}40`,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+                onPress={() => triggerFormat("redo")}
+              >
+                <Ionicons
+                  name="arrow-redo-outline"
+                  size={15}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <View
+                style={{
+                  width: 1,
+                  height: 16,
+                  backgroundColor: theme.colors.border,
+                  marginHorizontal: 2,
+                }}
+              />
+
+              {/* Word Count Badge */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: `${theme.colors.primary}12`,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 12,
                 }}
               >
-                Page Setup
-              </Text>
-            </TouchableOpacity>
+                <Ionicons
+                  name="document-text-outline"
+                  size={13}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "600",
+                    color: theme.colors.primary,
+                  }}
+                >
+                  {docStats.wordCount} {locale === "hi" ? "शब्द" : "Words"}
+                </Text>
+              </View>
 
-            <TouchableOpacity
-              style={{
-                backgroundColor: "#10B981",
-                borderRadius: 8,
-                paddingVertical: 12,
-                paddingHorizontal: 16,
-                justifyContent: "center",
-                alignItems: "center",
-                flexDirection: "row",
-              }}
-              onPress={handleGeneratePdf}
-              disabled={isGenerating}
-            >
-              <Ionicons
-                name="document-text-outline"
-                size={16}
-                color="#fff"
-                style={{ marginRight: 4 }}
-              />
-              <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 13 }}>
-                Export PDF
-              </Text>
-            </TouchableOpacity>
+              {/* Page Count Badge */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: `${theme.colors.primary}12`,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 12,
+                }}
+              >
+                <Ionicons
+                  name="layers-outline"
+                  size={13}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "600",
+                    color: theme.colors.primary,
+                  }}
+                >
+                  ~{docStats.estimatedPages} {locale === "hi" ? "पेज" : docStats.estimatedPages === 1 ? "Page" : "Pages"}
+                </Text>
+              </View>
+
+              {/* Paper Format Badge */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: `${theme.colors.textSecondary}15`,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 12,
+                }}
+                onPress={() => setIsPageSetupVisible(true)}
+              >
+                <Ionicons
+                  name="easel-outline"
+                  size={13}
+                  color={theme.colors.text}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "600",
+                    color: theme.colors.text,
+                  }}
+                >
+                  {pageSize === "legal" ? "Legal Paper" : "A4 Paper"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Auto-saved Status Badge */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: 6,
+                  paddingVertical: 3,
+                }}
+              >
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: isRichTextModified ? "#f59e0b" : "#10b981",
+                    marginRight: 5,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: theme.colors.textSecondary,
+                    fontWeight: "500",
+                  }}
+                >
+                  {isRichTextModified ? "Editing..." : "Ready"}
+                </Text>
+              </View>
+            </ScrollView>
           </View>
 
-          {/* Toolbar Mode Switcher */}
+          {/* Top Ribbon Segmented Control Switcher */}
           <View
             style={{
               flexDirection: "row",
               backgroundColor: theme.colors.cardBackground,
-              borderTopWidth: 1,
-              borderTopColor: theme.colors.border,
+              borderBottomWidth: 1,
+              borderBottomColor: theme.colors.border,
               paddingHorizontal: 12,
-              paddingTop: 8,
-              paddingBottom: 2,
+              paddingVertical: 6,
               justifyContent: "space-between",
               alignItems: "center",
             }}
           >
-            <View style={{ flexDirection: "row", gap: 8 }}>
+            {/* Segmented Control Container */}
+            <View
+              style={{
+                flexDirection: "row",
+                backgroundColor: theme.colors.inputBackground,
+                borderRadius: 20,
+                padding: 3,
+                gap: 2,
+                alignItems: "center",
+              }}
+            >
               <TouchableOpacity
                 style={{
-                  paddingVertical: 4,
-                  paddingHorizontal: 12,
-                  borderRadius: 12,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 5,
+                  paddingHorizontal: 14,
+                  borderRadius: 16,
                   backgroundColor:
                     toolbarMode === "format"
                       ? theme.colors.primary
                       : "transparent",
                 }}
-                onPress={() => setToolbarMode("format")}
+                onPress={() => {
+                  if (toolbarMode === "format") {
+                    setIsRibbonCollapsed((prev) => !prev);
+                  } else {
+                    setToolbarMode("format");
+                    setIsRibbonCollapsed(false);
+                  }
+                }}
+                testID="tab-formatting-btn"
               >
                 <Text
                   style={{
@@ -2743,24 +3030,51 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                     fontWeight: "bold",
                     color:
                       toolbarMode === "format"
-                        ? "#fff"
+                        ? "#ffffff"
                         : theme.colors.textSecondary,
                   }}
                 >
                   {locale === "hi" ? "फ़ॉर्मेटिंग" : "Formatting"}
                 </Text>
+                <Ionicons
+                  name={
+                    toolbarMode === "format"
+                      ? isRibbonCollapsed
+                        ? "chevron-forward"
+                        : "chevron-down"
+                      : "chevron-forward"
+                  }
+                  size={12}
+                  color={
+                    toolbarMode === "format"
+                      ? "#ffffff"
+                      : theme.colors.textSecondary
+                  }
+                  style={{ marginLeft: 4 }}
+                />
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={{
-                  paddingVertical: 4,
-                  paddingHorizontal: 12,
-                  borderRadius: 12,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 5,
+                  paddingHorizontal: 14,
+                  borderRadius: 16,
                   backgroundColor:
                     toolbarMode === "legal"
                       ? theme.colors.primary
                       : "transparent",
                 }}
-                onPress={() => setToolbarMode("legal")}
+                onPress={() => {
+                  if (toolbarMode === "legal") {
+                    setIsRibbonCollapsed((prev) => !prev);
+                  } else {
+                    setToolbarMode("legal");
+                    setIsRibbonCollapsed(false);
+                  }
+                }}
+                testID="tab-legal-assist-btn"
               >
                 <Text
                   style={{
@@ -2768,44 +3082,126 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                     fontWeight: "bold",
                     color:
                       toolbarMode === "legal"
-                        ? "#fff"
+                        ? "#ffffff"
                         : theme.colors.textSecondary,
                   }}
                 >
                   {locale === "hi" ? "लीगल असिस्ट" : "Legal Assist"}
                 </Text>
+                <Ionicons
+                  name={
+                    toolbarMode === "legal"
+                      ? isRibbonCollapsed
+                        ? "chevron-forward"
+                        : "chevron-down"
+                      : "chevron-forward"
+                  }
+                  size={12}
+                  color={
+                    toolbarMode === "legal"
+                      ? "#ffffff"
+                      : theme.colors.textSecondary
+                  }
+                  style={{ marginLeft: 4 }}
+                />
               </TouchableOpacity>
             </View>
-            <Text
-              style={{
-                fontSize: 11,
-                color: theme.colors.textSecondary,
-                fontWeight: "500",
-              }}
-            >
-              {pageSize === "legal"
-                ? "Legal Size (Double-Spaced)"
-                : "A4 Size (1.5 Spaced)"}
-            </Text>
-          </View>
 
-          {/* Dynamic Formatting Toolbar */}
-          {toolbarMode === "format" ? (
+            {/* Inline Live Document Language Switcher (English / Hindi Document Drafting) */}
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                justifyContent: "space-around",
-                paddingVertical: 8,
                 backgroundColor: theme.colors.inputBackground,
-                borderTopWidth: 1,
-                borderTopColor: theme.colors.border,
+                borderRadius: 12,
+                padding: 2,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+              }}
+            >
+              <TouchableOpacity
+                style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 10,
+                  backgroundColor: outputLanguage === "en" ? theme.colors.primary : "transparent",
+                }}
+                onPress={() => {
+                  setOutputLanguage("en");
+                  postMessageToWebView({ type: "setEditorLanguage", lang: "en" });
+                  if (documentType && documentType !== "blank_page") {
+                    const newHtml = getInterpolatedHtml("en");
+                    setHtmlContent(newHtml);
+                    postMessageToWebView({ type: "setContent", html: newHtml });
+                  }
+                }}
+                testID="lang-en-btn"
+              >
+                <Text style={{ fontSize: 11, fontWeight: "bold", color: outputLanguage === "en" ? "#ffffff" : theme.colors.textSecondary }}>
+                  EN
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 10,
+                  backgroundColor: outputLanguage === "hi" ? theme.colors.primary : "transparent",
+                }}
+                onPress={() => {
+                  setOutputLanguage("hi");
+                  postMessageToWebView({ type: "setEditorLanguage", lang: "hi" });
+                  if (documentType && documentType !== "blank_page") {
+                    const newHtml = getInterpolatedHtml("hi");
+                    setHtmlContent(newHtml);
+                    postMessageToWebView({ type: "setContent", html: newHtml });
+                  }
+                }}
+                testID="lang-hi-btn"
+              >
+                <Text style={{ fontSize: 11, fontWeight: "bold", color: outputLanguage === "hi" ? "#ffffff" : theme.colors.textSecondary }}>
+                  हिंदी
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text
+              style={{
+                fontSize: 11,
+                color: theme.colors.textSecondary,
+                fontWeight: "600",
+              }}
+            >
+              {pageSize === "legal"
+                ? "Legal Paper"
+                : "A4 Paper"}
+            </Text>
+          </View>
+
+          {/* Dynamic Top Formatting Ribbon */}
+          {!isRibbonCollapsed && (
+            toolbarMode === "format" ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{
+                borderBottomWidth: 1,
+                borderBottomColor: theme.colors.border,
+                backgroundColor: theme.colors.cardBackground,
+                maxHeight: 52,
+              }}
+              contentContainerStyle={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                gap: 8,
               }}
             >
               <TouchableOpacity
                 style={[
-                  { padding: 8, borderRadius: 6 },
-                  editorState.bold && { backgroundColor: theme.colors.primary },
+                  styles.toolbarButton,
+                  editorState.bold && styles.activeToolbarButton,
                 ]}
                 onPress={() => triggerFormat("bold")}
               >
@@ -2818,10 +3214,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
 
               <TouchableOpacity
                 style={[
-                  { padding: 8, borderRadius: 6 },
-                  editorState.italic && {
-                    backgroundColor: theme.colors.primary,
-                  },
+                  styles.toolbarButton,
+                  editorState.italic && styles.activeToolbarButton,
                 ]}
                 onPress={() => triggerFormat("italic")}
               >
@@ -2834,10 +3228,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
 
               <TouchableOpacity
                 style={[
-                  { padding: 8, borderRadius: 6 },
-                  editorState.underline && {
-                    backgroundColor: theme.colors.primary,
-                  },
+                  styles.toolbarButton,
+                  editorState.underline && styles.activeToolbarButton,
                 ]}
                 onPress={() => triggerFormat("underline")}
               >
@@ -2848,20 +3240,12 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                 />
               </TouchableOpacity>
 
-              <View
-                style={{
-                  width: 1,
-                  height: 20,
-                  backgroundColor: theme.colors.border,
-                }}
-              />
+              <View style={styles.divider} />
 
               <TouchableOpacity
                 style={[
-                  { padding: 8, borderRadius: 6 },
-                  editorState.alignLeft && {
-                    backgroundColor: theme.colors.primary,
-                  },
+                  styles.toolbarButton,
+                  editorState.alignLeft && styles.activeToolbarButton,
                 ]}
                 onPress={() => triggerFormat("justifyLeft")}
               >
@@ -2874,10 +3258,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
 
               <TouchableOpacity
                 style={[
-                  { padding: 8, borderRadius: 6 },
-                  editorState.alignCenter && {
-                    backgroundColor: theme.colors.primary,
-                  },
+                  styles.toolbarButton,
+                  editorState.alignCenter && styles.activeToolbarButton,
                 ]}
                 onPress={() => triggerFormat("justifyCenter")}
               >
@@ -2890,10 +3272,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
 
               <TouchableOpacity
                 style={[
-                  { padding: 8, borderRadius: 6 },
-                  editorState.alignRight && {
-                    backgroundColor: theme.colors.primary,
-                  },
+                  styles.toolbarButton,
+                  editorState.alignRight && styles.activeToolbarButton,
                 ]}
                 onPress={() => triggerFormat("justifyRight")}
               >
@@ -2904,20 +3284,26 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                 />
               </TouchableOpacity>
 
-              <View
-                style={{
-                  width: 1,
-                  height: 20,
-                  backgroundColor: theme.colors.border,
-                }}
-              />
+              <TouchableOpacity
+                style={[
+                  styles.toolbarButton,
+                  editorState.alignJustify && styles.activeToolbarButton,
+                ]}
+                onPress={() => triggerFormat("justifyFull")}
+              >
+                <FontAwesome
+                  name="align-justify"
+                  size={18}
+                  color={editorState.alignJustify ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
 
               <TouchableOpacity
                 style={[
-                  { padding: 8, borderRadius: 6 },
-                  editorState.unorderedList && {
-                    backgroundColor: theme.colors.primary,
-                  },
+                  styles.toolbarButton,
+                  editorState.unorderedList && styles.activeToolbarButton,
                 ]}
                 onPress={() => triggerFormat("insertUnorderedList")}
               >
@@ -2930,10 +3316,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
 
               <TouchableOpacity
                 style={[
-                  { padding: 8, borderRadius: 6 },
-                  editorState.orderedList && {
-                    backgroundColor: theme.colors.primary,
-                  },
+                  styles.toolbarButton,
+                  editorState.orderedList && styles.activeToolbarButton,
                 ]}
                 onPress={() => triggerFormat("insertOrderedList")}
               >
@@ -2944,8 +3328,10 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                 />
               </TouchableOpacity>
 
+              <View style={styles.divider} />
+
               <TouchableOpacity
-                style={{ padding: 8 }}
+                style={styles.toolbarButton}
                 onPress={() => triggerFormat("insertParagraph")}
               >
                 <Ionicons
@@ -2956,7 +3342,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={{ padding: 8 }}
+                style={styles.toolbarButton}
                 onPress={() => triggerFormat("insertPageBreak")}
               >
                 <Ionicons
@@ -2966,8 +3352,78 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                 />
               </TouchableOpacity>
 
+              <View style={styles.divider} />
+
+              {/* Scan-to-Editor OCR Button */}
               <TouchableOpacity
-                style={{ padding: 8 }}
+                style={styles.toolbarButton}
+                onPress={handleScanToEditorOcr}
+                testID="scan-to-editor-btn"
+              >
+                <Ionicons
+                  name="scan-outline"
+                  size={18}
+                  color={theme.colors.primary}
+                />
+              </TouchableOpacity>
+
+              {/* Offline Voice Dictation Button */}
+              <TouchableOpacity
+                style={[
+                  styles.toolbarButton,
+                  isDictating && { backgroundColor: theme.colors.error || "#ef4444" },
+                ]}
+                onPress={toggleVoiceDictation}
+                testID="voice-dictation-btn"
+              >
+                <Ionicons
+                  name={isDictating ? "mic" : "mic-outline"}
+                  size={18}
+                  color={isDictating ? "#ffffff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              {/* Insert Table Button */}
+              <TouchableOpacity
+                style={styles.toolbarButton}
+                onPress={() => setTableConfigModalVisible(true)}
+                testID="insert-table-btn"
+              >
+                <Ionicons
+                  name="grid-outline"
+                  size={18}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              {/* Attach Signature Stamp Button */}
+              <TouchableOpacity
+                style={styles.toolbarButton}
+                onPress={() => setSignatureModalVisible(true)}
+                testID="attach-signature-btn"
+              >
+                <Ionicons
+                  name="ribbon-outline"
+                  size={18}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              {/* Insert Geometry Shape / Legal Stamp Button */}
+              <TouchableOpacity
+                style={styles.toolbarButton}
+                onPress={() => setShapeModalVisible(true)}
+                testID="insert-shape-btn"
+              >
+                <Ionicons
+                  name="shapes-outline"
+                  size={18}
+                  color={theme.colors.primary}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.toolbarButton}
                 onPress={() => {
                   setTourStepIndex(0);
                   setShowTour(true);
@@ -2979,7 +3435,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                   color={theme.colors.text}
                 />
               </TouchableOpacity>
-            </View>
+            </ScrollView>
           ) : (
             <ScrollView
               horizontal
@@ -2993,8 +3449,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
               }}
               style={{
                 backgroundColor: theme.colors.inputBackground,
-                borderTopWidth: 1,
-                borderTopColor: theme.colors.border,
+                borderBottomWidth: 1,
+                borderBottomColor: theme.colors.border,
                 width: "100%",
                 maxHeight: 50,
               }}
@@ -3164,43 +3620,211 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                   </Text>
                 </TouchableOpacity>
               ))}
-
-              <View
-                style={{
-                  width: 1,
-                  height: 20,
-                  backgroundColor: theme.colors.border,
-                }}
-              />
-
-              {/* Placeholder Navigator */}
-              <TouchableOpacity
-                style={{
-                  padding: 7,
-                  paddingHorizontal: 10,
-                  borderRadius: 6,
-                  backgroundColor: theme.colors.primary,
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-                onPress={() => triggerFormat("nextPlaceholder")}
-              >
-                <Ionicons
-                  name="play-skip-forward-outline"
-                  size={12}
-                  color="#fff"
-                  style={{ marginRight: 4 }}
-                />
-                <Text
-                  style={{ color: "#fff", fontSize: 11, fontWeight: "bold" }}
-                >
-                  Next
-                </Text>
-              </TouchableOpacity>
             </ScrollView>
-          )}
+          ))}
 
-          {/* Page Setup Modal */}
+          {/* Full Height Editor Canvas */}
+          <WebView
+            ref={webViewRef}
+            source={{ html: getOfflineEditorHtml(htmlContent) }}
+            onMessage={handleEditorMessage}
+            style={{ flex: 1 }}
+            originWhitelist={["*"]}
+            javaScriptEnabled
+            domStorageEnabled
+            onLoadEnd={() => {
+              postMessageToWebView({ type: "load", html: htmlContent });
+              applyLayoutSettings(
+                font,
+                lineHeight,
+                pageSize,
+                topMargin,
+                bottomMargin,
+                leftMargin,
+                rightMargin,
+                letterheadSpace
+              );
+            }}
+            onShouldStartLoadWithRequest={() => false}
+          />
+
+          {/* Predictive Legal Phrase Autocomplete Bar */}
+          <LegalAutocompleteBar
+            suggestions={autocompleteSuggestions}
+            theme={theme}
+            onSelectSuggestion={(phrase) => triggerFormat("insertText", phrase + " ")}
+          />
+
+          {/* Form Actions Overlay */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              padding: 8,
+              paddingHorizontal: 12,
+              backgroundColor: theme.colors.cardBackground,
+              borderTopWidth: 1,
+              borderTopColor: theme.colors.border,
+              gap: 8,
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: theme.colors.primary,
+                borderRadius: 8,
+                height: 36,
+                justifyContent: "center",
+                alignItems: "center",
+                flexDirection: "row",
+              }}
+              onPress={() => {
+                postMessageToWebView({ type: "requestSave" });
+                saveCallbackRef.current = async (html) => {
+                  setHtmlContent(html);
+                  const boilerplateChanged = checkIfBoilerplateChanged(html);
+
+                  const saveDraftRoutine = async () => {
+                    try {
+                      setIsSavingTemplate(true);
+                      const idToSave = uuidv4();
+                      const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace })} -->`;
+                      const title = `${getFullDocTypesList().find((o) => o.value === documentType)?.label || "Draft"} - ${clientName || "Case"}`;
+
+                      await saveDocumentDraft({
+                        id: idToSave,
+                        case_id: caseId ? Number(caseId) : null,
+                        title,
+                        template_type: documentType,
+                        html_content: metadataComment + html,
+                        is_custom_template: 0,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                      });
+
+                      Alert.alert(
+                        locale === "hi" ? "सफलता" : "Success",
+                        locale === "hi"
+                          ? "ड्राफ्ट सफलतापूर्वक सहेजा गया।"
+                          : "Draft saved successfully.",
+                        [{ text: "OK", onPress: () => navigation.goBack() }]
+                      );
+                    } catch (err) {
+                      console.error("Failed to save draft:", err);
+                      Alert.alert("Error", "Could not save draft to database.");
+                    } finally {
+                      setIsSavingTemplate(false);
+                    }
+                  };
+
+                  if (boilerplateChanged) {
+                    Alert.alert(
+                      locale === "hi"
+                        ? "टेम्पलेट सहेजें?"
+                        : "Save Custom Template?",
+                      locale === "hi"
+                        ? "आपने इस टेम्पलेट के मूल पाठ में बदलाव किया है। क्या आप इसे भविष्य के दस्तावेज़ों के लिए एक कस्टम टेम्पलेट के रूप में सहेजना चाहेंगे?"
+                        : "You have modified the boilerplate text of this template. Would you like to save this as a custom reusable template for future documents?",
+                      [
+                        {
+                          text:
+                            locale === "hi"
+                              ? "हाँ, टेम्पलेट सहेजें"
+                              : "Yes, Save as Template",
+                          onPress: () => {
+                            setCustomTemplateTitle("");
+                            setIsSaveModalVisible(true);
+                          },
+                        },
+                        {
+                          text:
+                            locale === "hi"
+                              ? "नहीं, केवल ड्राफ्ट"
+                              : "No, Just Save Draft",
+                          onPress: saveDraftRoutine,
+                        },
+                        {
+                          text: locale === "hi" ? "रद्द करें" : "Cancel",
+                          style: "cancel",
+                        },
+                      ]
+                    );
+                  } else {
+                    await saveDraftRoutine();
+                  }
+                };
+              }}
+            >
+              <Ionicons
+                name="save-outline"
+                size={14}
+                color="#fff"
+                style={{ marginRight: 4 }}
+              />
+              <Text style={{ color: "#fff", fontWeight: "600", fontSize: 12 }}>
+                {locale === "hi" ? "ड्राफ्ट सहेजें" : "Save Draft"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: `${theme.colors.primary}12`,
+                borderColor: `${theme.colors.primary}35`,
+                borderWidth: 1,
+                borderRadius: 8,
+                height: 36,
+                justifyContent: "center",
+                alignItems: "center",
+                flexDirection: "row",
+              }}
+              onPress={() => setIsPageSetupVisible(true)}
+            >
+              <Ionicons
+                name="settings-outline"
+                size={14}
+                color={theme.colors.primary}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={{
+                  color: theme.colors.primary,
+                  fontWeight: "600",
+                  fontSize: 12,
+                }}
+              >
+                Page Setup
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: "#10B981",
+                borderRadius: 8,
+                height: 36,
+                justifyContent: "center",
+                alignItems: "center",
+                flexDirection: "row",
+              }}
+              onPress={handleGeneratePdf}
+              disabled={isGenerating}
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={14}
+                color="#fff"
+                style={{ marginRight: 4 }}
+              />
+              <Text style={{ color: "#fff", fontWeight: "600", fontSize: 12 }}>
+                Export PDF
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Page Setup Modal */}
           <Modal
             visible={isPageSetupVisible}
             transparent
@@ -3253,7 +3877,12 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                   </TouchableOpacity>
                 </View>
 
-                <View style={{ paddingVertical: 16 }}>
+                <ScrollView
+                  showsVerticalScrollIndicator={true}
+                  style={{ maxHeight: 380 }}
+                  contentContainerStyle={{ paddingBottom: 16 }}
+                >
+                  <View style={{ paddingVertical: 16 }}>
                   {/* Font selection */}
                   <Text
                     style={{
@@ -3290,7 +3919,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                               : theme.colors.border,
                           backgroundColor:
                             font === item.value
-                              ? "rgba(59, 130, 246, 0.1)"
+                              ? theme.colors.primary
                               : "transparent",
                           alignItems: "center",
                           marginHorizontal: 4,
@@ -3313,7 +3942,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           style={{
                             color:
                               font === item.value
-                                ? theme.colors.primary
+                                ? "#ffffff"
                                 : theme.colors.text,
                             fontSize: 12,
                             fontWeight: "600",
@@ -3355,7 +3984,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                               : theme.colors.border,
                           backgroundColor:
                             lineHeight === item.value
-                              ? "rgba(59, 130, 246, 0.1)"
+                              ? theme.colors.primary
                               : "transparent",
                           alignItems: "center",
                           marginHorizontal: 4,
@@ -3378,7 +4007,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           style={{
                             color:
                               lineHeight === item.value
-                                ? theme.colors.primary
+                                ? "#ffffff"
                                 : theme.colors.text,
                             fontSize: 12,
                             fontWeight: "600",
@@ -3420,7 +4049,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                               : theme.colors.border,
                           backgroundColor:
                             pageSize === item.value
-                              ? "rgba(59, 130, 246, 0.1)"
+                              ? theme.colors.primary
                               : "transparent",
                           alignItems: "center",
                           marginHorizontal: 4,
@@ -3443,7 +4072,61 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           style={{
                             color:
                               pageSize === item.value
-                                ? theme.colors.primary
+                                ? "#ffffff"
+                                : theme.colors.text,
+                            fontSize: 12,
+                            fontWeight: "600",
+                          }}
+                        >
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Unit System Selector */}
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "bold",
+                      color: theme.colors.textSecondary,
+                      marginBottom: 8,
+                      marginTop: 12,
+                    }}
+                  >
+                    Measurement Unit System
+                  </Text>
+                  <View style={{ flexDirection: "row", marginBottom: 16 }}>
+                    {[
+                      { label: "Inches (in)", value: "in" },
+                      { label: "Millimeters (mm)", value: "mm" },
+                      { label: "Pixels (px)", value: "px" },
+                    ].map((item) => (
+                      <TouchableOpacity
+                        key={item.value}
+                        style={{
+                          flex: 1,
+                          padding: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor:
+                            unitMode === item.value
+                              ? theme.colors.primary
+                              : theme.colors.border,
+                          backgroundColor:
+                            unitMode === item.value
+                              ? theme.colors.primary
+                              : "transparent",
+                          alignItems: "center",
+                          marginHorizontal: 4,
+                        }}
+                        onPress={() => setUnitMode(item.value as any)}
+                      >
+                        <Text
+                          style={{
+                            color:
+                              unitMode === item.value
+                                ? "#ffffff"
                                 : theme.colors.text,
                             fontSize: 12,
                             fontWeight: "600",
@@ -3501,7 +4184,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           backgroundColor: theme.colors.cardBackground,
                         }}
                         onPress={() => {
-                          const v = Math.max(0, topMargin - 5);
+                          const step = getMarginStepPx(unitMode);
+                          const v = Math.max(0, topMargin - step);
                           setTopMargin(v);
                           applyLayoutSettings(
                             font,
@@ -3523,14 +4207,14 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                       </TouchableOpacity>
                       <Text
                         style={{
-                          width: 60,
+                          width: 76,
                           textAlign: "center",
                           fontWeight: "bold",
                           color: theme.colors.text,
                           fontSize: 12,
                         }}
                       >
-                        {topMargin} px
+                        {formatMarginValue(topMargin, unitMode)}
                       </Text>
                       <TouchableOpacity
                         style={{
@@ -3544,7 +4228,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           backgroundColor: theme.colors.cardBackground,
                         }}
                         onPress={() => {
-                          const v = Math.min(200, topMargin + 5);
+                          const step = getMarginStepPx(unitMode);
+                          const v = Math.min(200, topMargin + step);
                           setTopMargin(v);
                           applyLayoutSettings(
                             font,
@@ -3600,7 +4285,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           backgroundColor: theme.colors.cardBackground,
                         }}
                         onPress={() => {
-                          const v = Math.max(20, leftMargin - 5);
+                          const step = getMarginStepPx(unitMode);
+                          const v = Math.max(20, leftMargin - step);
                           setLeftMargin(v);
                           applyLayoutSettings(
                             font,
@@ -3622,14 +4308,14 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                       </TouchableOpacity>
                       <Text
                         style={{
-                          width: 60,
+                          width: 76,
                           textAlign: "center",
                           fontWeight: "bold",
                           color: theme.colors.text,
                           fontSize: 12,
                         }}
                       >
-                        {leftMargin} px
+                        {formatMarginValue(leftMargin, unitMode)}
                       </Text>
                       <TouchableOpacity
                         style={{
@@ -3643,7 +4329,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           backgroundColor: theme.colors.cardBackground,
                         }}
                         onPress={() => {
-                          const v = Math.min(200, leftMargin + 5);
+                          const step = getMarginStepPx(unitMode);
+                          const v = Math.min(200, leftMargin + step);
                           setLeftMargin(v);
                           applyLayoutSettings(
                             font,
@@ -3699,7 +4386,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           backgroundColor: theme.colors.cardBackground,
                         }}
                         onPress={() => {
-                          const v = Math.max(0, rightMargin - 5);
+                          const step = getMarginStepPx(unitMode);
+                          const v = Math.max(0, rightMargin - step);
                           setRightMargin(v);
                           applyLayoutSettings(
                             font,
@@ -3721,14 +4409,14 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                       </TouchableOpacity>
                       <Text
                         style={{
-                          width: 60,
+                          width: 76,
                           textAlign: "center",
                           fontWeight: "bold",
                           color: theme.colors.text,
                           fontSize: 12,
                         }}
                       >
-                        {rightMargin} px
+                        {formatMarginValue(rightMargin, unitMode)}
                       </Text>
                       <TouchableOpacity
                         style={{
@@ -3742,7 +4430,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           backgroundColor: theme.colors.cardBackground,
                         }}
                         onPress={() => {
-                          const v = Math.min(200, rightMargin + 5);
+                          const step = getMarginStepPx(unitMode);
+                          const v = Math.min(200, rightMargin + step);
                           setRightMargin(v);
                           applyLayoutSettings(
                             font,
@@ -3798,7 +4487,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           backgroundColor: theme.colors.cardBackground,
                         }}
                         onPress={() => {
-                          const v = Math.max(0, bottomMargin - 5);
+                          const step = getMarginStepPx(unitMode);
+                          const v = Math.max(0, bottomMargin - step);
                           setBottomMargin(v);
                           applyLayoutSettings(
                             font,
@@ -3820,14 +4510,14 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                       </TouchableOpacity>
                       <Text
                         style={{
-                          width: 60,
+                          width: 76,
                           textAlign: "center",
                           fontWeight: "bold",
                           color: theme.colors.text,
                           fontSize: 12,
                         }}
                       >
-                        {bottomMargin} px
+                        {formatMarginValue(bottomMargin, unitMode)}
                       </Text>
                       <TouchableOpacity
                         style={{
@@ -3841,7 +4531,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           backgroundColor: theme.colors.cardBackground,
                         }}
                         onPress={() => {
-                          const v = Math.min(200, bottomMargin + 5);
+                          const step = getMarginStepPx(unitMode);
+                          const v = Math.min(200, bottomMargin + step);
                           setBottomMargin(v);
                           applyLayoutSettings(
                             font,
@@ -3897,7 +4588,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           backgroundColor: theme.colors.cardBackground,
                         }}
                         onPress={() => {
-                          const v = Math.max(0, letterheadSpace - 10);
+                          const step = getMarginStepPx(unitMode);
+                          const v = Math.max(0, letterheadSpace - step * 2);
                           setLetterheadSpace(v);
                           applyLayoutSettings(
                             font,
@@ -3919,14 +4611,14 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                       </TouchableOpacity>
                       <Text
                         style={{
-                          width: 60,
+                          width: 76,
                           textAlign: "center",
                           fontWeight: "bold",
                           color: theme.colors.text,
                           fontSize: 12,
                         }}
                       >
-                        {letterheadSpace} px
+                        {formatMarginValue(letterheadSpace, unitMode)}
                       </Text>
                       <TouchableOpacity
                         style={{
@@ -3940,7 +4632,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                           backgroundColor: theme.colors.cardBackground,
                         }}
                         onPress={() => {
-                          const v = Math.min(300, letterheadSpace + 10);
+                          const step = getMarginStepPx(unitMode);
+                          const v = Math.min(300, letterheadSpace + step * 2);
                           setLetterheadSpace(v);
                           applyLayoutSettings(
                             font,
@@ -3962,6 +4655,63 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                       </TouchableOpacity>
                     </View>
                   </View>
+                </View>
+              </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Insert Geometry Shape / Legal Stamp Modal */}
+          <Modal
+            visible={shapeModalVisible}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setShapeModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                    Insert Geometry Shape / Legal Stamp
+                  </Text>
+                  <TouchableOpacity onPress={() => setShapeModalVisible(false)}>
+                    <Ionicons name="close" size={24} color={theme.colors.text} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ gap: 12, paddingVertical: 12 }}>
+                  {[
+                    { title: "⏹️ Rectangle / Stamp Box", desc: "Standard bordered box for custom notes or fee seals", value: "rect" },
+                    { title: "🏷️ Court Fee Stamp Frame", desc: "Double-bordered ₹10/₹100 Fee Stamp placeholder box", value: "stamp" },
+                    { title: "⭕ Advocate Round Seal", desc: "Circular stamp frame for Advocate office / Notary seal", value: "circle" },
+                    { title: "➡️ Process Arrow", desc: "Legal chronology flowchart process arrow node", value: "arrow" },
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.value}
+                      style={{
+                        padding: 14,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        backgroundColor: theme.colors.inputBackground,
+                      }}
+                      onPress={() => {
+                        setShapeModalVisible(false);
+                        postMessageToWebView({
+                          type: "exec",
+                          command: "insertShape",
+                          value: item.value,
+                        });
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, fontWeight: "bold", color: theme.colors.text, marginBottom: 2 }}>
+                        {item.title}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>
+                        {item.desc}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
             </View>
@@ -4382,8 +5132,6 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
               </View>
             </View>
           </Modal>
-        </View>
-      )}
 
       {/* Walkthrough Tour Modal */}
       <Modal
@@ -4508,6 +5256,41 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
           </View>
         </View>
       </Modal>
+
+      {/* Native Placeholder Fill Modal */}
+      <PlaceholderBottomSheet
+        visible={placeholderModalVisible}
+        placeholderLabel={activePlaceholderLabel}
+        cleanLabel={activePlaceholderClean}
+        theme={theme}
+        onApply={handleApplyPlaceholderValue}
+        onClose={() => setPlaceholderModalVisible(false)}
+      />
+
+      {/* Advocate Digital Signature Stamp Modal */}
+      <SignatureCanvasModal
+        visible={signatureModalVisible}
+        theme={theme}
+        onSelectSignature={handleSelectSignature}
+        onClose={() => setSignatureModalVisible(false)}
+      />
+
+      {/* Table Custom Rows & Columns Configuration Modal */}
+      <TableConfigModal
+        visible={tableConfigModalVisible}
+        theme={theme}
+        onInsertTable={handleInsertTable}
+        onClose={() => setTableConfigModalVisible(false)}
+      />
+
+      {/* Selected Element Context Menu (Delete Table / Signature) */}
+      <ElementContextModal
+        visible={elementContextModalVisible}
+        elementType={selectedElementType}
+        theme={theme}
+        onDeleteElement={handleDeleteSelectedElement}
+        onClose={() => setElementContextModalVisible(false)}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -4517,6 +5300,30 @@ const getStyles = (theme: Theme) =>
     screen: {
       flex: 1,
       backgroundColor: theme.colors.background,
+    },
+    toolbarButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 8,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    activeToolbarButton: {
+      backgroundColor: theme.colors.primary,
+      borderRadius: 8,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+      elevation: 3,
+      borderWidth: 1.5,
+      borderColor: "#ffffff",
+    },
+    divider: {
+      width: 1,
+      height: 24,
+      backgroundColor: theme.colors.border,
+      marginHorizontal: 4,
     },
     scrollContentContainer: {
       flexGrow: 1,

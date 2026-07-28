@@ -565,6 +565,11 @@ export const getPoliceStations = async (districtId?: number | null, userId?: num
 
 export const saveDocumentDraft = async (draft: DocumentDraft): Promise<void> => {
   const db = await getDb();
+  let content = draft.html_content;
+  if (content === undefined || content === null) {
+    const existing = await getDocumentDraftById(draft.id);
+    content = existing?.html_content || "<div><p>Document Content</p></div>";
+  }
   await db.runAsync(
     `INSERT OR REPLACE INTO document_drafts (id, case_id, title, template_type, html_content, is_custom_template, created_at, updated_at) 
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -573,7 +578,7 @@ export const saveDocumentDraft = async (draft: DocumentDraft): Promise<void> => 
       draft.case_id ?? null,
       draft.title,
       draft.template_type,
-      draft.html_content,
+      content,
       draft.is_custom_template,
       draft.created_at || new Date().toISOString(),
       new Date().toISOString(),
@@ -590,23 +595,19 @@ export const getDocumentDrafts = async (
 ): Promise<DocumentDraft[]> => {
   const db = await getDb();
   const columns = excludeHtml
-    ? "id, case_id, title, template_type, is_custom_template, created_at, updated_at"
-    : "*";
-  let query = `SELECT ${columns} FROM document_drafts WHERE 1=1`;
+    ? "d.id, d.case_id, d.title, d.template_type, d.is_custom_template, d.created_at, d.updated_at, c.CaseTitle as case_title, c.ClientName as client_name, c.case_number"
+    : "d.*, c.CaseTitle as case_title, c.ClientName as client_name, c.case_number";
+  let query = `SELECT ${columns} FROM document_drafts d LEFT JOIN Cases c ON d.case_id = c.id WHERE 1=1`;
   const params: any[] = [];
   if (isCustomTemplate !== undefined && isCustomTemplate !== null) {
-    query += " AND is_custom_template = ?";
+    query += " AND d.is_custom_template = ?";
     params.push(isCustomTemplate);
   }
-  if (caseId !== undefined) {
-    if (caseId === null) {
-      query += " AND case_id IS NULL";
-    } else {
-      query += " AND case_id = ?";
-      params.push(caseId);
-    }
+  if (caseId !== undefined && caseId !== null) {
+    query += " AND d.case_id = ?";
+    params.push(caseId);
   }
-  query += " ORDER BY updated_at DESC";
+  query += " ORDER BY d.updated_at DESC";
   if (limit !== undefined && limit !== null) {
     query += " LIMIT ?";
     params.push(limit);
@@ -621,7 +622,10 @@ export const getDocumentDrafts = async (
 export const getDocumentDraftById = async (id: string): Promise<DocumentDraft | null> => {
   const db = await getDb();
   return db.getFirstAsync<DocumentDraft>(
-    "SELECT * FROM document_drafts WHERE id = ?",
+    `SELECT d.*, c.CaseTitle as case_title, c.ClientName as client_name, c.case_number 
+     FROM document_drafts d 
+     LEFT JOIN Cases c ON d.case_id = c.id 
+     WHERE d.id = ?`,
     [id]
   );
 };

@@ -551,6 +551,36 @@ const CaseDetailsScreen: React.FC = () => {
     }
   };
 
+  const handleDeleteDocument = (doc: Document) => {
+    Alert.alert(
+      t("alert_confirm_delete") || "Confirm Delete",
+      `Are you sure you want to permanently delete "${doc.fileName}"?`,
+      [
+        { text: t("alert_cancel") || "Cancel", style: "cancel" },
+        {
+          text: t("alert_delete") || "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const success = await db.deleteCaseDocument(doc.id);
+              if (success) {
+                if (caseId) {
+                  const caseIdToLoad = parseInt(caseId.toString(), 10);
+                  await loadDocumentsAndTimeline(caseIdToLoad);
+                }
+              } else {
+                Alert.alert(t("alert_error"), "Failed to delete document file.");
+              }
+            } catch (error) {
+              console.error("Error deleting case document:", error);
+              Alert.alert(t("alert_error"), "Failed to delete document due to database error.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleRecordPayment = async () => {
     if (!caseDetails || !caseDetails.id) return;
     const caseIdToUpdate = parseInt(caseDetails.id.toString(), 10);
@@ -786,30 +816,6 @@ const CaseDetailsScreen: React.FC = () => {
     } else {
       Alert.alert(t("alert_warning"), "Sharing unavailable for this document.");
     }
-  };
-
-  const handleDeleteDocument = async (doc: Document) => {
-    Alert.alert(
-      "Delete Document",
-      `Are you sure you want to delete ${doc.fileName}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              if (doc.id) {
-                await db.deleteDocument(parseInt(doc.id.toString(), 10));
-                if (caseId) loadDocumentsAndTimeline(caseId);
-              }
-            } catch (err) {
-              Alert.alert(t("alert_error"), "Failed to delete document.");
-            }
-          },
-        },
-      ]
-    );
   };
 
   const listData: ListItemType[] = [];

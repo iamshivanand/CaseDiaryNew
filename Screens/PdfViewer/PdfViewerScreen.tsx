@@ -173,12 +173,26 @@ export const PdfViewerScreen: React.FC = () => {
 
   useEffect(() => {
     navigation.setOptions({
-      headerTitle: title || "PDF Viewer",
+      headerTitle: () => (
+        <View style={{ flex: 1, marginRight: 8, justifyContent: "center" }}>
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: "bold",
+              color: theme.colors.text,
+            }}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {title || "PDF Viewer"}
+          </Text>
+        </View>
+      ),
       headerRight: () => (
         <TouchableOpacity onPress={handleShare} style={{ marginRight: 10 }}>
           <Ionicons
             name="share-social-outline"
-            size={24}
+            size={22}
             color={theme.colors.text}
           />
         </TouchableOpacity>

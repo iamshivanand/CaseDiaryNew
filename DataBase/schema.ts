@@ -144,6 +144,9 @@ export interface CaseTimelineRow {
 export interface DocumentDraft {
   id: string;
   case_id?: number | null;
+  case_title?: string | null;
+  client_name?: string | null;
+  case_number?: string | null;
   title: string;
   template_type: string;
   html_content?: string;
