@@ -49,6 +49,8 @@ import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
 import { initializeAlertInterceptor } from "./utils/AlertManager";
 import { emitter } from "./utils/event-emitter";
 
+import { scheduleDailyMultiIntervalNotifications } from "./utils/notificationScheduler";
+
 // Initialize the global alert interceptor
 initializeAlertInterceptor();
 
@@ -154,6 +156,7 @@ function AppContent() {
       try {
         await getDb();
         console.log("Database initialized successfully from App.tsx");
+        scheduleDailyMultiIntervalNotifications();
 
         // Check for updates asynchronously (does not block startup)
         const runUpdateCheck = async () => {
@@ -199,9 +202,8 @@ function AppContent() {
         };
         runUpdateCheck();
 
-        // Initialize Ads SDK
+        // Initialize Ads SDK (ads will be loaded lazily on demand)
         await mobileAds().initialize();
-        preloadAds();
 
         const isPremiumVal = await AsyncStorage.getItem("@user_is_premium");
         const isPremium = isPremiumVal === "true";

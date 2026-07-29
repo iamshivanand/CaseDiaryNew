@@ -38,22 +38,41 @@ export const getCaseTimelineEventsByCaseId = async (caseId: number): Promise<Cas
   }
 };
 
-export const updateCaseTimelineEvent = async (id: number, data: { hearing_date?: string; notes?: string }): Promise<boolean> => {
+export const updateCaseTimelineEvent = async (
+  id: number,
+  data: string | { hearing_date?: string; notes?: string; amount?: number; event_type?: string }
+): Promise<boolean> => {
   const db = await getDb();
   const fields: string[] = [];
   const values: any[] = [];
-  if (data.hearing_date !== undefined) {
-    fields.push("hearing_date = ?");
-    values.push(data.hearing_date);
-  }
-  if (data.notes !== undefined) {
+  if (typeof data === "string") {
     fields.push("notes = ?");
-    values.push(data.notes);
+    values.push(data);
+  } else {
+    if (data.hearing_date !== undefined) {
+      fields.push("hearing_date = ?");
+      values.push(data.hearing_date);
+    }
+    if (data.notes !== undefined) {
+      fields.push("notes = ?");
+      values.push(data.notes);
+    }
+    if (data.amount !== undefined) {
+      fields.push("amount = ?");
+      values.push(data.amount);
+    }
+    if (data.event_type !== undefined) {
+      fields.push("event_type = ?");
+      values.push(data.event_type);
+    }
   }
   if (fields.length === 0) return false;
   values.push(id);
   try {
-    const result = await db.runAsync(`UPDATE CaseTimeline SET ${fields.join(", ")}, updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = ?`, values);
+    const result = await db.runAsync(
+      `UPDATE CaseTimeline SET ${fields.join(", ")}, updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = ?`,
+      values
+    );
     return result.changes > 0;
   } catch (error) {
     console.error(`Error updating timeline event ID ${id}:`, error);

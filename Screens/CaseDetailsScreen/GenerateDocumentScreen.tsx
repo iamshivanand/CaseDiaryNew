@@ -3,6 +3,7 @@ import { Ionicons, FontAwesome } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system";
+import * as ImagePicker from "expo-image-picker";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import React, { useContext, useEffect, useLayoutEffect, useState } from "react";
@@ -71,6 +72,7 @@ import { SignatureCanvasModal } from "./components/SignatureCanvasModal";
 import { LegalAutocompleteBar } from "./components/LegalAutocompleteBar";
 import { TableConfigModal } from "./components/TableConfigModal";
 import { ElementContextModal } from "./components/ElementContextModal";
+import OcrReviewModal from "./components/OcrReviewModal";
 import ActionButton from "../CommonComponents/ActionButton";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 import FormInput from "../CommonComponents/FormInput";
@@ -471,6 +473,10 @@ const GenerateDocumentScreen: React.FC = () => {
   const [letterheadSpace, setLetterheadSpace] = useState(0);
   const [unitMode, setUnitMode] = useState<"in" | "mm" | "px">("in");
   const [isPageSetupVisible, setIsPageSetupVisible] = useState(false);
+  const [ocrModalVisible, setOcrModalVisible] = useState(false);
+  const [ocrModalImageUri, setOcrModalImageUri] = useState<string | null>(null);
+  const [ocrModalExtractedText, setOcrModalExtractedText] = useState("");
+  const [docDraftLanguage, setDocDraftLanguage] = useState<"en" | "hi">("en");
 
   const formatMarginValue = (px: number, mode: "in" | "mm" | "px"): string => {
     if (mode === "in") return `${(px / 96).toFixed(2)} in`;
@@ -877,35 +883,100 @@ const GenerateDocumentScreen: React.FC = () => {
     }
   };
 
+  const processOcrImages = async (imageUris: string[]) => {
+    setIsLoading(true);
+    try {
+      const extractedText = await extractTextFromImages(imageUris);
+      const firstUri = imageUris.length > 0 ? imageUris[0] : null;
+      setOcrModalImageUri(firstUri);
+      setOcrModalExtractedText(extractedText || "");
+      setOcrModalVisible(true);
+    } catch (ocrErr) {
+      console.error("OCR Extraction Error:", ocrErr);
+      Alert.alert("OCR Error", "Failed to recognize text from document image.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleImportOcrText = (finalText: string) => {
+    if (!finalText) return;
+    const formattedHtml = `<p>${finalText.replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br/>")}</p>`;
+    triggerFormat("insertHTML", formattedHtml);
+    Alert.alert("Imported", "Reviewed OCR text inserted into editor.");
+  };
+
   // Actions for Live Editor features
   const handleScanToEditorOcr = async () => {
-    try {
-      let scannedUris: string[] = [];
-      try {
-        const DocumentScanner = require("react-native-document-scanner-plugin").default;
-        const { scannedImages } = await DocumentScanner.scanDocument({
-          croppedImageQuality: 100,
-          maxNumDocuments: 10,
-        });
-        if (scannedImages) scannedUris = scannedImages;
-      } catch (scanErr) {
-        console.warn("Native DocumentScanner unavailable:", scanErr);
-      }
-
-      if (scannedUris.length > 0) {
-        setIsLoading(true);
-        const extractedText = await extractTextFromImages(scannedUris);
-        if (extractedText) {
-          triggerFormat("insertHTML", `<p>${extractedText.replace(/\n\n/g, "</p><p>")}</p>`);
-          Alert.alert("OCR Complete", "Extracted document text inserted directly into editor.");
-        }
-        setIsLoading(false);
-      }
-    } catch (err) {
-      console.error("Error in handleScanToEditorOcr:", err);
-      setIsLoading(false);
-      Alert.alert("OCR Error", "Could not extract text from scanned document.");
-    }
+    postMessageToWebView({ type: "saveSelection" });
+    Alert.alert(
+      "Extract Text (OCR)",
+      "Choose how you want to capture or upload the court document photo:",
+      [
+        {
+          text: "📷 Take Photo (Camera)",
+          onPress: async () => {
+            try {
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== "granted") {
+                Alert.alert("Permission Required", "Camera permission is needed to capture document photo.");
+                return;
+              }
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 1.0,
+              });
+              if (!result.canceled && result.assets && result.assets.length > 0) {
+                await processOcrImages([result.assets[0].uri]);
+              }
+            } catch (e) {
+              console.error("Camera capture error:", e);
+            }
+          },
+        },
+        {
+          text: "🖼️ Pick from Gallery",
+          onPress: async () => {
+            try {
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsMultipleSelection: true,
+                quality: 1.0,
+              });
+              if (!result.canceled && result.assets && result.assets.length > 0) {
+                await processOcrImages(result.assets.map((a) => a.uri));
+              }
+            } catch (e) {
+              console.error("Gallery picker error:", e);
+            }
+          },
+        },
+        {
+          text: "📄 Multi-Page Scanner",
+          onPress: async () => {
+            try {
+              let scannedUris: string[] = [];
+              try {
+                const DocumentScanner = require("react-native-document-scanner-plugin").default;
+                const { scannedImages } = await DocumentScanner.scanDocument({
+                  croppedImageQuality: 100,
+                  maxNumDocuments: 10,
+                });
+                if (scannedImages) scannedUris = scannedImages;
+              } catch (scanErr) {
+                console.warn("Native DocumentScanner unavailable:", scanErr);
+              }
+              if (scannedUris.length > 0) {
+                await processOcrImages(scannedUris);
+              }
+            } catch (err) {
+              console.error("Error in multi-page scanner:", err);
+            }
+          },
+        },
+        { text: "Cancel", style: "cancel" },
+      ]
+    );
   };
 
   const toggleVoiceDictation = async () => {
@@ -914,12 +985,19 @@ const GenerateDocumentScreen: React.FC = () => {
       setIsDictating(false);
     } else {
       setIsDictating(true);
-      const dictationLocale = locale === "hi" ? "hi-IN" : "en-IN";
+      const dictationLocale = (outputLanguage === "hi" || locale === "hi") ? "hi-IN" : "en-IN";
       const started = await speechRecognitionService.startListening(dictationLocale, {
         onStart: () => setIsDictating(true),
         onResult: (text) => {
           if (text) {
-            triggerFormat("insertText", text + " ");
+            let processed = text
+              .replace(/\b(full stop|period)\b/gi, ".")
+              .replace(/\b(पूर्ण विराम)\b/gi, "।")
+              .replace(/\b(comma)\b/gi, ",")
+              .replace(/\b(अल्पविराम)\b/gi, ",")
+              .replace(/\b(new paragraph|next paragraph)\b/gi, "\n\n")
+              .replace(/\b(नया पैराग्राफ|नया पैरा)\b/gi, "\n\n");
+            triggerFormat("insertText", processed + " ");
           }
         },
         onError: (err) => {
@@ -2232,9 +2310,9 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
           numColumns={2}
           contentContainerStyle={{ padding: 10, paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={5}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={3}
           removeClippedSubviews={true}
           ListEmptyComponent={
             <View
@@ -5290,6 +5368,15 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
         theme={theme}
         onDeleteElement={handleDeleteSelectedElement}
         onClose={() => setElementContextModalVisible(false)}
+      />
+
+      {/* Interactive OCR Review & Preview Modal */}
+      <OcrReviewModal
+        visible={ocrModalVisible}
+        imageUri={ocrModalImageUri}
+        extractedText={ocrModalExtractedText}
+        onClose={() => setOcrModalVisible(false)}
+        onImport={handleImportOcrText}
       />
     </KeyboardAvoidingView>
   );

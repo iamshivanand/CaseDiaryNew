@@ -137,6 +137,9 @@ export interface CaseTimelineRow {
   case_id: number; // Foreign Key to Cases table
   hearing_date: string; // ISO8601 "YYYY-MM-DD" or full timestamp
   notes: string;
+  event_type?: string | null;
+  amount?: number | null;
+  payment_mode?: string | null;
   created_at: string; // ISO8601
   updated_at: string; // ISO8601
 }
@@ -286,6 +289,9 @@ CREATE TABLE IF NOT EXISTS Cases (
   -- Financials
   total_fee REAL DEFAULT 0,
   fee_paid REAL DEFAULT 0,
+  date_fee REAL DEFAULT 0,
+  date_fee_collected REAL DEFAULT 0,
+  date_fee_paid INTEGER DEFAULT 0,
 
   -- Descriptions & Notes
   CaseDescription TEXT,
@@ -315,6 +321,9 @@ CREATE TABLE IF NOT EXISTS CaseTimeline (
   case_id INTEGER NOT NULL,
   notes TEXT,
   hearing_date TEXT NOT NULL,
+  event_type TEXT DEFAULT 'hearing_proceeding',
+  amount REAL DEFAULT 0,
+  payment_mode TEXT,
   created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
   updated_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
   FOREIGN KEY (case_id) REFERENCES Cases(id) ON DELETE CASCADE
@@ -410,6 +419,21 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
       await db.execAsync("ALTER TABLE Cases ADD COLUMN case_stage TEXT;");
       console.log("Migration: Added column case_stage to Cases table successfully.");
     }
+    const hasDateFee = tableInfo.some(col => col.name === 'date_fee');
+    if (!hasDateFee) {
+      await db.execAsync("ALTER TABLE Cases ADD COLUMN date_fee REAL DEFAULT 0;");
+      console.log("Migration: Added column date_fee to Cases table successfully.");
+    }
+    const hasDateFeePaid = tableInfo.some(col => col.name === 'date_fee_paid');
+    if (!hasDateFeePaid) {
+      await db.execAsync("ALTER TABLE Cases ADD COLUMN date_fee_paid INTEGER DEFAULT 0;");
+      console.log("Migration: Added column date_fee_paid to Cases table successfully.");
+    }
+    const hasDateFeeCollected = tableInfo.some(col => col.name === 'date_fee_collected');
+    if (!hasDateFeeCollected) {
+      await db.execAsync("ALTER TABLE Cases ADD COLUMN date_fee_collected REAL DEFAULT 0;");
+      console.log("Migration: Added column date_fee_collected to Cases table successfully.");
+    }
   } catch (migrationError) {
     console.error("Error migrating Cases table:", migrationError);
   }
@@ -425,6 +449,25 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   await db.execAsync(CREATE_CASE_TIMELINE_TABLE);
   await db.execAsync(CREATE_CASE_TIMELINE_CASE_ID_INDEX);
   await db.execAsync(CREATE_CASE_TIMELINE_UPDATED_AT_TRIGGER);
+
+  // Migration check for CaseTimeline columns
+  try {
+    const timelineInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(CaseTimeline);");
+    const hasEventType = timelineInfo.some(col => col.name === 'event_type');
+    if (!hasEventType) {
+      await db.execAsync("ALTER TABLE CaseTimeline ADD COLUMN event_type TEXT DEFAULT 'hearing_proceeding';");
+    }
+    const hasAmount = timelineInfo.some(col => col.name === 'amount');
+    if (!hasAmount) {
+      await db.execAsync("ALTER TABLE CaseTimeline ADD COLUMN amount REAL DEFAULT 0;");
+    }
+    const hasPaymentMode = timelineInfo.some(col => col.name === 'payment_mode');
+    if (!hasPaymentMode) {
+      await db.execAsync("ALTER TABLE CaseTimeline ADD COLUMN payment_mode TEXT;");
+    }
+  } catch (tError) {
+    console.error("Error migrating CaseTimeline table:", tError);
+  }
   await db.execAsync(CREATE_DOCUMENT_DRAFTS_TABLE);
   await db.execAsync(CREATE_DOCUMENT_DRAFTS_UPDATED_AT_TRIGGER);
   await initializeUserProfileDB(db);
@@ -553,24 +596,22 @@ export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> 
 
   // Seed Districts
   try {
-    await db.withTransactionAsync(async () => {
-      for (const stateObj of statesAndDistrictsData.states) {
-        for (const distName of stateObj.districts) {
-          const trimmedDist = distName.trim();
-          const trimmedState = stateObj.state.trim();
-          const existing = await db.getFirstAsync<{ id: number }>(
-            "SELECT id FROM Districts WHERE LOWER(name) = LOWER(?) AND LOWER(state) = LOWER(?) AND user_id IS NULL",
+    for (const stateObj of statesAndDistrictsData.states) {
+      for (const distName of stateObj.districts) {
+        const trimmedDist = distName.trim();
+        const trimmedState = stateObj.state.trim();
+        const existing = await db.getFirstAsync<{ id: number }>(
+          "SELECT id FROM Districts WHERE LOWER(name) = LOWER(?) AND LOWER(state) = LOWER(?) AND user_id IS NULL",
+          [trimmedDist, trimmedState]
+        );
+        if (!existing) {
+          await db.runAsync(
+            "INSERT INTO Districts (name, state, user_id) VALUES (?, ?, NULL)",
             [trimmedDist, trimmedState]
           );
-          if (!existing) {
-            await db.runAsync(
-              "INSERT INTO Districts (name, state, user_id) VALUES (?, ?, NULL)",
-              [trimmedDist, trimmedState]
-            );
-          }
         }
       }
-    });
+    }
     console.log("Predefined districts seeded or already exist.");
   } catch (error) {
     console.error("Error seeding predefined districts:", error);
@@ -579,43 +620,41 @@ export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> 
   // Seed Police Stations for Delhi, Maharashtra, and Uttar Pradesh
   try {
     const targetStates = ["Delhi (NCT)", "Maharashtra", "Uttar Pradesh"];
-    await db.withTransactionAsync(async () => {
-      const districts = await db.getAllAsync<{ id: number; name: string; state: string }>(
-        "SELECT id, name, state FROM Districts WHERE state IN (?, ?, ?)",
-        targetStates
-      );
+    const districts = await db.getAllAsync<{ id: number; name: string; state: string }>(
+      "SELECT id, name, state FROM Districts WHERE state IN (?, ?, ?)",
+      targetStates
+    );
 
-      const mappings = (policeStationsData.mappings || {}) as Record<string, string[]>;
+    const mappings = (policeStationsData.mappings || {}) as Record<string, string[]>;
 
-      for (const dist of districts) {
-        let stations: string[] = [];
-        if (mappings[dist.name]) {
-          stations = mappings[dist.name];
-        } else {
-          const isMaharashtra = dist.state === "Maharashtra";
-          const cityOrKotwali = isMaharashtra ? "City" : "Kotwali";
-          stations = [
-            `${dist.name} Sadar Police Station`,
-            `${dist.name} ${cityOrKotwali} Police Station`,
-            `${dist.name} Mahila Police Station`
-          ];
-        }
+    for (const dist of districts) {
+      let stations: string[] = [];
+      if (mappings[dist.name]) {
+        stations = mappings[dist.name];
+      } else {
+        const isMaharashtra = dist.state === "Maharashtra";
+        const cityOrKotwali = isMaharashtra ? "City" : "Kotwali";
+        stations = [
+          `${dist.name} Sadar Police Station`,
+          `${dist.name} ${cityOrKotwali} Police Station`,
+          `${dist.name} Mahila Police Station`
+        ];
+      }
 
-        for (const psName of stations) {
-          const trimmedPs = psName.trim();
-          const existing = await db.getFirstAsync<{ id: number }>(
-            "SELECT id FROM PoliceStations WHERE LOWER(name) = LOWER(?) AND (district_id = ? OR (district_id IS NULL AND ? IS NULL)) AND user_id IS NULL",
-            [trimmedPs, dist.id, dist.id]
+      for (const psName of stations) {
+        const trimmedPs = psName.trim();
+        const existing = await db.getFirstAsync<{ id: number }>(
+          "SELECT id FROM PoliceStations WHERE LOWER(name) = LOWER(?) AND (district_id = ? OR (district_id IS NULL AND ? IS NULL)) AND user_id IS NULL",
+          [trimmedPs, dist.id, dist.id]
+        );
+        if (!existing) {
+          await db.runAsync(
+            "INSERT INTO PoliceStations (name, district_id, user_id) VALUES (?, ?, NULL)",
+            [trimmedPs, dist.id]
           );
-          if (!existing) {
-            await db.runAsync(
-              "INSERT INTO PoliceStations (name, district_id, user_id) VALUES (?, ?, NULL)",
-              [trimmedPs, dist.id]
-            );
-          }
         }
       }
-    });
+    }
     console.log("Predefined police stations seeded or already exist.");
   } catch (error) {
     console.error("Error seeding predefined police stations:", error);

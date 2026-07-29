@@ -8,7 +8,7 @@ export const getEditCaseScreenStyles = (theme: Theme) =>
   StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: theme.colors.screenBackground || theme.colors.background,
+      backgroundColor: theme.colors.background,
     },
     scrollView: {
       flex: 1,

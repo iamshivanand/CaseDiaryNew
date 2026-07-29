@@ -1,15 +1,23 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
-import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform, Pressable, DeviceEventEmitter, Alert } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { format } from 'date-fns';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { getDb, getUserProfile } from '../../DataBase';
+import * as db from '../../DataBase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeContext } from '../../Providers/ThemeProvider';
 import { useTranslation } from '../../Providers/LanguageProvider';
 import { mapCaseDbToScreen } from '../../utils/caseMapper';
+import { CASE_UPDATED_EVENT } from '../../utils/caseEvents';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { promptClientNotification } from '../../utils/whatsappNotifier';
+import { useAdTrigger } from '../CommonComponents/AdManager';
+import { getCurrentUserId, formatDate, getLocalDateString, normalizeDateToYYYYMMDD } from '../../utils/commonFunctions';
+import NewCaseCard from '../CasesList/components/NewCaseCard';
+import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
+import { exportDailyCauseListToPdf } from '../../utils/pdfExporter';
+import { CaseData, CaseDataScreen } from '../../Types/appTypes';
 
 const WelcomeCard = () => {
   const { theme } = useContext(ThemeContext);
@@ -21,10 +29,10 @@ const WelcomeCard = () => {
   useEffect(() => {
     const fetchUserName = async () => {
       try {
-        const db = await getDb();
+        const database = await db.getDb();
         const userId = await AsyncStorage.getItem("@user_id");
         if (userId) {
-          const profile = await getUserProfile(db, parseInt(userId, 10));
+          const profile = await db.getUserProfile(database, parseInt(userId, 10));
           if (profile && profile.name) {
             setUserName(profile.name);
           }
@@ -75,7 +83,7 @@ const WelcomeCard = () => {
   );
 };
 
-const QuickActionButton = ({ icon, text, onPress, color }) => {
+const QuickActionButton = ({ icon, text, onPress, color, badgeCount, badgeColor }: any) => {
   const { theme } = useContext(ThemeContext);
   const scale = useSharedValue(1);
 
@@ -106,6 +114,34 @@ const QuickActionButton = ({ icon, text, onPress, color }) => {
           animatedStyle
         ]}
       >
+        {/* Notification badge with count */}
+        {badgeCount !== undefined && badgeCount > 0 && (
+          <View
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              backgroundColor: badgeColor || "#EF4444",
+              minWidth: 22,
+              height: 22,
+              borderRadius: 11,
+              paddingHorizontal: 6,
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 10,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 3,
+              elevation: 4,
+            }}
+          >
+            <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "800" }}>
+              {badgeCount > 99 ? "99+" : badgeCount}
+            </Text>
+          </View>
+        )}
+
         {/* Subtle Background Watermark Icon */}
         <Ionicons 
           name={icon} 
@@ -138,48 +174,6 @@ const QuickActionButton = ({ icon, text, onPress, color }) => {
 };
 
 import SectionHeader from '../CommonComponents/SectionHeader';
-
-const QuickActionsGrid = () => {
-  const navigation = useNavigation<any>();
-  const { t } = useTranslation();
-
-  const actions = [
-    { icon: "add-circle", text: t("dash_add_case"), onPress: () => navigation.navigate('AddCase' as any), color: "#00CC44" },
-    { icon: "folder-open", text: t("dash_view_all_cases"), onPress: () => navigation.navigate('AllCases' as any), color: "#007BFF" },
-    { icon: "briefcase", text: t("dash_drafts_hub") || "Document Hub", onPress: () => navigation.navigate('DraftsHub' as any), color: "#8B5CF6" },
-    { icon: "camera", text: "PDF Scanner", onPress: () => navigation.navigate('PdfScanner' as any), color: "#EC4899" },
-    { icon: "calendar", text: t("dash_yesterdays_cases"), onPress: () => navigation.navigate('YesterdaysCases' as any), color: "#007BFF" },
-    { icon: "alert-circle", text: t("dash_undated_cases"), onPress: () => navigation.navigate('UndatedCases' as any), color: "#FF6B00" },
-  ];
-
-  return (
-    <View>
-      <SectionHeader title={t("dash_quick_actions")} />
-      <View style={[styles.quickActionsContainer, { flexWrap: "wrap", flexDirection: "row" }]}>
-        {actions.map((action, index) => (
-          <Animated.View
-            key={action.text}
-            entering={FadeInDown.delay(index * 30).springify().damping(20).stiffness(300)}
-            style={{ width: '50%' }}
-          >
-            <QuickActionButton {...action} />
-          </Animated.View>
-        ))}
-      </View>
-    </View>
-  );
-};
-
-// import AdvertisementSection from './components/AdvertisementSection';
-import NewCaseCard from '../CasesList/components/NewCaseCard';
-import * as db from '../../DataBase';
-import { CaseData, CaseDataScreen } from '../../Types/appTypes';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
-import { getCurrentUserId, formatDate, getLocalDateString } from '../../utils/commonFunctions';
-import { exportDailyCauseListToPdf } from '../../utils/pdfExporter';
-import { Alert } from 'react-native';
-import { useAdTrigger } from '../CommonComponents/AdManager';
 
 const BackupReminderBanner = () => {
   const navigation = useNavigation<any>();
@@ -243,120 +237,69 @@ const BackupReminderBanner = () => {
   );
 };
 
-// ---- Stats Section ----
-const StatsSection = () => {
-  const { theme } = useContext(ThemeContext);
+const QuickActionsGrid = () => {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
-  const [totalCases, setTotalCases] = useState(0);
-  const [upcomingHearings, setUpcomingHearings] = useState(0);
+  const [yesterdayCount, setYesterdayCount] = useState(0);
+  const [undatedCount, setUndatedCount] = useState(0);
 
-  const fetchStats = async () => {
+  const fetchCounts = async () => {
     try {
-      const total = await db.getTotalCases();
-      const upcoming = await db.getUpcomingHearings();
-      setTotalCases(total);
-      setUpcomingHearings(upcoming);
+      const yCount = await db.getYesterdaysCasesCount();
+      const uCount = await db.getUndatedCasesCount();
+      setYesterdayCount(yCount);
+      setUndatedCount(uCount);
     } catch (e) {
-      console.error('Error fetching dashboard stats:', e);
+      console.error("Error fetching quick action counts:", e);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
-      fetchStats();
+      fetchCounts();
     }, [])
   );
 
-  const statCards = [
-    {
-      label: t('dash_stat_total_cases') || 'Total Cases',
-      value: totalCases,
-      icon: 'folder-open',
-      color: '#6366F1',
-      onPress: () => navigation.navigate('AllCases' as any),
-    },
-    {
-      label: t('dash_stat_upcoming') || 'Upcoming Hearings',
-      value: upcomingHearings,
-      icon: 'calendar',
-      color: '#10B981',
-      onPress: () => navigation.navigate('AllCases' as any),
-    },
+  useEffect(() => {
+    let isMounted = true;
+    const sub = DeviceEventEmitter.addListener(CASE_UPDATED_EVENT, () => {
+      if (isMounted) fetchCounts();
+    });
+    return () => {
+      isMounted = false;
+      if (sub && typeof sub.remove === 'function') sub.remove();
+    };
+  }, []);
+
+  const actions = [
+    { icon: "add-circle", text: t("dash_add_case"), onPress: () => navigation.navigate('AddCase' as any), color: "#00CC44" },
+    { icon: "folder-open", text: t("dash_view_all_cases"), onPress: () => navigation.navigate('AllCases' as any), color: "#007BFF" },
+    { icon: "briefcase", text: t("dash_drafts_hub") || "Document Hub", onPress: () => navigation.navigate('DraftsHub' as any), color: "#8B5CF6" },
+    { icon: "camera", text: "PDF Scanner", onPress: () => navigation.navigate('PdfScanner' as any), color: "#EC4899" },
+    { icon: "calendar", text: t("dash_yesterdays_cases"), onPress: () => navigation.navigate('YesterdaysCases' as any), color: "#007BFF", badgeCount: yesterdayCount, badgeColor: "#F97316" },
+    { icon: "alert-circle", text: t("dash_undated_cases"), onPress: () => navigation.navigate('UndatedCases' as any), color: "#FF6B00", badgeCount: undatedCount, badgeColor: "#EF4444" },
   ];
 
   return (
-    <View style={{ marginBottom: 24 }}>
+    <View style={{ marginBottom: 12 }}>
       <BackupReminderBanner />
-      <SectionHeader title={t('dash_overview') || 'Overview'} />
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        {statCards.map((card, index) => (
-          <StatCardButton key={card.label} card={card} theme={theme} index={index} />
+      <SectionHeader title={t("dash_quick_actions")} />
+      <View style={[styles.quickActionsContainer, { flexWrap: "wrap", flexDirection: "row" }]}>
+        {actions.map((action, index) => (
+          <Animated.View
+            key={action.text}
+            entering={FadeInDown.delay(index * 30).springify().damping(20).stiffness(300)}
+            style={{ width: '50%' }}
+          >
+            <QuickActionButton {...action} />
+          </Animated.View>
         ))}
       </View>
     </View>
   );
 };
 
-const StatCardButton = ({ card, theme, index }) => {
-  const scale = useSharedValue(1);
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-    };
-  });
 
-  return (
-    <Animated.View
-      entering={FadeInDown.delay(index * 30).springify().damping(20).stiffness(300)}
-      style={{ flex: 1, marginHorizontal: 4 }}
-    >
-      <Pressable
-        onPressIn={() => { scale.value = withSpring(0.95, { damping: 25, stiffness: 400, mass: 0.4 }); }}
-        onPressOut={() => { scale.value = withSpring(1, { damping: 25, stiffness: 400, mass: 0.4 }); }}
-        onPress={card.onPress}
-        style={{ width: "100%" }}
-      >
-        <Animated.View
-          style={[
-            {
-              backgroundColor: theme.colors.cardBackground,
-              borderRadius: 14,
-              padding: 16,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-              alignItems: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.05,
-              shadowRadius: 6,
-              elevation: 2,
-            },
-            animatedStyle
-          ]}
-        >
-          <View style={{
-            width: 44,
-            height: 44,
-            borderRadius: 12,
-            backgroundColor: `${card.color}15`,
-            justifyContent: 'center',
-            alignItems: 'center',
-            marginBottom: 8,
-          }}>
-            <Ionicons name={card.icon as any} size={22} color={card.color} />
-          </View>
-          <Text style={{ fontSize: 26, fontWeight: '800', color: theme.colors.text }}>
-            {card.value}
-          </Text>
-          <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2, textAlign: 'center' }}>
-            {card.label}
-          </Text>
-        </Animated.View>
-      </Pressable>
-    </Animated.View>
-  );
-};
 
 const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
   return (
@@ -386,7 +329,7 @@ const TodaysCasesSection = () => {
 
       const filteredCases = allCases.filter(c => {
         if (!c.NextDate) return false;
-        const caseDate = c.NextDate.split('T')[0];
+        const caseDate = normalizeDateToYYYYMMDD(c.NextDate);
         return caseDate === today;
       });
 
@@ -406,45 +349,90 @@ const TodaysCasesSection = () => {
     }, [])
   );
 
+  useEffect(() => {
+    let isMounted = true;
+    const sub = DeviceEventEmitter.addListener(CASE_UPDATED_EVENT, () => {
+      if (isMounted) fetchTodaysCases();
+    });
+    return () => {
+      isMounted = false;
+      if (sub && typeof sub.remove === 'function') sub.remove();
+    };
+  }, []);
+
   const handleUpdateHearing = (caseDetails: CaseDataScreen) => {
     setSelectedCase(caseDetails);
     setPopupVisible(true);
   };
 
-  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number, feeReceivedToday?: number) => {
+  const handleSaveHearing = async (
+    notes: string,
+    nextHearingDate: Date,
+    userId: number,
+    dateFeeCollectedToday?: number,
+    totalFeeCollectedToday?: number,
+    paymentMode?: string,
+    paymentNotes?: string
+  ) => {
     if (!selectedCase || !selectedCase.id) return;
     const caseId = parseInt(selectedCase.id.toString(), 10);
-    if(isNaN(caseId)) return;
+    if (isNaN(caseId)) return;
 
     try {
       const caseExists = await db.getCaseById(caseId);
-      if(!caseExists) {
+      if (!caseExists) {
         console.error("Case not found");
         return;
       }
-      const feeNote = feeReceivedToday && feeReceivedToday > 0 
-        ? ` [Fee Received: ₹${feeReceivedToday.toLocaleString('en-IN')}]` 
-        : "";
-      const finalNotes = (notes || "") + feeNote;
 
-      // 1. Add timeline event
-      await db.addCaseTimelineEvent({
-        case_id: caseId,
-        hearing_date: new Date().toISOString(),
-        notes: finalNotes.trim(),
-      });
+      const nowIso = new Date().toISOString();
+      const modeTag = paymentMode ? paymentMode : "Cash";
+      const noteTag = paymentNotes && paymentNotes.trim() ? ` - ${paymentNotes.trim()}` : "";
 
-      // 2. Update case's next hearing date and fee_paid
-      const updatedFeePaid = (caseExists.fee_paid || 0) + (feeReceivedToday || 0);
+      if (notes && notes.trim()) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: nowIso,
+          notes: notes.trim(),
+          event_type: 'hearing_proceeding',
+        });
+      }
+
+      if (dateFeeCollectedToday && dateFeeCollectedToday > 0) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: nowIso,
+          notes: `Fee Payment Received (Date Fee): ₹${dateFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`,
+          event_type: 'date_fee_payment',
+          amount: dateFeeCollectedToday,
+          payment_mode: modeTag,
+        });
+      }
+
+      if (totalFeeCollectedToday && totalFeeCollectedToday > 0) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: nowIso,
+          notes: `Fee Payment Received (Total Retainer): ₹${totalFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`,
+          event_type: 'total_fee_payment',
+          amount: totalFeeCollectedToday,
+          payment_mode: modeTag,
+        });
+      }
+
+      const updatedDateFeeCollected = ((caseExists as any).date_fee_collected || 0) + (dateFeeCollectedToday || 0);
+      const updatedTotalFeePaid = (caseExists.fee_paid || 0) + (totalFeeCollectedToday || 0);
+      const targetDateFee = (caseExists as any).date_fee || 0;
+      const isDateFeePaidNow = targetDateFee > 0 && updatedDateFeeCollected >= targetDateFee ? 1 : ((caseExists as any).date_fee_paid || 0);
+
       await db.updateCase(caseId, {
         NextDate: getLocalDateString(nextHearingDate),
-        ...(feeReceivedToday && feeReceivedToday > 0 ? { fee_paid: updatedFeePaid } : {}),
+        ...(dateFeeCollectedToday && dateFeeCollectedToday > 0 ? { date_fee_collected: updatedDateFeeCollected, date_fee_paid: isDateFeePaidNow } : {}),
+        ...(totalFeeCollectedToday && totalFeeCollectedToday > 0 ? { fee_paid: updatedTotalFeePaid } : {}),
       }, userId);
 
-      // 3. Refresh the list
       fetchTodaysCases();
 
-      // 4. Prompt WhatsApp notification to the client
       setTimeout(() => {
         promptClientNotification(caseId, getLocalDateString(nextHearingDate), notes);
       }, 500);
@@ -513,7 +501,7 @@ const TodaysCasesSection = () => {
       ) : todaysCases.length > 0 ? (
         todaysCases.map((caseData, index) => (
           <AnimatedNewCaseCard
-            key={caseData.id}
+            key={`${caseData.id}-${(caseData as any).updated_at || ''}-${(caseData as any).fee_paid || 0}-${(caseData as any).date_fee_collected || 0}-${(caseData as any).date_fee_paid || 0}-${(caseData as any).date_fee || 0}-${caseData.nextHearing || ''}`}
             caseDetails={caseData}
             onUpdateHearingPress={() => handleUpdateHearing(caseData)}
             index={index}
@@ -539,8 +527,8 @@ const TodaysCasesSection = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
-          onSave={async (notes, nextHearingDate, feeReceivedToday) =>
-            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId(), feeReceivedToday)
+          onSave={async (notes, nextHearingDate, dateFeeCollectedToday, totalFeeCollectedToday, paymentMode, paymentNotes) =>
+            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId(), dateFeeCollectedToday, totalFeeCollectedToday, paymentMode, paymentNotes)
           }
         />
       )}
@@ -548,16 +536,32 @@ const TodaysCasesSection = () => {
   );
 };
 
+import VoiceSearchBar from '../CommonComponents/VoiceSearchBar';
+
 const DashboardScreen = () => {
   const { theme } = useContext(ThemeContext);
+  const navigation = useNavigation<any>();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const handleSearchSubmit = (query: string) => {
+    setSearchQuery(query);
+    if (query && query.trim().length > 0) {
+      navigation.navigate('AllCases' as any, { initialSearch: query.trim() });
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
         <View style={styles.content}>
           <WelcomeCard />
+          <VoiceSearchBar
+            value={searchQuery}
+            onChangeText={handleSearchSubmit}
+            placeholder="🎙️ Search cases by name, CNR, or client..."
+            onClear={() => setSearchQuery("")}
+          />
           <QuickActionsGrid />
-          {/* <StatsSection /> */}
-          {/* <AdvertisementSection /> */}
           <TodaysCasesSection />
         </View>
       </ScrollView>

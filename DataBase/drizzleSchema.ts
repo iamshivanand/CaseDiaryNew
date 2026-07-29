@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, integer, text, real, index } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const Users = sqliteTable('Users', {
@@ -78,6 +78,9 @@ export const Cases = sqliteTable('Cases', {
   case_stage: text('case_stage'),
   total_fee: integer('total_fee'),
   fee_paid: integer('fee_paid'),
+  date_fee: real('date_fee'),
+  date_fee_collected: real('date_fee_collected'),
+  date_fee_paid: integer('date_fee_paid'),
 
   CaseDescription: text('CaseDescription'),
   CaseNotes: text('CaseNotes'),

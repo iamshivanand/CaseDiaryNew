@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import React, { useState, useCallback, useContext } from "react";
+import React, { useState, useEffect, useCallback, useContext } from "react";
 import { formatDate, getLocalDateString, parseLocalDate, normalizeDateToYYYYMMDD } from "../../utils/commonFunctions";
 import {
   ScrollView,
@@ -26,6 +26,9 @@ import { promptClientNotification } from "../../utils/whatsappNotifier";
 interface Props {
   // Add your prop types here
 }
+
+import { DeviceEventEmitter } from "react-native";
+import { CASE_UPDATED_EVENT } from "../../utils/caseEvents";
 
 const CalendarScreen: React.FC<Props> = () => {
   const { theme } = useContext(ThemeContext);
@@ -78,46 +81,96 @@ const CalendarScreen: React.FC<Props> = () => {
     }, [selected])
   );
 
+  useEffect(() => {
+    let isMounted = true;
+    const sub = DeviceEventEmitter.addListener(CASE_UPDATED_EVENT, () => {
+      if (isMounted) {
+        fetchAllDates();
+        getResultFromDate(selected);
+      }
+    });
+    return () => {
+      isMounted = false;
+      if (sub && typeof sub.remove === 'function') {
+        sub.remove();
+      }
+    };
+  }, [selected]);
+
   const handleUpdateHearing = (caseDetails: CaseDataScreen) => {
     setSelectedCase(caseDetails);
     setPopupVisible(true);
   };
 
-  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number, feeReceivedToday?: number) => {
+  const handleSaveHearing = async (
+    notes: string,
+    nextHearingDate: Date,
+    userId: number,
+    dateFeeCollectedToday?: number,
+    totalFeeCollectedToday?: number,
+    paymentMode?: string,
+    paymentNotes?: string
+  ) => {
     if (!selectedCase || !selectedCase.id) return;
     const caseId = parseInt(selectedCase.id.toString(), 10);
-    if(isNaN(caseId)) return;
+    if (isNaN(caseId)) return;
 
     try {
       const caseExists = await db.getCaseById(caseId);
-      if(!caseExists) {
+      if (!caseExists) {
         console.error("Case not found");
         return;
       }
-      const feeNote = feeReceivedToday && feeReceivedToday > 0 
-        ? ` [Fee Received: ₹${feeReceivedToday.toLocaleString('en-IN')}]` 
-        : "";
-      const finalNotes = (notes || "") + feeNote;
 
-      // 1. Add timeline event
-      await db.addCaseTimelineEvent({
-        case_id: caseId,
-        hearing_date: new Date().toISOString(),
-        notes: finalNotes.trim(),
-      });
+      const nowIso = new Date().toISOString();
+      const modeTag = paymentMode ? paymentMode : "Cash";
+      const noteTag = paymentNotes && paymentNotes.trim() ? ` - ${paymentNotes.trim()}` : "";
 
-      // 2. Update case's next hearing date and fee_paid
-      const updatedFeePaid = (caseExists.fee_paid || 0) + (feeReceivedToday || 0);
+      if (notes && notes.trim()) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: nowIso,
+          notes: notes.trim(),
+          event_type: 'hearing_proceeding',
+        });
+      }
+
+      if (dateFeeCollectedToday && dateFeeCollectedToday > 0) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: nowIso,
+          notes: `Fee Payment Received (Date Fee): ₹${dateFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`,
+          event_type: 'date_fee_payment',
+          amount: dateFeeCollectedToday,
+          payment_mode: modeTag,
+        });
+      }
+
+      if (totalFeeCollectedToday && totalFeeCollectedToday > 0) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: nowIso,
+          notes: `Fee Payment Received (Total Retainer): ₹${totalFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`,
+          event_type: 'total_fee_payment',
+          amount: totalFeeCollectedToday,
+          payment_mode: modeTag,
+        });
+      }
+
+      const updatedDateFeeCollected = (caseExists.date_fee_collected || 0) + (dateFeeCollectedToday || 0);
+      const updatedTotalFeePaid = (caseExists.fee_paid || 0) + (totalFeeCollectedToday || 0);
+      const targetDateFee = caseExists.date_fee || 0;
+      const isDateFeePaidNow = targetDateFee > 0 && updatedDateFeeCollected >= targetDateFee ? 1 : (caseExists.date_fee_paid || 0);
+
       await db.updateCase(caseId, {
         NextDate: getLocalDateString(nextHearingDate),
-        ...(feeReceivedToday && feeReceivedToday > 0 ? { fee_paid: updatedFeePaid } : {}),
+        ...(dateFeeCollectedToday && dateFeeCollectedToday > 0 ? { date_fee_collected: updatedDateFeeCollected, date_fee_paid: isDateFeePaidNow } : {}),
+        ...(totalFeeCollectedToday && totalFeeCollectedToday > 0 ? { fee_paid: updatedTotalFeePaid } : {}),
       }, userId);
 
-      // 3. Refresh the list
       fetchAllDates();
       getResultFromDate(selected);
 
-      // 4. Prompt WhatsApp notification to client
       setTimeout(() => {
         promptClientNotification(caseId, getLocalDateString(nextHearingDate), notes);
       }, 500);
@@ -208,10 +261,9 @@ const CalendarScreen: React.FC<Props> = () => {
           markedDates={{
             ...markedDates,
             [selected]: {
+              ...(markedDates[selected] || {}),
               selected: true,
-              disableTouchEvent: true,
               selectedColor: theme.colors.primary,
-              selectedTextColor: 'white'
             },
           }}
           dayComponent={({ date, state }) => renderDay(date, state)}
@@ -275,7 +327,7 @@ const CalendarScreen: React.FC<Props> = () => {
           {displayedCases?.length > 0 ? (
             displayedCases.map((each, index) => (
               <NewCaseCard 
-                key={index} 
+                key={`${each.id}-${(each as any).updated_at || ''}-${(each as any).fee_paid || 0}-${(each as any).date_fee_collected || 0}-${(each as any).date_fee_paid || 0}-${(each as any).date_fee || 0}-${each.nextHearing || ''}`} 
                 caseDetails={each} 
                 onUpdateHearingPress={() => handleUpdateHearing(each)} 
                 onPress={() => navigation.navigate('CaseDetails', { caseId: each.id })} 
@@ -295,8 +347,8 @@ const CalendarScreen: React.FC<Props> = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
-          onSave={async (notes, nextHearingDate, feeReceivedToday) =>
-            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId(), feeReceivedToday)
+          onSave={async (notes, nextHearingDate, dateFeeCollectedToday, totalFeeCollectedToday, paymentMode, paymentNotes) =>
+            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId(), dateFeeCollectedToday, totalFeeCollectedToday, paymentMode, paymentNotes)
           }
         />
       )}

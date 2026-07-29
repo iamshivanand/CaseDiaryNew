@@ -38,9 +38,10 @@ import {
   DropdownOption,
   caseStatusOptions,
   priorityOptions,
+  caseStageOptions,
 } from "../../Types/appTypes";
 import TimelineItem from "./components/TimelineItem";
-import { RootStackParamList } from "../../Types/navigationtypes";
+import { HomeStackParamList } from "../../Types/navigationtypes";
 import { CaseWithDetails } from "../../DataBase"; // Import TimelineEventRow
 import { PRIMARY_BLUE_COLOR_FOR_LOADER } from "../CaseDetailsScreen/CaseDetailsScreen";
 
@@ -59,7 +60,7 @@ const dummyCourtOptions: DropdownOption[] = [
   { label: "Supreme Court", value: 3 },
 ];
 
-type EditCaseScreenRouteProp = RouteProp<RootStackParamList, "EditCase">;
+type EditCaseScreenRouteProp = RouteProp<HomeStackParamList, "EditCase">;
 
 const deduplicateOptions = (options: DropdownOption[]): DropdownOption[] => {
   const seen = new Set<string>();
@@ -187,7 +188,10 @@ const EditCaseScreen: React.FC = () => {
       CaseDescription: dbCase.CaseDescription,
       CaseNotes: dbCase.CaseNotes,
       crime_number: dbCase.crime_number || "",
-      crime_year: dbCase.crime_year !== undefined && dbCase.crime_year !== null ? dbCase.crime_year.toString() : "",
+      session_trial_number: dbCase.session_trial_number || "",
+      case_stage: dbCase.case_stage || "",
+      total_fee: dbCase.total_fee,
+      fee_paid: dbCase.fee_paid,
     };
   };
 
@@ -512,8 +516,12 @@ const EditCaseScreen: React.FC = () => {
           CaseDescription: caseData.CaseDescription,
           CaseNotes: caseData.CaseNotes,
           case_year: caseData.case_year ? Number(caseData.case_year) : null,
+          session_trial_number: caseData.session_trial_number,
+          case_stage: caseData.case_stage,
           crime_number: crimeNo,
           crime_year: crimeYr,
+          total_fee: caseData.total_fee !== undefined ? (typeof caseData.total_fee === 'string' ? parseFloat(caseData.total_fee) : caseData.total_fee) : undefined,
+          fee_paid: caseData.fee_paid !== undefined ? (typeof caseData.fee_paid === 'string' ? parseFloat(caseData.fee_paid) : caseData.fee_paid) : undefined,
         };
         Object.keys(updatePayload).forEach((key) => {
           if (updatePayload[key as keyof db.CaseUpdateData] === undefined)
@@ -912,6 +920,12 @@ const EditCaseScreen: React.FC = () => {
             value={caseData.case_number || ""}
             onChangeText={(text) => handleInputChange("case_number", text)}
           />
+          <FormInput
+            label="Sessions Trial Number"
+            value={caseData.session_trial_number || ""}
+            onChangeText={(text) => handleInputChange("session_trial_number", text)}
+            placeholder="Enter Sessions Trial Number"
+          />
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={{ flex: 2 }}>
               <FormInput
@@ -1028,6 +1042,12 @@ const EditCaseScreen: React.FC = () => {
             options={getTranslatedOptions(caseStatusOptions)}
           />
           <DropdownPicker
+            label="Case Stage"
+            selectedValue={caseData.case_stage || ""}
+            onValueChange={(val) => handleInputChange("case_stage", val as string)}
+            options={getTranslatedOptions(caseStageOptions)}
+          />
+          <DropdownPicker
             label={t("field_priority")}
             selectedValue={caseData.Priority || ""}
             onValueChange={(val) =>
@@ -1088,6 +1108,26 @@ const EditCaseScreen: React.FC = () => {
             value={caseData.OnBehalfOf || ""}
             onChangeText={(text) => handleInputChange("OnBehalfOf", text)}
           />
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <FormInput
+                label="Total Fee (₹)"
+                value={caseData.total_fee !== undefined && caseData.total_fee !== null ? caseData.total_fee.toString() : ""}
+                onChangeText={(text) => handleInputChange("total_fee", text)}
+                placeholder="Agreed Total Fee"
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <FormInput
+                label="Fee Paid (₹)"
+                value={caseData.fee_paid !== undefined && caseData.fee_paid !== null ? caseData.fee_paid.toString() : ""}
+                onChangeText={(text) => handleInputChange("fee_paid", text)}
+                placeholder="Fee Paid to Date"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
           <FormInput
             label={t("field_case_description")}
             value={caseData.CaseDescription || ""}

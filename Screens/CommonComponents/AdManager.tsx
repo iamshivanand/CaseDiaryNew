@@ -51,7 +51,7 @@ export const createRewardedAd = () => {
       isRewardedAdLoading = false;
       console.warn("Rewarded ad failed to load, recreating instance:", err);
       cleanup();
-      createRewardedAd(); // Recreate immediately on error
+      setTimeout(() => createRewardedAd(), 5000);
     });
   } catch (e) {
     console.error("Failed to create RewardedAd instance:", e);
@@ -79,18 +79,14 @@ export const createInterstitialAd = () => {
       isInterstitialAdLoading = false;
       console.warn("Interstitial ad failed to load, recreating instance:", err);
       cleanup();
-      createInterstitialAd(); // Recreate immediately on error
+      setTimeout(() => createInterstitialAd(), 5000);
     });
   } catch (e) {
     console.error("Failed to create InterstitialAd instance:", e);
   }
 };
 
-// Initial instantiation
-createRewardedAd();
-createInterstitialAd();
-
-// Preload helper
+// Preload helper (used on-demand when requested)
 export const preloadAds = () => {
   try {
     if (rewardedAd && !rewardedAd.loaded && !isRewardedAdLoading) {
@@ -131,7 +127,7 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const [loading, setLoading] = useState(false);
   const [showSkip, setShowSkip] = useState(false);
   const [showRewardModal, setShowRewardModal] = useState(false);
-  const [secondsRemaining, setSecondsRemaining] = useState(15);
+  const [secondsRemaining, setSecondsRemaining] = useState(8);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const onCompleteCallbackRef = useRef<((success: boolean) => void) | null>(null);
@@ -141,7 +137,7 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const cleanUpAdRequest = () => {
     setLoading(false);
     setShowSkip(false);
-    setSecondsRemaining(15);
+    setSecondsRemaining(8);
     if (timerRef.current) clearInterval(timerRef.current);
     eventUnsubscribesRef.current.forEach((unsub) => {
       try {
@@ -185,7 +181,7 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       const netState = await Network.getNetworkStateAsync();
       isConnected = netState.isConnected ?? true;
     } catch (e) {
-      console.warn("expo-network is not available (native module missing or failed to require). Performing fetch fallback check...", e);
+      console.warn("expo-network is not available. Performing fetch fallback check...", e);
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2000);
@@ -221,8 +217,14 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       console.error("Error reading premium state in AdProvider:", e);
     }
 
-    // 3. Check if already loaded
-    const targetAd = adType === "rewarded" ? rewardedAd : interstitialAd;
+    // 3. Ensure instance exists
+    if (adType === "rewarded" && !rewardedAd) {
+      createRewardedAd();
+    } else if (adType === "interstitial" && !interstitialAd) {
+      createInterstitialAd();
+    }
+
+    let targetAd = adType === "rewarded" ? rewardedAd : interstitialAd;
     if (!targetAd) {
       console.warn(`Ad instance for ${adType} is null. Falling back gracefully.`);
       onComplete(true);
@@ -233,13 +235,13 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       return;
     }
 
-    // 4. Start preloading overlay & triggers
+    // 4. Start preloading overlay & triggers with 8-second timeout
     setLoading(true);
     setShowSkip(false);
-    setSecondsRemaining(15);
+    setSecondsRemaining(8);
 
     // Timeout countdown
-    let remaining = 15;
+    let remaining = 8;
     timerRef.current = setInterval(() => {
       remaining -= 1;
       setSecondsRemaining(remaining);
@@ -296,17 +298,9 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
     const unsubClosed = targetAd.addAdEventListener(closedEvent as any, () => {
       unsubClosed();
-      // Re-initialize and preload for next use
+      // Re-initialize for next on-demand use (without auto-loading immediately to save requests)
       if (adType === "rewarded") {
         createRewardedAd();
-        isRewardedAdLoading = true;
-        try {
-          rewardedAd.load();
-        } catch (loadErr) {
-          isRewardedAdLoading = false;
-          console.warn("Failed to reload rewarded ad after close:", loadErr);
-        }
-
         if (rewardEarned) {
           setShowRewardModal(true);
         } else {
@@ -317,14 +311,6 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         }
       } else {
         createInterstitialAd();
-        isInterstitialAdLoading = true;
-        try {
-          interstitialAd.load();
-        } catch (loadErr) {
-          isInterstitialAdLoading = false;
-          console.warn("Failed to reload interstitial ad after close:", loadErr);
-        }
-
         if (onCompleteCallbackRef.current) {
           onCompleteCallbackRef.current(true); // Interstitial completed
           onCompleteCallbackRef.current = null;

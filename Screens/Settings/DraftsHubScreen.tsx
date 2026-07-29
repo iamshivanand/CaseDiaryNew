@@ -1410,9 +1410,9 @@ const DraftsHubScreen: React.FC = () => {
           numColumns={2}
           contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={5}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={3}
           removeClippedSubviews={true}
           onEndReached={loadMoreDrafts}
           onEndReachedThreshold={0.5}
@@ -1432,11 +1432,12 @@ const DraftsHubScreen: React.FC = () => {
           data={filteredDrafts}
           renderItem={renderDraftItem}
           keyExtractor={(item) => item.id}
+          getItemLayout={(data, index) => ({ length: 110, offset: 110 * index, index })}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={5}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={3}
           removeClippedSubviews={true}
           onEndReached={loadMoreDrafts}
           onEndReachedThreshold={0.5}

@@ -131,3 +131,119 @@ export const reScheduleAllNotifications = async (): Promise<void> => {
   }
 };
 
+export const scheduleOverdueHearingNotification = async (caseData: CaseWithDetails): Promise<string | null> => {
+  if (!caseData.NextDate) return null;
+
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      return null;
+    }
+
+    const enabledVal = await AsyncStorage.getItem('@notification_enabled');
+    if (enabledVal === 'false') {
+      return null;
+    }
+
+    const identifier = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `⚠️ Pending Action: ${caseData.CaseTitle || 'Legal Case'}`,
+        body: `Hearing date (${caseData.NextDate}) has passed. Tap to update hearing proceedings or send a fee reminder to your client.`,
+        data: { caseId: caseData.id, type: 'overdue_hearing' },
+      },
+      trigger: null, // trigger immediately
+    });
+
+    return identifier;
+  } catch (error) {
+    console.error("Failed to trigger overdue notification:", error);
+    return null;
+  }
+};
+
+/**
+ * Schedules 3 multi-interval engagement push notifications every day:
+ * 1. Morning Briefing (8:00 AM) - Today's hearings count
+ * 2. Afternoon Digest (2:00 PM) - Pending fee balances & outcome updates
+ * 3. Evening Prep (7:00 PM) - Undated cases & tomorrow preview
+ */
+export const scheduleDailyMultiIntervalNotifications = async (): Promise<void> => {
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') return;
+
+    const enabledVal = await AsyncStorage.getItem('@notification_enabled');
+    if (enabledVal === 'false') return;
+
+    const db = await getDb();
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const todayCases = await db.getAllAsync<any>(
+      "SELECT * FROM Cases WHERE NextDate = ? AND (CaseStatus IS NULL OR CaseStatus != 'Closed')",
+      [todayStr]
+    );
+
+    const pendingFeeCases = await db.getAllAsync<any>(
+      "SELECT * FROM Cases WHERE (total_fee > fee_paid OR (date_fee > 0 AND (date_fee_collected < date_fee OR date_fee_paid = 0))) AND (CaseStatus IS NULL OR CaseStatus != 'Closed')",
+      []
+    );
+
+    const undatedCases = await db.getAllAsync<any>(
+      "SELECT * FROM Cases WHERE (NextDate IS NULL OR NextDate = '' OR NextDate = 'N/A') AND (CaseStatus IS NULL OR CaseStatus != 'Closed')",
+      []
+    );
+
+    const morningDate = new Date();
+    morningDate.setHours(8, 0, 0, 0);
+    if (morningDate.getTime() > Date.now()) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `🌅 Good Morning Advocate!`,
+          body: `You have ${todayCases.length} hearing${todayCases.length === 1 ? '' : 's'} scheduled today. Tap to view your daily court diary.`,
+          data: { type: 'morning_briefing' },
+        },
+        trigger: { date: morningDate },
+      });
+    }
+
+    const afternoonDate = new Date();
+    afternoonDate.setHours(14, 0, 0, 0);
+    if (afternoonDate.getTime() > Date.now()) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `☀️ Afternoon Fee & Outcome Digest`,
+          body: `${pendingFeeCases.length} case${pendingFeeCases.length === 1 ? '' : 's'} have pending fee balances. Tap to send client WhatsApp reminders.`,
+          data: { type: 'afternoon_digest' },
+        },
+        trigger: { date: afternoonDate },
+      });
+    }
+
+    const eveningDate = new Date();
+    eveningDate.setHours(19, 0, 0, 0);
+    if (eveningDate.getTime() > Date.now()) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `🌙 Evening Prep: Undated Cases`,
+          body: `${undatedCases.length} case${undatedCases.length === 1 ? '' : 's'} need next hearing dates assigned. Tap to organize your diary.`,
+          data: { type: 'evening_prep' },
+        },
+        trigger: { date: eveningDate },
+      });
+    }
+  } catch (error) {
+    console.error("Failed to schedule multi-interval notifications:", error);
+  }
+};
+

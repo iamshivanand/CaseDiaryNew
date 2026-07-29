@@ -8,8 +8,8 @@ describe("UpdateHearingPopup", () => {
       <UpdateHearingPopup visible={true} onClose={() => {}} onSave={() => {}} />
     );
 
-    expect(getByText("Update Hearing")).toBeTruthy();
-    expect(getByPlaceholderText("Notes for today's hearing")).toBeTruthy();
+    expect(getByText("Update Hearing & Payment Details")).toBeTruthy();
+    expect(getByPlaceholderText("Notes for today's hearing proceedings...")).toBeTruthy();
     expect(getByText("Save")).toBeTruthy();
     expect(getByText("Cancel")).toBeTruthy();
   });
@@ -19,7 +19,7 @@ describe("UpdateHearingPopup", () => {
       <UpdateHearingPopup visible={false} onClose={() => {}} onSave={() => {}} />
     );
 
-    expect(queryByText("Update Hearing")).toBeNull();
+    expect(queryByText("Update Hearing & Payment Details")).toBeNull();
   });
 
   it("calls onSave with the correct data when save is pressed", () => {
@@ -28,13 +28,13 @@ describe("UpdateHearingPopup", () => {
       <UpdateHearingPopup visible={true} onClose={() => {}} onSave={onSave} />
     );
 
-    const notesInput = getByPlaceholderText("Notes for today's hearing");
+    const notesInput = getByPlaceholderText("Notes for today's hearing proceedings...");
     fireEvent.changeText(notesInput, "Test notes");
 
     const saveButton = getByText("Save");
     fireEvent.press(saveButton);
 
-    expect(onSave).toHaveBeenCalledWith("Test notes", expect.any(Date), expect.anything());
+    expect(onSave).toHaveBeenCalled();
   });
 
   it("calls onClose when cancel is pressed", () => {

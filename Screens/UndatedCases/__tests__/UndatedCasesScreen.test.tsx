@@ -40,6 +40,7 @@ const mockCases = [
 jest.mock('../../../DataBase', () => ({
   ...jest.requireActual('../../../DataBase'),
   getCases: jest.fn(() => Promise.resolve(mockCases)),
+  getUndatedCases: jest.fn(() => Promise.resolve(mockCases)),
   getCaseById: jest.fn((id) => Promise.resolve(mockCases.find(c => c.id === id))),
 }));
 

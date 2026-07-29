@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useContext } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { formatDate, getLocalDateString, normalizeDateToYYYYMMDD } from '../../utils/commonFunctions';
 import * as db from '../../DataBase';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -16,7 +16,11 @@ import { useAdTrigger } from '../CommonComponents/AdManager';
 
 import { SafeAreaView, Platform } from "react-native";
 
-const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
+import { DeviceEventEmitter } from 'react-native';
+import { CASE_UPDATED_EVENT } from '../../utils/caseEvents';
+import { mapCaseDbToScreen } from '../../utils/caseMapper';
+
+const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }: any) => {
   return (
     <Animated.View entering={FadeInDown.delay(index * 30).springify().damping(20).stiffness(300)}>
       <NewCaseCard
@@ -39,26 +43,8 @@ const UndatedCasesScreen = () => {
 
   const fetchUndatedCases = async () => {
     try {
-      const allCases = await db.getCases();
-      const todayStr = getLocalDateString(new Date());
-
-      const filteredCases = allCases.filter(c => {
-        const normalized = normalizeDateToYYYYMMDD(c.NextDate);
-        if (!normalized) return true;
-        return normalized < todayStr;
-      });
-
-      const mappedCases: CaseDataScreen[] = filteredCases.map(c => ({
-        id: c.id,
-        title: c.CaseTitle || 'No Title',
-        client: c.ClientName || 'Unknown Client',
-        status: (c.CaseStatus === 'Active' || c.CaseStatus === 'Closed' || c.CaseStatus === 'Pending' ? c.CaseStatus : 'Pending') as 'Active' | 'Closed' | 'Pending',
-        nextHearing: c.NextDate ? formatDate(c.NextDate) : 'N/A',
-        lastUpdate: c.updated_at ? formatDate(c.updated_at) : 'N/A',
-        previousHearing: c.PreviousDate ? formatDate(c.PreviousDate) : 'N/A',
-        priority: c.Priority || 'Low',
-      }));
-
+      const filteredCases = await db.getUndatedCases();
+      const mappedCases: CaseDataScreen[] = filteredCases.map(mapCaseDbToScreen);
       setRawCases(filteredCases);
       setUndatedCases(mappedCases);
     } catch (error) {
@@ -74,45 +60,90 @@ const UndatedCasesScreen = () => {
     }, [])
   );
 
-  const handleUpdateHearing = (caseDetails: CaseDataScreen) => {
+  useEffect(() => {
+    let isMounted = true;
+    const sub = DeviceEventEmitter.addListener(CASE_UPDATED_EVENT, () => {
+      if (isMounted) fetchUndatedCases();
+    });
+    return () => {
+      isMounted = false;
+      if (sub && typeof sub.remove === 'function') sub.remove();
+    };
+  }, []);
+
+  const handleUpdateHearing = useCallback((caseDetails: CaseDataScreen) => {
     setSelectedCase(caseDetails);
     setPopupVisible(true);
-  };
+  }, []);
 
-  const handleSaveHearing = async (notes: string, nextHearingDate: Date, userId: number, feeReceivedToday?: number) => {
+  const handleSaveHearing = async (
+    notes: string,
+    nextHearingDate: Date,
+    userId: number,
+    dateFeeCollectedToday?: number,
+    totalFeeCollectedToday?: number,
+    paymentMode?: string,
+    paymentNotes?: string
+  ) => {
     if (!selectedCase || !selectedCase.id) return;
     const caseId = parseInt(selectedCase.id.toString(), 10);
-    if(isNaN(caseId)) return;
+    if (isNaN(caseId)) return;
 
     try {
       const caseExists = await db.getCaseById(caseId);
-      if(!caseExists) {
+      if (!caseExists) {
         console.error("Case not found");
         return;
       }
-      const feeNote = feeReceivedToday && feeReceivedToday > 0 
-        ? ` [Fee Received: ₹${feeReceivedToday.toLocaleString('en-IN')}]` 
-        : "";
-      const finalNotes = (notes || "") + feeNote;
 
-      // 1. Add timeline event
-      await db.addCaseTimelineEvent({
-        case_id: caseId,
-        hearing_date: new Date().toISOString(),
-        notes: finalNotes.trim(),
-      });
+      const nowIso = new Date().toISOString();
+      const modeTag = paymentMode ? paymentMode : "Cash";
+      const noteTag = paymentNotes && paymentNotes.trim() ? ` - ${paymentNotes.trim()}` : "";
 
-      // 2. Update case's next hearing date and fee_paid
-      const updatedFeePaid = (caseExists.fee_paid || 0) + (feeReceivedToday || 0);
+      if (notes && notes.trim()) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: nowIso,
+          notes: notes.trim(),
+          event_type: 'hearing_proceeding',
+        });
+      }
+
+      if (dateFeeCollectedToday && dateFeeCollectedToday > 0) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: nowIso,
+          notes: `Fee Payment Received (Date Fee): ₹${dateFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`,
+          event_type: 'date_fee_payment',
+          amount: dateFeeCollectedToday,
+          payment_mode: modeTag,
+        });
+      }
+
+      if (totalFeeCollectedToday && totalFeeCollectedToday > 0) {
+        await db.addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: nowIso,
+          notes: `Fee Payment Received (Total Retainer): ₹${totalFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`,
+          event_type: 'total_fee_payment',
+          amount: totalFeeCollectedToday,
+          payment_mode: modeTag,
+        });
+      }
+
+      const updatedDateFeeCollected = ((caseExists as any).date_fee_collected || 0) + (dateFeeCollectedToday || 0);
+      const updatedTotalFeePaid = (caseExists.fee_paid || 0) + (totalFeeCollectedToday || 0);
+      const targetDateFee = (caseExists as any).date_fee || 0;
+      const isDateFeePaidNow = targetDateFee > 0 && updatedDateFeeCollected >= targetDateFee ? 1 : ((caseExists as any).date_fee_paid || 0);
+
       await db.updateCase(caseId, {
         NextDate: getLocalDateString(nextHearingDate),
-        ...(feeReceivedToday && feeReceivedToday > 0 ? { fee_paid: updatedFeePaid } : {}),
+        ...(dateFeeCollectedToday && dateFeeCollectedToday > 0 ? { date_fee_collected: updatedDateFeeCollected, date_fee_paid: isDateFeePaidNow } : {}),
+        ...(totalFeeCollectedToday && totalFeeCollectedToday > 0 ? { fee_paid: updatedTotalFeePaid } : {}),
       }, userId);
 
-      // 3. Refresh the list
       fetchUndatedCases();
 
-      // 4. Prompt WhatsApp notification to client
       setTimeout(() => {
         promptClientNotification(caseId, getLocalDateString(nextHearingDate), notes);
       }, 500);
@@ -120,6 +151,22 @@ const UndatedCasesScreen = () => {
       console.error("Error updating hearing:", error);
     }
   };
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: CaseDataScreen; index: number }) => (
+      <AnimatedNewCaseCard
+        caseDetails={item}
+        onUpdateHearingPress={() => handleUpdateHearing(item)}
+        index={index}
+      />
+    ),
+    [handleUpdateHearing]
+  );
+
+  const keyExtractor = useCallback(
+    (item: CaseDataScreen) => `${item.id}-${(item as any).updated_at || ''}-${(item as any).fee_paid || 0}-${(item as any).date_fee_collected || 0}-${(item as any).date_fee_paid || 0}-${(item as any).date_fee || 0}-${item.nextHearing || ''}`,
+    []
+  );
 
   const handleShareUndatedCases = async () => {
     if (rawCases.length === 0) {
@@ -141,6 +188,29 @@ const UndatedCasesScreen = () => {
     }
   };
 
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={handleShareUndatedCases}
+          activeOpacity={0.8}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: theme.colors.primary,
+            paddingVertical: 5,
+            paddingHorizontal: 12,
+            borderRadius: 16,
+            marginRight: 8,
+          }}
+        >
+          <Ionicons name="share-social" size={14} color="#FFF" style={{ marginRight: 4 }} />
+          <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Share PDF</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, theme, rawCases]);
+
   if (loading) {
     return (
       <View style={[styles.centered, { backgroundColor: theme.colors.background }]}>
@@ -151,45 +221,15 @@ const UndatedCasesScreen = () => {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
-      <View style={{
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-        backgroundColor: theme.colors.cardBackground
-      }}>
-        <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.text }}>Undated Cases</Text>
-        {undatedCases.length > 0 && (
-          <TouchableOpacity 
-            onPress={handleShareUndatedCases}
-            activeOpacity={0.9}
-            style={{ 
-              flexDirection: 'row', 
-              alignItems: 'center', 
-              backgroundColor: theme.colors.primary, 
-              paddingVertical: 6, 
-              paddingHorizontal: 12, 
-              borderRadius: 20,
-            }}
-          >
-            <Ionicons name="share-social" size={14} color="#FFF" style={{ marginRight: 4 }} />
-            <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600' }}>Share List</Text>
-          </TouchableOpacity>
-        )}
-      </View>
       <FlatList
         data={undatedCases}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item, index }) => (
-          <AnimatedNewCaseCard
-            caseDetails={item}
-            onUpdateHearingPress={() => handleUpdateHearing(item)}
-            index={index}
-          />
-        )}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        getItemLayout={(data, index) => ({ length: 160, offset: 160 * index, index })}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={3}
+        removeClippedSubviews={true}
         ListEmptyComponent={
           <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
             No undated cases found.

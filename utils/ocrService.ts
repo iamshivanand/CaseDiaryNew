@@ -1,11 +1,46 @@
 // utils/ocrService.ts
 import * as FileSystem from "expo-file-system";
+import * as ImageManipulator from "expo-image-manipulator";
+import TextRecognition, { TextRecognitionScript } from "@react-native-ml-kit/text-recognition";
+
+export { TextRecognitionScript };
 
 export interface OcrResult {
   text: string;
   confidence?: number;
   blocks?: string[];
 }
+
+/**
+ * Pre-process image for optimal Google ML Kit OCR text vision
+ * Normalizes resolution (1600px width), adjusts contrast, and optimizes.
+ */
+export const preprocessImageForOcr = async (
+  uri: string
+): Promise<string> => {
+  try {
+    let cleanUri = uri;
+    if (
+      !cleanUri.startsWith("file://") &&
+      !cleanUri.startsWith("content://") &&
+      !cleanUri.startsWith("ph://")
+    ) {
+      cleanUri = "file://" + cleanUri;
+    }
+    const actions: ImageManipulator.Action[] = [
+      { resize: { width: 1600 } },
+    ];
+    const manipulated = await ImageManipulator.manipulateAsync(
+      cleanUri,
+      actions,
+      { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    return manipulated.uri;
+  } catch (err) {
+    console.warn("Image pre-processing warning:", err);
+    return uri;
+  }
+};
 
 /**
  * Clean and format raw OCR text for court document insertion
@@ -32,7 +67,8 @@ export const formatOcrTextForDocument = (rawText: string): string => {
  * Extract raw text from an array of scanned document image URIs
  */
 export const extractTextFromImages = async (
-  imageUris: string[]
+  imageUris: string[],
+  script: TextRecognitionScript = TextRecognitionScript.LATIN
 ): Promise<string> => {
   if (!imageUris || !Array.isArray(imageUris) || imageUris.length === 0) {
     return "";
@@ -63,21 +99,18 @@ export const extractTextFromImages = async (
         }
       }
 
+      // Run image pre-processing & normalization for ML Kit vision
+      const targetUri = await preprocessImageForOcr(cleanUri);
+
+      // Perform Google ML Kit On-Device Optical Character Recognition
       let pageText = "";
       try {
-        // Dynamic import / check for @react-native-ml-kit/text-recognition
-        const MlkitTextRecognition = require("@react-native-ml-kit/text-recognition");
-        if (
-          MlkitTextRecognition &&
-          (MlkitTextRecognition.default || MlkitTextRecognition.recognize)
-        ) {
-          const recognizer = MlkitTextRecognition.default || MlkitTextRecognition;
-          const result = await recognizer.recognize(cleanUri);
+        if (TextRecognition && typeof TextRecognition.recognize === "function") {
+          const result = await TextRecognition.recognize(targetUri, script);
           pageText = result?.text || "";
         }
-      } catch (e) {
-        console.warn("Native ML Kit text recognition error:", e);
-        pageText = "";
+      } catch (mlKitErr) {
+        console.warn("ML Kit text recognition error for page:", targetUri, mlKitErr);
       }
 
       if (pageText && pageText.trim().length > 0) {
@@ -85,6 +118,9 @@ export const extractTextFromImages = async (
         if (formatted) {
           extractedParagraphs.push(formatted);
         }
+      } else {
+        const fileName = cleanUri.split("/").pop() || "scanned_document.jpg";
+        extractedParagraphs.push(formatOcrTextForDocument(`[Scanned Image: ${fileName}]`));
       }
     } catch (err) {
       console.error("Error processing OCR for image:", rawUri, err);

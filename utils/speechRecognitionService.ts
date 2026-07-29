@@ -1,9 +1,11 @@
 // utils/speechRecognitionService.ts
 import { LEGAL_VOCABULARY } from "./legalVocabulary";
+import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
 
 export interface SpeechRecognitionCallbacks {
   onStart?: () => void;
   onResult?: (text: string) => void;
+  onFullResult?: (fullTranscript: string) => void;
   onError?: (error: string) => void;
   onEnd?: () => void;
 }
@@ -64,23 +66,13 @@ export const applyLegalVocabularyCorrection = (rawText: string): string => {
 
 class SpeechRecognitionService {
   private isListening: boolean = false;
-  private voiceModule: any = null;
+  private listeners: any[] = [];
+  private lastProcessedTranscript: string = "";
 
-  constructor() {
-    try {
-      // Dynamic require for @react-native-voice/voice if installed natively
-      const Voice = require("@react-native-voice/voice").default;
-      if (Voice) {
-        this.voiceModule = Voice;
-      }
-    } catch (e) {
-      // Running in Expo Go / web / test environment
-      this.voiceModule = null;
-    }
-  }
+  constructor() {}
 
   /**
-   * Start native Android SpeechRecognizer offline dictation session
+   * Start native speech dictation session using ExpoSpeechRecognitionModule
    */
   public async startListening(
     locale: string = "en-IN",
@@ -90,41 +82,73 @@ class SpeechRecognitionService {
       await this.stopListening();
     }
 
-    this.isListening = true;
-
-    if (this.voiceModule) {
-      try {
-        this.voiceModule.onSpeechStart = () => callbacks.onStart?.();
-        this.voiceModule.onSpeechError = (e: any) => {
-          this.isListening = false;
-          callbacks.onError?.(e?.error?.message || "Speech recognition error");
-        };
-        this.voiceModule.onSpeechEnd = () => {
-          this.isListening = false;
-          callbacks.onEnd?.();
-        };
-        this.voiceModule.onSpeechResults = (e: any) => {
-          if (e.value && e.value.length > 0) {
-            const rawResult = e.value[0];
-            const corrected = applyLegalVocabularyCorrection(rawResult);
-            callbacks.onResult?.(corrected);
-          }
-        };
-
-        // Enforce offline language recognition on Android
-        await this.voiceModule.start(locale, {
-          EXTRA_PREFER_OFFLINE: true,
-        });
-        return true;
-      } catch (err) {
-        this.isListening = false;
-        callbacks.onError?.("Failed to launch SpeechRecognizer");
+    try {
+      if (!ExpoSpeechRecognitionModule) {
+        callbacks.onError?.("Speech recognition module unavailable");
         return false;
       }
-    } else {
-      // Fallback / Mock environment for non-native test runs
+
+      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!permission.granted) {
+        callbacks.onError?.("Microphone permission required for voice dictation");
+        return false;
+      }
+
+      // Clear existing listeners
+      this.destroy();
+
+      this.isListening = true;
+      this.lastProcessedTranscript = "";
       callbacks.onStart?.();
+
+      const moduleAny = ExpoSpeechRecognitionModule as any;
+      const resultSub = moduleAny.addListener ? moduleAny.addListener("result", (event: any) => {
+        if (event.results && event.results.length > 0) {
+          const rawResult = (event.results[0]?.transcript || "").trim();
+          if (rawResult) {
+            const correctedFull = applyLegalVocabularyCorrection(rawResult);
+            callbacks.onFullResult?.(correctedFull);
+
+            let delta = "";
+            if (this.lastProcessedTranscript && rawResult.toLowerCase().startsWith(this.lastProcessedTranscript.toLowerCase())) {
+              delta = rawResult.slice(this.lastProcessedTranscript.length).trim();
+            } else if (!this.lastProcessedTranscript) {
+              delta = rawResult;
+            }
+
+            if (delta.length > 0) {
+              const correctedDelta = applyLegalVocabularyCorrection(delta);
+              callbacks.onResult?.(correctedDelta);
+              this.lastProcessedTranscript = rawResult;
+            }
+          }
+        }
+      }) : null;
+
+      const errorSub = moduleAny.addListener ? moduleAny.addListener("error", (event: any) => {
+        this.isListening = false;
+        callbacks.onError?.(event?.error || "Speech recognition error");
+      }) : null;
+
+      const endSub = moduleAny.addListener ? moduleAny.addListener("end", () => {
+        this.isListening = false;
+        callbacks.onEnd?.();
+      }) : null;
+
+      this.listeners.push(resultSub, errorSub, endSub);
+
+      ExpoSpeechRecognitionModule.start({
+        lang: locale,
+        interimResults: true,
+        maxAlternatives: 1,
+        addsPunctuation: true,
+      });
+
       return true;
+    } catch (err: any) {
+      this.isListening = false;
+      callbacks.onError?.(err?.message || "Failed to start speech dictation");
+      return false;
     }
   }
 
@@ -133,12 +157,12 @@ class SpeechRecognitionService {
    */
   public async stopListening(): Promise<void> {
     this.isListening = false;
-    if (this.voiceModule) {
-      try {
-        await this.voiceModule.stop();
-      } catch (e) {
-        console.warn("Error stopping voice module:", e);
+    try {
+      if (ExpoSpeechRecognitionModule) {
+        ExpoSpeechRecognitionModule.stop();
       }
+    } catch (e) {
+      console.warn("Error stopping speech recognition:", e);
     }
   }
 
@@ -147,13 +171,14 @@ class SpeechRecognitionService {
    */
   public destroy(): void {
     this.isListening = false;
-    if (this.voiceModule) {
+    this.listeners.forEach((sub) => {
       try {
-        this.voiceModule.destroy().then(this.voiceModule.removeAllListeners);
+        sub?.remove?.();
       } catch (e) {
         // ignore
       }
-    }
+    });
+    this.listeners = [];
   }
 
   public getIsListening(): boolean {
@@ -162,3 +187,4 @@ class SpeechRecognitionService {
 }
 
 export const speechRecognitionService = new SpeechRecognitionService();
+export default speechRecognitionService;

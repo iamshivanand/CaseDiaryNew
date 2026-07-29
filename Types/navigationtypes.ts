@@ -1,7 +1,6 @@
 import { NavigatorScreenParams } from "@react-navigation/native"; // Needed for nested navigators
 
-import { CaseData, Document, TimelineEvent } from "./appTypes"; // Comprehensive types
-import { CaseDetails } from "../Screens/CaseDetailsScreen/CaseDetailsScreen"; // Summary type
+import { CaseData, CaseDataScreen, Document, TimelineEvent } from "./appTypes"; // Comprehensive types
 
 // Stack for the "Home" or "Cases" Tab
 export type HomeStackParamList = {
@@ -20,7 +19,7 @@ export type HomeStackParamList = {
   AddCase: { uniqueId?: string };
   AddCaseDetails: {
     update?: boolean;
-    initialValues?: CaseDetails;
+    initialValues?: CaseDataScreen;
     uniqueId?: string;
   };
   AddDocument: { caseId: string | number };

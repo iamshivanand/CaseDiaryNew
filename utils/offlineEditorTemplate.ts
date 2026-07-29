@@ -29,10 +29,11 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       position: relative;
       width: 100%;
       max-width: 840px;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16), 0 3px 8px rgba(0, 0, 0, 0.08);
-      border-radius: 4px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
+      border-radius: 6px;
       overflow: hidden;
       background-color: #fcf9f2;
+      border: 1px solid #e2e8f0;
     }
     .page-margin-guide {
       position: absolute;
@@ -46,16 +47,14 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
     #editor {
       outline: none;
       width: 100%;
-      min-height: 80vh;
-      background-color: #fcf9f2; /* Court paper yellowish color */
-      padding: 24px;
-      padding-left: 55px; /* Leave space for left red ledger line */
-      padding-right: 24px;
+      min-height: 82vh;
+      background-color: #fcf9f2; /* Professional Court Green/Yellowish Ledger Paper */
+      padding: 28px 28px 48px 58px; /* Leave space for left red ledger line */
       box-sizing: border-box;
       font-family: 'Times New Roman', Georgia, serif;
       font-size: 16px;
       line-height: 1.8;
-      color: #1f2937;
+      color: #111827;
       -webkit-user-select: text;
       user-select: text;
     }
@@ -242,27 +241,67 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       }
     }
 
+    let savedEditorRange = null;
+
+    function saveEditorSelection() {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        if (editor.contains(range.commonAncestorContainer)) {
+          savedEditorRange = range.cloneRange();
+        }
+      }
+    }
+
+    function restoreEditorSelection() {
+      if (savedEditorRange) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(savedEditorRange);
+      }
+    }
+
+    document.addEventListener('selectionchange', saveEditorSelection);
+    editor.addEventListener('mouseup', saveEditorSelection);
+    editor.addEventListener('keyup', saveEditorSelection);
+    editor.addEventListener('touchend', saveEditorSelection);
+
     // Insert HTML cleanly at current cursor selection
     function insertHTMLAtCursor(html) {
+      editor.focus();
+      restoreEditorSelection();
       const sel = window.getSelection();
-      if (sel.getRangeAt && sel.rangeCount) {
-        const range = sel.getRangeAt(0);
-        range.deleteContents();
-        const el = document.createElement("div");
-        el.innerHTML = html;
-        const frag = document.createDocumentFragment();
-        let node, lastNode;
-        while ((node = el.firstChild)) {
-          lastNode = frag.appendChild(node);
+      let inserted = false;
+      if (sel && sel.getRangeAt && sel.rangeCount) {
+        try {
+          const range = sel.getRangeAt(0);
+          if (editor.contains(range.commonAncestorContainer)) {
+            range.deleteContents();
+            const el = document.createElement("div");
+            el.innerHTML = html;
+            const frag = document.createDocumentFragment();
+            let node, lastNode;
+            while ((node = el.firstChild)) {
+              lastNode = frag.appendChild(node);
+            }
+            range.insertNode(frag);
+            if (lastNode) {
+              range.setStartAfter(lastNode);
+              sel.removeAllRanges();
+              sel.addRange(range);
+              saveEditorSelection();
+            }
+            inserted = true;
+          }
+        } catch (e) {
+          inserted = false;
         }
-        range.insertNode(frag);
-        if (lastNode) {
-          range.setStartAfter(lastNode);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-      } else {
-        editor.innerHTML += html;
+      }
+      if (!inserted) {
+        const div = document.createElement("div");
+        div.innerHTML = html;
+        editor.appendChild(div);
+        saveEditorSelection();
       }
       sendStateToRN();
     }
@@ -293,6 +332,9 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
           editor.innerHTML = data.html || '';
           scanAndHighlightPlaceholders();
           editor.focus();
+        } else if (data.type === 'saveSelection') {
+          saveEditorSelection();
+        }
         } else if (data.type === 'exec') {
           editor.focus();
           if (data.command === 'insertText') {

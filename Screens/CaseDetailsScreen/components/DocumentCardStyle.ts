@@ -26,7 +26,7 @@ export const getDocumentCardStyles = (theme: Theme) => StyleSheet.create({
   documentIconContainer: {
     marginRight: 16,
     padding: 0,
-    backgroundColor: theme.colors.primaryLight || '#DBEAFE', // A lighter version of primary
+    backgroundColor: theme.isDark ? '#1E1B4B' : (theme.colors.primaryLight || '#DBEAFE'), // A lighter version of primary
     borderRadius: 22,
     width: 44,
     height: 44,

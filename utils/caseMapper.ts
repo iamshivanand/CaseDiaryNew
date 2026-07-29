@@ -12,6 +12,7 @@ import { ParsedTextCase } from "./ecourtsParser";
  */
 export const mapCaseDbToScreen = (dbCase: Partial<CaseWithDetails> & { id: number }): CaseDataScreen => {
   return {
+    ...dbCase,
     id: dbCase.id,
     title: dbCase.CaseTitle || 'No Title',
     client: dbCase.ClientName || 'Unknown Client',

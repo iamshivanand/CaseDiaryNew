@@ -53,6 +53,9 @@ export interface CaseData {
   case_stage?: string | null; // Stage: Framing of Charges, Evidence, Arguments, etc.
   total_fee?: number | null; // Total agreed fee
   fee_paid?: number | null; // Collected fee
+  date_fee?: number | null; // Date Hearing Fee
+  date_fee_collected?: number | null; // Date Hearing Fee Collected
+  date_fee_paid?: number | boolean | null; // Date Fee Paid (0 or 1 / boolean)
   PreviousDate?: string | null; // ISO8601 "YYYY-MM-DD"
   NextDate?: string | null; // ISO8601 "YYYY-MM-DD" (Can be "Hearing Date")
   FiledDate?: string | null; // Explicit field for form, maps to dateFiled
@@ -92,12 +95,17 @@ export interface Document {
   stored_filename?: string; // from CaseDocument stored_filename
 }
 
+export type TimelineEventType = 'hearing_proceeding' | 'date_fee_payment' | 'total_fee_payment' | 'date_fee_agreed';
+
 export interface TimelineEvent {
   id: number | string; // number from DB, string for temporary _clientSideId if 'new'
   case_id?: number;    // Will be set when saving new events to DB
   date: string;        // ISO8601 "YYYY-MM-DD" or full timestamp
   description: string;
   user_id?: number | null; // From TimelineEventRow
+  event_type?: TimelineEventType;
+  amount?: number | null;
+  payment_mode?: string | null;
 
   // Client-side flags for managing state before saving
   _clientSideId?: string; // For 'new' items before they have a DB id (e.g., uuidv4())

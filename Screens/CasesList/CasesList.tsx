@@ -16,7 +16,9 @@ import {
   View,
   ActivityIndicator,
   Platform,
-} from "react-native"; // Removed Dimensions, ScrollView
+  DeviceEventEmitter,
+} from "react-native";
+import { CASE_UPDATED_EVENT } from "../../utils/caseEvents";
 
 import { ECourtsTextImportModal } from "./components/ECourtsTextImportModal";
 import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
@@ -26,6 +28,7 @@ import {
   updateCase,
   getCaseById,
 } from "../../DataBase";
+import { mapCaseDbToScreen } from "../../utils/caseMapper";
 import { Case } from "../../DataBase/schema";
 import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
@@ -39,20 +42,6 @@ import { promptClientNotification } from "../../utils/whatsappNotifier";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import AdBanner from "../CommonComponents/AdBanner";
 
-const transformApiCaseToCaseDataScreen = (apiCase: Case): CaseDataScreen => {
-  return {
-    id: apiCase.id.toString(),
-    title: apiCase.CaseTitle || "No Title",
-    client: apiCase.ClientName || "N/A",
-    status: apiCase.CaseStatus || "N/A",
-    nextHearing: apiCase.NextDate ? formatDate(apiCase.NextDate) : "N/A",
-    lastUpdate: apiCase.updated_at ? formatDate(apiCase.updated_at) : "N/A",
-    previousHearing: apiCase.PreviousDate
-      ? formatDate(apiCase.PreviousDate)
-      : "N/A",
-    priority: apiCase.Priority || "Low",
-  };
-};
 type FilterStatus = "Active" | "Closed";
 
 type CasesListRouteProp = RouteProp<{ params: { Filter?: string } }, "params">;
@@ -123,7 +112,7 @@ const CasesList = () => {
         );
 
         const mapped = results
-          ? results.map(transformApiCaseToCaseDataScreen)
+          ? results.map(mapCaseDbToScreen)
           : [];
 
         if (offset === 0) {
@@ -148,6 +137,19 @@ const CasesList = () => {
       fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
     }, [debouncedSearchText, filterParam, activeFilter, fetchCasesList])
   );
+
+  useEffect(() => {
+    let isMounted = true;
+    const sub = DeviceEventEmitter.addListener(CASE_UPDATED_EVENT, () => {
+      if (isMounted) {
+        fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
+      }
+    });
+    return () => {
+      isMounted = false;
+      if (sub && typeof sub.remove === 'function') sub.remove();
+    };
+  }, [debouncedSearchText, filterParam, activeFilter, fetchCasesList]);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -183,7 +185,15 @@ const CasesList = () => {
   }, []);
 
   const handleSaveHearing = useCallback(
-    async (notes: string, nextHearingDate: Date, userId: number, feeReceivedToday?: number) => {
+    async (
+      notes: string,
+      nextHearingDate: Date,
+      userId: number,
+      dateFeeCollectedToday?: number,
+      totalFeeCollectedToday?: number,
+      paymentMode?: string,
+      paymentNotes?: string
+    ) => {
       if (!selectedCase || !selectedCase.id) return;
       const caseId = parseInt(selectedCase.id.toString(), 10);
       if (isNaN(caseId)) return;
@@ -194,33 +204,59 @@ const CasesList = () => {
           console.error("Case not found");
           return;
         }
-        const feeNote = feeReceivedToday && feeReceivedToday > 0 
-          ? ` [Fee Received: ₹${feeReceivedToday.toLocaleString('en-IN')}]` 
-          : "";
-        const finalNotes = (notes || "") + feeNote;
 
-        // 1. Add timeline event
-        await addCaseTimelineEvent({
-          case_id: caseId,
-          hearing_date: new Date().toISOString(),
-          notes: finalNotes.trim(),
-        });
+        const nowIso = new Date().toISOString();
+        const modeTag = paymentMode ? paymentMode : "Cash";
+        const noteTag = paymentNotes && paymentNotes.trim() ? ` - ${paymentNotes.trim()}` : "";
 
-        // 2. Update case's next hearing date and fee_paid
-        const updatedFeePaid = (caseExists.fee_paid || 0) + (feeReceivedToday || 0);
+        if (notes && notes.trim()) {
+          await addCaseTimelineEvent({
+            case_id: caseId,
+            hearing_date: nowIso,
+            notes: notes.trim(),
+            event_type: 'hearing_proceeding',
+          });
+        }
+
+        if (dateFeeCollectedToday && dateFeeCollectedToday > 0) {
+          await addCaseTimelineEvent({
+            case_id: caseId,
+            hearing_date: nowIso,
+            notes: `Fee Payment Received (Date Fee): ₹${dateFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`,
+            event_type: 'date_fee_payment',
+            amount: dateFeeCollectedToday,
+            payment_mode: modeTag,
+          });
+        }
+
+        if (totalFeeCollectedToday && totalFeeCollectedToday > 0) {
+          await addCaseTimelineEvent({
+            case_id: caseId,
+            hearing_date: nowIso,
+            notes: `Fee Payment Received (Total Retainer): ₹${totalFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`,
+            event_type: 'total_fee_payment',
+            amount: totalFeeCollectedToday,
+            payment_mode: modeTag,
+          });
+        }
+
+        const updatedDateFeeCollected = (caseExists.date_fee_collected || 0) + (dateFeeCollectedToday || 0);
+        const updatedTotalFeePaid = (caseExists.fee_paid || 0) + (totalFeeCollectedToday || 0);
+        const targetDateFee = caseExists.date_fee || 0;
+        const isDateFeePaidNow = targetDateFee > 0 && updatedDateFeeCollected >= targetDateFee ? 1 : (caseExists.date_fee_paid || 0);
+
         await updateCase(
           caseId,
           {
             NextDate: getLocalDateString(nextHearingDate),
-            ...(feeReceivedToday && feeReceivedToday > 0 ? { fee_paid: updatedFeePaid } : {}),
+            ...(dateFeeCollectedToday && dateFeeCollectedToday > 0 ? { date_fee_collected: updatedDateFeeCollected, date_fee_paid: isDateFeePaidNow } : {}),
+            ...(totalFeeCollectedToday && totalFeeCollectedToday > 0 ? { fee_paid: updatedTotalFeePaid } : {}),
           },
           userId
         );
 
-        // 3. Refresh list from page 0
         fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
 
-        // 4. Prompt WhatsApp notification to client
         setTimeout(() => {
           promptClientNotification(
             caseId,
@@ -257,7 +293,7 @@ const CasesList = () => {
   );
 
   const keyExtractor = useCallback(
-    (item: CaseDataScreen) => item.id.toString(),
+    (item: CaseDataScreen) => `${item.id}-${(item as any).updated_at || ''}-${(item as any).fee_paid || 0}-${(item as any).date_fee_collected || 0}-${(item as any).date_fee_paid || 0}-${(item as any).date_fee || 0}-${item.nextHearing || ''}`,
     []
   );
 
@@ -371,25 +407,52 @@ const CasesList = () => {
         data={cases}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        windowSize={7}
-        removeClippedSubviews={Platform.OS === 'android'}
+        getItemLayout={(data, index) => ({ length: 160, offset: 160 * index, index })}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={3}
+        removeClippedSubviews={true}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         refreshing={isRefreshing}
         onRefresh={handleRefresh}
         ListEmptyComponent={
           !isLoading ? (
-            <View style={styles.emptyListContainer}>
-              <Text
-                style={[
-                  styles.emptyListText,
-                  { color: theme.colors.textSecondary },
-                ]}
-              >
-                {t("cases_no_cases")}
+            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 50, paddingHorizontal: 24 }}>
+              <View style={{
+                width: 72,
+                height: 72,
+                borderRadius: 36,
+                backgroundColor: theme.isDark ? '#1E1B4B' : '#EEF2FF',
+                alignItems: 'center',
+                justify: 'center',
+                marginBottom: 16,
+                borderWidth: 1,
+                borderColor: theme.isDark ? '#4338CA' : '#C7D2FE',
+              }}>
+                <Ionicons name="briefcase-outline" size={36} color={theme.colors.primary} />
+              </View>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text, marginBottom: 6, textAlign: 'center' }}>
+                No Cases Found
               </Text>
+              <Text style={{ fontSize: 13, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 20, lineHeight: 18 }}>
+                No matching case records found. Tap below to register a new case.
+              </Text>
+              <TouchableOpacity
+                onPress={navigateToAddCase}
+                activeOpacity={0.85}
+                style={{
+                  backgroundColor: theme.colors.primary,
+                  paddingHorizontal: 20,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+              >
+                <Ionicons name="add-circle" size={18} color="#FFF" style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFF' }}>Add New Case</Text>
+              </TouchableOpacity>
             </View>
           ) : null
         }
@@ -423,7 +486,6 @@ const CasesList = () => {
           );
         }}
       />
-      <AdBanner />
     </SafeAreaView>
   );
 };
@@ -503,7 +565,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   listContentContainer: {
-    paddingBottom: 100, // Add some padding at the bottom of the list
+    paddingBottom: 24,
   },
   emptyListContainer: {
     flex: 1,

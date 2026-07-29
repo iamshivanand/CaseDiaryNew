@@ -18,6 +18,7 @@ import {
   updateUserProfile,
   getTotalCases,
   getUpcomingHearings,
+  getFinancialSummary,
 } from "../../DataBase";
 import { useFocusEffect } from "@react-navigation/native";
 import ProfileHeader from "./components/ProfileHeader";
@@ -52,6 +53,8 @@ const ProfileScreen: React.FC = () => {
   const [tempLanguages, setTempLanguages] = useState("");
   const [tempYearsOfPractice, setTempYearsOfPractice] = useState("");
 
+  const [financialSummary, setFinancialSummary] = useState({ totalCollected: 0, totalRemaining: 0, totalAgreed: 0 });
+
   useFocusEffect(
     useCallback(() => {
       const fetchProfile = async () => {
@@ -65,6 +68,8 @@ const ProfileScreen: React.FC = () => {
         // getTotalCases and getUpcomingHearings call getDb() internally — no db arg
         const totalCases = await getTotalCases(parsedUserId);
         const upcomingHearings = await getUpcomingHearings(parsedUserId);
+        const finSummary = await getFinancialSummary(parsedUserId);
+        setFinancialSummary(finSummary);
         if (profile) {
           setProfileData({
             ...profile,
@@ -370,6 +375,45 @@ const ProfileScreen: React.FC = () => {
           tempValue={tempYearsOfPractice}
           onTempValueChange={setTempYearsOfPractice}
         />
+      </View>
+
+      {/* Financial Overview Card */}
+      <View style={{
+        marginHorizontal: 16,
+        marginVertical: 12,
+        padding: 16,
+        backgroundColor: theme.colors.cardBackground,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+          <Icon name="cash-multiple" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
+          <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.text }}>Financial Overview</Text>
+        </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+          <View style={{ flex: 1, backgroundColor: theme.isDark ? '#064E3B' : '#DCFCE7', padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.isDark ? '#059669' : '#BBF7D0' }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: theme.isDark ? '#34D399' : '#15803D', marginBottom: 2 }}>COLLECTED</Text>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: theme.isDark ? '#6EE7B7' : '#166534' }}>
+              ₹{financialSummary.totalCollected.toLocaleString('en-IN')}
+            </Text>
+          </View>
+
+          <View style={{ flex: 1, backgroundColor: theme.isDark ? '#78350F' : '#FEF3C7', padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.isDark ? '#B45309' : '#FDE68A' }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: theme.isDark ? '#FDE68A' : '#D97706', marginBottom: 2 }}>PENDING</Text>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: theme.isDark ? '#FCD34D' : '#92400E' }}>
+              ₹{financialSummary.totalRemaining.toLocaleString('en-IN')}
+            </Text>
+          </View>
+
+          <View style={{ flex: 1, backgroundColor: theme.isDark ? '#1E1B4B' : '#EEF2FF', padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.isDark ? '#4338CA' : '#C7D2FE' }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: theme.isDark ? '#A5B4FC' : '#4F46E5', marginBottom: 2 }}>TOTAL FEE</Text>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: theme.isDark ? '#C7D2FE' : '#3730A3' }}>
+              ₹{financialSummary.totalAgreed.toLocaleString('en-IN')}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {selectedTab === "Profile" && (

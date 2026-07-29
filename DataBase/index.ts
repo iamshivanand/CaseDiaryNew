@@ -9,6 +9,7 @@ import { getDb, getDrizzleDb, __TEST_ONLY_resetDbInstance } from './connection';
 import { scheduleCaseReminder, cancelCaseReminder } from '../utils/notificationScheduler';
 import { eq, and } from 'drizzle-orm';
 import { Cases as drizzleCases } from './drizzleSchema';
+import { getLocalDateString, normalizeDateToYYYYMMDD } from '../utils/commonFunctions';
 
 // Re-export getDb so it's available when importing from './DataBase'
 export { getDb, getDrizzleDb };
@@ -155,8 +156,6 @@ export const getAllScannedPdfs = async (): Promise<ScannedPdfRow[]> => {
 export type CaseInsertData = Omit<CaseRow, 'id' | 'created_at' | 'updated_at'>;
 export type CaseUpdateData = Partial<Omit<CaseRow, 'id' | 'uniqueId' | 'created_at' | 'updated_at'>>;
 
-import { formatDate, getLocalDateString, normalizeDateToYYYYMMDD } from '../utils/commonFunctions';
-
 export const addCase = async (caseData: CaseInsertData): Promise<number | null> => {
   const drizzleDb = await getDrizzleDb(); if (!caseData.uniqueId) throw new Error("uniqueId is required.");
   const validCaseData: { [key: string]: any } = {};
@@ -188,6 +187,8 @@ export const addCase = async (caseData: CaseInsertData): Promise<number | null> 
   } catch (error) { console.error("Error adding case via Drizzle:", error, "Values:", validCaseData); throw error; }
 };
 
+import { notifyCaseUpdated } from "../utils/caseEvents";
+
 export interface CaseWithDetails extends CaseRow {
   districtName?: string | null; policeStationName?: string | null;
 }
@@ -203,15 +204,7 @@ export const getCases = async (
   }
 ): Promise<CaseWithDetails[]> => {
   const db = await getDb();
-  let sql = `SELECT c.id, c.uniqueId, c.user_id, c.CaseTitle, c.ClientName, c.OnBehalfOf, c.CNRNumber,
-                    c.case_number, c.case_year, c.session_trial_number, c.court_id, c.court_name,
-                    c.case_type_id, c.case_type_name, c.dateFiled, c.NextDate, c.PreviousDate,
-                    c.StatuteOfLimitations, c.crime_number, c.crime_year, c.police_station_id,
-                    c.district_id, c.Undersection, c.FirstParty, c.OppositeParty, c.Accussed,
-                    c.ClientContactNumber, c.JudgeName, c.OpposingCounsel, c.OppositeAdvocate,
-                    c.OppAdvocateContactNumber, c.CaseStatus, c.Priority, c.case_stage, c.total_fee, c.fee_paid,
-                    c.created_at, c.updated_at,
-                    ps.name as policeStationName, d.name as districtName 
+  let sql = `SELECT c.*, ps.name as policeStationName, d.name as districtName 
              FROM Cases c
              LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
              LEFT JOIN Districts d ON c.district_id = d.id`;
@@ -260,7 +253,7 @@ export const getCases = async (
     if (searchQuery && searchQuery.trim() !== '') {
       const escapedQuery = `%${searchQuery.trim()}%`;
       whereClauses.push(
-        "(c.CaseTitle LIKE ? OR c.ClientName LIKE ? OR c.case_number LIKE ? OR c.CNRNumber LIKE ? OR c.FirstParty LIKE ? OR c.OppositeParty LIKE ? OR c.crime_number LIKE ? OR c.session_trial_number LIKE ? OR EXISTS (SELECT 1 FROM CaseTimelineEvents cte WHERE cte.case_id = c.id AND cte.notes LIKE ?))"
+        "(c.CaseTitle LIKE ? OR c.ClientName LIKE ? OR c.case_number LIKE ? OR c.CNRNumber LIKE ? OR c.FirstParty LIKE ? OR c.OppositeParty LIKE ? OR c.crime_number LIKE ? OR c.session_trial_number LIKE ? OR EXISTS (SELECT 1 FROM CaseTimeline cte WHERE cte.case_id = c.id AND cte.notes LIKE ?))"
       );
       params.push(
         escapedQuery,
@@ -313,37 +306,49 @@ export const getCaseById = async (id: number, userId?: number | null): Promise<C
 };
 
 export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?: number | null): Promise<boolean> => {
-  const drizzleDb = await getDrizzleDb();
+  const db = await getDb();
   console.log("Updating case with ID:", id, "and data:", data);
   const currentCaseData = await getCaseById(id);
   if (!currentCaseData) {
     console.warn(`Case ${id} not found.`);
     return false;
   }
-  const validUpdateData: { [key: string]: any } = {};
+
+  const setClauses: string[] = [];
+  const params: any[] = [];
+
   for (const key in data) {
     if (Object.prototype.hasOwnProperty.call(data, key)) {
       const typedKey = key as keyof CaseUpdateData;
-      if (key === 'NextDate' || key === 'PreviousDate' || key === 'dateFiled' || key === 'StatuteOfLimitations') {
-        validUpdateData[typedKey] = normalizeDateToYYYYMMDD(data[typedKey]);
-      } else if (data[typedKey] !== undefined) {
-        validUpdateData[typedKey] = data[typedKey];
+      let val = data[typedKey];
+      if (val !== undefined) {
+        if (key === 'NextDate' || key === 'PreviousDate' || key === 'dateFiled' || key === 'StatuteOfLimitations') {
+          val = normalizeDateToYYYYMMDD(val);
+        }
+        setClauses.push(`${key} = ?`);
+        params.push(val);
       }
     }
   }
-  if (Object.keys(validUpdateData).length === 0) {
+
+  if (setClauses.length === 0) {
     console.warn("No fields for update.");
     return false;
   }
 
+  setClauses.push("updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')");
+  params.push(id);
+
+  let sql = `UPDATE Cases SET ${setClauses.join(', ')} WHERE id = ?`;
+  if (actorUserId != null) {
+    sql += " AND user_id = ?";
+    params.push(actorUserId);
+  }
+
   try {
-    const result = await drizzleDb
-      .update(drizzleCases)
-      .set(validUpdateData)
-      .where(eq(drizzleCases.id, id))
-      .returning({ id: drizzleCases.id });
-    
-    if (result.length > 0) {
+    const result = await db.runAsync(sql, params);
+    if (result.changes > 0) {
+      notifyCaseUpdated(id);
       try {
         const updatedCase = await getCaseById(id);
         if (updatedCase) {
@@ -360,7 +365,7 @@ export const updateCase = async (id: number, data: CaseUpdateData, actorUserId?:
     }
     return false;
   } catch (error) {
-    console.error(`Error updating case ID ${id} via Drizzle:`, error);
+    console.error(`Error updating case ID ${id}:`, error);
     throw error;
   }
 };
@@ -634,5 +639,89 @@ export const deleteDocumentDraft = async (id: string): Promise<boolean> => {
   const db = await getDb();
   const result = await db.runAsync("DELETE FROM document_drafts WHERE id = ?", [id]);
   return result.changes > 0;
+};
+
+// --- Financial & Dashboard Counts ---
+
+export const getFinancialSummary = async (userId?: number): Promise<{ totalCollected: number; totalRemaining: number; totalAgreed: number }> => {
+  const db = await getDb();
+  let sql = `SELECT SUM(COALESCE(fee_paid, 0)) as totalCollected,
+                    SUM(CASE WHEN COALESCE(total_fee, 0) > COALESCE(fee_paid, 0) THEN (COALESCE(total_fee, 0) - COALESCE(fee_paid, 0)) ELSE 0 END) as totalRemaining,
+                    SUM(COALESCE(total_fee, 0)) as totalAgreed
+             FROM Cases`;
+  const params: any[] = [];
+  if (userId !== undefined && userId !== null) {
+    sql += " WHERE user_id = ?";
+    params.push(userId);
+  }
+  const result = await db.getFirstAsync<{ totalCollected: number | null; totalRemaining: number | null; totalAgreed: number | null }>(sql, params);
+  return {
+    totalCollected: result?.totalCollected ?? 0,
+    totalRemaining: result?.totalRemaining ?? 0,
+    totalAgreed: result?.totalAgreed ?? 0,
+  };
+};
+
+export const getYesterdaysCases = async (userId?: number): Promise<CaseRow[]> => {
+  const db = await getDb();
+  let sql = "SELECT * FROM Cases WHERE 1=1 AND (CaseStatus IS NULL OR CaseStatus != 'Closed')";
+  const params: any[] = [];
+  if (userId !== undefined && userId !== null) {
+    sql += " AND user_id = ?";
+    params.push(userId);
+  }
+  const allCases = await db.getAllAsync<CaseRow>(sql, params);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = getLocalDateString(yesterday);
+
+  return allCases.filter(c => {
+    if (c.CaseStatus === 'Closed') return false;
+    if (!c.NextDate) return false;
+    const normalized = normalizeDateToYYYYMMDD(c.NextDate);
+    return normalized === yesterdayStr;
+  });
+};
+
+export const getYesterdaysCasesCount = async (userId?: number): Promise<number> => {
+  const cases = await getYesterdaysCases(userId);
+  return cases.length;
+};
+
+export const getUndatedCases = async (userId?: number): Promise<CaseRow[]> => {
+  const db = await getDb();
+  let sql = "SELECT * FROM Cases WHERE 1=1 AND (CaseStatus IS NULL OR CaseStatus != 'Closed')";
+  const params: any[] = [];
+  if (userId !== undefined && userId !== null) {
+    sql += " AND user_id = ?";
+    params.push(userId);
+  }
+  const allCases = await db.getAllAsync<CaseRow>(sql, params);
+  const todayStr = getLocalDateString(new Date());
+
+  return allCases.filter(c => {
+    if (c.CaseStatus === 'Closed') return false;
+    const normalized = normalizeDateToYYYYMMDD(c.NextDate);
+    if (!normalized) return true;
+    return normalized < todayStr;
+  });
+};
+
+export const getUndatedCasesCount = async (userId?: number): Promise<number> => {
+  const cases = await getUndatedCases(userId);
+  return cases.length;
+};
+
+export const updateCaseTimelineEvent = async (
+  id: number,
+  data: string | { hearing_date?: string; notes?: string; amount?: number; event_type?: string }
+): Promise<boolean> => {
+  const { updateCaseTimelineEvent: updateTimeline } = await import("./caseTimelineDb");
+  return updateTimeline(id, data);
+};
+
+export const deleteCaseTimelineEvent = async (id: number): Promise<boolean> => {
+  const { deleteCaseTimelineEvent: deleteTimeline } = await import("./caseTimelineDb");
+  return deleteTimeline(id);
 };
 

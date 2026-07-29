@@ -27,6 +27,8 @@ import {
   TextInput,
   ScrollView,
   Animated as RNAnimated,
+  LayoutAnimation,
+  UIManager,
 } from "react-native";
 
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -52,6 +54,8 @@ import {
   exportCaseToPdf,
   exportCaseHistoryToPdf,
 } from "../../utils/pdfExporter";
+import { sendFeeReminderWhatsApp } from "../../utils/whatsappNotifier";
+import { scheduleOverdueHearingNotification } from "../../utils/notificationScheduler";
 import DocumentUpload from "../Addcase/DocumentUpload";
 import ActionButton from "../CommonComponents/ActionButton";
 import { useAdTrigger } from "../CommonComponents/AdManager";
@@ -72,7 +76,7 @@ type ListItemType =
   | { type: "noTimelineEvents" }
   | { type: "loadingDocuments" };
 
-const SkeletonItem: React.FC<{ style: any }> = ({ style }) => {
+const SkeletonItem: React.FC<{ style: any; theme?: Theme }> = ({ style, theme }) => {
   const opacity = React.useRef(new RNAnimated.Value(0.4)).current;
 
   React.useEffect(() => {
@@ -96,7 +100,7 @@ const SkeletonItem: React.FC<{ style: any }> = ({ style }) => {
 
   return (
     <RNAnimated.View
-      style={[{ backgroundColor: "#E2E8F0", borderRadius: 8 }, style, { opacity }]}
+      style={[{ backgroundColor: theme?.isDark ? "#334155" : "#E2E8F0", borderRadius: 8 }, style, { opacity }]}
     />
   );
 };
@@ -214,10 +218,21 @@ const CaseDetailsScreen: React.FC = () => {
   // Fee, Hearing & Accordion States
   const [showFeeModal, setShowFeeModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPaymentEditModal, setShowPaymentEditModal] = useState(false);
   const [showUpdateHearingModal, setShowUpdateHearingModal] = useState(false);
   const [editingTotalFee, setEditingTotalFee] = useState("");
+  const [editingRecordedPayment, setEditingRecordedPayment] = useState("");
+  const [editingRecordedPaymentNote, setEditingRecordedPaymentNote] = useState("");
+  const [editingTimelinePaymentAmount, setEditingTimelinePaymentAmount] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
+
+  // Date Fee Specific States
+  const [showDateFeeModal, setShowDateFeeModal] = useState(false);
+  const [editingDateFeeAmount, setEditingDateFeeAmount] = useState("");
+  const [showDateFeePaymentModal, setShowDateFeePaymentModal] = useState(false);
+  const [editingDateFeePaymentAmount, setEditingDateFeePaymentAmount] = useState("");
+  const [editingDateFeePaymentNote, setEditingDateFeePaymentNote] = useState("");
 
   // Accordion Sections State
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -229,6 +244,10 @@ const CaseDetailsScreen: React.FC = () => {
   });
 
   const toggleSection = (sectionKey: string) => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedSections((prev) => ({
       ...prev,
       [sectionKey]: !prev[sectionKey],
@@ -262,6 +281,23 @@ const CaseDetailsScreen: React.FC = () => {
     if (details) {
       console.log("Case details found:", details);
       setCaseDetails(details);
+
+      if (details.NextDate) {
+        try {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const parts = details.NextDate.split('-');
+          if (parts.length === 3) {
+            const hDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            hDate.setHours(0, 0, 0, 0);
+            if (hDate.getTime() < today.getTime()) {
+              scheduleOverdueHearingNotification(details);
+            }
+          }
+        } catch (e) {
+          // ignore date parse errors
+        }
+      }
     } else {
       console.log("Case details not found for caseId:", caseId);
     }
@@ -503,7 +539,22 @@ const CaseDetailsScreen: React.FC = () => {
 
   const handleEditTimelineNotes = (event: TimelineEvent) => {
     setEditingTimelineEvent(event);
-    setEditedNotesText(event.description || "");
+    const text = event.description || "";
+    const isDateFeeAgreed = event.event_type === 'date_fee_agreed' || text.includes('Date Hearing Fee Agreed');
+    const isDateFeePayment = event.event_type === 'date_fee_payment' || text.includes('(Date Fee)');
+    const isTotalFeePayment = event.event_type === 'total_fee_payment' || text.includes('(Total Retainer)');
+    const isPayment = isDateFeePayment || isTotalFeePayment || isDateFeeAgreed || Boolean(text.match(/(Fee Payment Received|Recorded Payment|Fee Received)/i));
+
+    if (isPayment) {
+      const amtMatch = text.match(/₹\s*([\d,]+)/);
+      const extractedAmt = amtMatch ? amtMatch[1].replace(/,/g, '') : (event.amount != null ? String(event.amount) : '');
+      setEditingTimelinePaymentAmount(extractedAmt);
+      const noteMatch = text.match(/\[(.*?)\]/) || text.match(/\s+-\s+(.*)$/);
+      setEditedNotesText(noteMatch ? noteMatch[1].replace(/\(Edited\)/g, '').trim() : "");
+    } else {
+      setEditingTimelinePaymentAmount("");
+      setEditedNotesText(text.replace(/\(Edited\)/g, '').trim());
+    }
     setShowEditNotesModal(true);
   };
 
@@ -515,24 +566,221 @@ const CaseDetailsScreen: React.FC = () => {
         Alert.alert(t("alert_error"), "Invalid timeline event ID.");
         return;
       }
+
+      const origText = editingTimelineEvent.description || "";
+      const isDateFeeAgreed = editingTimelineEvent.event_type === 'date_fee_agreed' || origText.includes('Date Hearing Fee Agreed');
+      const isDateFeePayment = editingTimelineEvent.event_type === 'date_fee_payment' || origText.includes('(Date Fee)');
+      const isTotalFeePayment = editingTimelineEvent.event_type === 'total_fee_payment' || origText.includes('(Total Retainer)');
+      const isPayment = isDateFeePayment || isTotalFeePayment || isDateFeeAgreed || Boolean(origText.match(/(Fee Payment Received|Recorded Payment|Fee Received)/i));
+
+      let finalNotes = editedNotesText;
+      let newAmount: number | undefined = undefined;
+
+      if (isPayment) {
+        newAmount = editingTimelinePaymentAmount.trim() ? parseFloat(editingTimelinePaymentAmount.trim()) : 0;
+        const notePart = editedNotesText.trim() ? ` [${editedNotesText.trim()}]` : "";
+
+        if (isDateFeeAgreed) {
+          finalNotes = `Date Hearing Fee Agreed: ₹${newAmount.toLocaleString('en-IN')}${notePart}`;
+        } else if (isDateFeePayment) {
+          finalNotes = `Fee Payment Received (Date Fee): ₹${newAmount.toLocaleString('en-IN')}${notePart}`;
+        } else if (isTotalFeePayment) {
+          finalNotes = `Fee Payment Received (Total Retainer): ₹${newAmount.toLocaleString('en-IN')}${notePart}`;
+        } else {
+          finalNotes = `Fee Payment Received: ₹${newAmount.toLocaleString('en-IN')}${notePart}`;
+        }
+      }
+
       const success = await db.updateCaseTimelineEvent(eventId, {
-        notes: editedNotesText,
+        notes: finalNotes,
+        ...(newAmount !== undefined ? { amount: newAmount } : {}),
       });
+
       if (success) {
-        Alert.alert(t("alert_success"), "Notes updated successfully.");
         if (caseId) {
           const caseIdToLoad = parseInt(caseId.toString(), 10);
+          
+          const allEvents = await db.getCaseTimelineEventsByCaseId(caseIdToLoad);
+          
+          let recalculatedTotalFeePaid = 0;
+          let recalculatedDateFeeCollected = 0;
+          let recalculatedDateFeeAgreed: number | null = null;
+
+          allEvents.forEach((ev) => {
+            const evId = parseInt(ev.id.toString(), 10);
+            const evText = evId === eventId ? finalNotes : (ev.description || "");
+            const evType = ev.event_type;
+
+            if (evType === 'date_fee_payment' || evText.includes('(Date Fee)')) {
+              const match = evText.match(/₹\s*([\d,]+)/);
+              if (match) {
+                recalculatedDateFeeCollected += parseFloat(match[1].replace(/,/g, ''));
+              } else if (ev.amount) {
+                recalculatedDateFeeCollected += ev.amount;
+              }
+            } else if (evType === 'date_fee_agreed' || evText.includes('Date Hearing Fee Agreed')) {
+              const match = evText.match(/₹\s*([\d,]+)/);
+              if (match) {
+                recalculatedDateFeeAgreed = parseFloat(match[1].replace(/,/g, ''));
+              } else if (ev.amount) {
+                recalculatedDateFeeAgreed = ev.amount;
+              }
+            } else if (evType === 'total_fee_payment' || evText.includes('(Total Retainer)') || evText.match(/(Fee Payment Received|Recorded Payment|Fee Received)/i)) {
+              const match = evText.match(/₹\s*([\d,]+)/);
+              if (match) {
+                recalculatedTotalFeePaid += parseFloat(match[1].replace(/,/g, ''));
+              } else if (ev.amount) {
+                recalculatedTotalFeePaid += ev.amount;
+              }
+            }
+          });
+
+          const currentTargetDateFee = recalculatedDateFeeAgreed !== null ? recalculatedDateFeeAgreed : (caseDetails?.date_fee || 0);
+          const isDateFeePaidNow = currentTargetDateFee > 0 && recalculatedDateFeeCollected >= currentTargetDateFee ? 1 : 0;
+          const uId = await getCurrentUserId();
+
+          await db.updateCase(caseIdToLoad, {
+            fee_paid: recalculatedTotalFeePaid,
+            date_fee_collected: recalculatedDateFeeCollected,
+            date_fee_paid: isDateFeePaidNow,
+            ...(recalculatedDateFeeAgreed !== null ? { date_fee: recalculatedDateFeeAgreed } : {}),
+          }, uId);
+
+          await loadCaseDetails(caseIdToLoad);
           await loadDocumentsAndTimeline(caseIdToLoad);
         }
+
+        Alert.alert(t("alert_success"), "Timeline event and case fees updated successfully.");
         setShowEditNotesModal(false);
         setEditingTimelineEvent(null);
         setEditedNotesText("");
+        setEditingTimelinePaymentAmount("");
       } else {
         Alert.alert(t("alert_error"), "Failed to update notes.");
       }
     } catch (error) {
       console.error("Error updating timeline event notes:", error);
       Alert.alert(t("alert_error"), "Failed to update notes due to database error.");
+    }
+  };
+
+  const handlePromptDeleteTimelineNotes = (event: TimelineEvent) => {
+    Alert.alert(
+      t("alert_confirm_delete") || "Confirm Delete",
+      "Are you sure you want to permanently delete this timeline event?",
+      [
+        { text: t("alert_cancel") || "Cancel", style: "cancel" },
+        {
+          text: t("editcase_delete") || "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setEditingTimelineEvent(event);
+            try {
+              const eventId = parseInt(event.id.toString(), 10);
+              if (isNaN(eventId)) return;
+              const success = await db.deleteCaseTimelineEvent(eventId);
+              if (success && caseId) {
+                const caseIdToLoad = parseInt(caseId.toString(), 10);
+                const allEvents = await db.getCaseTimelineEventsByCaseId(caseIdToLoad);
+                let recalculatedTotalFeePaid = 0;
+                let recalculatedDateFeeCollected = 0;
+                allEvents.forEach((ev) => {
+                  const evId = parseInt(ev.id.toString(), 10);
+                  if (evId === eventId) return;
+                  const evText = ev.description || "";
+                  const evType = ev.event_type;
+                  if (evType === 'date_fee_payment' || evText.includes('(Date Fee)')) {
+                    const match = evText.match(/₹\s*([\d,]+)/);
+                    if (match) recalculatedDateFeeCollected += parseFloat(match[1].replace(/,/g, ''));
+                    else if (ev.amount) recalculatedDateFeeCollected += ev.amount;
+                  } else if (evType === 'total_fee_payment' || evText.includes('(Total Retainer)') || evText.match(/(Fee Payment Received|Recorded Payment|Fee Received)/i)) {
+                    const match = evText.match(/₹\s*([\d,]+)/);
+                    if (match) recalculatedTotalFeePaid += parseFloat(match[1].replace(/,/g, ''));
+                    else if (ev.amount) recalculatedTotalFeePaid += ev.amount;
+                  }
+                });
+                const currentTargetDateFee = caseDetails?.date_fee || 0;
+                const isDateFeePaidNow = currentTargetDateFee > 0 && recalculatedDateFeeCollected >= currentTargetDateFee ? 1 : 0;
+                const uId = await getCurrentUserId();
+                await db.updateCase(caseIdToLoad, {
+                  fee_paid: recalculatedTotalFeePaid,
+                  date_fee_collected: recalculatedDateFeeCollected,
+                  date_fee_paid: isDateFeePaidNow,
+                }, uId);
+                await loadCaseDetails(caseIdToLoad);
+                await loadDocumentsAndTimeline(caseIdToLoad);
+                DeviceEventEmitter.emit(CASE_UPDATED_EVENT);
+                Alert.alert(t("alert_success"), "Timeline event deleted successfully.");
+              }
+            } catch (error) {
+              console.error("Error deleting timeline event:", error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteTimelineNotes = async () => {
+    if (!editingTimelineEvent) return;
+    try {
+      const eventId = parseInt(editingTimelineEvent.id.toString(), 10);
+      if (isNaN(eventId)) return;
+
+      const success = await db.deleteCaseTimelineEvent(eventId);
+      if (success) {
+        if (caseId) {
+          const caseIdToLoad = parseInt(caseId.toString(), 10);
+          const allEvents = await db.getCaseTimelineEventsByCaseId(caseIdToLoad);
+          
+          let recalculatedTotalFeePaid = 0;
+          let recalculatedDateFeeCollected = 0;
+
+          allEvents.forEach((ev) => {
+            const evId = parseInt(ev.id.toString(), 10);
+            if (evId === eventId) return; // Skip deleted event
+            const evText = ev.description || "";
+            const evType = ev.event_type;
+
+            if (evType === 'date_fee_payment' || evText.includes('(Date Fee)')) {
+              const match = evText.match(/₹\s*([\d,]+)/);
+              if (match) {
+                recalculatedDateFeeCollected += parseFloat(match[1].replace(/,/g, ''));
+              } else if (ev.amount) {
+                recalculatedDateFeeCollected += ev.amount;
+              }
+            } else if (evType === 'total_fee_payment' || evText.includes('(Total Retainer)') || evText.match(/(Fee Payment Received|Recorded Payment|Fee Received)/i)) {
+              const match = evText.match(/₹\s*([\d,]+)/);
+              if (match) {
+                recalculatedTotalFeePaid += parseFloat(match[1].replace(/,/g, ''));
+              } else if (ev.amount) {
+                recalculatedTotalFeePaid += ev.amount;
+              }
+            }
+          });
+
+          const currentTargetDateFee = caseDetails?.date_fee || 0;
+          const isDateFeePaidNow = currentTargetDateFee > 0 && recalculatedDateFeeCollected >= currentTargetDateFee ? 1 : 0;
+          const uId = await getCurrentUserId();
+
+          await db.updateCase(caseIdToLoad, {
+            fee_paid: recalculatedTotalFeePaid,
+            date_fee_collected: recalculatedDateFeeCollected,
+            date_fee_paid: isDateFeePaidNow,
+          }, uId);
+
+          await loadCaseDetails(caseIdToLoad);
+          await loadDocumentsAndTimeline(caseIdToLoad);
+        }
+
+        Alert.alert(t("alert_success"), "Timeline event deleted successfully.");
+        setShowEditNotesModal(false);
+        setEditingTimelineEvent(null);
+        setEditedNotesText("");
+        setEditingTimelinePaymentAmount("");
+      }
+    } catch (error) {
+      console.error("Error deleting timeline event:", error);
     }
   };
 
@@ -610,6 +858,31 @@ const CaseDetailsScreen: React.FC = () => {
     }
   };
 
+  const handleSaveRecordedPayment = async () => {
+    if (!caseDetails || !caseDetails.id) return;
+    const caseIdToUpdate = parseInt(caseDetails.id.toString(), 10);
+    const newFeePaid = editingRecordedPayment.trim() ? parseFloat(editingRecordedPayment.trim()) : 0;
+    if (newFeePaid < 0) {
+      Alert.alert(t("alert_warning"), "Recorded payment amount cannot be negative.");
+      return;
+    }
+    try {
+      await db.updateCase(caseIdToUpdate, { fee_paid: newFeePaid });
+      await db.addCaseTimelineEvent({
+        case_id: caseIdToUpdate,
+        hearing_date: new Date().toISOString(),
+        notes: `Recorded Payment Updated: ₹${newFeePaid.toLocaleString('en-IN')} (Edited)`,
+      });
+      setShowPaymentEditModal(false);
+      await loadCaseDetails(caseIdToUpdate);
+      await loadDocumentsAndTimeline(caseIdToUpdate);
+      Alert.alert(t("alert_success"), `Recorded payment updated to ₹${newFeePaid.toLocaleString('en-IN')} (Edited) successfully.`);
+    } catch (e) {
+      console.error("Failed to update recorded payment:", e);
+      Alert.alert(t("alert_error"), "Failed to update recorded payment.");
+    }
+  };
+
   const getRelativeHearingTag = (dateStr?: string) => {
     if (!dateStr) return null;
     try {
@@ -627,7 +900,14 @@ const CaseDetailsScreen: React.FC = () => {
     }
   };
 
-  const handleSaveHearingUpdate = async (notes: string, nextHearingDate: Date, feeReceivedToday?: number) => {
+  const handleSaveHearingUpdate = async (
+    notes: string,
+    nextHearingDate: Date,
+    dateFeeCollectedToday?: number,
+    totalFeeCollectedToday?: number,
+    paymentMode?: string,
+    paymentNotes?: string
+  ) => {
     if (!caseDetails || !caseDetails.id) return;
     const caseIdToUpdate = parseInt(caseDetails.id.toString(), 10);
     try {
@@ -635,32 +915,66 @@ const CaseDetailsScreen: React.FC = () => {
       const caseExists = await db.getCaseById(caseIdToUpdate);
       if (!caseExists) return;
 
-      const feeNote = feeReceivedToday && feeReceivedToday > 0 
-        ? ` [Fee Received: ₹${feeReceivedToday.toLocaleString('en-IN')}]` 
-        : "";
-      const finalNotes = (notes || "") + feeNote;
+      const nowIso = new Date().toISOString();
+      const modeTag = paymentMode ? paymentMode : "Cash";
+      const noteTag = paymentNotes && paymentNotes.trim() ? ` - ${paymentNotes.trim()}` : "";
 
-      await db.addCaseTimelineEvent({
-        case_id: caseIdToUpdate,
-        hearing_date: new Date().toISOString(),
-        notes: finalNotes.trim(),
-      });
+      // 1. Log Court Proceedings & Notes event if notes present
+      if (notes && notes.trim()) {
+        await db.addCaseTimelineEvent({
+          case_id: caseIdToUpdate,
+          hearing_date: nowIso,
+          notes: notes.trim(),
+          event_type: 'hearing_proceeding',
+        });
+      }
+
+      // 2. Log Date Fee Payment event if dateFeeCollectedToday > 0
+      if (dateFeeCollectedToday && dateFeeCollectedToday > 0) {
+        const dateFeeStr = `Fee Payment Received (Date Fee): ₹${dateFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`;
+        await db.addCaseTimelineEvent({
+          case_id: caseIdToUpdate,
+          hearing_date: nowIso,
+          notes: dateFeeStr,
+          event_type: 'date_fee_payment',
+          amount: dateFeeCollectedToday,
+          payment_mode: modeTag,
+        });
+      }
+
+      // 3. Log Total Fee Payment event if totalFeeCollectedToday > 0
+      if (totalFeeCollectedToday && totalFeeCollectedToday > 0) {
+        const totalFeeStr = `Fee Payment Received (Total Retainer): ₹${totalFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`;
+        await db.addCaseTimelineEvent({
+          case_id: caseIdToUpdate,
+          hearing_date: nowIso,
+          notes: totalFeeStr,
+          event_type: 'total_fee_payment',
+          amount: totalFeeCollectedToday,
+          payment_mode: modeTag,
+        });
+      }
 
       const year = nextHearingDate.getFullYear();
       const month = String(nextHearingDate.getMonth() + 1).padStart(2, "0");
       const day = String(nextHearingDate.getDate()).padStart(2, "0");
       const formattedNextDate = `${year}-${month}-${day}`;
 
-      const updatedFeePaid = (caseDetails.fee_paid || 0) + (feeReceivedToday || 0);
+      const updatedDateFeeCollected = (caseDetails.date_fee_collected || 0) + (dateFeeCollectedToday || 0);
+      const updatedTotalFeePaid = (caseDetails.fee_paid || 0) + (totalFeeCollectedToday || 0);
+      const targetDateFee = caseDetails.date_fee || 0;
+      const isDateFeePaidNow = targetDateFee > 0 && updatedDateFeeCollected >= targetDateFee ? 1 : (caseDetails.date_fee_paid || 0);
+
       await db.updateCase(caseIdToUpdate, {
         NextDate: formattedNextDate,
-        ...(feeReceivedToday && feeReceivedToday > 0 ? { fee_paid: updatedFeePaid } : {}),
+        ...(dateFeeCollectedToday && dateFeeCollectedToday > 0 ? { date_fee_collected: updatedDateFeeCollected, date_fee_paid: isDateFeePaidNow } : {}),
+        ...(totalFeeCollectedToday && totalFeeCollectedToday > 0 ? { fee_paid: updatedTotalFeePaid } : {}),
       }, uId);
 
       setShowUpdateHearingModal(false);
       await loadCaseDetails(caseIdToUpdate);
       await loadDocumentsAndTimeline(caseIdToUpdate);
-      Alert.alert(t("alert_success"), "Hearing date updated successfully.");
+      Alert.alert(t("alert_success"), "Hearing date and fee payment details updated successfully.");
     } catch (e) {
       console.error("Failed to update hearing date:", e);
       Alert.alert(t("alert_error"), "Failed to update hearing date.");
@@ -855,6 +1169,128 @@ const CaseDetailsScreen: React.FC = () => {
         return priority;
     }
   };
+  const handleSendTotalFeeReminder = async () => {
+    if (!caseDetails || !caseDetails.ClientContactNumber) {
+      Alert.alert(t("alert_error"), "Client contact number is not available.");
+      return;
+    }
+    const totFee = caseDetails.total_fee || 0;
+    const pdFee = caseDetails.fee_paid || 0;
+    const balFee = Math.max(0, totFee - pdFee);
+    const msg = `Dear ${caseDetails.ClientName || 'Client'},\n\nThis is a gentle reminder regarding the total fee for your case "${caseDetails.CaseTitle || 'Legal Matter'}":\n- Total Agreed Fee: ₹${totFee.toLocaleString('en-IN')}\n- Amount Paid: ₹${pdFee.toLocaleString('en-IN')}\n- Outstanding Balance: ₹${balFee.toLocaleString('en-IN')}\n\nKindly arrange to settle the outstanding balance at your convenience.\n\nThank you.`;
+    await sendFeeReminderWhatsApp(caseDetails.ClientContactNumber, msg);
+  };
+
+  const handleSendDateFeeReminder = async () => {
+    if (!caseDetails || !caseDetails.ClientContactNumber) {
+      Alert.alert(t("alert_error"), "Client contact number is not available.");
+      return;
+    }
+    const dateFeeAmt = caseDetails.date_fee || 0;
+    const isPaid = Boolean(caseDetails.date_fee_paid);
+    const dateStr = caseDetails.NextDate ? formatDate(caseDetails.NextDate) : "Upcoming Hearing";
+    const msg = `Dear ${caseDetails.ClientName || 'Client'},\n\nThis is a reminder regarding the date hearing fee for your case "${caseDetails.CaseTitle || 'Legal Matter'}" (Hearing Date: ${dateStr}):\n- Date Fee: ₹${dateFeeAmt.toLocaleString('en-IN')}\n- Payment Status: ${isPaid ? 'Paid' : 'Unpaid / Pending'}\n\nKindly process the hearing fee payment. Thank you.`;
+    await sendFeeReminderWhatsApp(caseDetails.ClientContactNumber, msg);
+  };
+
+  const handleSendCombinedFeeReminder = async () => {
+    if (!caseDetails || !caseDetails.ClientContactNumber) {
+      Alert.alert(t("alert_error"), "Client contact number is not available.");
+      return;
+    }
+    const totFee = caseDetails.total_fee || 0;
+    const pdFee = caseDetails.fee_paid || 0;
+    const balFee = Math.max(0, totFee - pdFee);
+    const dateFeeAmt = caseDetails.date_fee || 0;
+    const isPaid = Boolean(caseDetails.date_fee_paid);
+    const dateStr = caseDetails.NextDate ? formatDate(caseDetails.NextDate) : "Upcoming Hearing";
+    const msg = `Dear ${caseDetails.ClientName || 'Client'},\n\nFee update summary for your case "${caseDetails.CaseTitle || 'Legal Matter'}":\n1. Overall Agreed Fee: ₹${totFee.toLocaleString('en-IN')} (Paid: ₹${pdFee.toLocaleString('en-IN')}, Remaining Balance: ₹${balFee.toLocaleString('en-IN')})\n2. Date Hearing Fee (${dateStr}): ₹${dateFeeAmt.toLocaleString('en-IN')} (${isPaid ? 'Paid' : 'Unpaid / Pending'})\n\nKindly settle the pending fees at your earliest convenience.\n\nThank you.`;
+    await sendFeeReminderWhatsApp(caseDetails.ClientContactNumber, msg);
+  };
+
+  const handleToggleDateFeePaid = async () => {
+    if (!caseDetails || !caseDetails.id) return;
+    const caseIdToUpdate = parseInt(caseDetails.id.toString(), 10);
+    const newStatus = caseDetails.date_fee_paid ? 0 : 1;
+    try {
+      const uId = await getCurrentUserId();
+      await db.updateCase(caseIdToUpdate, { date_fee_paid: newStatus }, uId);
+      await loadCaseDetails(caseIdToUpdate);
+    } catch (e) {
+      console.error("Failed to toggle date fee status:", e);
+    }
+  };
+
+  const handleSaveDateFeeAmount = async () => {
+    if (!caseDetails || !caseDetails.id) return;
+    const caseIdToUpdate = parseInt(caseDetails.id.toString(), 10);
+    const newDateFee = editingDateFeeAmount.trim() ? parseFloat(editingDateFeeAmount.trim()) : 0;
+    if (newDateFee < 0) {
+      Alert.alert(t("alert_error"), "Date fee cannot be negative.");
+      return;
+    }
+    try {
+      const uId = await getCurrentUserId();
+      await db.updateCase(caseIdToUpdate, { date_fee: newDateFee }, uId);
+
+      await db.addCaseTimelineEvent({
+        case_id: caseIdToUpdate,
+        hearing_date: new Date().toISOString(),
+        notes: `Date Hearing Fee Agreed: ₹${newDateFee.toLocaleString('en-IN')}`,
+        event_type: 'date_fee_agreed',
+        amount: newDateFee,
+      });
+
+      setShowDateFeeModal(false);
+      await loadCaseDetails(caseIdToUpdate);
+      await loadDocumentsAndTimeline(caseIdToUpdate);
+      Alert.alert(t("alert_success"), `Date hearing fee updated to ₹${newDateFee.toLocaleString('en-IN')} successfully.`);
+    } catch (e) {
+      console.error("Failed to update date fee:", e);
+      Alert.alert(t("alert_error"), "Failed to update date hearing fee.");
+    }
+  };
+
+  const handleRecordDateFeePayment = async () => {
+    if (!caseDetails || !caseDetails.id) return;
+    const caseIdToUpdate = parseInt(caseDetails.id.toString(), 10);
+    const amount = editingDateFeePaymentAmount.trim() ? parseFloat(editingDateFeePaymentAmount.trim()) : 0;
+    if (amount <= 0) {
+      Alert.alert(t("alert_error"), "Please enter a valid payment amount greater than 0.");
+      return;
+    }
+    try {
+      const uId = await getCurrentUserId();
+      const updatedDateFeeCollected = (caseDetails.date_fee_collected || 0) + amount;
+      const targetDateFee = caseDetails.date_fee || 0;
+      const isNowFullyPaid = targetDateFee > 0 && updatedDateFeeCollected >= targetDateFee ? 1 : (caseDetails.date_fee_paid || 0);
+
+      await db.updateCase(caseIdToUpdate, {
+        date_fee_collected: updatedDateFeeCollected,
+        date_fee_paid: isNowFullyPaid,
+      }, uId);
+
+      const noteStr = editingDateFeePaymentNote.trim() ? ` - ${editingDateFeePaymentNote.trim()}` : "";
+      await db.addCaseTimelineEvent({
+        case_id: caseIdToUpdate,
+        hearing_date: new Date().toISOString(),
+        notes: `Fee Payment Received (Date Fee): ₹${amount.toLocaleString('en-IN')}${noteStr}`,
+        event_type: 'date_fee_payment',
+        amount: amount,
+        payment_mode: 'Cash',
+      });
+
+      setShowDateFeePaymentModal(false);
+      setEditingDateFeePaymentAmount("");
+      setEditingDateFeePaymentNote("");
+      await loadCaseDetails(caseIdToUpdate);
+      await loadDocumentsAndTimeline(caseIdToUpdate);
+      Alert.alert(t("alert_success"), `Recorded ₹${amount.toLocaleString('en-IN')} payment for date hearing fee.`);
+    } catch (e) {
+      console.error("Failed to record date fee payment:", e);
+      Alert.alert(t("alert_error"), "Failed to record date fee payment.");
+    }
+  };
 
   const renderListItem = ({ item }: { item: ListItemType }) => {
     switch (item.type) {
@@ -906,13 +1342,13 @@ const CaseDetailsScreen: React.FC = () => {
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   {caseDetails.case_stage ? (
-                    <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, borderColor: '#C7D2FE' }}>
-                      <Text style={{ color: '#4F46E5', fontWeight: '700', fontSize: 11 }}>{caseDetails.case_stage}</Text>
+                    <View style={{ backgroundColor: theme.isDark ? '#1E1B4B' : '#EEF2FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, borderColor: theme.isDark ? '#4338CA' : '#C7D2FE' }}>
+                      <Text style={{ color: theme.isDark ? '#A5B4FC' : '#4F46E5', fontWeight: '700', fontSize: 11 }}>{caseDetails.case_stage}</Text>
                     </View>
                   ) : null}
                   {caseDetails.Priority ? (
-                    <View style={{ backgroundColor: '#FEF2F2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, borderColor: '#FCA5A5' }}>
-                      <Text style={{ color: '#DC2626', fontWeight: '700', fontSize: 11 }}>{getTranslatedPriority(caseDetails.Priority)}</Text>
+                    <View style={{ backgroundColor: theme.isDark ? '#451A1A' : '#FEF2F2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, borderColor: theme.isDark ? '#991B1B' : '#FCA5A5' }}>
+                      <Text style={{ color: theme.isDark ? '#F87171' : '#DC2626', fontWeight: '700', fontSize: 11 }}>{getTranslatedPriority(caseDetails.Priority)}</Text>
                     </View>
                   ) : null}
                 </View>
@@ -926,17 +1362,17 @@ const CaseDetailsScreen: React.FC = () => {
                   style={{
                     flex: 1,
                     height: 40,
-                    backgroundColor: caseDetails.ClientContactNumber ? '#E0F2FE' : '#F3F4F6',
+                    backgroundColor: caseDetails.ClientContactNumber ? (theme.isDark ? '#075985' : '#E0F2FE') : (theme.isDark ? '#334155' : '#F3F4F6'),
                     borderRadius: 10,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderWidth: 1,
-                    borderColor: caseDetails.ClientContactNumber ? '#BAE6FD' : '#E5E7EB',
+                    borderColor: caseDetails.ClientContactNumber ? (theme.isDark ? '#0284C7' : '#BAE6FD') : (theme.isDark ? '#475569' : '#E5E7EB'),
                   }}
                 >
-                  <Ionicons name="call" size={15} color={caseDetails.ClientContactNumber ? '#0284C7' : '#9CA3AF'} style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: caseDetails.ClientContactNumber ? '#0284C7' : '#6B7280' }}>Call</Text>
+                  <Ionicons name="call" size={15} color={caseDetails.ClientContactNumber ? (theme.isDark ? '#7DD3FC' : '#0284C7') : (theme.isDark ? '#94A3B8' : '#6B7280')} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: caseDetails.ClientContactNumber ? (theme.isDark ? '#7DD3FC' : '#0284C7') : (theme.isDark ? '#94A3B8' : '#6B7280') }}>Call</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -945,17 +1381,17 @@ const CaseDetailsScreen: React.FC = () => {
                   style={{
                     flex: 1,
                     height: 40,
-                    backgroundColor: caseDetails.ClientContactNumber ? '#DCFCE7' : '#F3F4F6',
+                    backgroundColor: caseDetails.ClientContactNumber ? (theme.isDark ? '#064E3B' : '#DCFCE7') : (theme.isDark ? '#334155' : '#F3F4F6'),
                     borderRadius: 10,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderWidth: 1,
-                    borderColor: caseDetails.ClientContactNumber ? '#BBF7D0' : '#E5E7EB',
+                    borderColor: caseDetails.ClientContactNumber ? (theme.isDark ? '#059669' : '#BBF7D0') : (theme.isDark ? '#475569' : '#E5E7EB'),
                   }}
                 >
-                  <Ionicons name="logo-whatsapp" size={15} color={caseDetails.ClientContactNumber ? '#15803D' : '#9CA3AF'} style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: caseDetails.ClientContactNumber ? '#15803D' : '#6B7280' }}>WhatsApp</Text>
+                  <Ionicons name="logo-whatsapp" size={15} color={caseDetails.ClientContactNumber ? (theme.isDark ? '#6EE7B7' : '#15803D') : (theme.isDark ? '#94A3B8' : '#6B7280')} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: caseDetails.ClientContactNumber ? (theme.isDark ? '#6EE7B7' : '#15803D') : (theme.isDark ? '#94A3B8' : '#6B7280') }}>WhatsApp</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -964,17 +1400,17 @@ const CaseDetailsScreen: React.FC = () => {
                   style={{
                     flex: 1,
                     height: 40,
-                    backgroundColor: '#FEF3C7',
+                    backgroundColor: theme.isDark ? '#78350F' : '#FEF3C7',
                     borderRadius: 10,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderWidth: 1,
-                    borderColor: '#FDE68A',
+                    borderColor: theme.isDark ? '#B45309' : '#FDE68A',
                   }}
                 >
-                  <Ionicons name="chatbubble-ellipses" size={15} color="#D97706" style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#D97706' }}>Reminder</Text>
+                  <Ionicons name="chatbubble-ellipses" size={15} color={theme.isDark ? '#FDE68A' : '#D97706'} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: theme.isDark ? '#FDE68A' : '#D97706' }}>Reminder</Text>
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -1002,11 +1438,19 @@ const CaseDetailsScreen: React.FC = () => {
                   )}
                 </View>
 
-                <View style={{ backgroundColor: theme.colors.card || '#F8FAFC', padding: 12, borderRadius: 12, marginBottom: 10 }}>
-                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 2 }}>Hearing Date</Text>
-                  <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>{formatDate(caseDetails.NextDate)}</Text>
+                <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F8FAFC'), padding: 12, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 2 }}>Hearing Date</Text>
+                      <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text }}>{formatDate(caseDetails.NextDate)}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 2 }}>Total Case Fee</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.primary }}>₹{totFee.toLocaleString('en-IN')}</Text>
+                    </View>
+                  </View>
                   {caseDetails.PreviousDate && (
-                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 4 }}>
+                    <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 6, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 4 }}>
                       Previous Hearing: {formatDate(caseDetails.PreviousDate)}
                     </Text>
                   )}
@@ -1029,60 +1473,226 @@ const CaseDetailsScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
+              {/* OVERDUE HEARING PENDING ACTION BANNER */}
+              {(() => {
+                if (!caseDetails.NextDate) return null;
+                try {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const parts = caseDetails.NextDate.split('-');
+                  if (parts.length === 3) {
+                    const hDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                    hDate.setHours(0, 0, 0, 0);
+                    if (hDate.getTime() < today.getTime()) {
+                      return (
+                        <View style={{
+                          backgroundColor: theme.isDark ? '#7F1D1D' : '#FEF2F2',
+                          borderWidth: 1,
+                          borderColor: theme.isDark ? '#991B1B' : '#FCA5A5',
+                          borderRadius: 12,
+                          padding: 12,
+                          marginTop: 10,
+                          marginBottom: 4,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 10,
+                        }}>
+                          <Ionicons name="alert-circle" size={22} color={theme.isDark ? '#F87171' : '#DC2626'} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.isDark ? '#F87171' : '#991B1B' }}>
+                              ⚠️ Pending Action: Hearing Date Passed
+                            </Text>
+                            <Text style={{ fontSize: 11, color: theme.isDark ? '#FCA5A5' : '#B91C1C', marginTop: 2 }}>
+                              Hearing date ({formatDate(caseDetails.NextDate)}) has passed. Update hearing proceedings or remind your client.
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    }
+                  }
+                } catch (e) {}
+                return null;
+              })()}
+
               {/* RETAINER FEE SECTION */}
               <View style={{ borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 14 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                  <Ionicons name="wallet-outline" size={20} color="#16A34A" style={{ marginRight: 8 }} />
-                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.text }}>Fee & Retainer Hub</Text>
-                </View>
-
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-                  <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F8FAFC', padding: 10, borderRadius: 10 }}>
-                    <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Agreed Fee</Text>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text, marginTop: 2 }}>₹{totFee.toLocaleString('en-IN')}</Text>
-                  </View>
-                  <View style={{ flex: 1, backgroundColor: '#F0FDF4', padding: 10, borderRadius: 10 }}>
-                    <Text style={{ fontSize: 11, color: '#166534' }}>Collected</Text>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#16A34A', marginTop: 2 }}>₹{pdFee.toLocaleString('en-IN')}</Text>
-                  </View>
-                  <View style={{ flex: 1, backgroundColor: balFee > 0 ? '#FEF2F2' : '#F0FDF4', padding: 10, borderRadius: 10 }}>
-                    <Text style={{ fontSize: 11, color: balFee > 0 ? '#991B1B' : '#166534' }}>Balance</Text>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: balFee > 0 ? '#DC2626' : '#16A34A', marginTop: 2 }}>₹{balFee.toLocaleString('en-IN')}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="wallet-outline" size={20} color="#16A34A" style={{ marginRight: 8 }} />
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.text }}>Fee & Retainer Hub</Text>
                   </View>
                 </View>
 
-                {totFee > 0 && (
-                  <View style={{ marginBottom: 12 }}>
-                    <View style={{ height: 6, width: '100%', backgroundColor: '#E5E7EB', borderRadius: 3, overflow: 'hidden' }}>
-                      <View style={{ height: '100%', width: `${pctPaid}%`, backgroundColor: '#16A34A' }} />
+                {/* --- SECTION A: TOTAL CASE RETAINER FEE --- */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 6 }}>
+                    TOTAL CASE RETAINER FEE
+                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                    <View style={{ flex: 1, backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F8FAFC'), padding: 10, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border }}>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Agreed Fee</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text, marginTop: 2 }}>₹{totFee.toLocaleString('en-IN')}</Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'right', marginTop: 4 }}>
-                      {pctPaid}% Paid ({balFee > 0 ? `₹${balFee.toLocaleString('en-IN')} pending` : 'Fully settled'})
-                    </Text>
-                  </View>
-                )}
 
-                {/* 2 EQUAL-WIDTH ACTION BUTTONS */}
-                <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1, backgroundColor: theme.isDark ? '#064E3B' : '#F0FDF4', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: theme.isDark ? '#059669' : '#BBF7D0' }}>
+                      <Text style={{ fontSize: 11, color: theme.isDark ? '#A7F3D0' : '#166534' }}>Collected</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: theme.isDark ? '#34D399' : '#16A34A', marginTop: 2 }}>
+                        ₹{pdFee.toLocaleString('en-IN')}
+                      </Text>
+                    </View>
+
+                    <View style={{ flex: 1, backgroundColor: balFee > 0 ? (theme.isDark ? '#7F1D1D' : '#FEF2F2') : (theme.isDark ? '#064E3B' : '#F0FDF4'), padding: 10, borderRadius: 10, borderWidth: 1, borderColor: balFee > 0 ? (theme.isDark ? '#991B1B' : '#FCA5A5') : (theme.isDark ? '#059669' : '#BBF7D0') }}>
+                      <Text style={{ fontSize: 11, color: balFee > 0 ? (theme.isDark ? '#FCA5A5' : '#991B1B') : (theme.isDark ? '#A7F3D0' : '#166534') }}>Balance</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: balFee > 0 ? (theme.isDark ? '#F87171' : '#DC2626') : (theme.isDark ? '#34D399' : '#16A34A'), marginTop: 2 }}>₹{balFee.toLocaleString('en-IN')}</Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => setShowPaymentModal(true)}
+                      activeOpacity={0.85}
+                      style={{ flex: 1, backgroundColor: '#16A34A', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Ionicons name="add-circle-outline" size={14} color="#FFF" style={{ marginRight: 4 }} />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Record Total Payment</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        setEditingTotalFee(caseDetails.total_fee != null ? String(caseDetails.total_fee) : "");
+                        setShowFeeModal(true);
+                      }}
+                      activeOpacity={0.85}
+                      style={{ flex: 1, backgroundColor: theme.isDark ? '#1E1B4B' : '#EEF2FF', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#4338CA' : '#C7D2FE' }}
+                    >
+                      <Ionicons name="create-outline" size={14} color={theme.isDark ? '#A5B4FC' : '#4F46E5'} style={{ marginRight: 4 }} />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: theme.isDark ? '#A5B4FC' : '#4F46E5' }}>Edit Total Fee</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* --- SECTION B: HEARING DATE FEE (PER HEARING) --- */}
+                {(() => {
+                  const dfAgreed = caseDetails.date_fee || 0;
+                  const dfCollected = caseDetails.date_fee_collected || 0;
+                  const dfBalance = Math.max(0, dfAgreed - dfCollected);
+
+                  const getStatusTag = () => {
+                    if (dfAgreed > 0 && dfCollected >= dfAgreed) {
+                      return { label: '✓ Paid', bg: theme.isDark ? '#064E3B' : '#DCFCE7', border: theme.isDark ? '#059669' : '#86EFAC', text: theme.isDark ? '#34D399' : '#15803D' };
+                    }
+                    if (dfCollected > 0) {
+                      return { label: '⏳ Partially Paid', bg: theme.isDark ? '#78350F' : '#FEF3C7', border: theme.isDark ? '#B45309' : '#FDE68A', text: theme.isDark ? '#FDE68A' : '#D97706' };
+                    }
+                    return { label: '⚠️ Pending', bg: theme.isDark ? '#7F1D1D' : '#FEF2F2', border: theme.isDark ? '#991B1B' : '#FCA5A5', text: theme.isDark ? '#F87171' : '#DC2626' };
+                  };
+
+                  const statusTag = getStatusTag();
+
+                  return (
+                    <View style={{ borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 12, marginBottom: 16 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary }}>
+                          HEARING DATE FEE ({caseDetails.NextDate ? formatDate(caseDetails.NextDate) : 'Upcoming'})
+                        </Text>
+                        <View style={{
+                          backgroundColor: statusTag.bg,
+                          borderWidth: 1,
+                          borderColor: statusTag.border,
+                          borderRadius: 16,
+                          paddingHorizontal: 10,
+                          paddingVertical: 3,
+                        }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: statusTag.text }}>
+                            {statusTag.label}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                        <View style={{ flex: 1, backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F8FAFC'), padding: 10, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border }}>
+                          <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Agreed Date Fee</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text, marginTop: 2 }}>
+                            ₹{dfAgreed.toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+
+                        <View style={{ flex: 1, backgroundColor: theme.isDark ? '#064E3B' : '#F0FDF4', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: theme.isDark ? '#059669' : '#BBF7D0' }}>
+                          <Text style={{ fontSize: 11, color: theme.isDark ? '#A7F3D0' : '#166534' }}>Date Fee Collected</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: theme.isDark ? '#34D399' : '#16A34A', marginTop: 2 }}>
+                            ₹{dfCollected.toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+
+                        <View style={{ flex: 1, backgroundColor: dfBalance > 0 ? (theme.isDark ? '#7F1D1D' : '#FEF2F2') : (theme.isDark ? '#064E3B' : '#F0FDF4'), padding: 10, borderRadius: 10, borderWidth: 1, borderColor: dfBalance > 0 ? (theme.isDark ? '#991B1B' : '#FCA5A5') : (theme.isDark ? '#059669' : '#BBF7D0') }}>
+                          <Text style={{ fontSize: 11, color: dfBalance > 0 ? (theme.isDark ? '#FCA5A5' : '#991B1B') : (theme.isDark ? '#A7F3D0' : '#166534') }}>Date Fee Balance</Text>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: dfBalance > 0 ? (theme.isDark ? '#F87171' : '#DC2626') : (theme.isDark ? '#34D399' : '#16A34A'), marginTop: 2 }}>
+                            ₹{dfBalance.toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* SEPARATE ACTION BUTTONS FOR DATE FEE ONLY */}
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setEditingDateFeePaymentAmount("");
+                            setEditingDateFeePaymentNote("");
+                            setShowDateFeePaymentModal(true);
+                          }}
+                          activeOpacity={0.85}
+                          style={{ flex: 1, backgroundColor: '#16A34A', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Ionicons name="add-circle-outline" size={14} color="#FFF" style={{ marginRight: 4 }} />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFF' }}>Record Date Payment</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={() => {
+                            setEditingDateFeeAmount(caseDetails.date_fee != null ? String(caseDetails.date_fee) : "");
+                            setShowDateFeeModal(true);
+                          }}
+                          activeOpacity={0.85}
+                          style={{ flex: 1, backgroundColor: theme.isDark ? '#1E1B4B' : '#EEF2FF', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#4338CA' : '#C7D2FE' }}
+                        >
+                          <Ionicons name="create-outline" size={14} color={theme.isDark ? '#A5B4FC' : '#4F46E5'} style={{ marginRight: 4 }} />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: theme.isDark ? '#A5B4FC' : '#4F46E5' }}>Edit Agreed Date Fee</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })()}
+
+                {/* 3 SEPARATE & CONSISTENT WHATSAPP REMINDER BUTTONS */}
+                <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 6 }}>
+                  Client Fee Reminders (WhatsApp)
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
                   <TouchableOpacity
-                    onPress={() => setShowPaymentModal(true)}
+                    onPress={handleSendTotalFeeReminder}
                     activeOpacity={0.85}
-                    style={{ flex: 1, backgroundColor: '#16A34A', paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ flex: 1, backgroundColor: theme.isDark ? '#064E3B' : '#F0FDF4', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#059669' : '#BBF7D0' }}
                   >
-                    <Ionicons name="add-circle-outline" size={18} color="#FFF" style={{ marginRight: 6 }} />
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFF' }}>Record Payment</Text>
+                    <Ionicons name="logo-whatsapp" size={14} color={theme.isDark ? '#34D399' : '#16A34A'} style={{ marginRight: 4 }} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: theme.isDark ? '#34D399' : '#16A34A' }}>Total Fee</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={() => {
-                      setEditingTotalFee(caseDetails.total_fee != null ? String(caseDetails.total_fee) : "");
-                      setShowFeeModal(true);
-                    }}
+                    onPress={handleSendDateFeeReminder}
                     activeOpacity={0.85}
-                    style={{ flex: 1, backgroundColor: '#EEF2FF', paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#C7D2FE' }}
+                    style={{ flex: 1, backgroundColor: theme.isDark ? '#78350F' : '#FEF3C7', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#B45309' : '#FDE68A' }}
                   >
-                    <Ionicons name="create-outline" size={18} color="#4F46E5" style={{ marginRight: 6 }} />
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#4F46E5' }}>Edit Fee</Text>
+                    <Ionicons name="logo-whatsapp" size={14} color={theme.isDark ? '#FDE68A' : '#D97706'} style={{ marginRight: 4 }} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: theme.isDark ? '#FDE68A' : '#D97706' }}>Date Fee</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleSendCombinedFeeReminder}
+                    activeOpacity={0.85}
+                    style={{ flex: 1, backgroundColor: theme.isDark ? '#1E1B4B' : '#EEF2FF', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#4338CA' : '#C7D2FE' }}
+                  >
+                    <Ionicons name="logo-whatsapp" size={14} color={theme.isDark ? '#A5B4FC' : '#4F46E5'} style={{ marginRight: 4 }} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: theme.isDark ? '#A5B4FC' : '#4F46E5' }}>Combined</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1107,14 +1717,14 @@ const CaseDetailsScreen: React.FC = () => {
                   justifyContent: "space-between",
                   alignItems: "center",
                   padding: 14,
-                  backgroundColor: theme.colors.card || "#F8FAFC",
+                  backgroundColor: theme.colors.cardBackground || (theme.isDark ? '#1E293B' : '#F8FAFC'),
                 }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                   <Ionicons name="business-outline" size={20} color={theme.colors.primary} style={{ marginRight: 10 }} />
                   <Text style={{ fontSize: 15, fontWeight: "700", color: theme.colors.text }}>Court & Jurisdiction</Text>
-                  <View style={{ backgroundColor: "#EEF2FF", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
-                    <Text style={{ fontSize: 11, fontWeight: "600", color: "#4F46E5" }}>6 Details</Text>
+                  <View style={{ backgroundColor: theme.isDark ? '#1E1B4B' : '#EEF2FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: theme.isDark ? '#A5B4FC' : '#4F46E5' }}>6 Details</Text>
                   </View>
                 </View>
                 <Ionicons
@@ -1127,32 +1737,32 @@ const CaseDetailsScreen: React.FC = () => {
               {expandedSections.court && (
                 <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
                   <View style={{ gap: 10 }}>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Court Name</Text>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.court_name || "N/A"}</Text>
                     </View>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Judge Name</Text>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.JudgeName || "N/A"}</Text>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 10 }}>
-                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                         <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>District</Text>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.districtName || "N/A"}</Text>
                       </View>
-                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                         <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Police Station</Text>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.policeStationName || "N/A"}</Text>
                       </View>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 10 }}>
-                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                         <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Date Filed</Text>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>
                           {caseDetails.dateFiled ? formatDate(new Date(caseDetails.dateFiled)) : "N/A"}
                         </Text>
                       </View>
-                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                         <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Statute of Limitations</Text>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>
                           {caseDetails.StatuteOfLimitations ? formatDate(new Date(caseDetails.StatuteOfLimitations)) : "N/A"}
@@ -1181,7 +1791,7 @@ const CaseDetailsScreen: React.FC = () => {
                   justifyContent: "space-between",
                   alignItems: "center",
                   padding: 14,
-                  backgroundColor: theme.colors.card || "#F8FAFC",
+                  backgroundColor: theme.colors.cardBackground || (theme.isDark ? '#1E293B' : '#F8FAFC'),
                 }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
@@ -1198,35 +1808,35 @@ const CaseDetailsScreen: React.FC = () => {
               {expandedSections.identifiers && (
                 <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
                   <View style={{ gap: 10 }}>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>CNR Number</Text>
                       <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text, marginTop: 2 }}>{caseDetails.CNRNumber || "N/A"}</Text>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 10 }}>
-                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                         <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Case Number</Text>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.case_number || "N/A"}</Text>
                       </View>
-                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                         <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Case Year</Text>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.case_year || "N/A"}</Text>
                       </View>
                     </View>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Session / Trial Number</Text>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.session_trial_number || "N/A"}</Text>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 10 }}>
-                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                         <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Crime Number</Text>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.crime_number || "N/A"}</Text>
                       </View>
-                      <View style={{ flex: 1, backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                         <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Crime Year</Text>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.crime_year || "N/A"}</Text>
                       </View>
                     </View>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Under Section / IPC / CrPC</Text>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.Undersection || "N/A"}</Text>
                     </View>
@@ -1252,7 +1862,7 @@ const CaseDetailsScreen: React.FC = () => {
                   justifyContent: "space-between",
                   alignItems: "center",
                   padding: 14,
-                  backgroundColor: theme.colors.card || "#F8FAFC",
+                  backgroundColor: theme.colors.cardBackground || (theme.isDark ? '#1E293B' : '#F8FAFC'),
                 }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
@@ -1269,34 +1879,34 @@ const CaseDetailsScreen: React.FC = () => {
               {expandedSections.parties && (
                 <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
                   <View style={{ gap: 10 }}>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Petitioner / First Party</Text>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.FirstParty || "N/A"}</Text>
                     </View>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Respondent / Opposite Party</Text>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.OppositeParty || "N/A"}</Text>
                     </View>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Accused Name</Text>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.Accussed || "N/A"}</Text>
                     </View>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>On Behalf Of</Text>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.OnBehalfOf || "N/A"}</Text>
                     </View>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Opposing Counsel / Advocate</Text>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.OpposingCounsel || caseDetails.OppositeAdvocate || "N/A"}</Text>
                     </View>
                     {caseDetails.OppAdvocateContactNumber ? (
-                      <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View>
                           <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Opp. Advocate Contact</Text>
                           <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text, marginTop: 2 }}>{caseDetails.OppAdvocateContactNumber}</Text>
                         </View>
-                        <TouchableOpacity onPress={() => Linking.openURL(`tel:${caseDetails.OppAdvocateContactNumber}`)} style={{ backgroundColor: '#E0F2FE', padding: 8, borderRadius: 20 }}>
-                          <Ionicons name="call" size={18} color="#0284C7" />
+                        <TouchableOpacity onPress={() => Linking.openURL(`tel:${caseDetails.OppAdvocateContactNumber}`)} style={{ backgroundColor: theme.isDark ? '#075985' : '#E0F2FE', padding: 8, borderRadius: 20 }}>
+                          <Ionicons name="call" size={18} color={theme.isDark ? '#7DD3FC' : '#0284C7'} />
                         </TouchableOpacity>
                       </View>
                     ) : null}
@@ -1322,7 +1932,7 @@ const CaseDetailsScreen: React.FC = () => {
                   justifyContent: "space-between",
                   alignItems: "center",
                   padding: 14,
-                  backgroundColor: theme.colors.card || "#F8FAFC",
+                  backgroundColor: theme.colors.cardBackground || (theme.isDark ? '#1E293B' : '#F8FAFC'),
                 }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
@@ -1339,11 +1949,11 @@ const CaseDetailsScreen: React.FC = () => {
               {expandedSections.notes && (
                 <View style={{ padding: 14, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
                   <View style={{ gap: 10 }}>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 4 }}>Case Description</Text>
                       <Text style={{ fontSize: 13, color: theme.colors.text, lineHeight: 18 }}>{caseDetails.CaseDescription || "N/A"}</Text>
                     </View>
-                    <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 10, borderRadius: 8 }}>
+                    <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.colors.border }}>
                       <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 4 }}>Internal Case Notes</Text>
                       <Text style={{ fontSize: 13, color: theme.colors.text, lineHeight: 18 }}>{caseDetails.CaseNotes || "N/A"}</Text>
                     </View>
@@ -1369,14 +1979,14 @@ const CaseDetailsScreen: React.FC = () => {
                   justifyContent: "space-between",
                   alignItems: "center",
                   padding: 14,
-                  backgroundColor: theme.colors.card || "#F8FAFC",
+                  backgroundColor: theme.colors.cardBackground || (theme.isDark ? '#1E293B' : '#F8FAFC'),
                 }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                   <Ionicons name="folder-open-outline" size={20} color={theme.colors.primary} style={{ marginRight: 10 }} />
                   <Text style={{ fontSize: 15, fontWeight: "700", color: theme.colors.text }}>Documents & Attachments</Text>
-                  <View style={{ backgroundColor: "#EEF2FF", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
-                    <Text style={{ fontSize: 11, fontWeight: "600", color: "#4F46E5" }}>{documents.length} Files</Text>
+                  <View style={{ backgroundColor: theme.isDark ? '#1E1B4B' : '#EEF2FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: theme.isDark ? '#A5B4FC' : '#4F46E5' }}>{documents.length} Files</Text>
                   </View>
                 </View>
                 <Ionicons
@@ -1401,7 +2011,7 @@ const CaseDetailsScreen: React.FC = () => {
                     </Text>
 
                     {documents.length === 0 ? (
-                      <View style={{ backgroundColor: theme.colors.card || '#F9FAFB', padding: 14, borderRadius: 10, alignItems: 'center' }}>
+                      <View style={{ backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F9FAFB'), padding: 14, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border }}>
                         <Ionicons name="document-text-outline" size={24} color={theme.colors.textSecondary} style={{ marginBottom: 4 }} />
                         <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>No documents attached yet.</Text>
                       </View>
@@ -1413,7 +2023,7 @@ const CaseDetailsScreen: React.FC = () => {
                           <View
                             key={doc.id}
                             style={{
-                              backgroundColor: theme.colors.card || '#F8FAFC',
+                              backgroundColor: theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F8FAFC'),
                               borderRadius: 12,
                               padding: 12,
                               marginBottom: 10,
@@ -1426,7 +2036,7 @@ const CaseDetailsScreen: React.FC = () => {
                                 width: 36,
                                 height: 36,
                                 borderRadius: 10,
-                                backgroundColor: isPdf ? '#FEF2F2' : isImg ? '#F0FDF4' : '#EEF2FF',
+                                backgroundColor: isPdf ? (theme.isDark ? '#451A1A' : '#FEF2F2') : isImg ? (theme.isDark ? '#064E3B' : '#F0FDF4') : (theme.isDark ? '#1E1B4B' : '#EEF2FF'),
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 marginRight: 10,
@@ -1434,7 +2044,7 @@ const CaseDetailsScreen: React.FC = () => {
                                 <Ionicons
                                   name={isPdf ? "document-text" : isImg ? "image" : "document"}
                                   size={18}
-                                  color={isPdf ? "#DC2626" : isImg ? "#16A34A" : "#4F46E5"}
+                                  color={isPdf ? (theme.isDark ? '#F87171' : '#DC2626') : isImg ? (theme.isDark ? '#34D399' : '#16A34A') : (theme.isDark ? '#A5B4FC' : '#4F46E5')}
                                 />
                               </View>
                               <View style={{ flex: 1 }}>
@@ -1452,28 +2062,28 @@ const CaseDetailsScreen: React.FC = () => {
                               <TouchableOpacity
                                 onPress={() => handleDocumentInteraction(doc)}
                                 activeOpacity={0.8}
-                                style={{ flex: 1, backgroundColor: '#EEF2FF', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                                style={{ flex: 1, backgroundColor: theme.isDark ? '#1E1B4B' : '#EEF2FF', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#4338CA' : '#C7D2FE' }}
                               >
-                                <Ionicons name="eye-outline" size={14} color="#4F46E5" style={{ marginRight: 4 }} />
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#4F46E5' }}>Open</Text>
+                                <Ionicons name="eye-outline" size={14} color={theme.isDark ? '#A5B4FC' : '#4F46E5'} style={{ marginRight: 4 }} />
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.isDark ? '#A5B4FC' : '#4F46E5' }}>Open</Text>
                               </TouchableOpacity>
 
                               <TouchableOpacity
                                 onPress={() => handleShareDocument(doc)}
                                 activeOpacity={0.8}
-                                style={{ flex: 1, backgroundColor: '#DCFCE7', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                                style={{ flex: 1, backgroundColor: theme.isDark ? '#064E3B' : '#DCFCE7', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#059669' : '#BBF7D0' }}
                               >
-                                <Ionicons name="share-outline" size={14} color="#15803D" style={{ marginRight: 4 }} />
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#15803D' }}>Share</Text>
+                                <Ionicons name="share-outline" size={14} color={theme.isDark ? '#6EE7B7' : '#15803D'} style={{ marginRight: 4 }} />
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.isDark ? '#6EE7B7' : '#15803D' }}>Share</Text>
                               </TouchableOpacity>
 
                               <TouchableOpacity
                                 onPress={() => handleDeleteDocument(doc)}
                                 activeOpacity={0.8}
-                                style={{ flex: 1, backgroundColor: '#FEF2F2', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                                style={{ flex: 1, backgroundColor: theme.isDark ? '#451A1A' : '#FEF2F2', paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#991B1B' : '#FCA5A5' }}
                               >
-                                <Ionicons name="trash-outline" size={14} color="#DC2626" style={{ marginRight: 4 }} />
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>Delete</Text>
+                                <Ionicons name="trash-outline" size={14} color={theme.isDark ? '#F87171' : '#DC2626'} style={{ marginRight: 4 }} />
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.isDark ? '#F87171' : '#DC2626' }}>Delete</Text>
                               </TouchableOpacity>
                             </View>
                           </View>
@@ -1503,19 +2113,19 @@ const CaseDetailsScreen: React.FC = () => {
                 <TouchableOpacity
                   onPress={handleEditCase}
                   activeOpacity={0.8}
-                  style={{ flex: 1, backgroundColor: '#EEF2FF', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#C7D2FE' }}
+                  style={{ flex: 1, backgroundColor: theme.isDark ? '#1E1B4B' : '#EEF2FF', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#4338CA' : '#C7D2FE' }}
                 >
-                  <Ionicons name="create-outline" size={16} color="#4F46E5" style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#4F46E5' }}>Edit Case</Text>
+                  <Ionicons name="create-outline" size={16} color={theme.isDark ? '#A5B4FC' : '#4F46E5'} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: theme.isDark ? '#A5B4FC' : '#4F46E5' }}>Edit Case</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={handleExportPdf}
                   activeOpacity={0.8}
-                  style={{ flex: 1, backgroundColor: '#E0F2FE', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#BAE6FD' }}
+                  style={{ flex: 1, backgroundColor: theme.isDark ? '#075985' : '#E0F2FE', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#0284C7' : '#BAE6FD' }}
                 >
-                  <Ionicons name="document-text-outline" size={16} color="#0284C7" style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#0284C7' }}>Export PDF</Text>
+                  <Ionicons name="document-text-outline" size={16} color={theme.isDark ? '#7DD3FC' : '#0284C7'} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: theme.isDark ? '#7DD3FC' : '#0284C7' }}>Export PDF</Text>
                 </TouchableOpacity>
               </View>
 
@@ -1523,29 +2133,29 @@ const CaseDetailsScreen: React.FC = () => {
                 <TouchableOpacity
                   onPress={handleShareHistory}
                   activeOpacity={0.8}
-                  style={{ flex: 1, backgroundColor: '#DCFCE7', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#BBF7D0' }}
+                  style={{ flex: 1, backgroundColor: theme.isDark ? '#064E3B' : '#DCFCE7', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#059669' : '#BBF7D0' }}
                 >
-                  <Ionicons name="share-social-outline" size={16} color="#15803D" style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#15803D' }}>Share History</Text>
+                  <Ionicons name="share-social-outline" size={16} color={theme.isDark ? '#6EE7B7' : '#15803D'} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: theme.isDark ? '#6EE7B7' : '#15803D' }}>Share History</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={handleGenerateDocument}
                   activeOpacity={0.8}
-                  style={{ flex: 1, backgroundColor: '#F3E8FF', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E9D5FF' }}
+                  style={{ flex: 1, backgroundColor: theme.isDark ? '#3B0764' : '#F3E8FF', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#7E22CE' : '#E9D5FF' }}
                 >
-                  <Ionicons name="sparkles-outline" size={16} color="#7E22CE" style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#7E22CE' }}>Generate Court Document</Text>
+                  <Ionicons name="sparkles-outline" size={16} color={theme.isDark ? '#D8B4FE' : '#7E22CE'} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: theme.isDark ? '#D8B4FE' : '#7E22CE' }}>Generate Court Document</Text>
                 </TouchableOpacity>
               </View>
 
               <TouchableOpacity
                 onPress={handleDeleteCase}
                 activeOpacity={0.8}
-                style={{ backgroundColor: '#FEF2F2', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FCA5A5' }}
+                style={{ backgroundColor: theme.isDark ? '#451A1A' : '#FEF2F2', paddingVertical: 12, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.isDark ? '#991B1B' : '#FCA5A5' }}
               >
-                <Ionicons name="trash-outline" size={16} color="#DC2626" style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>Delete Case Record</Text>
+                <Ionicons name="trash-outline" size={16} color={theme.isDark ? '#F87171' : '#DC2626'} style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.isDark ? '#F87171' : '#DC2626' }}>Delete Case Record</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1564,6 +2174,7 @@ const CaseDetailsScreen: React.FC = () => {
             event={item.data}
             isLast={item.isLast}
             onEditNotes={handleEditTimelineNotes}
+            onDeleteNotes={handlePromptDeleteTimelineNotes}
           />
         );
       case "noTimelineEvents":
@@ -1589,6 +2200,10 @@ const CaseDetailsScreen: React.FC = () => {
         data={listData}
         renderItem={renderListItem}
         keyExtractor={(item, index) => `${item.type}-${index}`}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
       />
@@ -1658,16 +2273,49 @@ const CaseDetailsScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Update Notes for Past Date</Text>
-            <TextInput
-              style={styles.reminderInput}
-              multiline
-              numberOfLines={6}
-              value={editedNotesText}
-              onChangeText={setEditedNotesText}
-              placeholder="Add details about what happened during this hearing..."
-              placeholderTextColor={theme.colors.textSecondary}
-            />
+            <Text style={styles.modalTitle}>
+              {editingTimelineEvent?.event_type === 'date_fee_agreed'
+                ? "Edit Agreed Date Fee"
+                : (editingTimelineEvent?.event_type === 'date_fee_payment' || editingTimelineEvent?.description?.includes('(Date Fee)'))
+                  ? "Edit Date Fee Payment"
+                  : (editingTimelineEvent?.description?.match(/(Fee Payment Received|Recorded Payment|Fee Received)/i)
+                    ? "Edit Recorded Fee Payment"
+                    : "Update Timeline Event Notes")}
+            </Text>
+            {Boolean(
+              editingTimelineEvent?.event_type === 'date_fee_agreed' ||
+              editingTimelineEvent?.event_type === 'date_fee_payment' ||
+              editingTimelineEvent?.event_type === 'total_fee_payment' ||
+              editingTimelineEvent?.description?.match(/(Fee Payment Received|Recorded Payment|Fee Received|Date Fee|Date Hearing Fee)/i)
+            ) && (
+              <View style={{ width: '100%', marginBottom: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 4 }}>
+                  FEE / PAYMENT AMOUNT (₹)
+                </Text>
+                <TextInput
+                  style={[styles.reminderInput, { minHeight: 48, height: 48 }]}
+                  keyboardType="numeric"
+                  value={editingTimelinePaymentAmount}
+                  onChangeText={setEditingTimelinePaymentAmount}
+                  placeholder="Fee / Payment Amount (₹)"
+                  placeholderTextColor={theme.colors.textSecondary}
+                />
+              </View>
+            )}
+            <View style={{ width: '100%', marginBottom: 16 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 4 }}>
+                {editingTimelineEvent?.description?.match(/(Fee Payment Received|Recorded Payment|Fee Received)/i) ? "PAYMENT NOTE / DESCRIPTION" : "EVENT NOTES"}
+              </Text>
+              <TextInput
+                style={[styles.reminderInput, { minHeight: 70 }]}
+                multiline
+                numberOfLines={3}
+                value={editedNotesText}
+                onChangeText={setEditedNotesText}
+                placeholder="Add notes or description..."
+                placeholderTextColor={theme.colors.textSecondary}
+              />
+            </View>
             <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
               <View style={{ flex: 1 }}>
                 <ActionButton
@@ -1676,13 +2324,14 @@ const CaseDetailsScreen: React.FC = () => {
                     setShowEditNotesModal(false);
                     setEditingTimelineEvent(null);
                     setEditedNotesText("");
+                    setEditingTimelinePaymentAmount("");
                   }}
                   type="secondary"
                 />
               </View>
               <View style={{ flex: 1 }}>
                 <ActionButton
-                  title={t("btn_save_changes") || "Save"}
+                  title={t("btn_save_changes") || "Save (Edited)"}
                   onPress={handleSaveTimelineNotes}
                   type="primary"
                 />
@@ -1745,17 +2394,17 @@ const CaseDetailsScreen: React.FC = () => {
                 <TouchableOpacity
                   key={amt}
                   onPress={() => setPaymentAmount(String(amt))}
-                  style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 }}
+                  style={{ backgroundColor: theme.isDark ? '#334155' : '#F3F4F6', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 }}
                 >
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151' }}>+ ₹{amt.toLocaleString('en-IN')}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.isDark ? '#E2E8F0' : '#374151' }}>+ ₹{amt.toLocaleString('en-IN')}</Text>
                 </TouchableOpacity>
               ))}
               {caseDetails && (caseDetails.total_fee || 0) > (caseDetails.fee_paid || 0) && (
                 <TouchableOpacity
                   onPress={() => setPaymentAmount(String((caseDetails.total_fee || 0) - (caseDetails.fee_paid || 0)))}
-                  style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 }}
+                  style={{ backgroundColor: theme.isDark ? '#064E3B' : '#DCFCE7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 }}
                 >
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#15803D' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: theme.isDark ? '#34D399' : '#15803D' }}>
                     Full Balance (₹{((caseDetails.total_fee || 0) - (caseDetails.fee_paid || 0)).toLocaleString('en-IN')})
                   </Text>
                 </TouchableOpacity>
@@ -1788,6 +2437,136 @@ const CaseDetailsScreen: React.FC = () => {
                 <ActionButton
                   title="Record Payment"
                   onPress={handleRecordPayment}
+                  type="primary"
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Recorded Payment Modal */}
+      <Modal
+        visible={showPaymentEditModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaymentEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Recorded Fee Payment</Text>
+            <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 12, textAlign: 'center' }}>
+              Correct mistaken payment entry. An (Edited) audit tag will be logged.
+            </Text>
+            <TextInput
+              style={[styles.reminderInput, { minHeight: 48, height: 48, marginBottom: 16 }]}
+              keyboardType="numeric"
+              value={editingRecordedPayment}
+              onChangeText={setEditingRecordedPayment}
+              placeholder="Total Collected Fee (₹)"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={t("alert_cancel") || "Cancel"}
+                  onPress={() => setShowPaymentEditModal(false)}
+                  type="secondary"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={t("btn_save_changes") || "Save (Edited)"}
+                  onPress={handleSaveRecordedPayment}
+                  type="primary"
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Decided Date Hearing Fee Modal */}
+      <Modal
+        visible={showDateFeeModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDateFeeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Decided Date Hearing Fee</Text>
+            <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 12, textAlign: 'center' }}>
+              Set or update the agreed fee for this specific hearing date.
+            </Text>
+            <TextInput
+              style={[styles.reminderInput, { minHeight: 48, height: 48, marginBottom: 16 }]}
+              keyboardType="numeric"
+              value={editingDateFeeAmount}
+              onChangeText={setEditingDateFeeAmount}
+              placeholder="Decided Date Fee (₹)"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={t("alert_cancel") || "Cancel"}
+                  onPress={() => setShowDateFeeModal(false)}
+                  type="secondary"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={t("btn_save_changes") || "Save Fee"}
+                  onPress={handleSaveDateFeeAmount}
+                  type="primary"
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Record Payment for Date Hearing Fee Modal */}
+      <Modal
+        visible={showDateFeePaymentModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDateFeePaymentModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Record Date Fee Payment</Text>
+            <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 12, textAlign: 'center' }}>
+              Record payment received specifically for this hearing date fee.
+            </Text>
+            <TextInput
+              style={[styles.reminderInput, { minHeight: 48, height: 48, marginBottom: 12 }]}
+              keyboardType="numeric"
+              value={editingDateFeePaymentAmount}
+              onChangeText={setEditingDateFeePaymentAmount}
+              placeholder="Payment Amount Received (₹)"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+            <TextInput
+              style={[styles.reminderInput, { minHeight: 44, height: 44, marginBottom: 16 }]}
+              value={editingDateFeePaymentNote}
+              onChangeText={setEditingDateFeePaymentNote}
+              placeholder="Payment Notes / Mode (Optional)"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title={t("alert_cancel") || "Cancel"}
+                  onPress={() => setShowDateFeePaymentModal(false)}
+                  type="secondary"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ActionButton
+                  title="Record Payment"
+                  onPress={handleRecordDateFeePayment}
                   type="primary"
                 />
               </View>

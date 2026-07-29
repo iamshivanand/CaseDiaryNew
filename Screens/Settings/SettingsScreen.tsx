@@ -4,6 +4,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import React, { useContext, useState, useEffect } from "react";
 import {
   View,
+  ScrollView,
   StyleSheet,
   Alert,
   Modal,
@@ -20,15 +21,12 @@ import { exportDatabaseBackup } from "../../utils/backupManager";
 import { reScheduleAllNotifications } from "../../utils/notificationScheduler";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 
-type SettingsScreenNavigationProp = StackNavigationProp<
-  RootStackParamList,
-  "SettingsScreen"
->;
+type SettingsScreenNavigationProp = any;
 
 const SettingsScreen = () => {
   const { theme, themeMode, setThemeMode } = useContext(ThemeContext);
   const { t, locale, setLocale } = useTranslation();
-  const navigation = useNavigation<SettingsScreenNavigationProp>();
+  const navigation = useNavigation<any>();
   const { showAdWithPreload } = useAdTrigger();
 
   const [notifEnabled, setNotifEnabled] = useState(true);
@@ -337,330 +335,220 @@ const SettingsScreen = () => {
         : "theme-light-dark";
 
   return (
-    <View
+    <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
+      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
     >
-      
-
-      <List.Section style={styles.listSection}>
-        <List.Subheader style={{ color: theme.colors.textSecondary }}>
-          {t("settings_personalization")}
-        </List.Subheader>
-        <List.Item
-          title={t("settings_theme")}
-          description={currentThemeLabel}
-          left={(props) => (
-            <List.Icon
-              {...props}
-              icon={themeIcon}
-              color={theme.colors.primary}
-            />
-          )}
-          right={(props) => (
-            <List.Icon
-              {...props}
-              icon="chevron-right"
-              color={theme.colors.textSecondary}
-            />
-          )}
-          onPress={selectTheme}
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.textSecondary }}
-          style={styles.listItem}
-        />
-        <Divider
-          style={[styles.divider, { backgroundColor: theme.colors.border }]}
-        />
-
-        <List.Item
-          title={t("settings_lang")}
-          description={locale === "en" ? "English" : "Hindi (हिंदी)"}
-          left={(props) => (
-            <List.Icon
-              {...props}
-              icon="translate"
-              color={theme.colors.primary}
-            />
-          )}
-          right={(props) => (
-            <List.Icon
-              {...props}
-              icon="chevron-right"
-              color={theme.colors.textSecondary}
-            />
-          )}
-          onPress={selectLanguage}
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.textSecondary }}
-          style={styles.listItem}
-        />
-        <Divider
-          style={[styles.divider, { backgroundColor: theme.colors.border }]}
-        />
-
-        <List.Item
-          title="WhatsApp Message Template"
-          description={customWaTemplate ? "Customized" : "Default Template"}
-          left={(props) => (
-            <List.Icon
-              {...props}
-              icon="whatsapp"
-              color="#25D366"
-            />
-          )}
-          right={(props) => (
-            <List.Icon
-              {...props}
-              icon="chevron-right"
-              color={theme.colors.textSecondary}
-            />
-          )}
-          onPress={() => setShowWaTemplateModal(true)}
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.textSecondary }}
-          style={styles.listItem}
-        />
-        <Divider
-          style={[styles.divider, { backgroundColor: theme.colors.border }]}
-        />
-
-        <List.Item
-          title={locale === "en" ? "Advocate Profile" : "अधिवक्ता प्रोफ़ाइल"}
-          description={
-            locale === "en"
-              ? "Set default name, bar enrollment and office address"
-              : "डिफ़ॉल्ट नाम, बार नामांकन और कार्यालय का पता सेट करें"
-          }
-          left={(props) => (
-            <List.Icon
-              {...props}
-              icon="account-cog-outline"
-              color={theme.colors.primary}
-            />
-          )}
-          right={(props) => (
-            <List.Icon
-              {...props}
-              icon="chevron-right"
-              color={theme.colors.textSecondary}
-            />
-          )}
-          onPress={() => setIsProfileModalVisible(true)}
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.textSecondary }}
-          style={styles.listItem}
-        />
-        <Divider
-          style={[styles.divider, { backgroundColor: theme.colors.border }]}
-        />
-
-        <List.Item
-          title={
-            locale === "en"
-              ? "Notification Preferences"
-              : "अधिसूचना प्राथमिकताएं"
-          }
-          description={getNotificationLabel()}
-          left={(props) => (
-            <List.Icon
-              {...props}
-              icon="bell-outline"
-              color={theme.colors.primary}
-            />
-          )}
-          right={(props) => (
-            <List.Icon
-              {...props}
-              icon="chevron-right"
-              color={theme.colors.textSecondary}
-            />
-          )}
-          onPress={selectNotificationPreferences}
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.textSecondary }}
-          style={styles.listItem}
-        />
-        <Divider
-          style={[styles.divider, { backgroundColor: theme.colors.border }]}
-        />
-
-        <List.Subheader style={{ color: theme.colors.textSecondary }}>
-          {t("settings_backup_section")}
-        </List.Subheader>
-        <List.Item
-          title={t("settings_backup_btn")}
-          description={t("settings_backup_desc")}
-          left={(props) => (
-            <List.Icon
-              {...props}
-              icon="cloud-upload-outline"
-              color={theme.colors.primary}
-            />
-          )}
-          right={(props) => (
-            <List.Icon
-              {...props}
-              icon="chevron-right"
-              color={theme.colors.textSecondary}
-            />
-          )}
-          onPress={handleBackup}
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.textSecondary }}
-          style={styles.listItem}
-        />
-        <Divider
-          style={[styles.divider, { backgroundColor: theme.colors.border }]}
-        />
-
-        <List.Item
-          title={t("settings_restore_btn")}
-          description={t("settings_restore_desc")}
-          left={(props) => (
-            <List.Icon
-              {...props}
-              icon="cloud-download-outline"
-              color={theme.colors.primary}
-            />
-          )}
-          right={(props) => (
-            <List.Icon
-              {...props}
-              icon="chevron-right"
-              color={theme.colors.textSecondary}
-            />
-          )}
-          onPress={handleRestore}
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.textSecondary }}
-          style={styles.listItem}
-        />
-        <Divider
-          style={[styles.divider, { backgroundColor: theme.colors.border }]}
-        />
-
-        <List.Item
-          title={t("settings_import_csv_btn")}
-          description={t("settings_import_csv_desc")}
-          left={(props) => (
-            <List.Icon
-              {...props}
-              icon="file-import-outline"
-              color={theme.colors.primary}
-            />
-          )}
-          right={(props) => (
-            <List.Icon
-              {...props}
-              icon="chevron-right"
-              color={theme.colors.textSecondary}
-            />
-          )}
-          onPress={handleImportCSV}
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.textSecondary }}
-          style={styles.listItem}
-        />
-        <Divider
-          style={[styles.divider, { backgroundColor: theme.colors.border }]}
-        />
-
-        <List.Item
-          title={t("settings_import_ecourts_btn") || "Import from eCourts App"}
-          description={
-            t("settings_import_ecourts_desc") ||
-            "Import all cases from eCourts Services backup text file"
-          }
-          left={(props) => (
-            <List.Icon
-              {...props}
-              icon="cellphone-arrow-down"
-              color={theme.colors.primary}
-            />
-          )}
-          right={(props) => (
-            <List.Icon
-              {...props}
-              icon="chevron-right"
-              color={theme.colors.textSecondary}
-            />
-          )}
-          onPress={() => navigation.navigate("ECourtsAppImport")}
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.textSecondary }}
-          style={styles.listItem}
-        />
-        <Divider
-          style={[styles.divider, { backgroundColor: theme.colors.border }]}
-        />
-
-        <List.Item
-          title={t("settings_scan_duplicates_btn")}
-          description={t("settings_scan_duplicates_desc")}
-          left={(props) => (
-            <List.Icon
-              {...props}
-              icon="content-copy"
-              color={theme.colors.primary}
-            />
-          )}
-          right={(props) => (
-            <List.Icon
-              {...props}
-              icon="chevron-right"
-              color={theme.colors.textSecondary}
-            />
-          )}
-          onPress={handleScanDuplicates}
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.textSecondary }}
-          style={styles.listItem}
-        />
-        <Divider
-          style={[styles.divider, { backgroundColor: theme.colors.border }]}
-        />
-
-        <List.Subheader style={{ color: theme.colors.textSecondary }}>
-          {t("settings_lookup_section")}
-        </List.Subheader>
-        {lookupMenuItems.map((item, index) => (
-          <React.Fragment key={item.category}>
-            <List.Item
-              title={item.title}
-              left={(props) => (
-                <List.Icon
-                  {...props}
-                  icon={item.icon}
-                  color={theme.colors.primary}
-                />
-              )}
-              right={(props) => (
-                <List.Icon
-                  {...props}
-                  icon="chevron-right"
-                  color={theme.colors.textSecondary}
-                />
-              )}
-              onPress={() =>
-                navigation.navigate("ManageLookupCategoryScreen", {
-                  categoryName: item.category,
-                  title: item.title,
-                })
-              }
-              titleStyle={{ color: theme.colors.text }}
-              style={styles.listItem}
-            />
-            {index < lookupMenuItems.length - 1 && (
-              <Divider
-                style={[
-                  styles.divider,
-                  { backgroundColor: theme.colors.border },
-                ]}
-              />
+      {/* SECTION 1: PREFERENCES */}
+      <View style={{ marginBottom: 20 }}>
+        <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, marginLeft: 4, letterSpacing: 0.8 }}>
+          PREFERENCES
+        </Text>
+        <View style={{ backgroundColor: theme.colors.cardBackground, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' }}>
+          <List.Item
+            title={t("settings_theme")}
+            description={currentThemeLabel}
+            left={(props) => (
+              <List.Icon {...props} icon={themeIcon} color={theme.colors.primary} />
             )}
-          </React.Fragment>
-        ))}
-      </List.Section>
+            right={(props) => (
+              <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />
+            )}
+            onPress={selectTheme}
+            titleStyle={{ color: theme.colors.text, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+
+          <List.Item
+            title={t("settings_lang")}
+            description={locale === "en" ? "English" : "Hindi (हिंदी)"}
+            left={(props) => (
+              <List.Icon {...props} icon="translate" color={theme.colors.primary} />
+            )}
+            right={(props) => (
+              <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />
+            )}
+            onPress={selectLanguage}
+            titleStyle={{ color: theme.colors.text, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+
+          <List.Item
+            title="WhatsApp Message Template"
+            description={customWaTemplate ? "Customized" : "Default Template"}
+            left={(props) => (
+              <List.Icon {...props} icon="whatsapp" color="#25D366" />
+            )}
+            right={(props) => (
+              <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />
+            )}
+            onPress={() => setShowWaTemplateModal(true)}
+            titleStyle={{ color: theme.colors.text, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+
+          <List.Item
+            title={locale === "en" ? "Advocate Profile" : "अधिवक्ता प्रोफ़ाइल"}
+            description={
+              locale === "en"
+                ? "Set default name, bar enrollment and office address"
+                : "डिफ़ॉल्ट नाम, बार नामांकन और कार्यालय का पता सेट करें"
+            }
+            left={(props) => (
+              <List.Icon {...props} icon="account-cog-outline" color={theme.colors.primary} />
+            )}
+            right={(props) => (
+              <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />
+            )}
+            onPress={() => setIsProfileModalVisible(true)}
+            titleStyle={{ color: theme.colors.text, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+
+          <List.Item
+            title={locale === "en" ? "Notification Preferences" : "अधिसूचना प्राथमिकताएं"}
+            description={getNotificationLabel()}
+            left={(props) => (
+              <List.Icon {...props} icon="bell-outline" color={theme.colors.primary} />
+            )}
+            right={(props) => (
+              <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />
+            )}
+            onPress={selectNotificationPreferences}
+            titleStyle={{ color: theme.colors.text, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+        </View>
+      </View>
+
+      {/* SECTION 2: DATA MANAGEMENT */}
+      <View style={{ marginBottom: 20 }}>
+        <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, marginLeft: 4, letterSpacing: 0.8 }}>
+          DATA MANAGEMENT
+        </Text>
+        <View style={{ backgroundColor: theme.colors.cardBackground, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' }}>
+          <List.Item
+            title={t("settings_backup_btn")}
+            description={t("settings_backup_desc")}
+            left={(props) => (
+              <List.Icon {...props} icon="cloud-upload-outline" color={theme.colors.primary} />
+            )}
+            right={(props) => (
+              <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />
+            )}
+            onPress={handleBackup}
+            titleStyle={{ color: theme.colors.text, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+
+          <List.Item
+            title={t("settings_restore_btn")}
+            description={t("settings_restore_desc")}
+            left={(props) => (
+              <List.Icon {...props} icon="cloud-download-outline" color={theme.colors.primary} />
+            )}
+            right={(props) => (
+              <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />
+            )}
+            onPress={handleRestore}
+            titleStyle={{ color: theme.colors.text, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+
+          <List.Item
+            title={t("settings_import_csv_btn")}
+            description={t("settings_import_csv_desc")}
+            left={(props) => (
+              <List.Icon {...props} icon="file-import-outline" color={theme.colors.primary} />
+            )}
+            right={(props) => (
+              <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />
+            )}
+            onPress={handleImportCSV}
+            titleStyle={{ color: theme.colors.text, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+
+          <List.Item
+            title="Import from eCourts App"
+            description="Import all cases from eCourts Services backup text file"
+            left={(props) => (
+              <List.Icon {...props} icon="cellphone-arrow-down" color={theme.colors.primary} />
+            )}
+            right={(props) => (
+              <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />
+            )}
+            onPress={() => navigation.navigate("ECourtsAppImport")}
+            titleStyle={{ color: theme.colors.text, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+          <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+
+          <List.Item
+            title={t("settings_scan_duplicates_btn")}
+            description={t("settings_scan_duplicates_desc")}
+            left={(props) => (
+              <List.Icon {...props} icon="content-copy" color={theme.colors.primary} />
+            )}
+            right={(props) => (
+              <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />
+            )}
+            onPress={handleScanDuplicates}
+            titleStyle={{ color: theme.colors.text, fontWeight: '600' }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+        </View>
+      </View>
+
+      {/* SECTION 3: LOOKUP CATEGORIES & CUSTOMIZATION */}
+      <View style={{ marginBottom: 20 }}>
+        <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, marginLeft: 4, letterSpacing: 0.8 }}>
+          LOOKUP CATEGORIES
+        </Text>
+        <View style={{ backgroundColor: theme.colors.cardBackground, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' }}>
+          {lookupMenuItems.map((item, index) => (
+            <React.Fragment key={item.category}>
+              <List.Item
+                title={item.title}
+                left={(props) => (
+                  <List.Icon {...props} icon={item.icon} color={theme.colors.primary} />
+                )}
+                right={(props) => (
+                  <List.Icon {...props} icon="chevron-right" color={theme.colors.textSecondary} />
+                )}
+                onPress={() =>
+                  navigation.navigate("ManageLookupCategoryScreen", {
+                    categoryName: item.category,
+                    title: item.title,
+                  })
+                }
+                titleStyle={{ color: theme.colors.text, fontWeight: '600' }}
+                style={styles.listItem}
+              />
+              {index < lookupMenuItems.length - 1 && (
+                <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+              )}
+            </React.Fragment>
+          ))}
+        </View>
+      </View>
 
       {/* Advocate Profile Edit Modal */}
       <Modal
@@ -812,7 +700,7 @@ const SettingsScreen = () => {
         onRequestClose={() => setShowWaTemplateModal(false)}
       >
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 20 }}>
+          <View style={{ backgroundColor: theme.colors.cardBackground, borderRadius: 16, padding: 20 }}>
             <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text, marginBottom: 6 }}>
               WhatsApp Message Template
             </Text>
@@ -848,7 +736,7 @@ const SettingsScreen = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 };
 

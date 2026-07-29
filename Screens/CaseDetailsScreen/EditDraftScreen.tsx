@@ -40,6 +40,7 @@ import { SignatureCanvasModal } from "./components/SignatureCanvasModal";
 import { LegalAutocompleteBar } from "./components/LegalAutocompleteBar";
 import { TableConfigModal } from "./components/TableConfigModal";
 import { ElementContextModal } from "./components/ElementContextModal";
+import OcrReviewModal from "./components/OcrReviewModal";
 
 type EditDraftScreenRouteProp = RouteProp<HomeStackParamList, "EditDraft">;
 
@@ -108,6 +109,9 @@ const EditDraftScreen: React.FC = () => {
   const [unitMode, setUnitMode] = useState<"in" | "mm" | "px">("in");
   const [isPageSetupVisible, setIsPageSetupVisible] = useState(false);
   const [docDraftLanguage, setDocDraftLanguage] = useState<"en" | "hi">("en");
+  const [ocrModalVisible, setOcrModalVisible] = useState(false);
+  const [ocrModalImageUri, setOcrModalImageUri] = useState<string | null>(null);
+  const [ocrModalExtractedText, setOcrModalExtractedText] = useState("");
 
   const formatMarginValue = (px: number, mode: "in" | "mm" | "px"): string => {
     if (mode === "in") return `${(px / 96).toFixed(2)} in`;
@@ -406,6 +410,7 @@ const EditDraftScreen: React.FC = () => {
 
   // 1. Scan-to-Editor OCR Action with Choice Modal (Camera / Gallery / Multi-Page Scanner)
   const handleScanToEditorOcr = () => {
+    postMessageToWebView({ type: "saveSelection" });
     Alert.alert(
       "Scan & Extract Text (OCR)",
       "Choose how to attach or scan document photo:",
@@ -479,17 +484,10 @@ const EditDraftScreen: React.FC = () => {
 
       if (scannedUris.length > 0) {
         const extractedText = await extractTextFromImages(scannedUris);
-        if (extractedText && extractedText.trim().length > 0) {
-          const cleanParagraphs = extractedText
-            .split("\n\n")
-            .filter((p) => p.trim().length > 0)
-            .map((p) => `<p>${p.trim()}</p>`)
-            .join("");
-          triggerFormat("insertHTML", cleanParagraphs);
-          Alert.alert("OCR Complete", "Extracted text inserted directly into document editor.");
-        } else {
-          Alert.alert("OCR Result", "No readable text could be extracted from the document photo.");
-        }
+        const firstUri = scannedUris.length > 0 ? scannedUris[0] : null;
+        setOcrModalImageUri(firstUri);
+        setOcrModalExtractedText(extractedText || "");
+        setOcrModalVisible(true);
       }
     } catch (err) {
       console.error("Error in processOcrFromSource:", err);
@@ -499,6 +497,13 @@ const EditDraftScreen: React.FC = () => {
     }
   };
 
+  const handleImportOcrText = (finalText: string) => {
+    if (!finalText) return;
+    const formattedHtml = `<p>${finalText.replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br/>")}</p>`;
+    triggerFormat("insertHTML", formattedHtml);
+    Alert.alert("Imported", "Reviewed OCR text inserted into document editor.");
+  };
+
   // 2. Offline Voice Dictation Toggle
   const toggleVoiceDictation = async () => {
     if (isDictating) {
@@ -506,12 +511,19 @@ const EditDraftScreen: React.FC = () => {
       setIsDictating(false);
     } else {
       setIsDictating(true);
-      const dictationLocale = locale === "hi" ? "hi-IN" : "en-IN";
+      const dictationLocale = (docDraftLanguage === "hi" || locale === "hi") ? "hi-IN" : "en-IN";
       const started = await speechRecognitionService.startListening(dictationLocale, {
         onStart: () => setIsDictating(true),
         onResult: (text) => {
           if (text) {
-            triggerFormat("insertText", text + " ");
+            let processed = text
+              .replace(/\b(full stop|period)\b/gi, ".")
+              .replace(/\b(पूर्ण विराम)\b/gi, "।")
+              .replace(/\b(comma)\b/gi, ",")
+              .replace(/\b(अल्पविराम)\b/gi, ",")
+              .replace(/\b(new paragraph|next paragraph)\b/gi, "\n\n")
+              .replace(/\b(नया पैराग्राफ|नया पैरा)\b/gi, "\n\n");
+            triggerFormat("insertText", processed + " ");
           }
         },
         onError: (err) => {
@@ -2949,6 +2961,15 @@ const EditDraftScreen: React.FC = () => {
         theme={theme}
         onDeleteElement={handleDeleteSelectedElement}
         onClose={() => setElementContextModalVisible(false)}
+      />
+
+      {/* Interactive OCR Review & Preview Modal */}
+      <OcrReviewModal
+        visible={ocrModalVisible}
+        imageUri={ocrModalImageUri}
+        extractedText={ocrModalExtractedText}
+        onClose={() => setOcrModalVisible(false)}
+        onImport={handleImportOcrText}
       />
     </SafeAreaView>
   );

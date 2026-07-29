@@ -1,6 +1,6 @@
 import { AntDesign } from "@expo/vector-icons";
-import React, { useContext, useState, useCallback } from "react";
-import { View, Text, TextInput, FlatList, ActivityIndicator, SafeAreaView, StyleSheet, Platform } from "react-native";
+import React, { useContext, useState, useCallback, useEffect } from "react";
+import { View, Text, TextInput, FlatList, ActivityIndicator, SafeAreaView, StyleSheet, Platform, DeviceEventEmitter } from "react-native";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { CaseDataScreen } from "../../Types/appTypes";
@@ -10,6 +10,7 @@ import { getCurrentUserId, getLocalDateString } from "../../utils/commonFunction
 import { useSearchCases } from "../../Hooks/useCases";
 import * as db from "../../DataBase";
 import { promptClientNotification } from "../../utils/whatsappNotifier";
+import { CASE_UPDATED_EVENT } from "../../utils/caseEvents";
 
 const SearchScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
@@ -28,6 +29,17 @@ const SearchScreen: React.FC = () => {
 
   const [isPopupVisible, setPopupVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const sub = DeviceEventEmitter.addListener(CASE_UPDATED_EVENT, () => {
+      if (isMounted) refreshSearch();
+    });
+    return () => {
+      isMounted = false;
+      if (sub && typeof sub.remove === "function") sub.remove();
+    };
+  }, [refreshSearch]);
 
   const handleUpdateHearing = useCallback((caseDetails: CaseDataScreen) => {
     setSelectedCase(caseDetails);
@@ -64,7 +76,8 @@ const SearchScreen: React.FC = () => {
         ...(feeReceivedToday && feeReceivedToday > 0 ? { fee_paid: updatedFeePaid } : {}),
       }, userId);
 
-      // 3. Refresh list from page 0
+      // 3. Emit global event & refresh search
+      DeviceEventEmitter.emit(CASE_UPDATED_EVENT);
       refreshSearch();
 
       // 4. Prompt WhatsApp notification to client
@@ -80,7 +93,11 @@ const SearchScreen: React.FC = () => {
     <NewCaseCard caseDetails={item} onUpdateHearingPress={() => handleUpdateHearing(item)} />
   ), [handleUpdateHearing]);
 
-  const keyExtractor = useCallback((item: CaseDataScreen) => item.id.toString(), []);
+  const keyExtractor = useCallback(
+    (item: CaseDataScreen) =>
+      `${item.id}-${(item as any).updated_at || ""}-${(item as any).fee_paid || 0}-${(item as any).date_fee_collected || 0}-${(item as any).date_fee_paid || 0}-${(item as any).date_fee || 0}-${item.nextHearing || ""}`,
+    []
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -114,10 +131,11 @@ const SearchScreen: React.FC = () => {
             data={results}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
-            initialNumToRender={10}
-            maxToRenderPerBatch={10}
-            windowSize={7}
-            removeClippedSubviews={Platform.OS === 'android'}
+            getItemLayout={(data, index) => ({ length: 160, offset: 160 * index, index })}
+            initialNumToRender={6}
+            maxToRenderPerBatch={6}
+            windowSize={3}
+            removeClippedSubviews={true}
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
             contentContainerStyle={styles.listContentContainer}

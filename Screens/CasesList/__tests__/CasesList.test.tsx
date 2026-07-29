@@ -71,7 +71,7 @@ describe("CasesList", () => {
     const updateHearingButton = await findByText("Update Hearing");
     fireEvent.press(updateHearingButton);
 
-    const updateHearingElements = await findAllByText("Update Hearing");
-    expect(updateHearingElements.length).toBe(2);
+    const popupTitle = await findByText("Update Hearing & Payment Details");
+    expect(popupTitle).toBeTruthy();
   });
 });

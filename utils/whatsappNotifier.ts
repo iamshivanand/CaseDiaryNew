@@ -98,22 +98,32 @@ export const promptClientNotification = async (
         {
           text: lang === "hi" ? "हाँ" : "Yes",
           onPress: async () => {
-            const url = `whatsapp://send?text=${encodeURIComponent(message)}&phone=${clientPhone}`;
-            try {
-              const supported = await Linking.canOpenURL(url);
-              if (supported) {
-                await Linking.openURL(url);
-              } else {
-                await Linking.openURL(`https://wa.me/${clientPhone}?text=${encodeURIComponent(message)}`);
-              }
-            } catch (err) {
-              console.error("Failed to open WhatsApp URL:", err);
-            }
+            await sendFeeReminderWhatsApp(clientPhone, message);
           },
         },
       ]
     );
   } catch (error) {
     console.error("Failed to process client WhatsApp prompt:", error);
+  }
+};
+
+export const sendFeeReminderWhatsApp = async (
+  clientPhone: string,
+  message: string
+): Promise<void> => {
+  let phone = clientPhone.replace(/\D/g, "");
+  if (!phone) return;
+  if (phone.length === 10) phone = `91${phone}`;
+  const url = `whatsapp://send?text=${encodeURIComponent(message)}&phone=${phone}`;
+  try {
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      await Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+    }
+  } catch (err) {
+    console.error("Failed to open WhatsApp URL:", err);
   }
 };
