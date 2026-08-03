@@ -1,4 +1,11 @@
 // Screens/EditCase/EditCaseScreen.tsx
+import { MaterialIcons, Ionicons } from "@expo/vector-icons";
+
+import { useTranslation } from "../../Providers/LanguageProvider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import React, { useState, useEffect, useCallback, useContext } from "react";
 import {
   ScrollView,
@@ -10,27 +17,11 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native"; // Changed StyleSheet to RNStyleSheet
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import { MaterialIcons, Ionicons } from "@expo/vector-icons";
-import * as DocumentPicker from "expo-document-picker";
-import * as ImagePicker from "expo-image-picker";
-import * as db from "../../DataBase";
 import * as Animatable from "react-native-animatable";
-import { getUserState } from "../../utils/locationService";
 import { v4 as uuidv4 } from "uuid";
-import { ThemeContext, Theme } from "../../Providers/ThemeProvider"; // Import ThemeContext and Theme type
-import { useTranslation } from "../../Providers/LanguageProvider";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getLocalDateString, parseLocalDate } from "../../utils/commonFunctions";
 
 import { getEditCaseScreenStyles } from "./EditCaseScreenStyle"; // Import the function
-import FormInput from "../CommonComponents/FormInput";
-import DropdownPicker from "../CommonComponents/DropdownPicker";
-import DatePickerField from "../CommonComponents/DatePickerField";
-import SectionHeader from "../CommonComponents/SectionHeader";
-import ActionButton from "../CommonComponents/ActionButton";
 import DocumentItem from "./components/DocumentItem";
-
 import {
   CaseData,
   Document,
@@ -41,9 +32,21 @@ import {
   caseStageOptions,
 } from "../../Types/appTypes";
 import TimelineItem from "./components/TimelineItem";
-import { HomeStackParamList } from "../../Types/navigationtypes";
+import * as db from "../../DataBase";
 import { CaseWithDetails } from "../../DataBase"; // Import TimelineEventRow
+import { ThemeContext, Theme } from "../../Providers/ThemeProvider"; // Import ThemeContext and Theme type
+import { HomeStackParamList } from "../../Types/navigationtypes";
+import {
+  getLocalDateString,
+  parseLocalDate,
+} from "../../utils/commonFunctions";
+import { getUserState } from "../../utils/locationService";
 import { PRIMARY_BLUE_COLOR_FOR_LOADER } from "../CaseDetailsScreen/CaseDetailsScreen";
+import ActionButton from "../CommonComponents/ActionButton";
+import DatePickerField from "../CommonComponents/DatePickerField";
+import DropdownPicker from "../CommonComponents/DropdownPicker";
+import FormInput from "../CommonComponents/FormInput";
+import SectionHeader from "../CommonComponents/SectionHeader";
 
 const dummyCaseTypeOptions: DropdownOption[] = [
   /* ... as before ... */ { label: "Select Case Type...", value: "" },
@@ -64,7 +67,7 @@ type EditCaseScreenRouteProp = RouteProp<HomeStackParamList, "EditCase">;
 
 const deduplicateOptions = (options: DropdownOption[]): DropdownOption[] => {
   const seen = new Set<string>();
-  return options.filter(opt => {
+  return options.filter((opt) => {
     const key = opt.label.trim().toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
@@ -81,28 +84,41 @@ const EditCaseScreen: React.FC = () => {
 
   const getOptionLabelKey = (label: string): string => {
     switch (label) {
-      case "Open": return "option_status_open";
-      case "In Progress": return "option_status_in_progress";
-      case "Closed": return "option_status_closed";
-      case "On Hold": return "option_status_on_hold";
-      case "Appealed": return "option_status_appealed";
-      case "High": return "option_priority_high";
-      case "Medium": return "option_priority_medium";
-      case "Low": return "option_priority_low";
-      case "Civil Suit": return "practice_civil";
-      case "Criminal Defense": return "practice_criminal";
-      case "Family Law": return "practice_family";
-      case "Corporate": return "practice_corporate";
-      default: return "";
+      case "Open":
+        return "option_status_open";
+      case "In Progress":
+        return "option_status_in_progress";
+      case "Closed":
+        return "option_status_closed";
+      case "On Hold":
+        return "option_status_on_hold";
+      case "Appealed":
+        return "option_status_appealed";
+      case "High":
+        return "option_priority_high";
+      case "Medium":
+        return "option_priority_medium";
+      case "Low":
+        return "option_priority_low";
+      case "Civil Suit":
+        return "practice_civil";
+      case "Criminal Defense":
+        return "practice_criminal";
+      case "Family Law":
+        return "practice_family";
+      case "Corporate":
+        return "practice_corporate";
+      default:
+        return "";
     }
   };
 
   const getTranslatedOptions = (options: DropdownOption[]) => {
-    return options.map(opt => {
+    return options.map((opt) => {
       const key = getOptionLabelKey(opt.label.toString());
       return {
         ...opt,
-        label: key ? t(key as any) : opt.label
+        label: key ? t(key as any) : opt.label,
       };
     });
   };
@@ -116,7 +132,9 @@ const EditCaseScreen: React.FC = () => {
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
-  const [policeStationOptions, setPoliceStationOptions] = useState<DropdownOption[]>([]);
+  const [policeStationOptions, setPoliceStationOptions] = useState<
+    DropdownOption[]
+  >([]);
   const [districtOptions, setDistrictOptions] = useState<DropdownOption[]>([]);
   const [otherDistrict, setOtherDistrict] = useState("");
   const [otherPoliceStation, setOtherPoliceStation] = useState("");
@@ -125,24 +143,33 @@ const EditCaseScreen: React.FC = () => {
   const [otherCourt, setOtherCourt] = useState("");
   const [otherCaseType, setOtherCaseType] = useState("");
   const [userId, setUserId] = useState<number | null>(null);
-  const [originalCase, setOriginalCase] = useState<CaseWithDetails | null>(null);
+  const [originalCase, setOriginalCase] = useState<CaseWithDetails | null>(
+    null
+  );
 
-  const handleDistrictChange = async (districtId: any, activeUserId?: number | null) => {
+  const handleDistrictChange = async (
+    districtId: any,
+    activeUserId?: number | null
+  ) => {
     try {
       if (!districtId) {
-        setPoliceStationOptions([{ label: "Other", value: "Other" }]);
+        const uId = activeUserId !== undefined ? activeUserId : userId;
+        const allPs = await db.getPoliceStations(null, uId);
+        const formatted = allPs.map((ps) => ({ label: ps.name, value: ps.id }));
+        formatted.push({ label: "Other", value: "Other" });
+        setPoliceStationOptions(deduplicateOptions(formatted));
         return;
       }
       const uId = activeUserId !== undefined ? activeUserId : userId;
       let psList = [];
-      if (districtId === 'Other') {
+      if (districtId === "Other") {
         psList = await db.getPoliceStations(null, uId);
       } else {
         psList = await db.getPoliceStations(Number(districtId), uId);
       }
-      const formatted = psList.map(ps => ({
+      const formatted = psList.map((ps) => ({
         label: ps.name,
-        value: ps.id
+        value: ps.id,
       }));
       formatted.push({ label: "Other", value: "Other" });
       setPoliceStationOptions(deduplicateOptions(formatted));
@@ -160,7 +187,10 @@ const EditCaseScreen: React.FC = () => {
       OnBehalfOf: dbCase.OnBehalfOf,
       CNRNumber: dbCase.CNRNumber,
       case_number: dbCase.case_number,
-      case_year: dbCase.case_year !== undefined && dbCase.case_year !== null ? dbCase.case_year.toString() : "",
+      case_year:
+        dbCase.case_year !== undefined && dbCase.case_year !== null
+          ? dbCase.case_year.toString()
+          : "",
       court_id: dbCase.court_id,
       court_name: dbCase.court_name,
       case_type_id: dbCase.case_type_id,
@@ -223,7 +253,8 @@ const EditCaseScreen: React.FC = () => {
     if (!currentCaseId) return;
     setIsLoadingTimeline(true);
     try {
-      const fetchedEvents = await db.getCaseTimelineEventsByCaseId(currentCaseId);
+      const fetchedEvents =
+        await db.getCaseTimelineEventsByCaseId(currentCaseId);
       const uiEvents: TimelineEvent[] = fetchedEvents.map((dbEvent) => ({
         id: dbEvent.id,
         case_id: dbEvent.case_id,
@@ -277,34 +308,101 @@ const EditCaseScreen: React.FC = () => {
           // Retrieve userId
           let activeUserId = null;
           try {
-            const userIdVal = await AsyncStorage.getItem('@user_id');
+            const userIdVal = await AsyncStorage.getItem("@user_id");
             activeUserId = userIdVal ? parseInt(userIdVal, 10) : null;
             setUserId(activeUserId);
           } catch (e) {
             console.error("Error retrieving userId:", e);
           }
 
+          // Auto-register missing court_name and case_type_name lookups
+          if (fetchedCase.court_name && !fetchedCase.court_id) {
+            try {
+              const cId = await db.addCourt(
+                fetchedCase.court_name,
+                activeUserId
+              );
+              if (cId) fetchedCase.court_id = cId;
+            } catch (e) {
+              console.warn(
+                "Could not auto-register court_name in EditCase:",
+                e
+              );
+            }
+          }
+
+          if (fetchedCase.case_type_name && !fetchedCase.case_type_id) {
+            try {
+              const ctId = await db.addCaseType(
+                fetchedCase.case_type_name,
+                activeUserId
+              );
+              if (ctId) fetchedCase.case_type_id = ctId;
+            } catch (e) {
+              console.warn(
+                "Could not auto-register case_type_name in EditCase:",
+                e
+              );
+            }
+          }
+
           // Fetch Case Types
           try {
             const caseTypesList = await db.getCaseTypes(activeUserId);
-            const formattedCaseTypes = caseTypesList.map(ct => ({ label: ct.name, value: ct.id }));
+            const formattedCaseTypes = caseTypesList.map((ct) => ({
+              label: ct.name,
+              value: ct.id,
+            }));
+            if (
+              fetchedCase.case_type_name &&
+              !formattedCaseTypes.some(
+                (o) =>
+                  o.label === fetchedCase.case_type_name ||
+                  o.value === fetchedCase.case_type_id
+              )
+            ) {
+              formattedCaseTypes.unshift({
+                label: fetchedCase.case_type_name,
+                value: fetchedCase.case_type_id || fetchedCase.case_type_name,
+              });
+            }
             formattedCaseTypes.push({ label: "Other", value: "Other" });
             setCaseTypeOptions(deduplicateOptions(formattedCaseTypes));
           } catch (error) {
             console.error("Error fetching case types:", error);
-            const formattedFallback = dummyCaseTypeOptions.filter(o => o.value !== "");
+            const formattedFallback = dummyCaseTypeOptions.filter(
+              (o) => o.value !== ""
+            );
             setCaseTypeOptions(deduplicateOptions(formattedFallback));
           }
 
           // Fetch Courts
           try {
             const courtsList = await db.getCourts(activeUserId);
-            const formattedCourts = courtsList.map(c => ({ label: c.name, value: c.id }));
+            const formattedCourts = courtsList.map((c) => ({
+              label: c.name,
+              value: c.id,
+            }));
+            if (
+              fetchedCase.court_name &&
+              !formattedCourts.some(
+                (o) =>
+                  o.label === fetchedCase.court_name ||
+                  o.value === fetchedCase.court_id
+              )
+            ) {
+              formattedCourts.unshift({
+                label: fetchedCase.court_name,
+                value: fetchedCase.court_id || fetchedCase.court_name,
+              });
+            }
             formattedCourts.push({ label: "Other", value: "Other" });
             setCourtOptions(deduplicateOptions(formattedCourts));
           } catch (error) {
             console.error("Error fetching courts:", error);
-            const formattedFallback = dummyCourtOptions.filter(o => o.value !== "");
+            const formattedFallback = dummyCourtOptions.filter(
+              (o) => o.value !== ""
+            );
             setCourtOptions(deduplicateOptions(formattedFallback));
           }
 
@@ -319,9 +417,9 @@ const EditCaseScreen: React.FC = () => {
             if (districtsList.length === 0) {
               districtsList = await db.getDistricts(activeUserId);
             }
-            const formattedDistricts = districtsList.map(d => ({
+            const formattedDistricts = districtsList.map((d) => ({
               label: d.name,
-              value: d.id
+              value: d.id,
             }));
             formattedDistricts.push({ label: "Other", value: "Other" });
             setDistrictOptions(deduplicateOptions(formattedDistricts));
@@ -334,10 +432,11 @@ const EditCaseScreen: React.FC = () => {
           if (fetchedCase.police_station_id) {
             try {
               const dbInstance = await db.getDb();
-              const psRow = await dbInstance.getFirstAsync<{ district_id: number | null }>(
-                "SELECT district_id FROM PoliceStations WHERE id = ?",
-                [fetchedCase.police_station_id]
-              );
+              const psRow = await dbInstance.getFirstAsync<{
+                district_id: number | null;
+              }>("SELECT district_id FROM PoliceStations WHERE id = ?", [
+                fetchedCase.police_station_id,
+              ]);
               if (psRow && psRow.district_id) {
                 initialDistrictId = psRow.district_id;
               }
@@ -407,23 +506,45 @@ const EditCaseScreen: React.FC = () => {
     // Validation: Do not allow previously set dates to be cleared
     const originalDateFiled = originalCase?.dateFiled;
     const newDateFiled = caseData.FiledDate;
-    if (originalDateFiled && originalDateFiled !== "N/A" && originalDateFiled !== "Invalid Date" && (!newDateFiled || newDateFiled.trim() === "")) {
-      Alert.alert(t("editcase_val_error"), "Date Filed is required and cannot be cleared.");
+    if (
+      originalDateFiled &&
+      originalDateFiled !== "N/A" &&
+      originalDateFiled !== "Invalid Date" &&
+      (!newDateFiled || newDateFiled.trim() === "")
+    ) {
+      Alert.alert(
+        t("editcase_val_error"),
+        "Date Filed is required and cannot be cleared."
+      );
       return;
     }
 
     const originalNextDate = originalCase?.NextDate;
     const newNextDate = caseData.HearingDate;
-    if (originalNextDate && originalNextDate !== "N/A" && originalNextDate !== "Invalid Date" && (!newNextDate || newNextDate.trim() === "")) {
-      Alert.alert(t("editcase_val_error"), "Hearing Date is required and cannot be cleared.");
+    if (
+      originalNextDate &&
+      originalNextDate !== "N/A" &&
+      originalNextDate !== "Invalid Date" &&
+      (!newNextDate || newNextDate.trim() === "")
+    ) {
+      Alert.alert(
+        t("editcase_val_error"),
+        "Hearing Date is required and cannot be cleared."
+      );
       return;
     }
 
     const executeSave = async (extraEvents: TimelineEvent[] = []) => {
       setIsSaving(true);
       let overallSuccess = true;
-      const crimeNo = caseData.crime_number && caseData.crime_number.trim() ? caseData.crime_number.trim() : null;
-      const crimeYr = caseData.crime_year && caseData.crime_year.toString().trim() ? parseInt(caseData.crime_year.toString().trim(), 10) : null;
+      const crimeNo =
+        caseData.crime_number && caseData.crime_number.trim()
+          ? caseData.crime_number.trim()
+          : null;
+      const crimeYr =
+        caseData.crime_year && caseData.crime_year.toString().trim()
+          ? parseInt(caseData.crime_year.toString().trim(), 10)
+          : null;
       try {
         let courtId = caseData.court_id || null;
         let courtNameForDb = caseData.court_name || null;
@@ -440,7 +561,8 @@ const EditCaseScreen: React.FC = () => {
           const selectedCourtOption = courtOptions.find(
             (opt) => opt.value === courtId
           );
-          courtNameForDb = selectedCourtOption?.label || caseData.court_name || null;
+          courtNameForDb =
+            selectedCourtOption?.label || caseData.court_name || null;
         }
 
         let caseTypeId = caseData.case_type_id || null;
@@ -458,13 +580,18 @@ const EditCaseScreen: React.FC = () => {
           const selectedCaseTypeOption = caseTypeOptions.find(
             (opt) => opt.value === caseTypeId
           );
-          caseTypeNameForDb = selectedCaseTypeOption?.label || caseData.case_type_name || null;
+          caseTypeNameForDb =
+            selectedCaseTypeOption?.label || caseData.case_type_name || null;
         }
 
         let districtId = caseData.district_id || null;
         if (districtId === "Other") {
           if (otherDistrict.trim()) {
-            const newId = await db.addDistrict(otherDistrict.trim(), null, userId);
+            const newId = await db.addDistrict(
+              otherDistrict.trim(),
+              null,
+              userId
+            );
             districtId = newId;
           } else {
             districtId = null;
@@ -476,7 +603,11 @@ const EditCaseScreen: React.FC = () => {
         let policeStationId = caseData.police_station_id || null;
         if (policeStationId === "Other") {
           if (otherPoliceStation.trim()) {
-            const newId = await db.addPoliceStation(otherPoliceStation.trim(), districtId, userId);
+            const newId = await db.addPoliceStation(
+              otherPoliceStation.trim(),
+              districtId,
+              userId
+            );
             policeStationId = newId;
           } else {
             policeStationId = null;
@@ -520,8 +651,18 @@ const EditCaseScreen: React.FC = () => {
           case_stage: caseData.case_stage,
           crime_number: crimeNo,
           crime_year: crimeYr,
-          total_fee: caseData.total_fee !== undefined ? (typeof caseData.total_fee === 'string' ? parseFloat(caseData.total_fee) : caseData.total_fee) : undefined,
-          fee_paid: caseData.fee_paid !== undefined ? (typeof caseData.fee_paid === 'string' ? parseFloat(caseData.fee_paid) : caseData.fee_paid) : undefined,
+          total_fee:
+            caseData.total_fee !== undefined
+              ? typeof caseData.total_fee === "string"
+                ? parseFloat(caseData.total_fee)
+                : caseData.total_fee
+              : undefined,
+          fee_paid:
+            caseData.fee_paid !== undefined
+              ? typeof caseData.fee_paid === "string"
+                ? parseFloat(caseData.fee_paid)
+                : caseData.fee_paid
+              : undefined,
         };
         Object.keys(updatePayload).forEach((key) => {
           if (updatePayload[key as keyof db.CaseUpdateData] === undefined)
@@ -546,7 +687,7 @@ const EditCaseScreen: React.FC = () => {
                 fileType: newDoc.fileType || "application/octet-stream",
                 fileUri: newDoc.uri as string,
                 fileSize: newDoc.fileSize,
-                userId: userId,
+                userId,
               });
               if (!uploadedDocId) overallSuccess = false;
             } catch (e) {
@@ -623,8 +764,11 @@ const EditCaseScreen: React.FC = () => {
     };
 
     // Check if hearing date changed but no new timeline event was added
-    const isHearingDateChanged = originalCase?.NextDate && caseData.HearingDate !== originalCase.NextDate;
-    const hasNewTimelineEvent = timelineEvents.some((event) => event._status === "new");
+    const isHearingDateChanged =
+      originalCase?.NextDate && caseData.HearingDate !== originalCase.NextDate;
+    const hasNewTimelineEvent = timelineEvents.some(
+      (event) => event._status === "new"
+    );
 
     if (isHearingDateChanged && !hasNewTimelineEvent) {
       Alert.alert(
@@ -664,94 +808,94 @@ const EditCaseScreen: React.FC = () => {
       Alert.alert(t("alert_error"), t("editcase_err_id_missing"));
       return;
     }
-    
-    Alert.alert(
-      t("doc_select_picker_title"),
-      t("doc_select_picker_desc"),
-      [
-        {
-          text: t("doc_select_picker_file"),
-          onPress: async () => {
-            try {
-              const result = await DocumentPicker.getDocumentAsync({
-                type: "*/*",
-                copyToCacheDirectory: true,
-              });
-              if (result.canceled || !result.assets || result.assets.length === 0)
-                return;
-              const asset = result.assets[0];
-              if (!asset.uri) {
-                Alert.alert(t("alert_error"), t("doc_err_uri"));
-                return;
-              }
-              const newDocument: Document = {
-                id: Date.now(),
-                case_id: caseData.id!,
-                fileName: asset.name || `doc_${Date.now()}`,
-                uploadDate: new Date().toISOString(),
-                fileType: asset.mimeType || "unknown",
-                fileSize: asset.size,
-                uri: asset.uri,
-              };
-              setDocuments((prev) => [...prev, newDocument]);
-              Alert.alert(
-                t("editcase_doc_added"),
-                `${newDocument.fileName} ${t("editcase_doc_added_desc")}`
-              );
-            } catch (e) {
-              console.error(e);
-              Alert.alert(t("alert_error"), t("editcase_err_pick_doc"));
+
+    Alert.alert(t("doc_select_picker_title"), t("doc_select_picker_desc"), [
+      {
+        text: t("doc_select_picker_file"),
+        onPress: async () => {
+          try {
+            const result = await DocumentPicker.getDocumentAsync({
+              type: "*/*",
+              copyToCacheDirectory: true,
+            });
+            if (result.canceled || !result.assets || result.assets.length === 0)
+              return;
+            const asset = result.assets[0];
+            if (!asset.uri) {
+              Alert.alert(t("alert_error"), t("doc_err_uri"));
+              return;
             }
+            const newDocument: Document = {
+              id: Date.now(),
+              case_id: caseData.id!,
+              fileName: asset.name || `doc_${Date.now()}`,
+              uploadDate: new Date().toISOString(),
+              fileType: asset.mimeType || "unknown",
+              fileSize: asset.size,
+              uri: asset.uri,
+            };
+            setDocuments((prev) => [...prev, newDocument]);
+            Alert.alert(
+              t("editcase_doc_added"),
+              `${newDocument.fileName} ${t("editcase_doc_added_desc")}`
+            );
+          } catch (e) {
+            console.error(e);
+            Alert.alert(t("alert_error"), t("editcase_err_pick_doc"));
           }
         },
-        {
-          text: t("doc_select_picker_camera"),
-          onPress: async () => {
-            try {
-              const { status } = await ImagePicker.requestCameraPermissionsAsync();
-              if (status !== 'granted') {
-                Alert.alert(t("alert_error"), "Permission to access camera was denied.");
-                return;
-              }
-              const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                quality: 0.9,
-              });
-              if (result.canceled || !result.assets || result.assets.length === 0)
-                return;
-              const asset = result.assets[0];
-              if (!asset.uri) {
-                Alert.alert(t("alert_error"), t("doc_err_uri"));
-                return;
-              }
-              const timestamp = Date.now();
-              const newDocument: Document = {
-                id: timestamp,
-                case_id: caseData.id!,
-                fileName: asset.fileName || `photo_${timestamp}.jpg`,
-                uploadDate: new Date().toISOString(),
-                fileType: asset.mimeType || "image/jpeg",
-                fileSize: asset.fileSize || 0,
-                uri: asset.uri,
-              };
-              setDocuments((prev) => [...prev, newDocument]);
+      },
+      {
+        text: t("doc_select_picker_camera"),
+        onPress: async () => {
+          try {
+            const { status } =
+              await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== "granted") {
               Alert.alert(
-                t("editcase_doc_added"),
-                `${newDocument.fileName} ${t("editcase_doc_added_desc")}`
+                t("alert_error"),
+                "Permission to access camera was denied."
               );
-            } catch (e) {
-              console.error(e);
-              Alert.alert(t("alert_error"), "Failed to capture image.");
+              return;
             }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              quality: 0.9,
+            });
+            if (result.canceled || !result.assets || result.assets.length === 0)
+              return;
+            const asset = result.assets[0];
+            if (!asset.uri) {
+              Alert.alert(t("alert_error"), t("doc_err_uri"));
+              return;
+            }
+            const timestamp = Date.now();
+            const newDocument: Document = {
+              id: timestamp,
+              case_id: caseData.id!,
+              fileName: asset.fileName || `photo_${timestamp}.jpg`,
+              uploadDate: new Date().toISOString(),
+              fileType: asset.mimeType || "image/jpeg",
+              fileSize: asset.fileSize || 0,
+              uri: asset.uri,
+            };
+            setDocuments((prev) => [...prev, newDocument]);
+            Alert.alert(
+              t("editcase_doc_added"),
+              `${newDocument.fileName} ${t("editcase_doc_added_desc")}`
+            );
+          } catch (e) {
+            console.error(e);
+            Alert.alert(t("alert_error"), "Failed to capture image.");
           }
         },
-        {
-          text: t("alert_cancel"),
-          style: "cancel"
-        }
-      ]
-    );
+      },
+      {
+        text: t("alert_cancel"),
+        style: "cancel",
+      },
+    ]);
   };
   const handleViewDocument = (doc: Document) =>
     Alert.alert(t("editcase_view_doc"), doc.fileName);
@@ -769,29 +913,33 @@ const EditCaseScreen: React.FC = () => {
       Alert.alert(t("alert_error"), t("editcase_err_invalid_doc_id"));
       return;
     }
-    Alert.alert(t("editcase_confirm"), `${t("editcase_delete")} "${docToDelete.fileName}"?`, [
-      { text: t("alert_cancel") },
-      {
-        text: t("editcase_delete"),
-        style: "destructive",
-        onPress: async () => {
-          try {
-            setIsLoadingDocuments(true);
-            const success = await db.deleteCaseDocument(docToDelete.id);
-            if (success) {
-              setDocuments((docs) =>
-                docs.filter((d) => d.id !== docToDelete.id)
-              );
-              Alert.alert(t("editcase_deleted"));
-            } else Alert.alert(t("alert_error"), t("editcase_err_delete_db"));
-          } catch (e) {
-            Alert.alert(t("alert_error"), t("editcase_err_delete"));
-          } finally {
-            setIsLoadingDocuments(false);
-          }
+    Alert.alert(
+      t("editcase_confirm"),
+      `${t("editcase_delete")} "${docToDelete.fileName}"?`,
+      [
+        { text: t("alert_cancel") },
+        {
+          text: t("editcase_delete"),
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsLoadingDocuments(true);
+              const success = await db.deleteCaseDocument(docToDelete.id);
+              if (success) {
+                setDocuments((docs) =>
+                  docs.filter((d) => d.id !== docToDelete.id)
+                );
+                Alert.alert(t("editcase_deleted"));
+              } else Alert.alert(t("alert_error"), t("editcase_err_delete_db"));
+            } catch (e) {
+              Alert.alert(t("alert_error"), t("editcase_err_delete"));
+            } finally {
+              setIsLoadingDocuments(false);
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const handleAddTimelineEvent = () => {
@@ -806,7 +954,7 @@ const EditCaseScreen: React.FC = () => {
             id: `temp_${uuidv4()}`, // Also use this for key until DB ID comes
             case_id: caseData.id as number,
             date: new Date().toISOString(), // Default to today, modal should allow picking date
-            description: description,
+            description,
             _status: "new",
           };
           setTimelineEvents((prev) => [...prev, newEvent]);
@@ -842,31 +990,38 @@ const EditCaseScreen: React.FC = () => {
     );
   };
   const handleDeleteTimelineEvent = (eventToDelete: TimelineEvent) => {
-    Alert.alert(t("editcase_confirm_delete"), t("editcase_delete_event_confirm"), [
-      { text: t("alert_cancel"), style: "cancel" },
-      {
-        text: t("editcase_delete"),
-        style: "destructive",
-        onPress: () => {
-          if (eventToDelete._status === "new" && eventToDelete._clientSideId) {
-            setTimelineEvents((prev) =>
-              prev.filter(
-                (event) => event._clientSideId !== eventToDelete._clientSideId
-              )
-            );
-          } else if (typeof eventToDelete.id === "number") {
-            // Existing event
-            setTimelineEvents((prev) =>
-              prev.map((event) =>
-                event.id === eventToDelete.id
-                  ? { ...event, _status: "deleted" }
-                  : event
-              )
-            );
-          }
+    Alert.alert(
+      t("editcase_confirm_delete"),
+      t("editcase_delete_event_confirm"),
+      [
+        { text: t("alert_cancel"), style: "cancel" },
+        {
+          text: t("editcase_delete"),
+          style: "destructive",
+          onPress: () => {
+            if (
+              eventToDelete._status === "new" &&
+              eventToDelete._clientSideId
+            ) {
+              setTimelineEvents((prev) =>
+                prev.filter(
+                  (event) => event._clientSideId !== eventToDelete._clientSideId
+                )
+              );
+            } else if (typeof eventToDelete.id === "number") {
+              // Existing event
+              setTimelineEvents((prev) =>
+                prev.map((event) =>
+                  event.id === eventToDelete.id
+                    ? { ...event, _status: "deleted" }
+                    : event
+                )
+              );
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   if (isLoadingCaseDetails) {
@@ -899,10 +1054,10 @@ const EditCaseScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContentContainer}
         keyboardShouldPersistTaps="handled"
       >
-        <Animatable.View 
-          animation="fadeInUp" 
-          duration={600} 
-          useNativeDriver 
+        <Animatable.View
+          animation="fadeInUp"
+          duration={600}
+          useNativeDriver
           style={styles.formContainer}
         >
           <FormInput
@@ -923,10 +1078,12 @@ const EditCaseScreen: React.FC = () => {
           <FormInput
             label="Sessions Trial Number"
             value={caseData.session_trial_number || ""}
-            onChangeText={(text) => handleInputChange("session_trial_number", text)}
+            onChangeText={(text) =>
+              handleInputChange("session_trial_number", text)
+            }
             placeholder="Enter Sessions Trial Number"
           />
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flexDirection: "row", gap: 12 }}>
             <View style={{ flex: 2 }}>
               <FormInput
                 label={t("field_crime_number")}
@@ -938,9 +1095,14 @@ const EditCaseScreen: React.FC = () => {
             <View style={{ flex: 1 }}>
               <FormInput
                 label={t("field_crime_year")}
-                value={caseData.crime_year !== undefined && caseData.crime_year !== null ? caseData.crime_year.toString() : ""}
+                value={
+                  caseData.crime_year !== undefined &&
+                  caseData.crime_year !== null
+                    ? caseData.crime_year.toString()
+                    : ""
+                }
                 onChangeText={(text) => {
-                  const sanitized = text.replace(/[^0-9]/g, '').slice(0, 4);
+                  const sanitized = text.replace(/[^0-9]/g, "").slice(0, 4);
                   handleInputChange("crime_year", sanitized);
                 }}
                 placeholder={new Date().getFullYear().toString()}
@@ -971,18 +1133,14 @@ const EditCaseScreen: React.FC = () => {
           <DropdownPicker
             label={t("field_case_type")}
             selectedValue={caseData.case_type_id || ""}
-            onValueChange={(val) =>
-              handleInputChange("case_type_id", val)
-            }
+            onValueChange={(val) => handleInputChange("case_type_id", val)}
             options={getTranslatedOptions(caseTypeOptions)}
             onOtherValueChange={(text) => setOtherCaseType(text)}
           />
           <DropdownPicker
             label={t("field_court")}
             selectedValue={caseData.court_id || ""}
-            onValueChange={(val) =>
-              handleInputChange("court_id", val)
-            }
+            onValueChange={(val) => handleInputChange("court_id", val)}
             options={getTranslatedOptions(courtOptions)}
             onOtherValueChange={(text) => setOtherCourt(text)}
           />
@@ -1000,17 +1158,20 @@ const EditCaseScreen: React.FC = () => {
           <DropdownPicker
             label={t("field_police_station")}
             selectedValue={caseData.police_station_id || ""}
-            onValueChange={(val) =>
-              handleInputChange("police_station_id", val)
-            }
+            onValueChange={(val) => handleInputChange("police_station_id", val)}
             options={getTranslatedOptions(policeStationOptions)}
             onOtherValueChange={(text) => setOtherPoliceStation(text)}
           />
           <DatePickerField
             label={t("field_filed_date")}
-            value={caseData.FiledDate ? parseLocalDate(caseData.FiledDate) : null}
+            value={
+              caseData.FiledDate ? parseLocalDate(caseData.FiledDate) : null
+            }
             onChange={(date) =>
-              handleInputChange("FiledDate", date ? getLocalDateString(date) : null)
+              handleInputChange(
+                "FiledDate",
+                date ? getLocalDateString(date) : null
+              )
             }
           />
           <FormInput
@@ -1031,7 +1192,9 @@ const EditCaseScreen: React.FC = () => {
           <FormInput
             label="Opposing Advocate Contact No."
             value={caseData.OppAdvocateContactNumber || ""}
-            onChangeText={(text) => handleInputChange("OppAdvocateContactNumber", text)}
+            onChangeText={(text) =>
+              handleInputChange("OppAdvocateContactNumber", text)
+            }
             keyboardType="phone-pad"
             showContactPicker
           />
@@ -1044,7 +1207,9 @@ const EditCaseScreen: React.FC = () => {
           <DropdownPicker
             label="Case Stage"
             selectedValue={caseData.case_stage || ""}
-            onValueChange={(val) => handleInputChange("case_stage", val as string)}
+            onValueChange={(val) =>
+              handleInputChange("case_stage", val as string)
+            }
             options={getTranslatedOptions(caseStageOptions)}
           />
           <DropdownPicker
@@ -1057,9 +1222,14 @@ const EditCaseScreen: React.FC = () => {
           />
           <DatePickerField
             label={t("field_hearing_date")}
-            value={caseData.HearingDate ? parseLocalDate(caseData.HearingDate) : null}
+            value={
+              caseData.HearingDate ? parseLocalDate(caseData.HearingDate) : null
+            }
             onChange={(date) =>
-              handleInputChange("HearingDate", date ? getLocalDateString(date) : null)
+              handleInputChange(
+                "HearingDate",
+                date ? getLocalDateString(date) : null
+              )
             }
           />
           <DatePickerField
@@ -1079,7 +1249,9 @@ const EditCaseScreen: React.FC = () => {
           {caseData.Status === "Closed" && (
             <DatePickerField
               label={t("field_date_closed")}
-              value={caseData.ClosedDate ? parseLocalDate(caseData.ClosedDate) : null}
+              value={
+                caseData.ClosedDate ? parseLocalDate(caseData.ClosedDate) : null
+              }
               onChange={(date) =>
                 handleInputChange(
                   "ClosedDate",
@@ -1108,11 +1280,16 @@ const EditCaseScreen: React.FC = () => {
             value={caseData.OnBehalfOf || ""}
             onChangeText={(text) => handleInputChange("OnBehalfOf", text)}
           />
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flexDirection: "row", gap: 12 }}>
             <View style={{ flex: 1 }}>
               <FormInput
                 label="Total Fee (₹)"
-                value={caseData.total_fee !== undefined && caseData.total_fee !== null ? caseData.total_fee.toString() : ""}
+                value={
+                  caseData.total_fee !== undefined &&
+                  caseData.total_fee !== null
+                    ? caseData.total_fee.toString()
+                    : ""
+                }
                 onChangeText={(text) => handleInputChange("total_fee", text)}
                 placeholder="Agreed Total Fee"
                 keyboardType="numeric"
@@ -1121,7 +1298,11 @@ const EditCaseScreen: React.FC = () => {
             <View style={{ flex: 1 }}>
               <FormInput
                 label="Fee Paid (₹)"
-                value={caseData.fee_paid !== undefined && caseData.fee_paid !== null ? caseData.fee_paid.toString() : ""}
+                value={
+                  caseData.fee_paid !== undefined && caseData.fee_paid !== null
+                    ? caseData.fee_paid.toString()
+                    : ""
+                }
                 onChangeText={(text) => handleInputChange("fee_paid", text)}
                 placeholder="Fee Paid to Date"
                 keyboardType="numeric"
@@ -1148,7 +1329,9 @@ const EditCaseScreen: React.FC = () => {
             {isLoadingDocuments ? (
               <ActivityIndicator />
             ) : documents.length === 0 ? (
-              <Text style={styles.emptyListText}>{t("editcase_no_documents")}</Text>
+              <Text style={styles.emptyListText}>
+                {t("editcase_no_documents")}
+              </Text>
             ) : (
               documents.map((doc) => (
                 <DocumentItem
@@ -1177,7 +1360,9 @@ const EditCaseScreen: React.FC = () => {
               <ActivityIndicator />
             ) : timelineEvents.filter((e) => e._status !== "deleted").length ===
               0 ? (
-              <Text style={styles.emptyListText}>{t("editcase_no_timeline")}</Text>
+              <Text style={styles.emptyListText}>
+                {t("editcase_no_timeline")}
+              </Text>
             ) : (
               timelineEvents
                 .filter((e) => e._status !== "deleted")

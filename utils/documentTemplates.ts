@@ -242,7 +242,10 @@ export interface PowerOfAttorneyData {
 }
 
 // 1. VAKALATNAMA
-export const getVakalatnamaHtml = (data: VakalatnamaData, isHindi = false): string => {
+export const getVakalatnamaHtml = (
+  data: VakalatnamaData,
+  isHindi = false
+): string => {
   if (isHindi) {
     return `<p class="court-header" style="text-align: center;"><b>समक्ष न्यायालय श्रीमान ${data.courtName.toUpperCase()}</b><br/>स्थान: जिला न्यायालय</p>
 <p class="case-details" style="text-align: center;"><b>वाद संख्या: ${data.suitNumber || "__________"} वर्ष ${data.caseYear || "2026"}</b></p>
@@ -264,7 +267,10 @@ export const getVakalatnamaHtml = (data: VakalatnamaData, isHindi = false): stri
 };
 
 // 2. ADJOURNMENT APPLICATION
-export const getAdjournmentHtml = (data: AdjournmentData, isHindi = false): string => {
+export const getAdjournmentHtml = (
+  data: AdjournmentData,
+  isHindi = false
+): string => {
   if (isHindi) {
     return `<p class="court-header" style="text-align: center;"><b>समक्ष न्यायालय श्रीमान ${data.courtName.toUpperCase()}</b><br/>स्थान: जिला न्यायालय</p>
 <p class="case-details"><b>वाद संख्या: ${data.caseNumber || "__________"}</b><br/><b>पक्षकार: ${data.parties.toUpperCase()}</b></p>
@@ -312,13 +318,19 @@ export const getBailHtml = (data: BailData, isHindi = false): string => {
 };
 
 // 4. SUPPORTING AFFIDAVIT
-export const getAffidavitHtml = (data: AffidavitData, isHindi = false): string => {
+export const getAffidavitHtml = (
+  data: AffidavitData,
+  isHindi = false
+): string => {
   const factsList = data.facts
     ? data.facts
-        .split('\n')
-        .filter((fact) => fact.trim() !== '')
-        .map((fact, idx) => `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि" : "That"} ${fact.trim()}</p>`)
-        .join('\n')
+        .split("\n")
+        .filter((fact) => fact.trim() !== "")
+        .map(
+          (fact, idx) =>
+            `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि" : "That"} ${fact.trim()}</p>`
+        )
+        .join("\n")
     : `<p class="body-text">1. ${isHindi ? "यह कि साथ में प्रस्तुत आवेदन की सभी बातें सही हैं।" : "That the contents of the accompanying application are true and correct."}</p>`;
 
   if (isHindi) {
@@ -344,21 +356,30 @@ ${factsList}
 };
 
 // 5. WRITTEN STATEMENT
-export const getWrittenStatementHtml = (data: WrittenStatementData, isHindi = false): string => {
+export const getWrittenStatementHtml = (
+  data: WrittenStatementData,
+  isHindi = false
+): string => {
   const objectionsList = data.preliminaryObjections
     ? data.preliminaryObjections
-        .split('\n')
-        .filter((p) => p.trim() !== '')
-        .map((p, idx) => `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि" : "That"} ${p.trim()}</p>`)
-        .join('\n')
+        .split("\n")
+        .filter((p) => p.trim() !== "")
+        .map(
+          (p, idx) =>
+            `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि" : "That"} ${p.trim()}</p>`
+        )
+        .join("\n")
     : `<p class="body-text">1. ${isHindi ? "यह कि वादी का वाद कानूनन चलने योग्य नहीं है।" : "That the suit is not maintainable under law."}</p>`;
 
   const replyList = data.replyOnMerits
     ? data.replyOnMerits
-        .split('\n')
-        .filter((p) => p.trim() !== '')
-        .map((p, idx) => `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि वाद पत्र के पैरा का उत्तर अस्वीकार किया जाता है..." : "That paragraph contents are denied..."} ${p.trim()}</p>`)
-        .join('\n')
+        .split("\n")
+        .filter((p) => p.trim() !== "")
+        .map(
+          (p, idx) =>
+            `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि वाद पत्र के पैरा का उत्तर अस्वीकार किया जाता है..." : "That paragraph contents are denied..."} ${p.trim()}</p>`
+        )
+        .join("\n")
     : `<p class="body-text">1. ${isHindi ? "यह कि पैरा 1 के तथ्य अस्वीकार किए जाते हैं।" : "That paragraph 1 contents are denied."}</p>`;
 
   if (isHindi) {
@@ -384,13 +405,16 @@ ${replyList}
 };
 
 // 6. LEGAL NOTICE
-export const getLegalNoticeHtml = (data: LegalNoticeData, isHindi = false): string => {
+export const getLegalNoticeHtml = (
+  data: LegalNoticeData,
+  isHindi = false
+): string => {
   const factsHtml = data.noticeFacts
     ? data.noticeFacts
-        .split('\n')
-        .filter((p) => p.trim() !== '')
+        .split("\n")
+        .filter((p) => p.trim() !== "")
         .map((p, idx) => `<p class="body-text">${idx + 1}. ${p.trim()}</p>`)
-        .join('\n')
+        .join("\n")
     : `<p class="body-text">1. Under instructions from my client, I hereby serve you with this notice.</p>`;
 
   if (isHindi) {
@@ -436,13 +460,19 @@ export const getCaveatHtml = (data: CaveatData, isHindi = false): string => {
 };
 
 // 8. TEMPORARY INJUNCTION (Order 39 R 1/2)
-export const getInjunctionHtml = (data: InjunctionData, isHindi = false): string => {
+export const getInjunctionHtml = (
+  data: InjunctionData,
+  isHindi = false
+): string => {
   const factsHtml = data.injunctionFacts
     ? data.injunctionFacts
-        .split('\n')
-        .filter((p) => p.trim() !== '')
-        .map((p, idx) => `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि" : "That"} ${p.trim()}</p>`)
-        .join('\n')
+        .split("\n")
+        .filter((p) => p.trim() !== "")
+        .map(
+          (p, idx) =>
+            `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि" : "That"} ${p.trim()}</p>`
+        )
+        .join("\n")
     : `<p class="body-text">1. ${isHindi ? "यह कि वादी के पक्ष में एक मजबूत मामला बनता है।" : "That the Plaintiff has a strong prima facie case."}</p>`;
 
   if (isHindi) {
@@ -467,10 +497,13 @@ ${factsHtml}
 export const getPlaintHtml = (data: PlaintData, isHindi = false): string => {
   const factsList = data.suitFacts
     ? data.suitFacts
-        .split('\n')
-        .filter((f) => f.trim() !== '')
-        .map((f, idx) => `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि" : "That"} ${f.trim()}</p>`)
-        .join('\n')
+        .split("\n")
+        .filter((f) => f.trim() !== "")
+        .map(
+          (f, idx) =>
+            `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि" : "That"} ${f.trim()}</p>`
+        )
+        .join("\n")
     : `<p class="body-text">1. ${isHindi ? "यह कि वादी मुकदमे का स्वामी है।" : "That the Plaintiff is the rightful owner."}</p>`;
 
   if (isHindi) {
@@ -494,13 +527,19 @@ ${factsList}
 };
 
 // 10. REJOINDER
-export const getRejoinderHtml = (data: RejoinderData, isHindi = false): string => {
+export const getRejoinderHtml = (
+  data: RejoinderData,
+  isHindi = false
+): string => {
   const pointsList = data.replyPoints
     ? data.replyPoints
-        .split('\n')
-        .filter((p) => p.trim() !== '')
-        .map((p, idx) => `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि" : "That"} ${p.trim()}</p>`)
-        .join('\n')
+        .split("\n")
+        .filter((p) => p.trim() !== "")
+        .map(
+          (p, idx) =>
+            `<p class="body-text">${idx + 1}. ${isHindi ? "यह कि" : "That"} ${p.trim()}</p>`
+        )
+        .join("\n")
     : `<p class="body-text">1. ${isHindi ? "यह कि लिखित कथन के सभी प्रतिकूल कथनों से इंकार किया जाता है।" : "That all adverse allegations are denied."}</p>`;
 
   if (isHindi) {
@@ -518,7 +557,10 @@ ${pointsList}
 };
 
 // 11. EXECUTION PETITION
-export const getExecutionHtml = (data: ExecutionPetitionData, isHindi = false): string => {
+export const getExecutionHtml = (
+  data: ExecutionPetitionData,
+  isHindi = false
+): string => {
   if (isHindi) {
     return `<p class="court-header" style="text-align: center;"><b>समक्ष न्यायालय श्रीमान सिविल जज, ${data.courtName.toUpperCase()}</b></p>
 <p class="case-details"><b>निष्पादन संख्या: ____________ वर्ष ${data.caseYear || "2026"}</b><br/><b>${data.decreeHolder} बनाम ${data.judgmentDebtor}</b></p>
@@ -538,7 +580,10 @@ export const getExecutionHtml = (data: ExecutionPetitionData, isHindi = false): 
 };
 
 // 12. ANTICIPATORY BAIL
-export const getAnticipatoryBailHtml = (data: AnticipatoryBailData, isHindi = false): string => {
+export const getAnticipatoryBailHtml = (
+  data: AnticipatoryBailData,
+  isHindi = false
+): string => {
   if (isHindi) {
     return `<p class="court-header" style="text-align: center;"><b>समक्ष न्यायालय सत्र न्यायाधीश, ${data.courtName.toUpperCase()}</b></p>
 <p class="case-details" style="border: 1px solid #9ca3af; padding: 10px;"><b>आवेदक: ${data.applicantName.toUpperCase()} बनाम राज्य</b><br/>प्राथमिकी: ${data.firNumber || "__________"} / ${data.firYear || "2026"}<br/>थाना: ${data.policeStation || "__________"}</p>
@@ -558,7 +603,10 @@ export const getAnticipatoryBailHtml = (data: AnticipatoryBailData, isHindi = fa
 };
 
 // 13. PRIVATE COMPLAINT
-export const getPrivateComplaintHtml = (data: PrivateComplaintData, isHindi = false): string => {
+export const getPrivateComplaintHtml = (
+  data: PrivateComplaintData,
+  isHindi = false
+): string => {
   if (isHindi) {
     return `<p class="court-header" style="text-align: center;"><b>समक्ष न्यायालय मुख्य न्यायिक मजिस्ट्रेट, ${data.courtName.toUpperCase()}</b></p>
 <p class="case-details"><b>शिकायतकर्ता: ${data.complainantName}</b> बनाम <b>अभियुक्त: ${data.accusedName}</b></p>
@@ -576,7 +624,10 @@ export const getPrivateComplaintHtml = (data: PrivateComplaintData, isHindi = fa
 };
 
 // 14. FIR QUASHING
-export const getFirQuashingHtml = (data: FirQuashingData, isHindi = false): string => {
+export const getFirQuashingHtml = (
+  data: FirQuashingData,
+  isHindi = false
+): string => {
   return `<p class="court-header" style="text-align: center;"><b>IN THE HIGH COURT OF JUDICATURE AT ${data.courtName.toUpperCase()}</b></p>
 <p class="title" style="text-align: center;"><b>PETITION UNDER SECTION 482 Cr.P.C. FOR QUASHING OF F.I.R.</b></p>
 <p class="body-text">1. That the petitioner prays for quashing of FIR No. ${data.firNumber || "__________"} / ${data.firYear || "2026"}, P.S. ${data.policeStation || "__________"}.</p>
@@ -585,7 +636,10 @@ export const getFirQuashingHtml = (data: FirQuashingData, isHindi = false): stri
 };
 
 // 15. EXEMPTION APPLICATION
-export const getExemptionHtml = (data: ExemptionData, isHindi = false): string => {
+export const getExemptionHtml = (
+  data: ExemptionData,
+  isHindi = false
+): string => {
   return `<p class="court-header" style="text-align: center;"><b>IN THE COURT OF ${data.courtName.toUpperCase()}</b></p>
 <p class="case-details"><b>Case No: ${data.caseNumber || "__________"}</b><br/><b>State Vs. ${data.accusedName}</b></p>
 <p class="title" style="text-align: center;"><b>APPLICATION FOR EXEMPTION FROM PERSONAL APPEARANCE (SEC 317 CrPC)</b></p>
@@ -594,7 +648,10 @@ export const getExemptionHtml = (data: ExemptionData, isHindi = false): string =
 };
 
 // 16. CHEQUE BOUNCE NOTICE
-export const getChequeBounceHtml = (data: ChequeBounceData, isHindi = false): string => {
+export const getChequeBounceHtml = (
+  data: ChequeBounceData,
+  isHindi = false
+): string => {
   return `<p class="court-header" style="text-align: center;"><b>DEMAND NOTICE UNDER SECTION 138 OF NEGOTIABLE INSTRUMENTS ACT</b></p>
 <p class="body-text"><b>TO:</b> ${data.receiverName}, ${data.receiverAddress}</p>
 <p class="body-text">1. Cheque No: ${data.chequeNumber || "__________"} dated ${data.chequeDate || "__________"} for Rs. ${data.chequeAmount || "__________"} drawn on ${data.bankName || "__________"} was dishonored on ${data.dishonorDate || "__________"}.</p>
@@ -603,7 +660,10 @@ export const getChequeBounceHtml = (data: ChequeBounceData, isHindi = false): st
 };
 
 // 17. ARBITRATION SEC 9
-export const getArbitrationSec9Html = (data: ArbitrationSec9Data, isHindi = false): string => {
+export const getArbitrationSec9Html = (
+  data: ArbitrationSec9Data,
+  isHindi = false
+): string => {
   return `<p class="court-header" style="text-align: center;"><b>IN THE COURT OF COMMERCIAL JUDGE, ${data.courtName.toUpperCase()}</b></p>
 <p class="title" style="text-align: center;"><b>APPLICATION UNDER SECTION 9 OF ARBITRATION & CONCILIATION ACT, 1996</b></p>
 <p class="body-text">1. Interim relief sought: <b>${data.interimRelief || "protection of assets pending arbitration."}</b></p>
@@ -611,7 +671,10 @@ export const getArbitrationSec9Html = (data: ArbitrationSec9Data, isHindi = fals
 };
 
 // 18. CONSUMER COMPLAINT
-export const getConsumerComplaintHtml = (data: ConsumerComplaintData, isHindi = false): string => {
+export const getConsumerComplaintHtml = (
+  data: ConsumerComplaintData,
+  isHindi = false
+): string => {
   return `<p class="court-header" style="text-align: center;"><b>BEFORE THE DISTRICT CONSUMER DISPUTES REDRESSAL COMMISSION, ${data.forumName.toUpperCase()}</b></p>
 <p class="title" style="text-align: center;"><b>CONSUMER COMPLAINT UNDER CONSUMER PROTECTION ACT, 2019</b></p>
 <p class="body-text">Complainant: <b>${data.complainantName}</b> VS Opposite Party: <b>${data.oppositePartyName}</b></p>
@@ -620,7 +683,10 @@ export const getConsumerComplaintHtml = (data: ConsumerComplaintData, isHindi = 
 };
 
 // 19. RENT AGREEMENT
-export const getRentAgreementHtml = (data: RentAgreementData, isHindi = false): string => {
+export const getRentAgreementHtml = (
+  data: RentAgreementData,
+  isHindi = false
+): string => {
   return `<p class="title" style="text-align: center;"><b>RENT / LEASE AGREEMENT</b></p>
 <p class="body-text">This agreement made between Landlord <b>${data.landlordName}</b> and Tenant <b>${data.tenantName}</b> for property: ${data.propertyAddress}.</p>
 <p class="body-text">Rent: Rs. ${data.rentAmount || "__________"}/month. Security Deposit: Rs. ${data.securityDeposit || "__________"}.</p>
@@ -628,7 +694,10 @@ export const getRentAgreementHtml = (data: RentAgreementData, isHindi = false): 
 };
 
 // 20. POWER OF ATTORNEY
-export const getPowerOfAttorneyHtml = (data: PowerOfAttorneyData, isHindi = false): string => {
+export const getPowerOfAttorneyHtml = (
+  data: PowerOfAttorneyData,
+  isHindi = false
+): string => {
   return `<p class="title" style="text-align: center;"><b>GENERAL POWER OF ATTORNEY</b></p>
 <p class="body-text">KNOW ALL MEN BY THESE PRESENTS that I, <b>${data.principalName}</b>, do hereby appoint <b>${data.attorneyName}</b> as my true and lawful Attorney.</p>
 <p class="body-text">Powers granted: <b>${data.powersGranted || "to manage property, file court cases and sign documents."}</b></p>

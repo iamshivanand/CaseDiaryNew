@@ -26,6 +26,12 @@ import {
 import { WebView } from "react-native-webview";
 import { v4 as uuidv4 } from "uuid";
 
+import { ElementContextModal } from "./components/ElementContextModal";
+import { LegalAutocompleteBar } from "./components/LegalAutocompleteBar";
+import OcrReviewModal from "./components/OcrReviewModal";
+import { PlaceholderBottomSheet } from "./components/PlaceholderBottomSheet";
+import { SignatureCanvasModal } from "./components/SignatureCanvasModal";
+import { TableConfigModal } from "./components/TableConfigModal";
 import {
   getCaseById,
   CaseWithDetails,
@@ -61,18 +67,15 @@ import {
   getRentAgreementHtml,
   getPowerOfAttorneyHtml,
 } from "../../utils/documentTemplates";
-import { LEGAL_VOCABULARY } from "../../utils/legalVocabulary";
-import { getOfflineEditorHtml } from "../../utils/offlineEditorTemplate";
-import { extractTextFromImages } from "../../utils/ocrService";
-import { extractLegalEntities, ExtractedLegalEntities } from "../../utils/legalNerService";
-import { speechRecognitionService } from "../../utils/speechRecognitionService";
 import { legalAutocompleteService } from "../../utils/legalAutocompleteService";
-import { PlaceholderBottomSheet } from "./components/PlaceholderBottomSheet";
-import { SignatureCanvasModal } from "./components/SignatureCanvasModal";
-import { LegalAutocompleteBar } from "./components/LegalAutocompleteBar";
-import { TableConfigModal } from "./components/TableConfigModal";
-import { ElementContextModal } from "./components/ElementContextModal";
-import OcrReviewModal from "./components/OcrReviewModal";
+import {
+  extractLegalEntities,
+  ExtractedLegalEntities,
+} from "../../utils/legalNerService";
+import { LEGAL_VOCABULARY } from "../../utils/legalVocabulary";
+import { extractTextFromImages } from "../../utils/ocrService";
+import { getOfflineEditorHtml } from "../../utils/offlineEditorTemplate";
+import { speechRecognitionService } from "../../utils/speechRecognitionService";
 import ActionButton from "../CommonComponents/ActionButton";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 import FormInput from "../CommonComponents/FormInput";
@@ -405,11 +408,23 @@ const GenerateDocumentScreen: React.FC = () => {
   const [selectedTemplateCategory, setSelectedTemplateCategory] =
     useState("all");
   const [categoriesList, setCategoriesList] = useState([
-    { label: locale === "hi" ? "सभी श्रेणियां" : "All Categories", value: "all" },
+    {
+      label: locale === "hi" ? "सभी श्रेणियां" : "All Categories",
+      value: "all",
+    },
     { label: locale === "hi" ? "सिविल (CPC)" : "Civil (CPC)", value: "civil" },
-    { label: locale === "hi" ? "क्रिमिनल (CrPC)" : "Criminal (CrPC)", value: "criminal" },
-    { label: locale === "hi" ? "कमर्शियल / ADR" : "Commercial / ADR", value: "commercial" },
-    { label: locale === "hi" ? "सामान्य दस्तावेज़" : "Common Docs", value: "common" },
+    {
+      label: locale === "hi" ? "क्रिमिनल (CrPC)" : "Criminal (CrPC)",
+      value: "criminal",
+    },
+    {
+      label: locale === "hi" ? "कमर्शियल / ADR" : "Commercial / ADR",
+      value: "commercial",
+    },
+    {
+      label: locale === "hi" ? "सामान्य दस्तावेज़" : "Common Docs",
+      value: "common",
+    },
   ]);
 
   const [isTransitionFinished, setIsTransitionFinished] = useState(
@@ -497,45 +512,58 @@ const GenerateDocumentScreen: React.FC = () => {
 
   const tourSteps = [
     {
-      title: locale === "hi" ? "दस्तावेज़ संपादक मार्गदर्शिका" : "Document Editor Guide",
-      description: locale === "hi"
-        ? "आपका स्वागत है! आइए इस नए लाइव एडिटर की मुख्य विशेषताओं का जल्दी से परिचय लें।"
-        : "Welcome! Let's take a quick tour of the key features in this document editor.",
+      title:
+        locale === "hi"
+          ? "दस्तावेज़ संपादक मार्गदर्शिका"
+          : "Document Editor Guide",
+      description:
+        locale === "hi"
+          ? "आपका स्वागत है! आइए इस नए लाइव एडिटर की मुख्य विशेषताओं का जल्दी से परिचय लें।"
+          : "Welcome! Let's take a quick tour of the key features in this document editor.",
       icon: "book-outline",
     },
     {
-      title: locale === "hi" ? "लाइव स्वरूपण (Formatting) उपकरण" : "Formatting Tools",
-      description: locale === "hi"
-        ? "बोल्ड, इटैलिक, अंडरलाइन, संरेखण (alignment), और बुलेट/नंबर सूचियों का उपयोग करके अपने दस्तावेज़ को तुरंत स्वरूपित करें।"
-        : "Format your text instantly using Bold, Italic, Underline, alignments, and lists in the formatting toolbar.",
+      title:
+        locale === "hi"
+          ? "लाइव स्वरूपण (Formatting) उपकरण"
+          : "Formatting Tools",
+      description:
+        locale === "hi"
+          ? "बोल्ड, इटैलिक, अंडरलाइन, संरेखण (alignment), और बुलेट/नंबर सूचियों का उपयोग करके अपने दस्तावेज़ को तुरंत स्वरूपित करें।"
+          : "Format your text instantly using Bold, Italic, Underline, alignments, and lists in the formatting toolbar.",
       icon: "text-outline",
     },
     {
       title: locale === "hi" ? "पेज सेटअप और मार्जिन" : "Page Setup & Margins",
-      description: locale === "hi"
-        ? "पेज साइज (A4 बनाम Legal), फ़ॉन्ट आकार, लाइन स्पेसिंग, और रेड लेज़र मार्जिन लाइनों को आवश्यकतानुसार समायोजित करें।"
-        : "Configure paper size (A4 vs Legal), active fonts, margins, line spacing, and print properties easily.",
+      description:
+        locale === "hi"
+          ? "पेज साइज (A4 बनाम Legal), फ़ॉन्ट आकार, लाइन स्पेसिंग, और रेड लेज़र मार्जिन लाइनों को आवश्यकतानुसार समायोजित करें।"
+          : "Configure paper size (A4 vs Legal), active fonts, margins, line spacing, and print properties easily.",
       icon: "settings-outline",
     },
     {
       title: locale === "hi" ? "पेज ब्रेक जोड़ना" : "Insert Page Breaks",
-      description: locale === "hi"
-        ? "नई 'पेज ब्रेक' सुविधा से दस्तावेज़ को अलग-अलग पेजों में विभाजित करें ताकि प्रिंट या पीडीएफ में पेज सही जगह से कटें।"
-        : "Use the new Page Break feature to insert page dividers. The generated PDF will cleanly break the page at these points.",
+      description:
+        locale === "hi"
+          ? "नई 'पेज ब्रेक' सुविधा से दस्तावेज़ को अलग-अलग पेजों में विभाजित करें ताकि प्रिंट या पीडीएफ में पेज सही जगह से कटें।"
+          : "Use the new Page Break feature to insert page dividers. The generated PDF will cleanly break the page at these points.",
       icon: "layers-outline",
     },
     {
       title: locale === "hi" ? "स्मार्ट प्लेसहोल्डर्स" : "Smart Placeholders",
-      description: locale === "hi"
-        ? "दस्तावेज़ में मौजूद [Client Name] जैसे कोष्ठक वाले शब्दों पर केवल एक बार टैप करके उन्हें आसानी से बदलें।"
-        : "Tap on any bracketed text like [Client Name] or lines like _____ to open a quick fill popup and replace them instantly.",
+      description:
+        locale === "hi"
+          ? "दस्तावेज़ में मौजूद [Client Name] जैसे कोष्ठक वाले शब्दों पर केवल एक बार टैप करके उन्हें आसानी से बदलें।"
+          : "Tap on any bracketed text like [Client Name] or lines like _____ to open a quick fill popup and replace them instantly.",
       icon: "create-outline",
     },
     {
-      title: locale === "hi" ? "टेम्पलेट के रूप में सहेजें" : "Save as Template",
-      description: locale === "hi"
-        ? "इस दस्तावेज़ को एक नए कस्टम टेम्पलेट के रूप में सहेजें, ताकि भविष्य में किसी भी केस के लिए इसका पुनः उपयोग किया जा सके!"
-        : "Save your customized drafts as reusable custom templates. Next time, they will automatically fill in details for new cases!",
+      title:
+        locale === "hi" ? "टेम्पलेट के रूप में सहेजें" : "Save as Template",
+      description:
+        locale === "hi"
+          ? "इस दस्तावेज़ को एक नए कस्टम टेम्पलेट के रूप में सहेजें, ताकि भविष्य में किसी भी केस के लिए इसका पुनः उपयोग किया जा सके!"
+          : "Save your customized drafts as reusable custom templates. Next time, they will automatically fill in details for new cases!",
       icon: "save-outline",
     },
   ];
@@ -582,13 +610,19 @@ const GenerateDocumentScreen: React.FC = () => {
   const [activePlaceholderLabel, setActivePlaceholderLabel] = useState("");
   const [activePlaceholderClean, setActivePlaceholderClean] = useState("");
   const [signatureModalVisible, setSignatureModalVisible] = useState(false);
-  const [extractedEntities, setExtractedEntities] = useState<ExtractedLegalEntities | null>(null);
+  const [extractedEntities, setExtractedEntities] =
+    useState<ExtractedLegalEntities | null>(null);
   const [isDictating, setIsDictating] = useState(false);
-  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<
+    string[]
+  >([]);
   const [isRibbonCollapsed, setIsRibbonCollapsed] = useState(false);
   const [tableConfigModalVisible, setTableConfigModalVisible] = useState(false);
-  const [elementContextModalVisible, setElementContextModalVisible] = useState(false);
-  const [selectedElementType, setSelectedElementType] = useState<"table" | "signature" | null>(null);
+  const [elementContextModalVisible, setElementContextModalVisible] =
+    useState(false);
+  const [selectedElementType, setSelectedElementType] = useState<
+    "table" | "signature" | null
+  >(null);
   const [shapeModalVisible, setShapeModalVisible] = useState(false);
 
   const filteredTemplates = React.useMemo(() => {
@@ -635,157 +669,164 @@ const GenerateDocumentScreen: React.FC = () => {
     ({ item }: { item: any }) => {
       const color =
         documentTypeColors[item.template_type] || theme.colors.primary;
-    return (
-      <TouchableOpacity
-        style={{
-          flex: 1,
-          margin: 6,
-          backgroundColor: theme.colors.cardBackground,
-          borderRadius: 12,
-          padding: 12,
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-          alignItems: "center",
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 3,
-          elevation: 2,
-          maxWidth: (Dimensions.get("window").width - 32) / 2 - 12,
-        }}
-        activeOpacity={0.85}
-        onPress={async () => {
-          setDocumentType(item.template_type);
-          if (!item.isBuiltIn) {
-            try {
-              const draft = await db.getDocumentDraftById(item.id);
-              if (draft) {
-                setHtmlContent(draft.html_content);
-              }
-            } catch (err) {
-              console.error("Failed to load template draft HTML:", err);
-            }
-          } else {
-            setHtmlContent("");
-          }
-          setIsTemplateSelected(true);
-          if (item.template_type === "blank_page") {
-            setActiveTab("preview");
-          } else {
-            setActiveTab("fields");
-          }
-        }}
-      >
-        <View
+      return (
+        <TouchableOpacity
           style={{
-            width: 72,
-            height: 114,
-            backgroundColor: "#fcf9f2",
-            borderRadius: 6,
-            borderWidth: 1.5,
-            borderColor: "#e2d2b2",
-            position: "relative",
-            overflow: "hidden",
-            marginBottom: 10,
+            flex: 1,
+            margin: 6,
+            backgroundColor: theme.colors.cardBackground,
+            borderRadius: 12,
+            padding: 12,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            alignItems: "center",
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 2,
-            elevation: 3,
+            shadowOpacity: 0.05,
+            shadowRadius: 3,
+            elevation: 2,
+            maxWidth: (Dimensions.get("window").width - 32) / 2 - 12,
+          }}
+          activeOpacity={0.85}
+          onPress={async () => {
+            setDocumentType(item.template_type);
+            if (!item.isBuiltIn) {
+              try {
+                const draft = await db.getDocumentDraftById(item.id);
+                if (draft) {
+                  setHtmlContent(draft.html_content);
+                }
+              } catch (err) {
+                console.error("Failed to load template draft HTML:", err);
+              }
+            } else {
+              setHtmlContent("");
+            }
+            setIsTemplateSelected(true);
+            if (item.template_type === "blank_page") {
+              setActiveTab("preview");
+            } else {
+              setActiveTab("fields");
+            }
           }}
         >
           <View
             style={{
-              position: "absolute",
-              left: 14,
-              top: 0,
-              bottom: 0,
-              width: 1,
-              backgroundColor: "#ef4444",
-              opacity: 0.6,
-            }}
-          />
-          <View
-            style={{ marginTop: 14, paddingLeft: 18, paddingRight: 6, gap: 5 }}
-          >
-            <View
-              style={{ height: 3, backgroundColor: "#d1d5db", width: "80%" }}
-            />
-            <View
-              style={{ height: 3, backgroundColor: "#d1d5db", width: "90%" }}
-            />
-            <View
-              style={{ height: 3, backgroundColor: "#d1d5db", width: "65%" }}
-            />
-            <View
-              style={{ height: 3, backgroundColor: "#e5e7eb", width: "85%" }}
-            />
-            <View
-              style={{ height: 3, backgroundColor: "#e5e7eb", width: "70%" }}
-            />
-            <View
-              style={{ height: 3, backgroundColor: "#e5e7eb", width: "90%" }}
-            />
-            <View
-              style={{ height: 3, backgroundColor: "#e5e7eb", width: "50%" }}
-            />
-          </View>
-          <View
-            style={{
-              position: "absolute",
-              bottom: 4,
-              right: 4,
-              backgroundColor: color,
-              borderRadius: 3,
-              paddingHorizontal: 4,
-              paddingVertical: 2,
+              width: 72,
+              height: 114,
+              backgroundColor: "#fcf9f2",
+              borderRadius: 6,
+              borderWidth: 1.5,
+              borderColor: "#e2d2b2",
+              position: "relative",
+              overflow: "hidden",
+              marginBottom: 10,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 2,
+              elevation: 3,
             }}
           >
-            <Text style={{ color: "#fff", fontSize: 8, fontWeight: "bold" }}>
-              PDF
-            </Text>
+            <View
+              style={{
+                position: "absolute",
+                left: 14,
+                top: 0,
+                bottom: 0,
+                width: 1,
+                backgroundColor: "#ef4444",
+                opacity: 0.6,
+              }}
+            />
+            <View
+              style={{
+                marginTop: 14,
+                paddingLeft: 18,
+                paddingRight: 6,
+                gap: 5,
+              }}
+            >
+              <View
+                style={{ height: 3, backgroundColor: "#d1d5db", width: "80%" }}
+              />
+              <View
+                style={{ height: 3, backgroundColor: "#d1d5db", width: "90%" }}
+              />
+              <View
+                style={{ height: 3, backgroundColor: "#d1d5db", width: "65%" }}
+              />
+              <View
+                style={{ height: 3, backgroundColor: "#e5e7eb", width: "85%" }}
+              />
+              <View
+                style={{ height: 3, backgroundColor: "#e5e7eb", width: "70%" }}
+              />
+              <View
+                style={{ height: 3, backgroundColor: "#e5e7eb", width: "90%" }}
+              />
+              <View
+                style={{ height: 3, backgroundColor: "#e5e7eb", width: "50%" }}
+              />
+            </View>
+            <View
+              style={{
+                position: "absolute",
+                bottom: 4,
+                right: 4,
+                backgroundColor: color,
+                borderRadius: 3,
+                paddingHorizontal: 4,
+                paddingVertical: 2,
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 8, fontWeight: "bold" }}>
+                PDF
+              </Text>
+            </View>
           </View>
-        </View>
 
-        <Text
-          style={{
-            fontSize: 13,
-            fontWeight: "bold",
-            color: theme.colors.text,
-            textAlign: "center",
-            marginBottom: 6,
-            height: 36,
-          }}
-          numberOfLines={2}
-        >
-          {item.title}
-        </Text>
-
-        <View
-          style={{
-            backgroundColor: item.isBuiltIn
-              ? `${theme.colors.primary}12`
-              : `${theme.colors.success}12`,
-            paddingHorizontal: 8,
-            paddingVertical: 2,
-            borderRadius: 4,
-          }}
-        >
           <Text
             style={{
-              fontSize: 10,
-              fontWeight: "600",
-              color: item.isBuiltIn
-                ? theme.colors.primary
-                : theme.colors.success,
+              fontSize: 13,
+              fontWeight: "bold",
+              color: theme.colors.text,
+              textAlign: "center",
+              marginBottom: 6,
+              height: 36,
+            }}
+            numberOfLines={2}
+          >
+            {item.title}
+          </Text>
+
+          <View
+            style={{
+              backgroundColor: item.isBuiltIn
+                ? `${theme.colors.primary}12`
+                : `${theme.colors.success}12`,
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 4,
             }}
           >
-            {item.isBuiltIn ? "Built-in" : "Custom"}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  }, [theme]);
+            <Text
+              style={{
+                fontSize: 10,
+                fontWeight: "600",
+                color: item.isBuiltIn
+                  ? theme.colors.primary
+                  : theme.colors.success,
+              }}
+            >
+              {item.isBuiltIn ? "Built-in" : "Custom"}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    [theme]
+  );
 
   const webViewRef = React.useRef<WebView>(null);
   const saveCallbackRef = React.useRef<((html: string) => void) | null>(null);
@@ -800,15 +841,56 @@ const GenerateDocumentScreen: React.FC = () => {
 
   const triggerFormat = (command: string, value: string | null = null) => {
     // Optimistic state toggle for instant active button highlight UI
-    if (command === "bold") setEditorState((prev) => ({ ...prev, bold: !prev.bold }));
-    if (command === "italic") setEditorState((prev) => ({ ...prev, italic: !prev.italic }));
-    if (command === "underline") setEditorState((prev) => ({ ...prev, underline: !prev.underline }));
-    if (command === "justifyLeft") setEditorState((prev) => ({ ...prev, alignLeft: true, alignCenter: false, alignRight: false, alignJustify: false }));
-    if (command === "justifyCenter") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: true, alignRight: false, alignJustify: false }));
-    if (command === "justifyRight") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: false, alignRight: true, alignJustify: false }));
-    if (command === "justifyFull") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: false, alignRight: false, alignJustify: true }));
-    if (command === "insertUnorderedList") setEditorState((prev) => ({ ...prev, unorderedList: !prev.unorderedList, orderedList: false }));
-    if (command === "insertOrderedList") setEditorState((prev) => ({ ...prev, orderedList: !prev.orderedList, unorderedList: false }));
+    if (command === "bold")
+      setEditorState((prev) => ({ ...prev, bold: !prev.bold }));
+    if (command === "italic")
+      setEditorState((prev) => ({ ...prev, italic: !prev.italic }));
+    if (command === "underline")
+      setEditorState((prev) => ({ ...prev, underline: !prev.underline }));
+    if (command === "justifyLeft")
+      setEditorState((prev) => ({
+        ...prev,
+        alignLeft: true,
+        alignCenter: false,
+        alignRight: false,
+        alignJustify: false,
+      }));
+    if (command === "justifyCenter")
+      setEditorState((prev) => ({
+        ...prev,
+        alignLeft: false,
+        alignCenter: true,
+        alignRight: false,
+        alignJustify: false,
+      }));
+    if (command === "justifyRight")
+      setEditorState((prev) => ({
+        ...prev,
+        alignLeft: false,
+        alignCenter: false,
+        alignRight: true,
+        alignJustify: false,
+      }));
+    if (command === "justifyFull")
+      setEditorState((prev) => ({
+        ...prev,
+        alignLeft: false,
+        alignCenter: false,
+        alignRight: false,
+        alignJustify: true,
+      }));
+    if (command === "insertUnorderedList")
+      setEditorState((prev) => ({
+        ...prev,
+        unorderedList: !prev.unorderedList,
+        orderedList: false,
+      }));
+    if (command === "insertOrderedList")
+      setEditorState((prev) => ({
+        ...prev,
+        orderedList: !prev.orderedList,
+        unorderedList: false,
+      }));
 
     postMessageToWebView({
       type: "exec",
@@ -861,7 +943,10 @@ const GenerateDocumentScreen: React.FC = () => {
             const words = data.stats.text.trim().split(/\s+/);
             const lastWord = words.length > 0 ? words[words.length - 1] : "";
             if (lastWord.length >= 2) {
-              const matches = legalAutocompleteService.getSuggestions(lastWord, 5);
+              const matches = legalAutocompleteService.getSuggestions(
+                lastWord,
+                5
+              );
               setAutocompleteSuggestions(matches);
             } else {
               setAutocompleteSuggestions([]);
@@ -917,16 +1002,24 @@ const GenerateDocumentScreen: React.FC = () => {
           text: "📷 Take Photo (Camera)",
           onPress: async () => {
             try {
-              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              const { status } =
+                await ImagePicker.requestCameraPermissionsAsync();
               if (status !== "granted") {
-                Alert.alert("Permission Required", "Camera permission is needed to capture document photo.");
+                Alert.alert(
+                  "Permission Required",
+                  "Camera permission is needed to capture document photo."
+                );
                 return;
               }
               const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 quality: 1.0,
               });
-              if (!result.canceled && result.assets && result.assets.length > 0) {
+              if (
+                !result.canceled &&
+                result.assets &&
+                result.assets.length > 0
+              ) {
                 await processOcrImages([result.assets[0].uri]);
               }
             } catch (e) {
@@ -943,7 +1036,11 @@ const GenerateDocumentScreen: React.FC = () => {
                 allowsMultipleSelection: true,
                 quality: 1.0,
               });
-              if (!result.canceled && result.assets && result.assets.length > 0) {
+              if (
+                !result.canceled &&
+                result.assets &&
+                result.assets.length > 0
+              ) {
                 await processOcrImages(result.assets.map((a) => a.uri));
               }
             } catch (e) {
@@ -957,7 +1054,8 @@ const GenerateDocumentScreen: React.FC = () => {
             try {
               let scannedUris: string[] = [];
               try {
-                const DocumentScanner = require("react-native-document-scanner-plugin").default;
+                const DocumentScanner =
+                  require("react-native-document-scanner-plugin").default;
                 const { scannedImages } = await DocumentScanner.scanDocument({
                   croppedImageQuality: 100,
                   maxNumDocuments: 10,
@@ -985,34 +1083,41 @@ const GenerateDocumentScreen: React.FC = () => {
       setIsDictating(false);
     } else {
       setIsDictating(true);
-      const dictationLocale = (outputLanguage === "hi" || locale === "hi") ? "hi-IN" : "en-IN";
-      const started = await speechRecognitionService.startListening(dictationLocale, {
-        onStart: () => setIsDictating(true),
-        onResult: (text) => {
-          if (text) {
-            let processed = text
-              .replace(/\b(full stop|period)\b/gi, ".")
-              .replace(/\b(पूर्ण विराम)\b/gi, "।")
-              .replace(/\b(comma)\b/gi, ",")
-              .replace(/\b(अल्पविराम)\b/gi, ",")
-              .replace(/\b(new paragraph|next paragraph)\b/gi, "\n\n")
-              .replace(/\b(नया पैराग्राफ|नया पैरा)\b/gi, "\n\n");
-            triggerFormat("insertText", processed + " ");
-          }
-        },
-        onError: (err) => {
-          setIsDictating(false);
-          Alert.alert("Dictation Error", err || "Speech recognition error");
-        },
-        onEnd: () => setIsDictating(false),
-      });
+      const dictationLocale =
+        outputLanguage === "hi" || locale === "hi" ? "hi-IN" : "en-IN";
+      const started = await speechRecognitionService.startListening(
+        dictationLocale,
+        {
+          onStart: () => setIsDictating(true),
+          onResult: (text) => {
+            if (text) {
+              const processed = text
+                .replace(/\b(full stop|period)\b/gi, ".")
+                .replace(/\b(पूर्ण विराम)\b/gi, "।")
+                .replace(/\b(comma)\b/gi, ",")
+                .replace(/\b(अल्पविराम)\b/gi, ",")
+                .replace(/\b(new paragraph|next paragraph)\b/gi, "\n\n")
+                .replace(/\b(नया पैराग्राफ|नया पैरा)\b/gi, "\n\n");
+              triggerFormat("insertText", processed + " ");
+            }
+          },
+          onError: (err) => {
+            setIsDictating(false);
+            Alert.alert("Dictation Error", err || "Speech recognition error");
+          },
+          onEnd: () => setIsDictating(false),
+        }
+      );
       if (!started) {
         setIsDictating(false);
       }
     }
   };
 
-  const handleApplyPlaceholderValue = (originalLabel: string, newValue: string) => {
+  const handleApplyPlaceholderValue = (
+    originalLabel: string,
+    newValue: string
+  ) => {
     postMessageToWebView({
       type: "exec",
       command: "replacePlaceholderValue",
@@ -1306,8 +1411,14 @@ const GenerateDocumentScreen: React.FC = () => {
           const parsedUserId = parseInt(userIdVal, 10);
           const dbInstance = await getDb();
           const profile = await getUserProfile(dbInstance, parsedUserId);
-          if (profile && profile.practiceAreas && profile.practiceAreas.length > 0) {
-            const practiceAreasLower = profile.practiceAreas.map((p: string) => p.toLowerCase());
+          if (
+            profile &&
+            profile.practiceAreas &&
+            profile.practiceAreas.length > 0
+          ) {
+            const practiceAreasLower = profile.practiceAreas.map((p: string) =>
+              p.toLowerCase()
+            );
             let matchedCategory: string | null = null;
             for (const area of practiceAreasLower) {
               if (area.includes("civil")) {
@@ -1316,7 +1427,12 @@ const GenerateDocumentScreen: React.FC = () => {
               } else if (area.includes("criminal")) {
                 matchedCategory = "criminal";
                 break;
-              } else if (area.includes("commercial") || area.includes("adr") || area.includes("arbitration") || area.includes("corporate")) {
+              } else if (
+                area.includes("commercial") ||
+                area.includes("adr") ||
+                area.includes("arbitration") ||
+                area.includes("corporate")
+              ) {
                 matchedCategory = "commercial";
                 break;
               }
@@ -1327,16 +1443,37 @@ const GenerateDocumentScreen: React.FC = () => {
 
               // Reorder categoriesList to prioritize lawyer's matching category
               const baseCategories = [
-                { label: locale === "hi" ? "सभी श्रेणियां" : "All Categories", value: "all" },
-                { label: locale === "hi" ? "सिविल (CPC)" : "Civil (CPC)", value: "civil" },
-                { label: locale === "hi" ? "क्रिमिनल (CrPC)" : "Criminal (CrPC)", value: "criminal" },
-                { label: locale === "hi" ? "कमर्शियल / ADR" : "Commercial / ADR", value: "commercial" },
-                { label: locale === "hi" ? "सामान्य दस्तावेज़" : "Common Docs", value: "common" },
+                {
+                  label: locale === "hi" ? "सभी श्रेणियां" : "All Categories",
+                  value: "all",
+                },
+                {
+                  label: locale === "hi" ? "सिविल (CPC)" : "Civil (CPC)",
+                  value: "civil",
+                },
+                {
+                  label:
+                    locale === "hi" ? "क्रिमिनल (CrPC)" : "Criminal (CrPC)",
+                  value: "criminal",
+                },
+                {
+                  label:
+                    locale === "hi" ? "कमर्शियल / ADR" : "Commercial / ADR",
+                  value: "commercial",
+                },
+                {
+                  label: locale === "hi" ? "सामान्य दस्तावेज़" : "Common Docs",
+                  value: "common",
+                },
               ];
 
-              const matchedItem = baseCategories.find((c) => c.value === matchedCategory);
+              const matchedItem = baseCategories.find(
+                (c) => c.value === matchedCategory
+              );
               if (matchedItem) {
-                const rest = baseCategories.filter((c) => c.value !== matchedCategory);
+                const rest = baseCategories.filter(
+                  (c) => c.value !== matchedCategory
+                );
                 setCategoriesList([matchedItem, ...rest]);
               }
             }
@@ -1848,7 +1985,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
         try {
           const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, pageSize, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace })} -->`;
           const effectiveTopMargin = (topMargin || 24) + (letterheadSpace || 0);
-          const pageCssSize = pageSize === "legal" ? "8.5in 14in" : "A4 portrait";
+          const pageCssSize =
+            pageSize === "legal" ? "8.5in 14in" : "A4 portrait";
           const cleanBodyHtml = html
             .replace(/<!-- CD_LAYOUT:(.*?) -->/g, "")
             .replace(/<div id="red-margin-line".*?<\/div>/g, "")
@@ -2070,7 +2208,10 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                   text: "Link to Case",
                   onPress: () => {
                     // @ts-ignore
-                    navigation.navigate("DraftsHub", { draftId: draftId, action: "attach" });
+                    navigation.navigate("DraftsHub", {
+                      draftId,
+                      action: "attach",
+                    });
                   },
                 },
                 {
@@ -2313,7 +2454,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
           initialNumToRender={6}
           maxToRenderPerBatch={6}
           windowSize={3}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           ListEmptyComponent={
             <View
               style={{
@@ -2992,7 +3133,12 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                     color: theme.colors.primary,
                   }}
                 >
-                  ~{docStats.estimatedPages} {locale === "hi" ? "पेज" : docStats.estimatedPages === 1 ? "Page" : "Pages"}
+                  ~{docStats.estimatedPages}{" "}
+                  {locale === "hi"
+                    ? "पेज"
+                    : docStats.estimatedPages === 1
+                      ? "Page"
+                      : "Pages"}
                 </Text>
               </View>
 
@@ -3202,11 +3348,17 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                   paddingHorizontal: 8,
                   paddingVertical: 2,
                   borderRadius: 10,
-                  backgroundColor: outputLanguage === "en" ? theme.colors.primary : "transparent",
+                  backgroundColor:
+                    outputLanguage === "en"
+                      ? theme.colors.primary
+                      : "transparent",
                 }}
                 onPress={() => {
                   setOutputLanguage("en");
-                  postMessageToWebView({ type: "setEditorLanguage", lang: "en" });
+                  postMessageToWebView({
+                    type: "setEditorLanguage",
+                    lang: "en",
+                  });
                   if (documentType && documentType !== "blank_page") {
                     const newHtml = getInterpolatedHtml("en");
                     setHtmlContent(newHtml);
@@ -3215,7 +3367,16 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                 }}
                 testID="lang-en-btn"
               >
-                <Text style={{ fontSize: 11, fontWeight: "bold", color: outputLanguage === "en" ? "#ffffff" : theme.colors.textSecondary }}>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "bold",
+                    color:
+                      outputLanguage === "en"
+                        ? "#ffffff"
+                        : theme.colors.textSecondary,
+                  }}
+                >
                   EN
                 </Text>
               </TouchableOpacity>
@@ -3224,11 +3385,17 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                   paddingHorizontal: 8,
                   paddingVertical: 2,
                   borderRadius: 10,
-                  backgroundColor: outputLanguage === "hi" ? theme.colors.primary : "transparent",
+                  backgroundColor:
+                    outputLanguage === "hi"
+                      ? theme.colors.primary
+                      : "transparent",
                 }}
                 onPress={() => {
                   setOutputLanguage("hi");
-                  postMessageToWebView({ type: "setEditorLanguage", lang: "hi" });
+                  postMessageToWebView({
+                    type: "setEditorLanguage",
+                    lang: "hi",
+                  });
                   if (documentType && documentType !== "blank_page") {
                     const newHtml = getInterpolatedHtml("hi");
                     setHtmlContent(newHtml);
@@ -3237,7 +3404,16 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                 }}
                 testID="lang-hi-btn"
               >
-                <Text style={{ fontSize: 11, fontWeight: "bold", color: outputLanguage === "hi" ? "#ffffff" : theme.colors.textSecondary }}>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "bold",
+                    color:
+                      outputLanguage === "hi"
+                        ? "#ffffff"
+                        : theme.colors.textSecondary,
+                  }}
+                >
                   हिंदी
                 </Text>
               </TouchableOpacity>
@@ -3250,433 +3426,330 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                 fontWeight: "600",
               }}
             >
-              {pageSize === "legal"
-                ? "Legal Paper"
-                : "A4 Paper"}
+              {pageSize === "legal" ? "Legal Paper" : "A4 Paper"}
             </Text>
           </View>
 
           {/* Dynamic Top Formatting Ribbon */}
-          {!isRibbonCollapsed && (
-            toolbarMode === "format" ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{
-                borderBottomWidth: 1,
-                borderBottomColor: theme.colors.border,
-                backgroundColor: theme.colors.cardBackground,
-                maxHeight: 52,
-              }}
-              contentContainerStyle={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                gap: 8,
-              }}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.toolbarButton,
-                  editorState.bold && styles.activeToolbarButton,
-                ]}
-                onPress={() => triggerFormat("bold")}
-              >
-                <FontAwesome
-                  name="bold"
-                  size={18}
-                  color={editorState.bold ? "#fff" : theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.toolbarButton,
-                  editorState.italic && styles.activeToolbarButton,
-                ]}
-                onPress={() => triggerFormat("italic")}
-              >
-                <FontAwesome
-                  name="italic"
-                  size={18}
-                  color={editorState.italic ? "#fff" : theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.toolbarButton,
-                  editorState.underline && styles.activeToolbarButton,
-                ]}
-                onPress={() => triggerFormat("underline")}
-              >
-                <FontAwesome
-                  name="underline"
-                  size={18}
-                  color={editorState.underline ? "#fff" : theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              <View style={styles.divider} />
-
-              <TouchableOpacity
-                style={[
-                  styles.toolbarButton,
-                  editorState.alignLeft && styles.activeToolbarButton,
-                ]}
-                onPress={() => triggerFormat("justifyLeft")}
-              >
-                <FontAwesome
-                  name="align-left"
-                  size={18}
-                  color={editorState.alignLeft ? "#fff" : theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.toolbarButton,
-                  editorState.alignCenter && styles.activeToolbarButton,
-                ]}
-                onPress={() => triggerFormat("justifyCenter")}
-              >
-                <FontAwesome
-                  name="align-center"
-                  size={18}
-                  color={editorState.alignCenter ? "#fff" : theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.toolbarButton,
-                  editorState.alignRight && styles.activeToolbarButton,
-                ]}
-                onPress={() => triggerFormat("justifyRight")}
-              >
-                <FontAwesome
-                  name="align-right"
-                  size={18}
-                  color={editorState.alignRight ? "#fff" : theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.toolbarButton,
-                  editorState.alignJustify && styles.activeToolbarButton,
-                ]}
-                onPress={() => triggerFormat("justifyFull")}
-              >
-                <FontAwesome
-                  name="align-justify"
-                  size={18}
-                  color={editorState.alignJustify ? "#fff" : theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              <View style={styles.divider} />
-
-              <TouchableOpacity
-                style={[
-                  styles.toolbarButton,
-                  editorState.unorderedList && styles.activeToolbarButton,
-                ]}
-                onPress={() => triggerFormat("insertUnorderedList")}
-              >
-                <FontAwesome
-                  name="list-ul"
-                  size={18}
-                  color={editorState.unorderedList ? "#fff" : theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.toolbarButton,
-                  editorState.orderedList && styles.activeToolbarButton,
-                ]}
-                onPress={() => triggerFormat("insertOrderedList")}
-              >
-                <FontAwesome
-                  name="list-ol"
-                  size={18}
-                  color={editorState.orderedList ? "#fff" : theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              <View style={styles.divider} />
-
-              <TouchableOpacity
-                style={styles.toolbarButton}
-                onPress={() => triggerFormat("insertParagraph")}
-              >
-                <Ionicons
-                  name="add-circle-outline"
-                  size={18}
-                  color={theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.toolbarButton}
-                onPress={() => triggerFormat("insertPageBreak")}
-              >
-                <Ionicons
-                  name="layers-outline"
-                  size={18}
-                  color={theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              <View style={styles.divider} />
-
-              {/* Scan-to-Editor OCR Button */}
-              <TouchableOpacity
-                style={styles.toolbarButton}
-                onPress={handleScanToEditorOcr}
-                testID="scan-to-editor-btn"
-              >
-                <Ionicons
-                  name="scan-outline"
-                  size={18}
-                  color={theme.colors.primary}
-                />
-              </TouchableOpacity>
-
-              {/* Offline Voice Dictation Button */}
-              <TouchableOpacity
-                style={[
-                  styles.toolbarButton,
-                  isDictating && { backgroundColor: theme.colors.error || "#ef4444" },
-                ]}
-                onPress={toggleVoiceDictation}
-                testID="voice-dictation-btn"
-              >
-                <Ionicons
-                  name={isDictating ? "mic" : "mic-outline"}
-                  size={18}
-                  color={isDictating ? "#ffffff" : theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              {/* Insert Table Button */}
-              <TouchableOpacity
-                style={styles.toolbarButton}
-                onPress={() => setTableConfigModalVisible(true)}
-                testID="insert-table-btn"
-              >
-                <Ionicons
-                  name="grid-outline"
-                  size={18}
-                  color={theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              {/* Attach Signature Stamp Button */}
-              <TouchableOpacity
-                style={styles.toolbarButton}
-                onPress={() => setSignatureModalVisible(true)}
-                testID="attach-signature-btn"
-              >
-                <Ionicons
-                  name="ribbon-outline"
-                  size={18}
-                  color={theme.colors.text}
-                />
-              </TouchableOpacity>
-
-              {/* Insert Geometry Shape / Legal Stamp Button */}
-              <TouchableOpacity
-                style={styles.toolbarButton}
-                onPress={() => setShapeModalVisible(true)}
-                testID="insert-shape-btn"
-              >
-                <Ionicons
-                  name="shapes-outline"
-                  size={18}
-                  color={theme.colors.primary}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.toolbarButton}
-                onPress={() => {
-                  setTourStepIndex(0);
-                  setShowTour(true);
+          {!isRibbonCollapsed &&
+            (toolbarMode === "format" ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{
+                  borderBottomWidth: 1,
+                  borderBottomColor: theme.colors.border,
+                  backgroundColor: theme.colors.cardBackground,
+                  maxHeight: 52,
+                }}
+                contentContainerStyle={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  gap: 8,
                 }}
               >
-                <Ionicons
-                  name="help-circle-outline"
-                  size={18}
-                  color={theme.colors.text}
-                />
-              </TouchableOpacity>
-            </ScrollView>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 8,
-                paddingHorizontal: 12,
-                gap: 8,
-              }}
-              style={{
-                backgroundColor: theme.colors.inputBackground,
-                borderBottomWidth: 1,
-                borderBottomColor: theme.colors.border,
-                width: "100%",
-                maxHeight: 50,
-              }}
-            >
-              {/* Symbols */}
-              {["§", "¶", "Δ", "π", "№"].map((sym) => (
                 <TouchableOpacity
-                  key={sym}
-                  style={{
-                    padding: 8,
-                    borderRadius: 6,
-                    backgroundColor: theme.colors.cardBackground,
-                    borderWidth: 1,
-                    borderColor: theme.colors.border,
-                    minWidth: 34,
-                    alignItems: "center",
-                  }}
-                  onPress={() => triggerFormat("insertText", sym)}
+                  style={[
+                    styles.toolbarButton,
+                    editorState.bold && styles.activeToolbarButton,
+                  ]}
+                  onPress={() => triggerFormat("bold")}
                 >
-                  <Text
-                    style={{
-                      color: theme.colors.text,
-                      fontWeight: "bold",
-                      fontSize: 14,
-                    }}
-                  >
-                    {sym}
-                  </Text>
+                  <FontAwesome
+                    name="bold"
+                    size={18}
+                    color={editorState.bold ? "#fff" : theme.colors.text}
+                  />
                 </TouchableOpacity>
-              ))}
 
-              <View
-                style={{
-                  width: 1,
-                  height: 20,
-                  backgroundColor: theme.colors.border,
-                }}
-              />
-
-              {/* Outlining Toggle (Legal List) */}
-              <TouchableOpacity
-                style={{
-                  padding: 7,
-                  paddingHorizontal: 8,
-                  borderRadius: 6,
-                  backgroundColor: theme.colors.cardBackground,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-                onPress={() => triggerFormat("toggleLegalList")}
-              >
-                <FontAwesome
-                  name="list-ol"
-                  size={14}
-                  color={theme.colors.primary}
-                  style={{ marginRight: 4 }}
-                />
-                <Text
-                  style={{
-                    color: theme.colors.text,
-                    fontSize: 11,
-                    fontWeight: "600",
-                  }}
-                >
-                  Legal List
-                </Text>
-              </TouchableOpacity>
-
-              {/* Signature Block */}
-              <TouchableOpacity
-                style={{
-                  padding: 7,
-                  paddingHorizontal: 8,
-                  borderRadius: 6,
-                  backgroundColor: theme.colors.cardBackground,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-                onPress={() => setIsSignatureListVisible(true)}
-              >
-                <Ionicons
-                  name="pencil"
-                  size={14}
-                  color={theme.colors.primary}
-                  style={{ marginRight: 4 }}
-                />
-                <Text
-                  style={{
-                    color: theme.colors.text,
-                    fontSize: 11,
-                    fontWeight: "600",
-                  }}
-                >
-                  Signature
-                </Text>
-              </TouchableOpacity>
-
-              {/* Legal Dictionary (Vocabulary) */}
-              <TouchableOpacity
-                style={{
-                  padding: 7,
-                  paddingHorizontal: 8,
-                  borderRadius: 6,
-                  backgroundColor: theme.colors.cardBackground,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-                onPress={() => setIsVocabularyVisible(true)}
-              >
-                <Ionicons
-                  name="book-outline"
-                  size={14}
-                  color={theme.colors.primary}
-                  style={{ marginRight: 4 }}
-                />
-                <Text
-                  style={{
-                    color: theme.colors.text,
-                    fontSize: 11,
-                    fontWeight: "600",
-                  }}
-                >
-                  Dictionary
-                </Text>
-              </TouchableOpacity>
-
-              <View
-                style={{
-                  width: 1,
-                  height: 20,
-                  backgroundColor: theme.colors.border,
-                }}
-              />
-
-              {/* Case Converters */}
-              {[
-                { label: "UPPER", value: "upper" },
-                { label: "lower", value: "lower" },
-                { label: "Title", value: "title" },
-              ].map((c) => (
                 <TouchableOpacity
-                  key={c.value}
+                  style={[
+                    styles.toolbarButton,
+                    editorState.italic && styles.activeToolbarButton,
+                  ]}
+                  onPress={() => triggerFormat("italic")}
+                >
+                  <FontAwesome
+                    name="italic"
+                    size={18}
+                    color={editorState.italic ? "#fff" : theme.colors.text}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.toolbarButton,
+                    editorState.underline && styles.activeToolbarButton,
+                  ]}
+                  onPress={() => triggerFormat("underline")}
+                >
+                  <FontAwesome
+                    name="underline"
+                    size={18}
+                    color={editorState.underline ? "#fff" : theme.colors.text}
+                  />
+                </TouchableOpacity>
+
+                <View style={styles.divider} />
+
+                <TouchableOpacity
+                  style={[
+                    styles.toolbarButton,
+                    editorState.alignLeft && styles.activeToolbarButton,
+                  ]}
+                  onPress={() => triggerFormat("justifyLeft")}
+                >
+                  <FontAwesome
+                    name="align-left"
+                    size={18}
+                    color={editorState.alignLeft ? "#fff" : theme.colors.text}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.toolbarButton,
+                    editorState.alignCenter && styles.activeToolbarButton,
+                  ]}
+                  onPress={() => triggerFormat("justifyCenter")}
+                >
+                  <FontAwesome
+                    name="align-center"
+                    size={18}
+                    color={editorState.alignCenter ? "#fff" : theme.colors.text}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.toolbarButton,
+                    editorState.alignRight && styles.activeToolbarButton,
+                  ]}
+                  onPress={() => triggerFormat("justifyRight")}
+                >
+                  <FontAwesome
+                    name="align-right"
+                    size={18}
+                    color={editorState.alignRight ? "#fff" : theme.colors.text}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.toolbarButton,
+                    editorState.alignJustify && styles.activeToolbarButton,
+                  ]}
+                  onPress={() => triggerFormat("justifyFull")}
+                >
+                  <FontAwesome
+                    name="align-justify"
+                    size={18}
+                    color={
+                      editorState.alignJustify ? "#fff" : theme.colors.text
+                    }
+                  />
+                </TouchableOpacity>
+
+                <View style={styles.divider} />
+
+                <TouchableOpacity
+                  style={[
+                    styles.toolbarButton,
+                    editorState.unorderedList && styles.activeToolbarButton,
+                  ]}
+                  onPress={() => triggerFormat("insertUnorderedList")}
+                >
+                  <FontAwesome
+                    name="list-ul"
+                    size={18}
+                    color={
+                      editorState.unorderedList ? "#fff" : theme.colors.text
+                    }
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.toolbarButton,
+                    editorState.orderedList && styles.activeToolbarButton,
+                  ]}
+                  onPress={() => triggerFormat("insertOrderedList")}
+                >
+                  <FontAwesome
+                    name="list-ol"
+                    size={18}
+                    color={editorState.orderedList ? "#fff" : theme.colors.text}
+                  />
+                </TouchableOpacity>
+
+                <View style={styles.divider} />
+
+                <TouchableOpacity
+                  style={styles.toolbarButton}
+                  onPress={() => triggerFormat("insertParagraph")}
+                >
+                  <Ionicons
+                    name="add-circle-outline"
+                    size={18}
+                    color={theme.colors.text}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.toolbarButton}
+                  onPress={() => triggerFormat("insertPageBreak")}
+                >
+                  <Ionicons
+                    name="layers-outline"
+                    size={18}
+                    color={theme.colors.text}
+                  />
+                </TouchableOpacity>
+
+                <View style={styles.divider} />
+
+                {/* Scan-to-Editor OCR Button */}
+                <TouchableOpacity
+                  style={styles.toolbarButton}
+                  onPress={handleScanToEditorOcr}
+                  testID="scan-to-editor-btn"
+                >
+                  <Ionicons
+                    name="scan-outline"
+                    size={18}
+                    color={theme.colors.primary}
+                  />
+                </TouchableOpacity>
+
+                {/* Offline Voice Dictation Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.toolbarButton,
+                    isDictating && {
+                      backgroundColor: theme.colors.error || "#ef4444",
+                    },
+                  ]}
+                  onPress={toggleVoiceDictation}
+                  testID="voice-dictation-btn"
+                >
+                  <Ionicons
+                    name={isDictating ? "mic" : "mic-outline"}
+                    size={18}
+                    color={isDictating ? "#ffffff" : theme.colors.text}
+                  />
+                </TouchableOpacity>
+
+                {/* Insert Table Button */}
+                <TouchableOpacity
+                  style={styles.toolbarButton}
+                  onPress={() => setTableConfigModalVisible(true)}
+                  testID="insert-table-btn"
+                >
+                  <Ionicons
+                    name="grid-outline"
+                    size={18}
+                    color={theme.colors.text}
+                  />
+                </TouchableOpacity>
+
+                {/* Attach Signature Stamp Button */}
+                <TouchableOpacity
+                  style={styles.toolbarButton}
+                  onPress={() => setSignatureModalVisible(true)}
+                  testID="attach-signature-btn"
+                >
+                  <Ionicons
+                    name="ribbon-outline"
+                    size={18}
+                    color={theme.colors.text}
+                  />
+                </TouchableOpacity>
+
+                {/* Insert Geometry Shape / Legal Stamp Button */}
+                <TouchableOpacity
+                  style={styles.toolbarButton}
+                  onPress={() => setShapeModalVisible(true)}
+                  testID="insert-shape-btn"
+                >
+                  <Ionicons
+                    name="shapes-outline"
+                    size={18}
+                    color={theme.colors.primary}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.toolbarButton}
+                  onPress={() => {
+                    setTourStepIndex(0);
+                    setShowTour(true);
+                  }}
+                >
+                  <Ionicons
+                    name="help-circle-outline"
+                    size={18}
+                    color={theme.colors.text}
+                  />
+                </TouchableOpacity>
+              </ScrollView>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
+                  gap: 8,
+                }}
+                style={{
+                  backgroundColor: theme.colors.inputBackground,
+                  borderBottomWidth: 1,
+                  borderBottomColor: theme.colors.border,
+                  width: "100%",
+                  maxHeight: 50,
+                }}
+              >
+                {/* Symbols */}
+                {["§", "¶", "Δ", "π", "№"].map((sym) => (
+                  <TouchableOpacity
+                    key={sym}
+                    style={{
+                      padding: 8,
+                      borderRadius: 6,
+                      backgroundColor: theme.colors.cardBackground,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                      minWidth: 34,
+                      alignItems: "center",
+                    }}
+                    onPress={() => triggerFormat("insertText", sym)}
+                  >
+                    <Text
+                      style={{
+                        color: theme.colors.text,
+                        fontWeight: "bold",
+                        fontSize: 14,
+                      }}
+                    >
+                      {sym}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+
+                <View
+                  style={{
+                    width: 1,
+                    height: 20,
+                    backgroundColor: theme.colors.border,
+                  }}
+                />
+
+                {/* Outlining Toggle (Legal List) */}
+                <TouchableOpacity
                   style={{
                     padding: 7,
                     paddingHorizontal: 8,
@@ -3684,9 +3757,17 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                     backgroundColor: theme.colors.cardBackground,
                     borderWidth: 1,
                     borderColor: theme.colors.border,
+                    flexDirection: "row",
+                    alignItems: "center",
                   }}
-                  onPress={() => triggerFormat("changeCase", c.value)}
+                  onPress={() => triggerFormat("toggleLegalList")}
                 >
+                  <FontAwesome
+                    name="list-ol"
+                    size={14}
+                    color={theme.colors.primary}
+                    style={{ marginRight: 4 }}
+                  />
                   <Text
                     style={{
                       color: theme.colors.text,
@@ -3694,12 +3775,111 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                       fontWeight: "600",
                     }}
                   >
-                    {c.label}
+                    Legal List
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-          ))}
+
+                {/* Signature Block */}
+                <TouchableOpacity
+                  style={{
+                    padding: 7,
+                    paddingHorizontal: 8,
+                    borderRadius: 6,
+                    backgroundColor: theme.colors.cardBackground,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                  onPress={() => setIsSignatureListVisible(true)}
+                >
+                  <Ionicons
+                    name="pencil"
+                    size={14}
+                    color={theme.colors.primary}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontSize: 11,
+                      fontWeight: "600",
+                    }}
+                  >
+                    Signature
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Legal Dictionary (Vocabulary) */}
+                <TouchableOpacity
+                  style={{
+                    padding: 7,
+                    paddingHorizontal: 8,
+                    borderRadius: 6,
+                    backgroundColor: theme.colors.cardBackground,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                  onPress={() => setIsVocabularyVisible(true)}
+                >
+                  <Ionicons
+                    name="book-outline"
+                    size={14}
+                    color={theme.colors.primary}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontSize: 11,
+                      fontWeight: "600",
+                    }}
+                  >
+                    Dictionary
+                  </Text>
+                </TouchableOpacity>
+
+                <View
+                  style={{
+                    width: 1,
+                    height: 20,
+                    backgroundColor: theme.colors.border,
+                  }}
+                />
+
+                {/* Case Converters */}
+                {[
+                  { label: "UPPER", value: "upper" },
+                  { label: "lower", value: "lower" },
+                  { label: "Title", value: "title" },
+                ].map((c) => (
+                  <TouchableOpacity
+                    key={c.value}
+                    style={{
+                      padding: 7,
+                      paddingHorizontal: 8,
+                      borderRadius: 6,
+                      backgroundColor: theme.colors.cardBackground,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                    }}
+                    onPress={() => triggerFormat("changeCase", c.value)}
+                  >
+                    <Text
+                      style={{
+                        color: theme.colors.text,
+                        fontSize: 11,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {c.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ))}
 
           {/* Full Height Editor Canvas */}
           <WebView
@@ -3730,7 +3910,9 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
           <LegalAutocompleteBar
             suggestions={autocompleteSuggestions}
             theme={theme}
-            onSelectSuggestion={(phrase) => triggerFormat("insertText", phrase + " ")}
+            onSelectSuggestion={(phrase) =>
+              triggerFormat("insertText", phrase + " ")
+            }
           />
 
           {/* Form Actions Overlay */}
@@ -3903,1313 +4085,1312 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
       )}
 
       {/* Page Setup Modal */}
-          <Modal
-            visible={isPageSetupVisible}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setIsPageSetupVisible(false)}
+      <Modal
+        visible={isPageSetupVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsPageSetupVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            justifyContent: "flex-end",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.colors.cardBackground,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              padding: 20,
+              maxHeight: "80%",
+            }}
           >
             <View
               style={{
-                flex: 1,
-                backgroundColor: "rgba(0, 0, 0, 0.5)",
-                justifyContent: "flex-end",
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                paddingBottom: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: theme.colors.border,
               }}
             >
-              <View
+              <Text
                 style={{
-                  backgroundColor: theme.colors.cardBackground,
-                  borderTopLeftRadius: 20,
-                  borderTopRightRadius: 20,
-                  padding: 20,
-                  maxHeight: "80%",
+                  fontSize: 18,
+                  fontWeight: "bold",
+                  color: theme.colors.text,
                 }}
               >
+                {locale === "hi" ? "पेज सेटअप" : "Page Setup"}
+              </Text>
+              <TouchableOpacity onPress={() => setIsPageSetupVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator
+              style={{ maxHeight: 380 }}
+              contentContainerStyle={{ paddingBottom: 16 }}
+            >
+              <View style={{ paddingVertical: 16 }}>
+                {/* Font selection */}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "bold",
+                    color: theme.colors.textSecondary,
+                    marginBottom: 8,
+                  }}
+                >
+                  {locale === "hi" ? "फ़ॉन्ट" : "Font Family"}
+                </Text>
+                <View style={{ flexDirection: "row", marginBottom: 16 }}>
+                  {[
+                    {
+                      label: "Times New Roman",
+                      value: "'Times New Roman', Georgia, serif",
+                    },
+                    {
+                      label: "Georgia",
+                      value: "Georgia, 'Times New Roman', serif",
+                    },
+                    { label: "Arial", value: "Arial, Helvetica, sans-serif" },
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.label}
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor:
+                          font === item.value
+                            ? theme.colors.primary
+                            : theme.colors.border,
+                        backgroundColor:
+                          font === item.value
+                            ? theme.colors.primary
+                            : "transparent",
+                        alignItems: "center",
+                        marginHorizontal: 4,
+                      }}
+                      onPress={() => {
+                        setFont(item.value);
+                        applyLayoutSettings(
+                          item.value,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          leftMargin,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color:
+                            font === item.value ? "#ffffff" : theme.colors.text,
+                          fontSize: 12,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Line Spacing */}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "bold",
+                    color: theme.colors.textSecondary,
+                    marginBottom: 8,
+                  }}
+                >
+                  {locale === "hi" ? "लाइन स्पेसिंग" : "Line Spacing"}
+                </Text>
+                <View style={{ flexDirection: "row", marginBottom: 16 }}>
+                  {[
+                    { label: "1.15", value: "1.15" },
+                    { label: "1.5", value: "1.5" },
+                    { label: "2.0 (Double)", value: "2.0" },
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.label}
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor:
+                          lineHeight === item.value
+                            ? theme.colors.primary
+                            : theme.colors.border,
+                        backgroundColor:
+                          lineHeight === item.value
+                            ? theme.colors.primary
+                            : "transparent",
+                        alignItems: "center",
+                        marginHorizontal: 4,
+                      }}
+                      onPress={() => {
+                        setLineHeight(item.value);
+                        applyLayoutSettings(
+                          font,
+                          item.value,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          leftMargin,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color:
+                            lineHeight === item.value
+                              ? "#ffffff"
+                              : theme.colors.text,
+                          fontSize: 12,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Paper Size */}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "bold",
+                    color: theme.colors.textSecondary,
+                    marginBottom: 8,
+                    marginTop: 12,
+                  }}
+                >
+                  {locale === "hi" ? "पेज साइज" : "Paper Size"}
+                </Text>
+                <View style={{ flexDirection: "row", marginBottom: 16 }}>
+                  {[
+                    { label: "A4 Size", value: "a4" },
+                    { label: "Legal Size", value: "legal" },
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.value}
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor:
+                          pageSize === item.value
+                            ? theme.colors.primary
+                            : theme.colors.border,
+                        backgroundColor:
+                          pageSize === item.value
+                            ? theme.colors.primary
+                            : "transparent",
+                        alignItems: "center",
+                        marginHorizontal: 4,
+                      }}
+                      onPress={() => {
+                        setPageSize(item.value as "a4" | "legal");
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          item.value as "a4" | "legal",
+                          topMargin,
+                          bottomMargin,
+                          leftMargin,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color:
+                            pageSize === item.value
+                              ? "#ffffff"
+                              : theme.colors.text,
+                          fontSize: 12,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Unit System Selector */}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "bold",
+                    color: theme.colors.textSecondary,
+                    marginBottom: 8,
+                    marginTop: 12,
+                  }}
+                >
+                  Measurement Unit System
+                </Text>
+                <View style={{ flexDirection: "row", marginBottom: 16 }}>
+                  {[
+                    { label: "Inches (in)", value: "in" },
+                    { label: "Millimeters (mm)", value: "mm" },
+                    { label: "Pixels (px)", value: "px" },
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.value}
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor:
+                          unitMode === item.value
+                            ? theme.colors.primary
+                            : theme.colors.border,
+                        backgroundColor:
+                          unitMode === item.value
+                            ? theme.colors.primary
+                            : "transparent",
+                        alignItems: "center",
+                        marginHorizontal: 4,
+                      }}
+                      onPress={() => setUnitMode(item.value as any)}
+                    >
+                      <Text
+                        style={{
+                          color:
+                            unitMode === item.value
+                              ? "#ffffff"
+                              : theme.colors.text,
+                          fontSize: 12,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Margins Steppers */}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "bold",
+                    color: theme.colors.textSecondary,
+                    marginBottom: 8,
+                    marginTop: 12,
+                  }}
+                >
+                  {locale === "hi" ? "दस्तावेज़ मार्जिन" : "Document Margins"}
+                </Text>
+
+                {/* Top Margin */}
                 <View
                   style={{
                     flexDirection: "row",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    paddingBottom: 16,
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.colors.border,
+                    marginVertical: 6,
                   }}
                 >
                   <Text
                     style={{
-                      fontSize: 18,
-                      fontWeight: "bold",
                       color: theme.colors.text,
-                    }}
-                  >
-                    {locale === "hi" ? "पेज सेटअप" : "Page Setup"}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setIsPageSetupVisible(false)}
-                  >
-                    <Ionicons
-                      name="close"
-                      size={24}
-                      color={theme.colors.text}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView
-                  showsVerticalScrollIndicator={true}
-                  style={{ maxHeight: 380 }}
-                  contentContainerStyle={{ paddingBottom: 16 }}
-                >
-                  <View style={{ paddingVertical: 16 }}>
-                  {/* Font selection */}
-                  <Text
-                    style={{
                       fontSize: 13,
-                      fontWeight: "bold",
-                      color: theme.colors.textSecondary,
-                      marginBottom: 8,
+                      fontWeight: "500",
                     }}
                   >
-                    {locale === "hi" ? "फ़ॉन्ट" : "Font Family"}
+                    Top Margin
                   </Text>
-                  <View style={{ flexDirection: "row", marginBottom: 16 }}>
-                    {[
-                      {
-                        label: "Times New Roman",
-                        value: "'Times New Roman', Georgia, serif",
-                      },
-                      {
-                        label: "Georgia",
-                        value: "Georgia, 'Times New Roman', serif",
-                      },
-                      { label: "Arial", value: "Arial, Helvetica, sans-serif" },
-                    ].map((item) => (
-                      <TouchableOpacity
-                        key={item.label}
-                        style={{
-                          flex: 1,
-                          padding: 10,
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor:
-                            font === item.value
-                              ? theme.colors.primary
-                              : theme.colors.border,
-                          backgroundColor:
-                            font === item.value
-                              ? theme.colors.primary
-                              : "transparent",
-                          alignItems: "center",
-                          marginHorizontal: 4,
-                        }}
-                        onPress={() => {
-                          setFont(item.value);
-                          applyLayoutSettings(
-                            item.value,
-                            lineHeight,
-                            pageSize,
-                            topMargin,
-                            bottomMargin,
-                            leftMargin,
-                            rightMargin,
-                            letterheadSpace
-                          );
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color:
-                              font === item.value
-                                ? "#ffffff"
-                                : theme.colors.text,
-                            fontSize: 12,
-                            fontWeight: "600",
-                          }}
-                        >
-                          {item.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {/* Line Spacing */}
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "bold",
-                      color: theme.colors.textSecondary,
-                      marginBottom: 8,
-                    }}
-                  >
-                    {locale === "hi" ? "लाइन स्पेसिंग" : "Line Spacing"}
-                  </Text>
-                  <View style={{ flexDirection: "row", marginBottom: 16 }}>
-                    {[
-                      { label: "1.15", value: "1.15" },
-                      { label: "1.5", value: "1.5" },
-                      { label: "2.0 (Double)", value: "2.0" },
-                    ].map((item) => (
-                      <TouchableOpacity
-                        key={item.label}
-                        style={{
-                          flex: 1,
-                          padding: 10,
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor:
-                            lineHeight === item.value
-                              ? theme.colors.primary
-                              : theme.colors.border,
-                          backgroundColor:
-                            lineHeight === item.value
-                              ? theme.colors.primary
-                              : "transparent",
-                          alignItems: "center",
-                          marginHorizontal: 4,
-                        }}
-                        onPress={() => {
-                          setLineHeight(item.value);
-                          applyLayoutSettings(
-                            font,
-                            item.value,
-                            pageSize,
-                            topMargin,
-                            bottomMargin,
-                            leftMargin,
-                            rightMargin,
-                            letterheadSpace
-                          );
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color:
-                              lineHeight === item.value
-                                ? "#ffffff"
-                                : theme.colors.text,
-                            fontSize: 12,
-                            fontWeight: "600",
-                          }}
-                        >
-                          {item.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {/* Paper Size */}
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "bold",
-                      color: theme.colors.textSecondary,
-                      marginBottom: 8,
-                      marginTop: 12,
-                    }}
-                  >
-                    {locale === "hi" ? "पेज साइज" : "Paper Size"}
-                  </Text>
-                  <View style={{ flexDirection: "row", marginBottom: 16 }}>
-                    {[
-                      { label: "A4 Size", value: "a4" },
-                      { label: "Legal Size", value: "legal" },
-                    ].map((item) => (
-                      <TouchableOpacity
-                        key={item.value}
-                        style={{
-                          flex: 1,
-                          padding: 10,
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor:
-                            pageSize === item.value
-                              ? theme.colors.primary
-                              : theme.colors.border,
-                          backgroundColor:
-                            pageSize === item.value
-                              ? theme.colors.primary
-                              : "transparent",
-                          alignItems: "center",
-                          marginHorizontal: 4,
-                        }}
-                        onPress={() => {
-                          setPageSize(item.value as "a4" | "legal");
-                          applyLayoutSettings(
-                            font,
-                            lineHeight,
-                            item.value as "a4" | "legal",
-                            topMargin,
-                            bottomMargin,
-                            leftMargin,
-                            rightMargin,
-                            letterheadSpace
-                          );
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color:
-                              pageSize === item.value
-                                ? "#ffffff"
-                                : theme.colors.text,
-                            fontSize: 12,
-                            fontWeight: "600",
-                          }}
-                        >
-                          {item.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {/* Unit System Selector */}
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "bold",
-                      color: theme.colors.textSecondary,
-                      marginBottom: 8,
-                      marginTop: 12,
-                    }}
-                  >
-                    Measurement Unit System
-                  </Text>
-                  <View style={{ flexDirection: "row", marginBottom: 16 }}>
-                    {[
-                      { label: "Inches (in)", value: "in" },
-                      { label: "Millimeters (mm)", value: "mm" },
-                      { label: "Pixels (px)", value: "px" },
-                    ].map((item) => (
-                      <TouchableOpacity
-                        key={item.value}
-                        style={{
-                          flex: 1,
-                          padding: 10,
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor:
-                            unitMode === item.value
-                              ? theme.colors.primary
-                              : theme.colors.border,
-                          backgroundColor:
-                            unitMode === item.value
-                              ? theme.colors.primary
-                              : "transparent",
-                          alignItems: "center",
-                          marginHorizontal: 4,
-                        }}
-                        onPress={() => setUnitMode(item.value as any)}
-                      >
-                        <Text
-                          style={{
-                            color:
-                              unitMode === item.value
-                                ? "#ffffff"
-                                : theme.colors.text,
-                            fontSize: 12,
-                            fontWeight: "600",
-                          }}
-                        >
-                          {item.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {/* Margins Steppers */}
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "bold",
-                      color: theme.colors.textSecondary,
-                      marginBottom: 8,
-                      marginTop: 12,
-                    }}
-                  >
-                    {locale === "hi" ? "दस्तावेज़ मार्जिन" : "Document Margins"}
-                  </Text>
-
-                  {/* Top Margin */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginVertical: 6,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: theme.colors.text,
-                        fontSize: 13,
-                        fontWeight: "500",
-                      }}
-                    >
-                      Top Margin
-                    </Text>
-                    <View
-                      style={{ flexDirection: "row", alignItems: "center" }}
-                    >
-                      <TouchableOpacity
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          backgroundColor: theme.colors.cardBackground,
-                        }}
-                        onPress={() => {
-                          const step = getMarginStepPx(unitMode);
-                          const v = Math.max(0, topMargin - step);
-                          setTopMargin(v);
-                          applyLayoutSettings(
-                            font,
-                            lineHeight,
-                            pageSize,
-                            v,
-                            bottomMargin,
-                            leftMargin,
-                            rightMargin,
-                            letterheadSpace
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="remove"
-                          size={14}
-                          color={theme.colors.text}
-                        />
-                      </TouchableOpacity>
-                      <Text
-                        style={{
-                          width: 76,
-                          textAlign: "center",
-                          fontWeight: "bold",
-                          color: theme.colors.text,
-                          fontSize: 12,
-                        }}
-                      >
-                        {formatMarginValue(topMargin, unitMode)}
-                      </Text>
-                      <TouchableOpacity
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          backgroundColor: theme.colors.cardBackground,
-                        }}
-                        onPress={() => {
-                          const step = getMarginStepPx(unitMode);
-                          const v = Math.min(200, topMargin + step);
-                          setTopMargin(v);
-                          applyLayoutSettings(
-                            font,
-                            lineHeight,
-                            pageSize,
-                            v,
-                            bottomMargin,
-                            leftMargin,
-                            rightMargin,
-                            letterheadSpace
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="add"
-                          size={14}
-                          color={theme.colors.text}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Left Margin */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginVertical: 6,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: theme.colors.text,
-                        fontSize: 13,
-                        fontWeight: "500",
-                      }}
-                    >
-                      Left Margin
-                    </Text>
-                    <View
-                      style={{ flexDirection: "row", alignItems: "center" }}
-                    >
-                      <TouchableOpacity
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          backgroundColor: theme.colors.cardBackground,
-                        }}
-                        onPress={() => {
-                          const step = getMarginStepPx(unitMode);
-                          const v = Math.max(20, leftMargin - step);
-                          setLeftMargin(v);
-                          applyLayoutSettings(
-                            font,
-                            lineHeight,
-                            pageSize,
-                            topMargin,
-                            bottomMargin,
-                            v,
-                            rightMargin,
-                            letterheadSpace
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="remove"
-                          size={14}
-                          color={theme.colors.text}
-                        />
-                      </TouchableOpacity>
-                      <Text
-                        style={{
-                          width: 76,
-                          textAlign: "center",
-                          fontWeight: "bold",
-                          color: theme.colors.text,
-                          fontSize: 12,
-                        }}
-                      >
-                        {formatMarginValue(leftMargin, unitMode)}
-                      </Text>
-                      <TouchableOpacity
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          backgroundColor: theme.colors.cardBackground,
-                        }}
-                        onPress={() => {
-                          const step = getMarginStepPx(unitMode);
-                          const v = Math.min(200, leftMargin + step);
-                          setLeftMargin(v);
-                          applyLayoutSettings(
-                            font,
-                            lineHeight,
-                            pageSize,
-                            topMargin,
-                            bottomMargin,
-                            v,
-                            rightMargin,
-                            letterheadSpace
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="add"
-                          size={14}
-                          color={theme.colors.text}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Right Margin */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginVertical: 6,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: theme.colors.text,
-                        fontSize: 13,
-                        fontWeight: "500",
-                      }}
-                    >
-                      Right Margin
-                    </Text>
-                    <View
-                      style={{ flexDirection: "row", alignItems: "center" }}
-                    >
-                      <TouchableOpacity
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          backgroundColor: theme.colors.cardBackground,
-                        }}
-                        onPress={() => {
-                          const step = getMarginStepPx(unitMode);
-                          const v = Math.max(0, rightMargin - step);
-                          setRightMargin(v);
-                          applyLayoutSettings(
-                            font,
-                            lineHeight,
-                            pageSize,
-                            topMargin,
-                            bottomMargin,
-                            leftMargin,
-                            v,
-                            letterheadSpace
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="remove"
-                          size={14}
-                          color={theme.colors.text}
-                        />
-                      </TouchableOpacity>
-                      <Text
-                        style={{
-                          width: 76,
-                          textAlign: "center",
-                          fontWeight: "bold",
-                          color: theme.colors.text,
-                          fontSize: 12,
-                        }}
-                      >
-                        {formatMarginValue(rightMargin, unitMode)}
-                      </Text>
-                      <TouchableOpacity
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          backgroundColor: theme.colors.cardBackground,
-                        }}
-                        onPress={() => {
-                          const step = getMarginStepPx(unitMode);
-                          const v = Math.min(200, rightMargin + step);
-                          setRightMargin(v);
-                          applyLayoutSettings(
-                            font,
-                            lineHeight,
-                            pageSize,
-                            topMargin,
-                            bottomMargin,
-                            leftMargin,
-                            v,
-                            letterheadSpace
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="add"
-                          size={14}
-                          color={theme.colors.text}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Bottom Margin */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginVertical: 6,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: theme.colors.text,
-                        fontSize: 13,
-                        fontWeight: "500",
-                      }}
-                    >
-                      Bottom Margin
-                    </Text>
-                    <View
-                      style={{ flexDirection: "row", alignItems: "center" }}
-                    >
-                      <TouchableOpacity
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          backgroundColor: theme.colors.cardBackground,
-                        }}
-                        onPress={() => {
-                          const step = getMarginStepPx(unitMode);
-                          const v = Math.max(0, bottomMargin - step);
-                          setBottomMargin(v);
-                          applyLayoutSettings(
-                            font,
-                            lineHeight,
-                            pageSize,
-                            topMargin,
-                            v,
-                            leftMargin,
-                            rightMargin,
-                            letterheadSpace
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="remove"
-                          size={14}
-                          color={theme.colors.text}
-                        />
-                      </TouchableOpacity>
-                      <Text
-                        style={{
-                          width: 76,
-                          textAlign: "center",
-                          fontWeight: "bold",
-                          color: theme.colors.text,
-                          fontSize: 12,
-                        }}
-                      >
-                        {formatMarginValue(bottomMargin, unitMode)}
-                      </Text>
-                      <TouchableOpacity
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          backgroundColor: theme.colors.cardBackground,
-                        }}
-                        onPress={() => {
-                          const step = getMarginStepPx(unitMode);
-                          const v = Math.min(200, bottomMargin + step);
-                          setBottomMargin(v);
-                          applyLayoutSettings(
-                            font,
-                            lineHeight,
-                            pageSize,
-                            topMargin,
-                            v,
-                            leftMargin,
-                            rightMargin,
-                            letterheadSpace
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="add"
-                          size={14}
-                          color={theme.colors.text}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Letterhead Top Space */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginVertical: 6,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: theme.colors.text,
-                        fontSize: 13,
-                        fontWeight: "500",
-                      }}
-                    >
-                      Letterhead Top Space
-                    </Text>
-                    <View
-                      style={{ flexDirection: "row", alignItems: "center" }}
-                    >
-                      <TouchableOpacity
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          backgroundColor: theme.colors.cardBackground,
-                        }}
-                        onPress={() => {
-                          const step = getMarginStepPx(unitMode);
-                          const v = Math.max(0, letterheadSpace - step * 2);
-                          setLetterheadSpace(v);
-                          applyLayoutSettings(
-                            font,
-                            lineHeight,
-                            pageSize,
-                            topMargin,
-                            bottomMargin,
-                            leftMargin,
-                            rightMargin,
-                            v
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="remove"
-                          size={14}
-                          color={theme.colors.text}
-                        />
-                      </TouchableOpacity>
-                      <Text
-                        style={{
-                          width: 76,
-                          textAlign: "center",
-                          fontWeight: "bold",
-                          color: theme.colors.text,
-                          fontSize: 12,
-                        }}
-                      >
-                        {formatMarginValue(letterheadSpace, unitMode)}
-                      </Text>
-                      <TouchableOpacity
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 4,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                          justifyContent: "center",
-                          alignItems: "center",
-                          backgroundColor: theme.colors.cardBackground,
-                        }}
-                        onPress={() => {
-                          const step = getMarginStepPx(unitMode);
-                          const v = Math.min(300, letterheadSpace + step * 2);
-                          setLetterheadSpace(v);
-                          applyLayoutSettings(
-                            font,
-                            lineHeight,
-                            pageSize,
-                            topMargin,
-                            bottomMargin,
-                            leftMargin,
-                            rightMargin,
-                            v
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="add"
-                          size={14}
-                          color={theme.colors.text}
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              </ScrollView>
-              </View>
-            </View>
-          </Modal>
-
-          {/* Insert Geometry Shape / Legal Stamp Modal */}
-          <Modal
-            visible={shapeModalVisible}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setShapeModalVisible(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
-                <View style={styles.modalHeader}>
-                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                    Insert Geometry Shape / Legal Stamp
-                  </Text>
-                  <TouchableOpacity onPress={() => setShapeModalVisible(false)}>
-                    <Ionicons name="close" size={24} color={theme.colors.text} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={{ gap: 12, paddingVertical: 12 }}>
-                  {[
-                    { title: "⏹️ Rectangle / Stamp Box", desc: "Standard bordered box for custom notes or fee seals", value: "rect" },
-                    { title: "🏷️ Court Fee Stamp Frame", desc: "Double-bordered ₹10/₹100 Fee Stamp placeholder box", value: "stamp" },
-                    { title: "⭕ Advocate Round Seal", desc: "Circular stamp frame for Advocate office / Notary seal", value: "circle" },
-                    { title: "➡️ Process Arrow", desc: "Legal chronology flowchart process arrow node", value: "arrow" },
-                  ].map((item) => (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
                     <TouchableOpacity
-                      key={item.value}
                       style={{
-                        padding: 14,
-                        borderRadius: 10,
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
                         borderWidth: 1,
                         borderColor: theme.colors.border,
-                        backgroundColor: theme.colors.inputBackground,
-                      }}
-                      onPress={() => {
-                        setShapeModalVisible(false);
-                        postMessageToWebView({
-                          type: "exec",
-                          command: "insertShape",
-                          value: item.value,
-                        });
-                      }}
-                    >
-                      <Text style={{ fontSize: 14, fontWeight: "bold", color: theme.colors.text, marginBottom: 2 }}>
-                        {item.title}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>
-                        {item.desc}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
-          </Modal>
-
-          {/* Save Custom Template Modal */}
-          <Modal
-            visible={isSaveModalVisible}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setIsSaveModalVisible(false)}
-          >
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: "rgba(0, 0, 0, 0.5)",
-                justifyContent: "center",
-                padding: 20,
-              }}
-            >
-              <View
-                style={{
-                  backgroundColor: theme.colors.cardBackground,
-                  borderRadius: 16,
-                  padding: 20,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontWeight: "bold",
-                    color: theme.colors.text,
-                    marginBottom: 12,
-                  }}
-                >
-                  Save Custom Template
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: theme.colors.textSecondary,
-                    marginBottom: 12,
-                  }}
-                >
-                  Provide a name for this customized template format to reuse it
-                  later:
-                </Text>
-                <TextInput
-                  style={{
-                    backgroundColor: theme.colors.inputBackground,
-                    color: theme.colors.text,
-                    padding: 12,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: theme.colors.border,
-                    marginBottom: 16,
-                    fontSize: 14,
-                  }}
-                  value={customTemplateTitle}
-                  onChangeText={setCustomTemplateTitle}
-                  placeholder="e.g. My Bail Application Format"
-                  placeholderTextColor={theme.colors.textSecondary}
-                />
-                <View
-                  style={{ flexDirection: "row", justifyContent: "flex-end" }}
-                >
-                  <TouchableOpacity
-                    style={{ padding: 12, marginRight: 8 }}
-                    onPress={() => setIsSaveModalVisible(false)}
-                  >
-                    <Text
-                      style={{
-                        color: theme.colors.textSecondary,
-                        fontWeight: "600",
-                      }}
-                    >
-                      Cancel
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: theme.colors.primary,
-                      borderRadius: 8,
-                      paddingHorizontal: 16,
-                      paddingVertical: 12,
-                      justifyContent: "center",
-                      alignItems: "center",
-                    }}
-                    onPress={async () => {
-                      if (!customTemplateTitle.trim()) {
-                        Alert.alert(
-                          "Error",
-                          "Please provide a valid template name."
-                        );
-                        return;
-                      }
-                      setIsSavingTemplate(true);
-                      try {
-                        const templateId = uuidv4();
-                        const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace })} -->`;
-                        const contentWithMetadata =
-                          metadataComment + htmlContent;
-
-                        await saveDocumentDraft({
-                          id: templateId,
-                          case_id: null,
-                          title: customTemplateTitle,
-                          template_type: documentType,
-                          html_content: contentWithMetadata,
-                          is_custom_template: 1,
-                          created_at: new Date().toISOString(),
-                          updated_at: new Date().toISOString(),
-                        });
-
-                        const templates = await getDocumentDrafts(null, 1);
-                        setCustomTemplates(templates);
-
-                        Alert.alert(
-                          "Success",
-                          "Custom template saved successfully."
-                        );
-                        setIsSaveModalVisible(false);
-                      } catch (err) {
-                        console.error("Failed to save custom template:", err);
-                        Alert.alert(
-                          "Error",
-                          "Could not save custom template to database."
-                        );
-                      } finally {
-                        setIsSavingTemplate(false);
-                      }
-                    }}
-                    disabled={isSavingTemplate}
-                  >
-                    {isSavingTemplate ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                        Save Template
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
-          {/* Signature Modal */}
-          <Modal
-            visible={isSignatureListVisible}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setIsSignatureListVisible(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={[styles.modalContent, { maxHeight: "80%" }]}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>
-                    Insert Signature / Verification
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setIsSignatureListVisible(false)}
-                  >
-                    <Ionicons
-                      name="close"
-                      size={24}
-                      color={theme.colors.text}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView contentContainerStyle={{ paddingVertical: 12 }}>
-                  {[
-                    {
-                      title: "Advocate Signature Block",
-                      description:
-                        "Standard right-aligned block for advocate's signature and designation.",
-                      html: `<table style="width: 100%; border: none; margin-top: 30px; font-family: inherit;"><tr><td style="width: 50%; border: none;"></td><td style="width: 50%; text-align: right; border: none;"><strong>[ADVOCATE NAME]</strong><br/>Advocate for Petitioner</td></tr></table>`,
-                    },
-                    {
-                      title: "Double Signature Block",
-                      description:
-                        "Left-aligned Petitioner block + right-aligned Advocate block.",
-                      html: `<table style="width: 100%; border: none; margin-top: 30px; font-family: inherit;"><tr><td style="width: 50%; text-align: left; border: none;"><strong>[CLIENT NAME]</strong><br/>Petitioner / Plaintiff</td><td style="width: 50%; text-align: right; border: none;"><strong>[ADVOCATE NAME]</strong><br/>Advocate for Petitioner</td></tr></table>`,
-                    },
-                    {
-                      title: "Court Verification Block",
-                      description:
-                        "Formal pleading verification box confirming facts under oath.",
-                      html: `<div style="border: 1.5px solid #1f2937; padding: 14px; margin-top: 24px; border-radius: 4px; font-family: inherit; line-height: 1.6;"><p style="margin: 0 0 12px 0; text-align: center;"><strong><u>VERIFICATION</u></strong></p><p style="margin: 0 0 12px 0;">I, the deponent above named, do hereby solemnly declare and verify that the contents of paragraphs 1 to ___ are true and correct to my personal knowledge, and nothing material has been concealed therefrom.</p><p style="margin: 0 0 20px 0;">Verified at New Delhi on this day ___ of ____, 2026.</p><table style="width: 100%; border: none; margin-top: 20px;"><tr><td style="width: 50%; border: none;"><strong>DEPONENT</strong></td><td style="width: 50%; text-align: right; border: none;"><strong>IDENTIFIED BY ME</strong></td></tr></table></div>`,
-                    },
-                  ].map((item, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={{
+                        justifyContent: "center",
+                        alignItems: "center",
                         backgroundColor: theme.colors.cardBackground,
-                        borderWidth: 1,
-                        borderColor: theme.colors.border,
-                        borderRadius: 8,
-                        padding: 14,
-                        marginBottom: 12,
                       }}
                       onPress={() => {
-                        triggerFormat("insertHTML", item.html);
-                        setIsSignatureListVisible(false);
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.max(0, topMargin - step);
+                        setTopMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          v,
+                          bottomMargin,
+                          leftMargin,
+                          rightMargin,
+                          letterheadSpace
+                        );
                       }}
                     >
-                      <Text
-                        style={{
-                          fontSize: 15,
-                          fontWeight: "bold",
-                          color: theme.colors.text,
-                          marginBottom: 4,
-                        }}
-                      >
-                        {item.title}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: theme.colors.textSecondary,
-                        }}
-                      >
-                        {item.description}
-                      </Text>
+                      <Ionicons
+                        name="remove"
+                        size={14}
+                        color={theme.colors.text}
+                      />
                     </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </View>
-          </Modal>
-
-          {/* Vocabulary Modal */}
-          <Modal
-            visible={isVocabularyVisible}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setIsVocabularyVisible(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={[styles.modalContent, { maxHeight: "80%" }]}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Legal Dictionary</Text>
-                  <TouchableOpacity
-                    onPress={() => setIsVocabularyVisible(false)}
-                  >
-                    <Ionicons
-                      name="close"
-                      size={24}
-                      color={theme.colors.text}
-                    />
-                  </TouchableOpacity>
+                    <Text
+                      style={{
+                        width: 76,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color: theme.colors.text,
+                        fontSize: 12,
+                      }}
+                    >
+                      {formatMarginValue(topMargin, unitMode)}
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.min(200, topMargin + step);
+                        setTopMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          v,
+                          bottomMargin,
+                          leftMargin,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
-                {/* Search Bar */}
+                {/* Left Margin */}
                 <View
                   style={{
                     flexDirection: "row",
+                    justifyContent: "space-between",
                     alignItems: "center",
-                    backgroundColor: theme.colors.background,
-                    borderRadius: 8,
-                    paddingHorizontal: 10,
-                    borderWidth: 1,
-                    borderColor: theme.colors.border,
-                    height: 40,
-                    marginBottom: 12,
+                    marginVertical: 6,
                   }}
                 >
-                  <Ionicons
-                    name="search-outline"
-                    size={18}
-                    color={theme.colors.textSecondary}
-                    style={{ marginRight: 6 }}
-                  />
-                  <TextInput
-                    placeholder="Search legal words..."
-                    placeholderTextColor={theme.colors.textSecondary}
+                  <Text
                     style={{
-                      flex: 1,
                       color: theme.colors.text,
-                      fontSize: 14,
-                      padding: 0,
+                      fontSize: 13,
+                      fontWeight: "500",
                     }}
-                    value={vocabSearchQuery}
-                    onChangeText={setVocabSearchQuery}
-                  />
-                  {vocabSearchQuery !== "" && (
-                    <TouchableOpacity onPress={() => setVocabSearchQuery("")}>
-                      <Ionicons
-                        name="close-circle"
-                        size={16}
-                        color={theme.colors.textSecondary}
-                      />
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                <ScrollView
-                  contentContainerStyle={{ paddingBottom: 24 }}
-                  showsVerticalScrollIndicator={false}
-                >
-                  {LEGAL_VOCABULARY.filter(
-                    (item) =>
-                      item.english
-                        .toLowerCase()
-                        .includes(vocabSearchQuery.toLowerCase()) ||
-                      item.hindi.includes(vocabSearchQuery) ||
-                      item.transliteration
-                        .toLowerCase()
-                        .includes(vocabSearchQuery.toLowerCase())
-                  ).map((item, idx) => (
-                    <View
-                      key={idx}
+                  >
+                    Left Margin
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity
                       style={{
-                        borderBottomWidth: 1,
-                        borderBottomColor: theme.colors.border,
-                        paddingVertical: 12,
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.max(20, leftMargin - step);
+                        setLeftMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          v,
+                          rightMargin,
+                          letterheadSpace
+                        );
                       }}
                     >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: 4,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 15,
-                            fontWeight: "bold",
-                            color: theme.colors.text,
-                          }}
-                        >
-                          {item.english}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 14,
-                            fontWeight: "bold",
-                            color: theme.colors.primary,
-                          }}
-                        >
-                          {item.hindi}
-                        </Text>
-                      </View>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: theme.colors.textSecondary,
-                          fontStyle: "italic",
-                          marginBottom: 6,
-                        }}
-                      >
-                        Pronunciation: {item.transliteration}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: theme.colors.textSecondary,
-                          marginBottom: 8,
-                        }}
-                      >
-                        {item.meaning}
-                      </Text>
-                      <View style={{ flexDirection: "row", gap: 8 }}>
-                        <TouchableOpacity
-                          style={{
-                            backgroundColor: `${theme.colors.primary}12`,
-                            paddingHorizontal: 10,
-                            paddingVertical: 4,
-                            borderRadius: 4,
-                            borderWidth: 0.5,
-                            borderColor: theme.colors.primary,
-                          }}
-                          onPress={() => {
-                            triggerFormat("insertText", item.english);
-                            setIsVocabularyVisible(false);
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: theme.colors.primary,
-                              fontSize: 11,
-                              fontWeight: "bold",
-                            }}
-                          >
-                            Insert English
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={{
-                            backgroundColor: `${theme.colors.primary}12`,
-                            paddingHorizontal: 10,
-                            paddingVertical: 4,
-                            borderRadius: 4,
-                            borderWidth: 0.5,
-                            borderColor: theme.colors.primary,
-                          }}
-                          onPress={() => {
-                            triggerFormat("insertText", item.hindi);
-                            setIsVocabularyVisible(false);
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: theme.colors.primary,
-                              fontSize: 11,
-                              fontWeight: "bold",
-                            }}
-                          >
-                            Insert Hindi
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ))}
-                </ScrollView>
+                      <Ionicons
+                        name="remove"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                    <Text
+                      style={{
+                        width: 76,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color: theme.colors.text,
+                        fontSize: 12,
+                      }}
+                    >
+                      {formatMarginValue(leftMargin, unitMode)}
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.min(200, leftMargin + step);
+                        setLeftMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          v,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Right Margin */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginVertical: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontSize: 13,
+                      fontWeight: "500",
+                    }}
+                  >
+                    Right Margin
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.max(0, rightMargin - step);
+                        setRightMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          leftMargin,
+                          v,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="remove"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                    <Text
+                      style={{
+                        width: 76,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color: theme.colors.text,
+                        fontSize: 12,
+                      }}
+                    >
+                      {formatMarginValue(rightMargin, unitMode)}
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.min(200, rightMargin + step);
+                        setRightMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          leftMargin,
+                          v,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Bottom Margin */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginVertical: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontSize: 13,
+                      fontWeight: "500",
+                    }}
+                  >
+                    Bottom Margin
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.max(0, bottomMargin - step);
+                        setBottomMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          v,
+                          leftMargin,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="remove"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                    <Text
+                      style={{
+                        width: 76,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color: theme.colors.text,
+                        fontSize: 12,
+                      }}
+                    >
+                      {formatMarginValue(bottomMargin, unitMode)}
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.min(200, bottomMargin + step);
+                        setBottomMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          v,
+                          leftMargin,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Letterhead Top Space */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginVertical: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontSize: 13,
+                      fontWeight: "500",
+                    }}
+                  >
+                    Letterhead Top Space
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.max(0, letterheadSpace - step * 2);
+                        setLetterheadSpace(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          leftMargin,
+                          rightMargin,
+                          v
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="remove"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                    <Text
+                      style={{
+                        width: 76,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color: theme.colors.text,
+                        fontSize: 12,
+                      }}
+                    >
+                      {formatMarginValue(letterheadSpace, unitMode)}
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.min(300, letterheadSpace + step * 2);
+                        setLetterheadSpace(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          leftMargin,
+                          rightMargin,
+                          v
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Insert Geometry Shape / Legal Stamp Modal */}
+      <Modal
+        visible={shapeModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShapeModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: theme.colors.cardBackground },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                Insert Geometry Shape / Legal Stamp
+              </Text>
+              <TouchableOpacity onPress={() => setShapeModalVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
             </View>
-          </Modal>
+
+            <View style={{ gap: 12, paddingVertical: 12 }}>
+              {[
+                {
+                  title: "⏹️ Rectangle / Stamp Box",
+                  desc: "Standard bordered box for custom notes or fee seals",
+                  value: "rect",
+                },
+                {
+                  title: "🏷️ Court Fee Stamp Frame",
+                  desc: "Double-bordered ₹10/₹100 Fee Stamp placeholder box",
+                  value: "stamp",
+                },
+                {
+                  title: "⭕ Advocate Round Seal",
+                  desc: "Circular stamp frame for Advocate office / Notary seal",
+                  value: "circle",
+                },
+                {
+                  title: "➡️ Process Arrow",
+                  desc: "Legal chronology flowchart process arrow node",
+                  value: "arrow",
+                },
+              ].map((item) => (
+                <TouchableOpacity
+                  key={item.value}
+                  style={{
+                    padding: 14,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.inputBackground,
+                  }}
+                  onPress={() => {
+                    setShapeModalVisible(false);
+                    postMessageToWebView({
+                      type: "exec",
+                      command: "insertShape",
+                      value: item.value,
+                    });
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "bold",
+                      color: theme.colors.text,
+                      marginBottom: 2,
+                    }}
+                  >
+                    {item.title}
+                  </Text>
+                  <Text
+                    style={{ fontSize: 12, color: theme.colors.textSecondary }}
+                  >
+                    {item.desc}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Save Custom Template Modal */}
+      <Modal
+        visible={isSaveModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsSaveModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: theme.colors.cardBackground,
+              borderRadius: 16,
+              padding: 20,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "bold",
+                color: theme.colors.text,
+                marginBottom: 12,
+              }}
+            >
+              Save Custom Template
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.colors.textSecondary,
+                marginBottom: 12,
+              }}
+            >
+              Provide a name for this customized template format to reuse it
+              later:
+            </Text>
+            <TextInput
+              style={{
+                backgroundColor: theme.colors.inputBackground,
+                color: theme.colors.text,
+                padding: 12,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                marginBottom: 16,
+                fontSize: 14,
+              }}
+              value={customTemplateTitle}
+              onChangeText={setCustomTemplateTitle}
+              placeholder="e.g. My Bail Application Format"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+            <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+              <TouchableOpacity
+                style={{ padding: 12, marginRight: 8 }}
+                onPress={() => setIsSaveModalVisible(false)}
+              >
+                <Text
+                  style={{
+                    color: theme.colors.textSecondary,
+                    fontWeight: "600",
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: theme.colors.primary,
+                  borderRadius: 8,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+                onPress={async () => {
+                  if (!customTemplateTitle.trim()) {
+                    Alert.alert(
+                      "Error",
+                      "Please provide a valid template name."
+                    );
+                    return;
+                  }
+                  setIsSavingTemplate(true);
+                  try {
+                    const templateId = uuidv4();
+                    const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace })} -->`;
+                    const contentWithMetadata = metadataComment + htmlContent;
+
+                    await saveDocumentDraft({
+                      id: templateId,
+                      case_id: null,
+                      title: customTemplateTitle,
+                      template_type: documentType,
+                      html_content: contentWithMetadata,
+                      is_custom_template: 1,
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    });
+
+                    const templates = await getDocumentDrafts(null, 1);
+                    setCustomTemplates(templates);
+
+                    Alert.alert(
+                      "Success",
+                      "Custom template saved successfully."
+                    );
+                    setIsSaveModalVisible(false);
+                  } catch (err) {
+                    console.error("Failed to save custom template:", err);
+                    Alert.alert(
+                      "Error",
+                      "Could not save custom template to database."
+                    );
+                  } finally {
+                    setIsSavingTemplate(false);
+                  }
+                }}
+                disabled={isSavingTemplate}
+              >
+                {isSavingTemplate ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    Save Template
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* Signature Modal */}
+      <Modal
+        visible={isSignatureListVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsSignatureListVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Insert Signature / Verification
+              </Text>
+              <TouchableOpacity
+                onPress={() => setIsSignatureListVisible(false)}
+              >
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingVertical: 12 }}>
+              {[
+                {
+                  title: "Advocate Signature Block",
+                  description:
+                    "Standard right-aligned block for advocate's signature and designation.",
+                  html: `<table style="width: 100%; border: none; margin-top: 30px; font-family: inherit;"><tr><td style="width: 50%; border: none;"></td><td style="width: 50%; text-align: right; border: none;"><strong>[ADVOCATE NAME]</strong><br/>Advocate for Petitioner</td></tr></table>`,
+                },
+                {
+                  title: "Double Signature Block",
+                  description:
+                    "Left-aligned Petitioner block + right-aligned Advocate block.",
+                  html: `<table style="width: 100%; border: none; margin-top: 30px; font-family: inherit;"><tr><td style="width: 50%; text-align: left; border: none;"><strong>[CLIENT NAME]</strong><br/>Petitioner / Plaintiff</td><td style="width: 50%; text-align: right; border: none;"><strong>[ADVOCATE NAME]</strong><br/>Advocate for Petitioner</td></tr></table>`,
+                },
+                {
+                  title: "Court Verification Block",
+                  description:
+                    "Formal pleading verification box confirming facts under oath.",
+                  html: `<div style="border: 1.5px solid #1f2937; padding: 14px; margin-top: 24px; border-radius: 4px; font-family: inherit; line-height: 1.6;"><p style="margin: 0 0 12px 0; text-align: center;"><strong><u>VERIFICATION</u></strong></p><p style="margin: 0 0 12px 0;">I, the deponent above named, do hereby solemnly declare and verify that the contents of paragraphs 1 to ___ are true and correct to my personal knowledge, and nothing material has been concealed therefrom.</p><p style="margin: 0 0 20px 0;">Verified at New Delhi on this day ___ of ____, 2026.</p><table style="width: 100%; border: none; margin-top: 20px;"><tr><td style="width: 50%; border: none;"><strong>DEPONENT</strong></td><td style="width: 50%; text-align: right; border: none;"><strong>IDENTIFIED BY ME</strong></td></tr></table></div>`,
+                },
+              ].map((item, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={{
+                    backgroundColor: theme.colors.cardBackground,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    borderRadius: 8,
+                    padding: 14,
+                    marginBottom: 12,
+                  }}
+                  onPress={() => {
+                    triggerFormat("insertHTML", item.html);
+                    setIsSignatureListVisible(false);
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "bold",
+                      color: theme.colors.text,
+                      marginBottom: 4,
+                    }}
+                  >
+                    {item.title}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: theme.colors.textSecondary,
+                    }}
+                  >
+                    {item.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Vocabulary Modal */}
+      <Modal
+        visible={isVocabularyVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsVocabularyVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Legal Dictionary</Text>
+              <TouchableOpacity onPress={() => setIsVocabularyVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Bar */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: theme.colors.background,
+                borderRadius: 8,
+                paddingHorizontal: 10,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                height: 40,
+                marginBottom: 12,
+              }}
+            >
+              <Ionicons
+                name="search-outline"
+                size={18}
+                color={theme.colors.textSecondary}
+                style={{ marginRight: 6 }}
+              />
+              <TextInput
+                placeholder="Search legal words..."
+                placeholderTextColor={theme.colors.textSecondary}
+                style={{
+                  flex: 1,
+                  color: theme.colors.text,
+                  fontSize: 14,
+                  padding: 0,
+                }}
+                value={vocabSearchQuery}
+                onChangeText={setVocabSearchQuery}
+              />
+              {vocabSearchQuery !== "" && (
+                <TouchableOpacity onPress={() => setVocabSearchQuery("")}>
+                  <Ionicons
+                    name="close-circle"
+                    size={16}
+                    color={theme.colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <ScrollView
+              contentContainerStyle={{ paddingBottom: 24 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {LEGAL_VOCABULARY.filter(
+                (item) =>
+                  item.english
+                    .toLowerCase()
+                    .includes(vocabSearchQuery.toLowerCase()) ||
+                  item.hindi.includes(vocabSearchQuery) ||
+                  item.transliteration
+                    .toLowerCase()
+                    .includes(vocabSearchQuery.toLowerCase())
+              ).map((item, idx) => (
+                <View
+                  key={idx}
+                  style={{
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.colors.border,
+                    paddingVertical: 12,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 15,
+                        fontWeight: "bold",
+                        color: theme.colors.text,
+                      }}
+                    >
+                      {item.english}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: "bold",
+                        color: theme.colors.primary,
+                      }}
+                    >
+                      {item.hindi}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: theme.colors.textSecondary,
+                      fontStyle: "italic",
+                      marginBottom: 6,
+                    }}
+                  >
+                    Pronunciation: {item.transliteration}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: theme.colors.textSecondary,
+                      marginBottom: 8,
+                    }}
+                  >
+                    {item.meaning}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: `${theme.colors.primary}12`,
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                        borderWidth: 0.5,
+                        borderColor: theme.colors.primary,
+                      }}
+                      onPress={() => {
+                        triggerFormat("insertText", item.english);
+                        setIsVocabularyVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: theme.colors.primary,
+                          fontSize: 11,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        Insert English
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: `${theme.colors.primary}12`,
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                        borderWidth: 0.5,
+                        borderColor: theme.colors.primary,
+                      }}
+                      onPress={() => {
+                        triggerFormat("insertText", item.hindi);
+                        setIsVocabularyVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: theme.colors.primary,
+                          fontSize: 11,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        Insert Hindi
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Walkthrough Tour Modal */}
       <Modal
@@ -5286,7 +5467,13 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
               ))}
             </View>
 
-            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
               {tourStepIndex > 0 ? (
                 <View style={{ flex: 1 }}>
                   <ActionButton
@@ -5314,8 +5501,12 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                 <ActionButton
                   title={
                     tourStepIndex === tourSteps.length - 1
-                      ? locale === "hi" ? "समाप्त" : "Finish"
-                      : locale === "hi" ? "आगे" : "Next"
+                      ? locale === "hi"
+                        ? "समाप्त"
+                        : "Finish"
+                      : locale === "hi"
+                        ? "आगे"
+                        : "Next"
                   }
                   onPress={async () => {
                     if (tourStepIndex < tourSteps.length - 1) {

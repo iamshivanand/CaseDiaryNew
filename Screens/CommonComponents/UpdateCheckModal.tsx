@@ -9,8 +9,9 @@ import {
   ScrollView,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { ThemeContext } from "../../Providers/ThemeProvider";
+
 import ActionButton from "./ActionButton";
+import { ThemeContext } from "../../Providers/ThemeProvider";
 
 interface UpdateCheckModalProps {
   visible: boolean;
@@ -68,7 +69,9 @@ const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({
             ]}
           >
             <Icon
-              name={forceUpdate ? "alert-decagram-outline" : "rocket-launch-outline"}
+              name={
+                forceUpdate ? "alert-decagram-outline" : "rocket-launch-outline"
+              }
               size={44}
               color={theme.colors.primary || "#1E40AF"}
             />
@@ -76,10 +79,7 @@ const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({
 
           {/* Title */}
           <Text
-            style={[
-              styles.title,
-              { color: theme.colors.text || "#111827" },
-            ]}
+            style={[styles.title, { color: theme.colors.text || "#111827" }]}
           >
             {forceUpdate ? "Update Required" : "Update Available"}
           </Text>

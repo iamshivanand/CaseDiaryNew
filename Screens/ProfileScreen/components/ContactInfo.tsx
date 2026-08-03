@@ -1,9 +1,16 @@
 import React, { useContext } from "react";
-import { View, Text, StyleSheet, Linking, TouchableOpacity } from "react-native";
-import ContactItem from "./ContactItem";
-import { LawyerProfileData } from "../../../Types/appTypes";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Linking,
+  TouchableOpacity,
+} from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+
+import ContactItem from "./ContactItem";
 import { ThemeContext } from "../../../Providers/ThemeProvider";
+import { LawyerProfileData } from "../../../Types/appTypes";
 
 interface ContactInfoProps {
   contactDetails: LawyerProfileData["contactInfo"];
@@ -19,27 +26,33 @@ interface ContactInfoProps {
 const ContactInfo: React.FC<ContactInfoProps> = ({
   contactDetails,
   isEditing,
-  tempEmail, onTempEmailChange,
-  tempPhone, onTempPhoneChange,
-  tempAddress, onTempAddressChange,
+  tempEmail,
+  onTempEmailChange,
+  tempPhone,
+  onTempPhoneChange,
+  tempAddress,
+  onTempAddressChange,
 }) => {
   const { theme } = useContext(ThemeContext);
-  const handleEmailPress = () => Linking.openURL(`mailto:${contactDetails.email}`);
+  const handleEmailPress = () =>
+    Linking.openURL(`mailto:${contactDetails.email}`);
   const handlePhonePress = () => Linking.openURL(`tel:${contactDetails.phone}`);
 
   return (
-    <View 
+    <View
       style={[
-        styles.container, 
-        { 
+        styles.container,
+        {
           backgroundColor: theme.colors.cardBackground,
           borderColor: theme.colors.border,
           borderWidth: 1,
-        }
+        },
       ]}
     >
       <View style={styles.headerContainer}>
-        <Text style={[styles.heading, { color: theme.colors.text }]}>Contact Information</Text>
+        <Text style={[styles.heading, { color: theme.colors.text }]}>
+          Contact Information
+        </Text>
       </View>
 
       <ContactItem
@@ -106,13 +119,13 @@ const styles = StyleSheet.create({
     paddingBottom: 5,
   },
   button: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 25,
     minWidth: 120,
-    justifyContent: 'center',
+    justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
@@ -128,7 +141,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#fff",
     marginLeft: 8,
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 15,
   },
 });

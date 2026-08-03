@@ -1,8 +1,17 @@
 import React, { useContext } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, ViewStyle } from "react-native";
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ViewStyle,
+} from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { LawyerProfileData } from "../../../Types/appTypes";
+
 import { ThemeContext } from "../../../Providers/ThemeProvider";
+import { LawyerProfileData } from "../../../Types/appTypes";
 
 interface EditControlsProps {
   onSave: () => void;
@@ -10,13 +19,23 @@ interface EditControlsProps {
   style?: ViewStyle;
 }
 
-const EditControls: React.FC<EditControlsProps> = ({ onSave, onCancel, style }) => (
+const EditControls: React.FC<EditControlsProps> = ({
+  onSave,
+  onCancel,
+  style,
+}) => (
   <View style={[styles.editControlsBase, style]}>
-    <TouchableOpacity onPress={onSave} style={[styles.editButtonBase, styles.saveButton]}>
+    <TouchableOpacity
+      onPress={onSave}
+      style={[styles.editButtonBase, styles.saveButton]}
+    >
       <Icon name="check" size={20} color="#fff" />
       <Text style={styles.editButtonText}>Save</Text>
     </TouchableOpacity>
-    <TouchableOpacity onPress={onCancel} style={[styles.editButtonBase, styles.cancelButton]}>
+    <TouchableOpacity
+      onPress={onCancel}
+      style={[styles.editButtonBase, styles.cancelButton]}
+    >
       <Icon name="close" size={20} color="#fff" />
       <Text style={styles.editButtonText}>Cancel</Text>
     </TouchableOpacity>
@@ -58,7 +77,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   onCancelPress,
 }) => {
   const { theme } = useContext(ThemeContext);
-  
+
   const getInitials = (name?: string) => {
     if (!name) return "CD";
     const parts = name.trim().split(/\s+/);
@@ -68,31 +87,46 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
-  const hasImage = !!(tempAvatarUri || (profileData.avatarUrl && !profileData.avatarUrl.includes("placeholder")));
+  const hasImage = !!(
+    tempAvatarUri ||
+    (profileData.avatarUrl && !profileData.avatarUrl.includes("placeholder"))
+  );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.cardBackground }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.cardBackground },
+      ]}
+    >
       {/* Header Edit/Controls Icon Actions */}
       <View style={styles.headerActionsContainer}>
         {!isEditing ? (
-          <TouchableOpacity 
-            onPress={onEditPress} 
-            style={[styles.smallActionButton, { backgroundColor: theme.colors.inputBackground }]}
+          <TouchableOpacity
+            onPress={onEditPress}
+            style={[
+              styles.smallActionButton,
+              { backgroundColor: theme.colors.inputBackground },
+            ]}
             activeOpacity={0.85}
           >
             <Icon name="pencil" size={18} color={theme.colors.primary} />
           </TouchableOpacity>
         ) : (
           <View style={{ flexDirection: "row" }}>
-            <TouchableOpacity 
-              onPress={onCancelPress} 
-              style={[styles.smallActionButton, styles.cancelIconBtn, { marginRight: 8 }]}
+            <TouchableOpacity
+              onPress={onCancelPress}
+              style={[
+                styles.smallActionButton,
+                styles.cancelIconBtn,
+                { marginRight: 8 },
+              ]}
               activeOpacity={0.85}
             >
               <Icon name="close" size={18} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={onSavePress} 
+            <TouchableOpacity
+              onPress={onSavePress}
               style={[styles.smallActionButton, styles.saveIconBtn]}
               activeOpacity={0.85}
             >
@@ -105,15 +139,30 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       {/* Avatar Section */}
       <View style={styles.avatarSectionContainer}>
         <View style={styles.avatarWrapper}>
-          <View style={[styles.avatarContainer, { borderColor: theme.colors.primary, backgroundColor: theme.colors.cardBackground }]}>
+          <View
+            style={[
+              styles.avatarContainer,
+              {
+                borderColor: theme.colors.primary,
+                backgroundColor: theme.colors.cardBackground,
+              },
+            ]}
+          >
             {hasImage ? (
               <Image
                 source={{ uri: tempAvatarUri || profileData.avatarUrl || "" }}
                 style={styles.avatarImage}
               />
             ) : (
-              <View style={[styles.initialsContainer, { backgroundColor: theme.colors.primary + "12" }]}>
-                <Text style={[styles.initialsText, { color: theme.colors.primary }]}>
+              <View
+                style={[
+                  styles.initialsContainer,
+                  { backgroundColor: theme.colors.primary + "12" },
+                ]}
+              >
+                <Text
+                  style={[styles.initialsText, { color: theme.colors.primary }]}
+                >
                   {getInitials(profileData.name)}
                 </Text>
               </View>
@@ -122,32 +171,52 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         </View>
 
         {isEditing && (
-          <TouchableOpacity 
-            onPress={onChooseImage} 
+          <TouchableOpacity
+            onPress={onChooseImage}
             style={[
-              styles.avatarChangeButton, 
-              { backgroundColor: theme.colors.primary + "15" }
+              styles.avatarChangeButton,
+              { backgroundColor: theme.colors.primary + "15" },
             ]}
           >
-            <Icon name="camera-plus-outline" size={22} color={theme.colors.primary} />
-            <Text style={[styles.avatarChangeButtonText, { color: theme.colors.primary }]}>Change Photo</Text>
+            <Icon
+              name="camera-plus-outline"
+              size={22}
+              color={theme.colors.primary}
+            />
+            <Text
+              style={[
+                styles.avatarChangeButtonText,
+                { color: theme.colors.primary },
+              ]}
+            >
+              Change Photo
+            </Text>
           </TouchableOpacity>
         )}
       </View>
 
       {/* Info Section */}
-      <View style={[styles.infoSectionContainer, { backgroundColor: theme.colors.background, borderColor: theme.colors.border, borderWidth: 1 }]}>
+      <View
+        style={[
+          styles.infoSectionContainer,
+          {
+            backgroundColor: theme.colors.background,
+            borderColor: theme.colors.border,
+            borderWidth: 1,
+          },
+        ]}
+      >
         {isEditing ? (
           <>
             <TextInput
               style={[
-                styles.inputBase, 
-                styles.nameInput, 
-                { 
-                  backgroundColor: theme.colors.inputBackground, 
-                  color: theme.colors.text, 
-                  borderColor: theme.colors.border 
-                }
+                styles.inputBase,
+                styles.nameInput,
+                {
+                  backgroundColor: theme.colors.inputBackground,
+                  color: theme.colors.text,
+                  borderColor: theme.colors.border,
+                },
               ]}
               value={tempName}
               onChangeText={onTempNameChange}
@@ -156,13 +225,13 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             />
             <TextInput
               style={[
-                styles.inputBase, 
-                styles.designationInput, 
-                { 
-                  backgroundColor: theme.colors.inputBackground, 
-                  color: theme.colors.text, 
-                  borderColor: theme.colors.border 
-                }
+                styles.inputBase,
+                styles.designationInput,
+                {
+                  backgroundColor: theme.colors.inputBackground,
+                  color: theme.colors.text,
+                  borderColor: theme.colors.border,
+                },
               ]}
               value={tempDesignation}
               onChangeText={onTempDesignationChange}
@@ -171,13 +240,13 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             />
             <TextInput
               style={[
-                styles.inputBase, 
-                styles.practiceAreasInput, 
-                { 
-                  backgroundColor: theme.colors.inputBackground, 
-                  color: theme.colors.text, 
-                  borderColor: theme.colors.border 
-                }
+                styles.inputBase,
+                styles.practiceAreasInput,
+                {
+                  backgroundColor: theme.colors.inputBackground,
+                  color: theme.colors.text,
+                  borderColor: theme.colors.border,
+                },
               ]}
               value={tempPracticeAreas}
               onChangeText={onTempPracticeAreasChange}
@@ -189,10 +258,26 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </>
         ) : (
           <>
-            <Text style={[styles.name, { color: theme.colors.text }]}>{profileData.name}</Text>
-            <Text style={[styles.designation, { color: theme.colors.textSecondary }]}>{profileData.designation}</Text>
-            <Text style={[styles.practiceAreas, { color: theme.colors.textSecondary }]}>
-              {Array.isArray(profileData.practiceAreas) ? profileData.practiceAreas.join(", ") : profileData.practiceAreas}
+            <Text style={[styles.name, { color: theme.colors.text }]}>
+              {profileData.name}
+            </Text>
+            <Text
+              style={[
+                styles.designation,
+                { color: theme.colors.textSecondary },
+              ]}
+            >
+              {profileData.designation}
+            </Text>
+            <Text
+              style={[
+                styles.practiceAreas,
+                { color: theme.colors.textSecondary },
+              ]}
+            >
+              {Array.isArray(profileData.practiceAreas)
+                ? profileData.practiceAreas.join(", ")
+                : profileData.practiceAreas}
             </Text>
           </>
         )}
@@ -234,7 +319,7 @@ const styles = StyleSheet.create({
   avatarSectionContainer: {
     alignItems: "center",
     marginBottom: 20,
-    width: '100%',
+    width: "100%",
   },
   avatarWrapper: {
     position: "relative",
@@ -272,7 +357,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   avatarEditIcon: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 2,
     right: 2,
     padding: 8,
@@ -284,24 +369,23 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   avatarChangeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 8,
     borderRadius: 20,
     marginBottom: 10,
   },
   avatarChangeButtonText: {
     marginLeft: 8,
-    fontWeight: '500',
+    fontWeight: "500",
   },
-  avatarEditControls: {
-  },
+  avatarEditControls: {},
   infoSectionContainer: {
     alignItems: "center",
-    width: '90%',
+    width: "90%",
     padding: 15,
     borderRadius: 12,
-    position: 'relative',
+    position: "relative",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -312,12 +396,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 4,
-    textAlign: 'center',
+    textAlign: "center",
   },
   designation: {
     fontSize: 15,
     marginBottom: 6,
-    textAlign: 'center',
+    textAlign: "center",
     fontWeight: "500",
   },
   practiceAreas: {
@@ -328,7 +412,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   inputBase: {
-    width: '100%',
+    width: "100%",
     borderWidth: 1,
     borderRadius: 8,
     paddingVertical: 10,
@@ -338,7 +422,7 @@ const styles = StyleSheet.create({
   },
   nameInput: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   designationInput: {
     fontSize: 15,
@@ -346,13 +430,13 @@ const styles = StyleSheet.create({
   practiceAreasInput: {
     fontSize: 14,
     minHeight: 70,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   infoEditControls: {
     marginTop: 5,
   },
   editIconTopRight: {
-    position: 'absolute',
+    position: "absolute",
     top: 10,
     right: 10,
     padding: 6,
@@ -361,18 +445,18 @@ const styles = StyleSheet.create({
   editControlsBase: {
     flexDirection: "row",
     justifyContent: "space-evenly",
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 15,
-    width: '100%',
+    width: "100%",
   },
   editButtonBase: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 25,
     minWidth: 120,
-    justifyContent: 'center',
+    justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
@@ -388,7 +472,7 @@ const styles = StyleSheet.create({
   editButtonText: {
     color: "#fff",
     marginLeft: 8,
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 15,
   },
 });

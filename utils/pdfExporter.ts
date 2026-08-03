@@ -761,37 +761,33 @@ export const exportUndatedCasesToPdf = async (
 
     const docTitle = "Undated_Cases_List";
     if (navigation) {
-      Alert.alert(
-        "Undated Cases List",
-        "Choose an action for this PDF:",
-        [
-          {
-            text: "Open in App",
-            onPress: () => {
-              navigation.navigate("PdfViewer", {
-                pdfUri: uri,
-                title: "Undated Cases List",
+      Alert.alert("Undated Cases List", "Choose an action for this PDF:", [
+        {
+          text: "Open in App",
+          onPress: () => {
+            navigation.navigate("PdfViewer", {
+              pdfUri: uri,
+              title: "Undated Cases List",
+            });
+          },
+        },
+        {
+          text: "Share PDF",
+          onPress: async () => {
+            if (await Sharing.isAvailableAsync()) {
+              await Sharing.shareAsync(uri, {
+                mimeType: "application/pdf",
+                dialogTitle: docTitle,
+                UTI: "com.adobe.pdf",
               });
-            },
+            }
           },
-          {
-            text: "Share PDF",
-            onPress: async () => {
-              if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, {
-                  mimeType: "application/pdf",
-                  dialogTitle: docTitle,
-                  UTI: "com.adobe.pdf",
-                });
-              }
-            },
-          },
-          {
-            text: "Cancel",
-            style: "cancel",
-          },
-        ]
-      );
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]);
     } else {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {

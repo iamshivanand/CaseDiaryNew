@@ -1,9 +1,10 @@
 // Screens/CaseDetailsScreen/__tests__/EditDraftScreen.test.tsx
-import React from "react";
 import { render, fireEvent, waitFor } from "@testing-library/react-native";
-import EditDraftScreen from "../EditDraftScreen";
-import ThemeProvider from "../../../Providers/ThemeProvider";
+import React from "react";
+
 import LanguageProvider from "../../../Providers/LanguageProvider";
+import ThemeProvider from "../../../Providers/ThemeProvider";
+import EditDraftScreen from "../EditDraftScreen";
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
@@ -36,7 +37,9 @@ jest.mock("expo-file-system", () => ({
 }));
 
 jest.mock("expo-print", () => ({
-  printToFileAsync: jest.fn(() => Promise.resolve({ uri: "file:///mock/print.pdf" })),
+  printToFileAsync: jest.fn(() =>
+    Promise.resolve({ uri: "file:///mock/print.pdf" })
+  ),
 }));
 
 jest.mock("expo-sharing", () => ({

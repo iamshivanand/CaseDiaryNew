@@ -297,7 +297,7 @@ const transliterationCache: { [key: string]: string[] } = {};
 
 /**
  * Queries Google's public Input Tools API or checks local dictionary to get Hindi phonetic candidates for a given English word.
- * 
+ *
  * @param word The word typed in English phonetics (e.g., "tarikh")
  * @returns A promise resolving to an array of Hindi candidates (e.g., ["तारीख", "तारिख"])
  */
@@ -331,7 +331,9 @@ export const getHindiCandidates = async (word: string): Promise<string[]> => {
     });
 
     if (!response.ok) {
-      throw new Error(`Transliteration API failed with status ${response.status}`);
+      throw new Error(
+        `Transliteration API failed with status ${response.status}`
+      );
     }
 
     const data = await response.json();
@@ -350,9 +352,11 @@ export const getHindiCandidates = async (word: string): Promise<string[]> => {
       return candidates;
     }
   } catch (error) {
-    console.warn("Failed to fetch Hindi candidates from transliteration service:", error);
+    console.warn(
+      "Failed to fetch Hindi candidates from transliteration service:",
+      error
+    );
   }
 
   return [];
 };
-

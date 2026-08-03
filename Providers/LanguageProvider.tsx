@@ -1,7 +1,18 @@
 // Providers/LanguageProvider.tsx
-import React, { createContext, useState, useEffect, useContext, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { translations, TranslationKey, LocaleType } from "../utils/translations";
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  ReactNode,
+} from "react";
+
+import {
+  translations,
+  TranslationKey,
+  LocaleType,
+} from "../utils/translations";
 
 interface LanguageContextType {
   locale: LocaleType;
@@ -19,7 +30,9 @@ interface LanguageProviderProps {
   children: ReactNode;
 }
 
-export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) => {
+export const LanguageProvider: React.FC<LanguageProviderProps> = ({
+  children,
+}) => {
   const [locale, setLocaleState] = useState<LocaleType>("en");
 
   useEffect(() => {

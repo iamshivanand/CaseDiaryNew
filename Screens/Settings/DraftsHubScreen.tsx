@@ -1,7 +1,11 @@
 // Screens/Settings/DraftsHubScreen.tsx
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation, useIsFocused, useRoute } from "@react-navigation/native";
+import {
+  useNavigation,
+  useIsFocused,
+  useRoute,
+} from "@react-navigation/native";
 import * as FileSystem from "expo-file-system";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
@@ -24,6 +28,7 @@ import * as db from "../../DataBase";
 import { CaseWithDetails, DocumentDraft } from "../../DataBase";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import ActionButton from "../CommonComponents/ActionButton";
+import { SkeletonList } from "../CommonComponents/SkeletonLoader";
 
 const documentTypeColors: { [key: string]: string } = {
   vakalatnama: "#10B981", // Emerald/Green
@@ -343,8 +348,14 @@ const DraftsHubScreen: React.FC = () => {
 
   // Auto-open attach modal if navigated from Export screen with action = "attach"
   useEffect(() => {
-    if (isFocused && route.params?.action === "attach" && route.params?.draftId) {
+    if (
+      isFocused &&
+      route.params?.action === "attach" &&
+      route.params?.draftId
+    ) {
       const attachId = route.params.draftId;
+      // Immediately clear route params so it won't repeatedly re-trigger on subsequent focuses
+      navigation.setParams({ action: undefined, draftId: undefined });
       db.getDocumentDraftById(attachId).then((found) => {
         if (found) {
           openAttachModal(found);
@@ -373,10 +384,12 @@ const DraftsHubScreen: React.FC = () => {
         if (layout.lineHeight) lineHeight = layout.lineHeight;
         if (layout.pageSize) pageSize = layout.pageSize;
         if (layout.topMargin !== undefined) topMargin = layout.topMargin;
-        if (layout.bottomMargin !== undefined) bottomMargin = layout.bottomMargin;
+        if (layout.bottomMargin !== undefined)
+          bottomMargin = layout.bottomMargin;
         if (layout.leftMargin !== undefined) leftMargin = layout.leftMargin;
         if (layout.rightMargin !== undefined) rightMargin = layout.rightMargin;
-        if (layout.letterheadSpace !== undefined) letterheadSpace = layout.letterheadSpace;
+        if (layout.letterheadSpace !== undefined)
+          letterheadSpace = layout.letterheadSpace;
         cleanedHtml = html.replace(/<!-- CD_LAYOUT:(.*?) -->/g, "");
       } catch (e) {
         console.error("Failed to parse layout metadata in DraftsHub:", e);
@@ -495,20 +508,27 @@ const DraftsHubScreen: React.FC = () => {
         const offset = isSearching ? null : targetPage * PAGE_SIZE;
 
         // Fetch custom templates metadata-only (excludeHtml = true)
-        const results = await db.getDocumentDrafts(null, 1, true, limit, offset);
-        
-        const builtIn = (targetPage === 0 || isSearching) ? BUILT_IN_TEMPLATES : [];
+        const results = await db.getDocumentDrafts(
+          null,
+          1,
+          true,
+          limit,
+          offset
+        );
+
+        const builtIn =
+          targetPage === 0 || isSearching ? BUILT_IN_TEMPLATES : [];
         const mappedResults = results.map((r) => ({ ...r, isBuiltIn: false }));
         const combined = [...builtIn, ...mappedResults];
-        
+
         if (targetPage === 0 || isSearching) {
           setDrafts(combined as any);
           setFilteredDrafts(combined as any);
         } else {
-          setDrafts((prev) => [...prev, ...combined as any]);
-          setFilteredDrafts((prev) => [...prev, ...combined as any]);
+          setDrafts((prev) => [...prev, ...(combined as any)]);
+          setFilteredDrafts((prev) => [...prev, ...(combined as any)]);
         }
-        
+
         setHasMore(!isSearching && results.length === PAGE_SIZE);
         if (!isSearching) {
           setPage(targetPage + 1);
@@ -518,8 +538,14 @@ const DraftsHubScreen: React.FC = () => {
         const offset = isSearching ? null : targetPage * PAGE_SIZE;
 
         // Fetch drafts metadata-only (excludeHtml = true), passing undefined for caseId to get all drafts
-        const results = await db.getDocumentDrafts(undefined, 0, true, limit, offset);
-        
+        const results = await db.getDocumentDrafts(
+          undefined,
+          0,
+          true,
+          limit,
+          offset
+        );
+
         if (targetPage === 0 || isSearching) {
           setDrafts(results);
           setFilteredDrafts(results);
@@ -527,7 +553,7 @@ const DraftsHubScreen: React.FC = () => {
           setDrafts((prev) => [...prev, ...results]);
           setFilteredDrafts((prev) => [...prev, ...results]);
         }
-        
+
         setHasMore(!isSearching && results.length === PAGE_SIZE);
         if (!isSearching) {
           setPage(targetPage + 1);
@@ -543,7 +569,13 @@ const DraftsHubScreen: React.FC = () => {
   };
 
   const loadMoreDrafts = () => {
-    if (isLoading || isFetchingNextPage || !hasMore || searchQuery.trim() !== "") return;
+    if (
+      isLoading ||
+      isFetchingNextPage ||
+      !hasMore ||
+      searchQuery.trim() !== ""
+    )
+      return;
     loadDrafts(false);
   };
 
@@ -564,7 +596,8 @@ const DraftsHubScreen: React.FC = () => {
     if (activeTab === "templates" && selectedCategory !== "all") {
       filtered = filtered.filter((item) => {
         // @ts-ignore
-        const cat = item.category || getCategoryForTemplateType(item.template_type);
+        const cat =
+          item.category || getCategoryForTemplateType(item.template_type);
         return cat === selectedCategory;
       });
     }
@@ -716,7 +749,9 @@ const DraftsHubScreen: React.FC = () => {
               setIsLoading(true);
               // Optimistically update local state immediately so item vanishes right away
               setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
-              setFilteredDrafts((prev) => prev.filter((d) => d.id !== draft.id));
+              setFilteredDrafts((prev) =>
+                prev.filter((d) => d.id !== draft.id)
+              );
               await db.deleteDocumentDraft(draft.id);
               await loadDrafts(true);
             } catch (error) {
@@ -789,7 +824,8 @@ const DraftsHubScreen: React.FC = () => {
         });
 
         // 5. Optimistically update local state so the case badge renders live immediately
-        const updatedCaseTitle = selectedCase.CaseTitle || selectedCase.ClientName;
+        const updatedCaseTitle =
+          selectedCase.CaseTitle || selectedCase.ClientName;
         const updatedCaseId = selectedCase.id;
         const updatedClientName = selectedCase.ClientName;
         const updatedCaseNumber = selectedCase.case_number;
@@ -839,6 +875,67 @@ const DraftsHubScreen: React.FC = () => {
     } finally {
       setIsAttaching(false);
     }
+  };
+
+  // Unlink Draft from Case
+  const handleUnlinkCase = async (draft: DocumentDraft) => {
+    if (!draft.case_id) return;
+    Alert.alert(
+      "Unlink Case",
+      `Are you sure you want to unlink this draft from case "${draft.case_title || draft.client_name}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Unlink",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              const fullDraft = await db.getDocumentDraftById(draft.id);
+              if (fullDraft) {
+                await db.saveDocumentDraft({
+                  ...fullDraft,
+                  case_id: null,
+                  updated_at: new Date().toISOString(),
+                });
+              }
+              setDrafts((prev) =>
+                prev.map((d) =>
+                  d.id === draft.id
+                    ? {
+                        ...d,
+                        case_id: null,
+                        case_title: undefined,
+                        client_name: undefined,
+                        case_number: undefined,
+                      }
+                    : d
+                )
+              );
+              setFilteredDrafts((prev) =>
+                prev.map((d) =>
+                  d.id === draft.id
+                    ? {
+                        ...d,
+                        case_id: null,
+                        case_title: undefined,
+                        client_name: undefined,
+                        case_number: undefined,
+                      }
+                    : d
+                )
+              );
+              Alert.alert("Success", "Draft unlinked from case successfully.");
+            } catch (err) {
+              console.error("Error unlinking draft from case:", err);
+              Alert.alert("Error", "Could not unlink draft from case.");
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderDraftItem = ({ item }: { item: DocumentDraft }) => {
@@ -966,14 +1063,32 @@ const DraftsHubScreen: React.FC = () => {
               {item.title}
             </Text>
 
-            {(item.case_title || item.client_name) ? (
-              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, marginBottom: 4 }}>
-                <Ionicons name="briefcase-outline" size={13} color={theme.colors.primary} style={{ marginRight: 4 }} />
+            {item.case_title || item.client_name ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginTop: 4,
+                  marginBottom: 4,
+                }}
+              >
+                <Ionicons
+                  name="briefcase-outline"
+                  size={13}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
                 <Text
-                  style={{ fontSize: 11, fontWeight: "600", color: theme.colors.primary, flex: 1 }}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "600",
+                    color: theme.colors.primary,
+                    flex: 1,
+                  }}
                   numberOfLines={1}
                 >
-                  Case: {item.case_title || item.client_name} {item.case_number ? `(${item.case_number})` : ""}
+                  Case: {item.case_title || item.client_name}{" "}
+                  {item.case_number ? `(${item.case_number})` : ""}
                 </Text>
               </View>
             ) : null}
@@ -1047,22 +1162,58 @@ const DraftsHubScreen: React.FC = () => {
           </TouchableOpacity>
 
           {activeTab === "drafts" && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { borderColor: theme.colors.border }]}
-              onPress={() => openAttachModal(item)}
-              activeOpacity={0.85}
-            >
-              <Ionicons
-                name="link-outline"
-                size={16}
-                color={theme.colors.success}
-              />
-              <Text
-                style={[styles.actionBtnText, { color: theme.colors.success }]}
+            <>
+              <TouchableOpacity
+                style={[styles.actionBtn, { borderColor: theme.colors.border }]}
+                onPress={() => openAttachModal(item)}
+                activeOpacity={0.85}
               >
-                Link Case
-              </Text>
-            </TouchableOpacity>
+                <Ionicons
+                  name={item.case_id ? "options-outline" : "link-outline"}
+                  size={16}
+                  color={
+                    item.case_id ? theme.colors.primary : theme.colors.success
+                  }
+                />
+                <Text
+                  style={[
+                    styles.actionBtnText,
+                    {
+                      color: item.case_id
+                        ? theme.colors.primary
+                        : theme.colors.success,
+                    },
+                  ]}
+                >
+                  {item.case_id ? "Change Case" : "Link Case"}
+                </Text>
+              </TouchableOpacity>
+
+              {item.case_id ? (
+                <TouchableOpacity
+                  style={[
+                    styles.actionBtn,
+                    { borderColor: theme.colors.border },
+                  ]}
+                  onPress={() => handleUnlinkCase(item)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons
+                    name="unlink-outline"
+                    size={16}
+                    color={theme.colors.danger}
+                  />
+                  <Text
+                    style={[
+                      styles.actionBtnText,
+                      { color: theme.colors.danger },
+                    ]}
+                  >
+                    Unlink
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </>
           )}
 
           <TouchableOpacity
@@ -1322,7 +1473,14 @@ const DraftsHubScreen: React.FC = () => {
       </View>
 
       {activeTab === "templates" && (
-        <View style={{ height: 48, backgroundColor: theme.colors.cardBackground, borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
+        <View
+          style={{
+            height: 48,
+            backgroundColor: theme.colors.cardBackground,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.colors.border,
+          }}
+        >
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1367,10 +1525,7 @@ const DraftsHubScreen: React.FC = () => {
       )}
 
       {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Fetching drafts from SQLite...</Text>
-        </View>
+        <SkeletonList count={4} />
       ) : filteredDrafts.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconCircle}>
@@ -1413,7 +1568,7 @@ const DraftsHubScreen: React.FC = () => {
           initialNumToRender={6}
           maxToRenderPerBatch={6}
           windowSize={3}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           onEndReached={loadMoreDrafts}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
@@ -1432,13 +1587,17 @@ const DraftsHubScreen: React.FC = () => {
           data={filteredDrafts}
           renderItem={renderDraftItem}
           keyExtractor={(item) => item.id}
-          getItemLayout={(data, index) => ({ length: 110, offset: 110 * index, index })}
+          getItemLayout={(data, index) => ({
+            length: 110,
+            offset: 110 * index,
+            index,
+          })}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           initialNumToRender={6}
           maxToRenderPerBatch={6}
           windowSize={3}
-          removeClippedSubviews={true}
+          removeClippedSubviews
           onEndReached={loadMoreDrafts}
           onEndReachedThreshold={0.5}
           ListFooterComponent={

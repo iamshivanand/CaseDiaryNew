@@ -85,7 +85,11 @@ export class LegalAutocompleteService {
     return results;
   }
 
-  private collectAllPhrases(node: TrieNode, results: string[], limit: number): void {
+  private collectAllPhrases(
+    node: TrieNode,
+    results: string[],
+    limit: number
+  ): void {
     if (results.length >= limit) return;
 
     if (node.isEndOfWord && node.phrase) {

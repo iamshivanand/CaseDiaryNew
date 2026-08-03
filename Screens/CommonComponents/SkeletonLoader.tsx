@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useContext } from 'react';
-import { View, Animated, ViewStyle, StyleSheet } from 'react-native';
-import { ThemeContext } from '../../Providers/ThemeProvider';
+import React, { useEffect, useRef, useContext } from "react";
+import { View, Animated, ViewStyle, StyleSheet } from "react-native";
+
+import { ThemeContext } from "../../Providers/ThemeProvider";
 
 export const SkeletonItem: React.FC<{ style?: ViewStyle }> = ({ style }) => {
   const { theme } = useContext(ThemeContext);
@@ -54,12 +55,21 @@ export const SkeletonCard: React.FC = () => {
         borderColor: theme.colors.border,
       }}
     >
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <SkeletonItem style={{ width: '60%', height: 18, borderRadius: 6 }} />
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
+        <SkeletonItem style={{ width: "60%", height: 18, borderRadius: 6 }} />
         <SkeletonItem style={{ width: 64, height: 22, borderRadius: 12 }} />
       </View>
-      <SkeletonItem style={{ width: '40%', height: 14, marginBottom: 14, borderRadius: 4 }} />
-      <View style={{ flexDirection: 'row', gap: 10 }}>
+      <SkeletonItem
+        style={{ width: "40%", height: 14, marginBottom: 14, borderRadius: 4 }}
+      />
+      <View style={{ flexDirection: "row", gap: 10 }}>
         <SkeletonItem style={{ flex: 1, height: 40, borderRadius: 10 }} />
         <SkeletonItem style={{ flex: 1, height: 40, borderRadius: 10 }} />
       </View>
@@ -83,8 +93,17 @@ export const SkeletonForm: React.FC<{ rows?: number }> = ({ rows = 5 }) => {
     <View style={{ padding: 16 }}>
       {Array.from({ length: rows }).map((_, idx) => (
         <View key={idx} style={{ marginBottom: 18 }}>
-          <SkeletonItem style={{ width: '35%', height: 14, marginBottom: 8, borderRadius: 4 }} />
-          <SkeletonItem style={{ width: '100%', height: 48, borderRadius: 12 }} />
+          <SkeletonItem
+            style={{
+              width: "35%",
+              height: 14,
+              marginBottom: 8,
+              borderRadius: 4,
+            }}
+          />
+          <SkeletonItem
+            style={{ width: "100%", height: 48, borderRadius: 12 }}
+          />
         </View>
       ))}
     </View>
@@ -94,14 +113,20 @@ export const SkeletonForm: React.FC<{ rows?: number }> = ({ rows = 5 }) => {
 export const SkeletonProfile: React.FC = () => {
   const { theme } = useContext(ThemeContext);
   return (
-    <View style={{ padding: 20, alignItems: 'center' }}>
-      <SkeletonItem style={{ width: 90, height: 90, borderRadius: 45, marginBottom: 16 }} />
-      <SkeletonItem style={{ width: '50%', height: 20, marginBottom: 8, borderRadius: 6 }} />
-      <SkeletonItem style={{ width: '30%', height: 14, marginBottom: 24, borderRadius: 4 }} />
-      <View style={{ width: '100%', gap: 16 }}>
-        <SkeletonItem style={{ width: '100%', height: 54, borderRadius: 12 }} />
-        <SkeletonItem style={{ width: '100%', height: 54, borderRadius: 12 }} />
-        <SkeletonItem style={{ width: '100%', height: 54, borderRadius: 12 }} />
+    <View style={{ padding: 20, alignItems: "center" }}>
+      <SkeletonItem
+        style={{ width: 90, height: 90, borderRadius: 45, marginBottom: 16 }}
+      />
+      <SkeletonItem
+        style={{ width: "50%", height: 20, marginBottom: 8, borderRadius: 6 }}
+      />
+      <SkeletonItem
+        style={{ width: "30%", height: 14, marginBottom: 24, borderRadius: 4 }}
+      />
+      <View style={{ width: "100%", gap: 16 }}>
+        <SkeletonItem style={{ width: "100%", height: 54, borderRadius: 12 }} />
+        <SkeletonItem style={{ width: "100%", height: 54, borderRadius: 12 }} />
+        <SkeletonItem style={{ width: "100%", height: 54, borderRadius: 12 }} />
       </View>
     </View>
   );

@@ -1,4 +1,4 @@
-import React, { createContext, useState, ReactNode } from 'react';
+import React, { createContext, useState, ReactNode } from "react";
 
 export interface OnboardingData {
   fullName?: string;
@@ -23,7 +23,9 @@ export const OnboardingContext = createContext<OnboardingContextProps>({
   setOnboardingData: () => {},
 });
 
-const OnboardingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+const OnboardingProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
 
   return (

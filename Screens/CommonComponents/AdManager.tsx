@@ -1,26 +1,47 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Modal, ActivityIndicator, Alert, Platform } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { RewardedAd, InterstitialAd, TestIds, AdEventType, RewardedAdEventType } from "react-native-google-mobile-ads";
 import { Ionicons } from "@expo/vector-icons";
-import { ThemeContext } from "../../Providers/ThemeProvider";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+} from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  ActivityIndicator,
+  Alert,
+  Platform,
+} from "react-native";
+import {
+  RewardedAd,
+  InterstitialAd,
+  TestIds,
+  AdEventType,
+  RewardedAdEventType,
+} from "react-native-google-mobile-ads";
+
 import ActionButton from "./ActionButton";
+import { ThemeContext } from "../../Providers/ThemeProvider";
 
 // Android: ca-app-pub-6084954144919761/3119046561
 // iOS: ca-app-pub-3940256099942544/1712485313
 const rewardedAdUnitId = __DEV__
   ? TestIds.REWARDED
   : Platform.OS === "ios"
-  ? "ca-app-pub-3940256099942544/1712485313"
-  : "ca-app-pub-6084954144919761/3119046561";
+    ? "ca-app-pub-3940256099942544/1712485313"
+    : "ca-app-pub-6084954144919761/3119046561";
 
 // Android: ca-app-pub-6084954144919761/4080470524
 // iOS: ca-app-pub-3940256099942544/4411468910
 const interstitialAdUnitId = __DEV__
   ? TestIds.INTERSTITIAL
   : Platform.OS === "ios"
-  ? "ca-app-pub-3940256099942544/4411468910"
-  : "ca-app-pub-6084954144919761/4080470524";
+    ? "ca-app-pub-3940256099942544/4411468910"
+    : "ca-app-pub-6084954144919761/4080470524";
 
 // State tracking for preloader to prevent race conditions
 let isRewardedAdLoading = false;
@@ -32,8 +53,10 @@ let interstitialAd: InterstitialAd;
 
 export const createRewardedAd = () => {
   try {
-    rewardedAd = RewardedAd.createForAdRequest(rewardedAdUnitId, { requestNonPersonalizedAdsOnly: true });
-    
+    rewardedAd = RewardedAd.createForAdRequest(rewardedAdUnitId, {
+      requestNonPersonalizedAdsOnly: true,
+    });
+
     let unsubL: (() => void) | null = null;
     let unsubE: (() => void) | null = null;
 
@@ -46,7 +69,7 @@ export const createRewardedAd = () => {
       isRewardedAdLoading = false;
       cleanup();
     });
-    
+
     unsubE = rewardedAd.addAdEventListener(AdEventType.ERROR, (err) => {
       isRewardedAdLoading = false;
       console.warn("Rewarded ad failed to load, recreating instance:", err);
@@ -60,8 +83,10 @@ export const createRewardedAd = () => {
 
 export const createInterstitialAd = () => {
   try {
-    interstitialAd = InterstitialAd.createForAdRequest(interstitialAdUnitId, { requestNonPersonalizedAdsOnly: true });
-    
+    interstitialAd = InterstitialAd.createForAdRequest(interstitialAdUnitId, {
+      requestNonPersonalizedAdsOnly: true,
+    });
+
     let unsubL: (() => void) | null = null;
     let unsubE: (() => void) | null = null;
 
@@ -74,7 +99,7 @@ export const createInterstitialAd = () => {
       isInterstitialAdLoading = false;
       cleanup();
     });
-    
+
     unsubE = interstitialAd.addAdEventListener(AdEventType.ERROR, (err) => {
       isInterstitialAdLoading = false;
       console.warn("Interstitial ad failed to load, recreating instance:", err);
@@ -122,7 +147,9 @@ interface AdContextProps {
 
 const AdContext = createContext<AdContextProps | null>(null);
 
-export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AdProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { theme } = useContext(ThemeContext);
   const [loading, setLoading] = useState(false);
   const [showSkip, setShowSkip] = useState(false);
@@ -130,7 +157,9 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const [secondsRemaining, setSecondsRemaining] = useState(8);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const onCompleteCallbackRef = useRef<((success: boolean) => void) | null>(null);
+  const onCompleteCallbackRef = useRef<((success: boolean) => void) | null>(
+    null
+  );
   const eventUnsubscribesRef = useRef<(() => void)[]>([]);
 
   // Cleanup timers and subscriptions
@@ -181,7 +210,10 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       const netState = await Network.getNetworkStateAsync();
       isConnected = netState.isConnected ?? true;
     } catch (e) {
-      console.warn("expo-network is not available. Performing fetch fallback check...", e);
+      console.warn(
+        "expo-network is not available. Performing fetch fallback check...",
+        e
+      );
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2000);
@@ -224,9 +256,11 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       createInterstitialAd();
     }
 
-    let targetAd = adType === "rewarded" ? rewardedAd : interstitialAd;
+    const targetAd = adType === "rewarded" ? rewardedAd : interstitialAd;
     if (!targetAd) {
-      console.warn(`Ad instance for ${adType} is null. Falling back gracefully.`);
+      console.warn(
+        `Ad instance for ${adType} is null. Falling back gracefully.`
+      );
       onComplete(true);
       return;
     }
@@ -251,7 +285,8 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }, 1000);
 
     // Load Ad and listen to events
-    const loadEvent = adType === "rewarded" ? RewardedAdEventType.LOADED : AdEventType.LOADED;
+    const loadEvent =
+      adType === "rewarded" ? RewardedAdEventType.LOADED : AdEventType.LOADED;
     const errorEvent = AdEventType.ERROR;
 
     const unsubLoaded = targetAd.addAdEventListener(loadEvent as any, () => {
@@ -259,16 +294,20 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       triggerShow(adType);
     });
 
-    const unsubError = targetAd.addAdEventListener(errorEvent as any, (error) => {
-      console.warn(`Ad failed to load (${adType}):`, error);
-      if (timerRef.current) clearInterval(timerRef.current);
-      setShowSkip(true);
-    });
+    const unsubError = targetAd.addAdEventListener(
+      errorEvent as any,
+      (error) => {
+        console.warn(`Ad failed to load (${adType}):`, error);
+        if (timerRef.current) clearInterval(timerRef.current);
+        setShowSkip(true);
+      }
+    );
 
     eventUnsubscribesRef.current.push(unsubLoaded, unsubError);
 
     // Trigger load if not already in progress
-    const isTargetAdLoading = adType === "rewarded" ? isRewardedAdLoading : isInterstitialAdLoading;
+    const isTargetAdLoading =
+      adType === "rewarded" ? isRewardedAdLoading : isInterstitialAdLoading;
     if (!isTargetAdLoading) {
       if (adType === "rewarded") {
         isRewardedAdLoading = true;
@@ -283,7 +322,10 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         } else {
           isInterstitialAdLoading = false;
         }
-        console.warn(`Synchronous error calling targetAd.load() for ${adType}:`, loadErr);
+        console.warn(
+          `Synchronous error calling targetAd.load() for ${adType}:`,
+          loadErr
+        );
         cleanUpAdRequest();
         setShowSkip(true);
       }
@@ -353,23 +395,62 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       {loading && (
         <Modal visible={loading} transparent animationType="fade">
           <View style={styles.modalOverlay}>
-            <View style={[styles.card, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: theme.colors.cardBackground,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
               {!showSkip ? (
                 <>
-                  <ActivityIndicator size="large" color={theme.colors.primary} />
-                  <Text style={[styles.loadingText, { color: theme.colors.text }]}>Preloading Ad...</Text>
-                  <Text style={[styles.subText, { color: theme.colors.textSecondary }]}>
+                  <ActivityIndicator
+                    size="large"
+                    color={theme.colors.primary}
+                  />
+                  <Text
+                    style={[styles.loadingText, { color: theme.colors.text }]}
+                  >
+                    Preloading Ad...
+                  </Text>
+                  <Text
+                    style={[
+                      styles.subText,
+                      { color: theme.colors.textSecondary },
+                    ]}
+                  >
                     Please wait while we prepare your ad.
                   </Text>
-                  <Text style={[styles.countdownText, { color: theme.colors.textSecondary }]}>
+                  <Text
+                    style={[
+                      styles.countdownText,
+                      { color: theme.colors.textSecondary },
+                    ]}
+                  >
                     Timeout in {secondsRemaining}s...
                   </Text>
                 </>
               ) : (
                 <>
-                  <Ionicons name="warning-outline" size={40} color="#F59E0B" style={{ marginBottom: 12 }} />
-                  <Text style={[styles.loadingText, { color: theme.colors.text }]}>Ad Loading Failed</Text>
-                  <Text style={[styles.subText, { color: theme.colors.textSecondary, marginBottom: 20 }]}>
+                  <Ionicons
+                    name="warning-outline"
+                    size={40}
+                    color="#F59E0B"
+                    style={{ marginBottom: 12 }}
+                  />
+                  <Text
+                    style={[styles.loadingText, { color: theme.colors.text }]}
+                  >
+                    Ad Loading Failed
+                  </Text>
+                  <Text
+                    style={[
+                      styles.subText,
+                      { color: theme.colors.textSecondary, marginBottom: 20 },
+                    ]}
+                  >
                     We could not load the ad. You may skip this ad to proceed.
                   </Text>
                   <ActionButton
@@ -388,13 +469,31 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       {showRewardModal && (
         <Modal visible={showRewardModal} transparent animationType="fade">
           <View style={styles.modalOverlay}>
-            <View style={[styles.card, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
-              <View style={[styles.iconContainer, { backgroundColor: "#DCFCE7" }]}>
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: theme.colors.cardBackground,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <View
+                style={[styles.iconContainer, { backgroundColor: "#DCFCE7" }]}
+              >
                 <Ionicons name="gift-outline" size={36} color="#16A34A" />
               </View>
-              <Text style={[styles.loadingText, { color: theme.colors.text }]}>Reward Achieved!</Text>
-              <Text style={[styles.subText, { color: theme.colors.textSecondary, marginBottom: 20 }]}>
-                Thank you for supporting this free app! Your action has been unlocked.
+              <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+                Reward Achieved!
+              </Text>
+              <Text
+                style={[
+                  styles.subText,
+                  { color: theme.colors.textSecondary, marginBottom: 20 },
+                ]}
+              >
+                Thank you for supporting this free app! Your action has been
+                unlocked.
               </Text>
               <ActionButton
                 title="Proceed"

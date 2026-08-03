@@ -1,23 +1,25 @@
 // DataBase/schema.ts
 
-import * as SQLite from 'expo-sqlite';
-import statesAndDistrictsData from '../assets/states-and-districts.json';
-import policeStationsData from '../assets/police-stations.json';
+import * as SQLite from "expo-sqlite";
 
-const PREDEFINED_CASE_TYPES: Array<Omit<CaseType, 'id' | 'user_id'>> = [
-  { name: 'Civil' },
-  { name: 'Criminal' },
-  { name: 'Family' },
-  { name: 'Writ' },
-  { name: 'Corporate' },
-  { name: 'Revenue' },
-  { name: 'Consumer' },
-  { name: 'Labour' },
-  { name: 'Arbitration' },
-  { name: 'Service Matter' },
+import { initializeUserInformationDB } from "./userInformationDB";
+import { initializeUserProfileDB } from "./userProfileDB";
+import policeStationsData from "../assets/police-stations.json";
+import statesAndDistrictsData from "../assets/states-and-districts.json";
+
+const PREDEFINED_CASE_TYPES: Omit<CaseType, "id" | "user_id">[] = [
+  { name: "Civil" },
+  { name: "Criminal" },
+  { name: "Family" },
+  { name: "Writ" },
+  { name: "Corporate" },
+  { name: "Revenue" },
+  { name: "Consumer" },
+  { name: "Labour" },
+  { name: "Arbitration" },
+  { name: "Service Matter" },
   // Add more as needed
 ];
-
 
 // ---------------
 // TYPE INTERFACES
@@ -74,58 +76,57 @@ export interface Case {
   user_id?: number | null;
 
   // Case Identification & Core Details
-  CaseTitle?: string | null;        // Primary title for the case
-  ClientName?: string | null;       // Primary client associated with the case
-  OnBehalfOf?: string | null;       // E.g., "Self", "Minor child", "Company XYZ" (if different from ClientName)
-  CNRNumber?: string | null;        // CNR Number
-  case_number?: string | null;      // Case number (e.g., O.S No. 123/2023)
-  case_year?: number | null;        // Year of the case, if part of case_number or separate
+  CaseTitle?: string | null; // Primary title for the case
+  ClientName?: string | null; // Primary client associated with the case
+  OnBehalfOf?: string | null; // E.g., "Self", "Minor child", "Company XYZ" (if different from ClientName)
+  CNRNumber?: string | null; // CNR Number
+  case_number?: string | null; // Case number (e.g., O.S No. 123/2023)
+  case_year?: number | null; // Year of the case, if part of case_number or separate
 
   // Court and Type (Name stored directly, ID for future linking)
-  court_id?: number | null;         // Optional ID for future linking to a managed Courts table
-  court_name?: string | null;       // Actual name of the court (e.g., "District Court, Cityville")
-  case_type_id?: number | null;     // Optional ID for future linking to a managed CaseTypes table
-  case_type_name?: string | null;   // Actual name of the case type (e.g., "Civil Suit", "Criminal Appeal")
+  court_id?: number | null; // Optional ID for future linking to a managed Courts table
+  court_name?: string | null; // Actual name of the court (e.g., "District Court, Cityville")
+  case_type_id?: number | null; // Optional ID for future linking to a managed CaseTypes table
+  case_type_name?: string | null; // Actual name of the case type (e.g., "Civil Suit", "Criminal Appeal")
 
   // Dates
-  dateFiled?: string | null;        // Date case was filed (ISO8601 "YYYY-MM-DD")
-  NextDate?: string | null;         // Next hearing date (ISO8601 "YYYY-MM-DD")
-  PreviousDate?: string | null;     // Previous hearing date (ISO8601 "YYYY-MM-DD")
+  dateFiled?: string | null; // Date case was filed (ISO8601 "YYYY-MM-DD")
+  NextDate?: string | null; // Next hearing date (ISO8601 "YYYY-MM-DD")
+  PreviousDate?: string | null; // Previous hearing date (ISO8601 "YYYY-MM-DD")
   StatuteOfLimitations?: string | null; // Statute of limitations date
 
   // Legal Specifics
-  crime_number?: string | null;     // FIR/Crime number, if applicable
-  crime_year?: number | null;       // Year of the crime/FIR
-  police_station_id?: number | null;// FK to PoliceStations table (if this table is managed)
-  Undersection?: string | null;     // Relevant sections of law (e.g., "Sec 302 IPC, Sec 120B IPC")
+  crime_number?: string | null; // FIR/Crime number, if applicable
+  crime_year?: number | null; // Year of the crime/FIR
+  police_station_id?: number | null; // FK to PoliceStations table (if this table is managed)
+  Undersection?: string | null; // Relevant sections of law (e.g., "Sec 302 IPC, Sec 120B IPC")
 
   // Parties
-  FirstParty?: string | null;       // Name of the first party (e.g., Plaintiff/Petitioner)
-  OppositeParty?: string | null;    // Name of the opposite party (e.g., Defendant/Respondent)
-  Accussed?: string | null;         // Name(s) of accused, if applicable
+  FirstParty?: string | null; // Name of the first party (e.g., Plaintiff/Petitioner)
+  OppositeParty?: string | null; // Name of the opposite party (e.g., Defendant/Respondent)
+  Accussed?: string | null; // Name(s) of accused, if applicable
   ClientContactNumber?: string | null; // Contact number for the primary client
   session_trial_number?: string | null; // Sessions Trial Number
 
-
   // Counsel Details
-  JudgeName?: string | null;        // Name of the presiding judge
-  OpposingCounsel?: string | null;  // Name of the opposing counsel
+  JudgeName?: string | null; // Name of the presiding judge
+  OpposingCounsel?: string | null; // Name of the opposing counsel
   OppositeAdvocate?: string | null; // Often same as OpposingCounsel, or specific advocate name
   OppAdvocateContactNumber?: string | null; // Contact for opposing counsel
-  district_id?: number | null;      // Direct district ID for custom/non-police station cases
+  district_id?: number | null; // Direct district ID for custom/non-police station cases
 
   // Case Status & Management
-  CaseStatus?: string | null;       // Current status (e.g., "Open", "In Progress", "Closed", "Appealed")
-  Priority?: string | null;         // Priority (e.g., "High", "Medium", "Low")
-  case_stage?: string | null;       // Legal stage (e.g., "Framing of Charges", "Evidence", "Arguments")
+  CaseStatus?: string | null; // Current status (e.g., "Open", "In Progress", "Closed", "Appealed")
+  Priority?: string | null; // Priority (e.g., "High", "Medium", "Low")
+  case_stage?: string | null; // Legal stage (e.g., "Framing of Charges", "Evidence", "Arguments")
 
   // Financials
-  total_fee?: number | null;        // Total agreed advocate fee
-  fee_paid?: number | null;         // Fee collected to date
+  total_fee?: number | null; // Total agreed advocate fee
+  fee_paid?: number | null; // Fee collected to date
 
   // Descriptions & Notes
-  CaseDescription?: string | null;  // Detailed description of the case
-  CaseNotes?: string | null;        // Internal notes, strategy, etc.
+  CaseDescription?: string | null; // Detailed description of the case
+  CaseNotes?: string | null; // Internal notes, strategy, etc.
 
   // Timestamps
   created_at: string;
@@ -157,7 +158,6 @@ export interface DocumentDraft {
   created_at: string;
   updated_at: string;
 }
-
 
 // ---------------
 // DDL STATEMENTS
@@ -232,7 +232,6 @@ CREATE TABLE IF NOT EXISTS CaseDocuments (
 export const CREATE_CASE_DOCUMENTS_CASE_ID_INDEX = `
 CREATE INDEX IF NOT EXISTS idx_casedocuments_case_id ON CaseDocuments(case_id);
 `;
-
 
 export const CREATE_CASES_TABLE = `
 CREATE TABLE IF NOT EXISTS Cases (
@@ -363,18 +362,16 @@ FOR EACH ROW
 BEGIN
   UPDATE document_drafts SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = OLD.id;
 END;`;
-
-
-import { initializeUserProfileDB } from './userProfileDB';
-import { initializeUserInformationDB } from './userInformationDB';
 // Function to execute all DDL statements
-export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void> => {
+export const initializeSchema = async (
+  db: SQLite.SQLiteDatabase
+): Promise<void> => {
   // Enable foreign keys - this is important for SQLite to enforce constraints
   // It's often good practice to do this at the start of a connection.
   // With expo-sqlite/next, this might be on by default or managed differently,
   // but explicit is often better.
   try {
-    await db.execAsync('PRAGMA foreign_keys = ON;');
+    await db.execAsync("PRAGMA foreign_keys = ON;");
     console.log("Foreign keys enabled.");
   } catch (e) {
     console.error("Error enabling foreign keys, or already enabled:", e);
@@ -393,56 +390,100 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
 
   // Schema migration: Add column session_trial_number if it does not exist
   try {
-    const tableInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(Cases);");
-    const hasSessionTrialNumber = tableInfo.some(col => col.name === 'session_trial_number');
+    const tableInfo = await db.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(Cases);"
+    );
+    const hasSessionTrialNumber = tableInfo.some(
+      (col) => col.name === "session_trial_number"
+    );
     if (!hasSessionTrialNumber) {
-      await db.execAsync("ALTER TABLE Cases ADD COLUMN session_trial_number TEXT;");
-      console.log("Migration: Added column session_trial_number to Cases table successfully.");
+      await db.execAsync(
+        "ALTER TABLE Cases ADD COLUMN session_trial_number TEXT;"
+      );
+      console.log(
+        "Migration: Added column session_trial_number to Cases table successfully."
+      );
     }
-    const hasDistrictId = tableInfo.some(col => col.name === 'district_id');
+    const hasDistrictId = tableInfo.some((col) => col.name === "district_id");
     if (!hasDistrictId) {
       await db.execAsync("ALTER TABLE Cases ADD COLUMN district_id INTEGER;");
-      console.log("Migration: Added column district_id to Cases table successfully.");
+      console.log(
+        "Migration: Added column district_id to Cases table successfully."
+      );
     }
-    const hasTotalFee = tableInfo.some(col => col.name === 'total_fee');
+    const hasTotalFee = tableInfo.some((col) => col.name === "total_fee");
     if (!hasTotalFee) {
-      await db.execAsync("ALTER TABLE Cases ADD COLUMN total_fee REAL DEFAULT 0;");
-      console.log("Migration: Added column total_fee to Cases table successfully.");
+      await db.execAsync(
+        "ALTER TABLE Cases ADD COLUMN total_fee REAL DEFAULT 0;"
+      );
+      console.log(
+        "Migration: Added column total_fee to Cases table successfully."
+      );
     }
-    const hasFeePaid = tableInfo.some(col => col.name === 'fee_paid');
+    const hasFeePaid = tableInfo.some((col) => col.name === "fee_paid");
     if (!hasFeePaid) {
-      await db.execAsync("ALTER TABLE Cases ADD COLUMN fee_paid REAL DEFAULT 0;");
-      console.log("Migration: Added column fee_paid to Cases table successfully.");
+      await db.execAsync(
+        "ALTER TABLE Cases ADD COLUMN fee_paid REAL DEFAULT 0;"
+      );
+      console.log(
+        "Migration: Added column fee_paid to Cases table successfully."
+      );
     }
-    const hasCaseStage = tableInfo.some(col => col.name === 'case_stage');
+    const hasCaseStage = tableInfo.some((col) => col.name === "case_stage");
     if (!hasCaseStage) {
       await db.execAsync("ALTER TABLE Cases ADD COLUMN case_stage TEXT;");
-      console.log("Migration: Added column case_stage to Cases table successfully.");
+      console.log(
+        "Migration: Added column case_stage to Cases table successfully."
+      );
     }
-    const hasDateFee = tableInfo.some(col => col.name === 'date_fee');
+    const hasDateFee = tableInfo.some((col) => col.name === "date_fee");
     if (!hasDateFee) {
-      await db.execAsync("ALTER TABLE Cases ADD COLUMN date_fee REAL DEFAULT 0;");
-      console.log("Migration: Added column date_fee to Cases table successfully.");
+      await db.execAsync(
+        "ALTER TABLE Cases ADD COLUMN date_fee REAL DEFAULT 0;"
+      );
+      console.log(
+        "Migration: Added column date_fee to Cases table successfully."
+      );
     }
-    const hasDateFeePaid = tableInfo.some(col => col.name === 'date_fee_paid');
+    const hasDateFeePaid = tableInfo.some(
+      (col) => col.name === "date_fee_paid"
+    );
     if (!hasDateFeePaid) {
-      await db.execAsync("ALTER TABLE Cases ADD COLUMN date_fee_paid INTEGER DEFAULT 0;");
-      console.log("Migration: Added column date_fee_paid to Cases table successfully.");
+      await db.execAsync(
+        "ALTER TABLE Cases ADD COLUMN date_fee_paid INTEGER DEFAULT 0;"
+      );
+      console.log(
+        "Migration: Added column date_fee_paid to Cases table successfully."
+      );
     }
-    const hasDateFeeCollected = tableInfo.some(col => col.name === 'date_fee_collected');
+    const hasDateFeeCollected = tableInfo.some(
+      (col) => col.name === "date_fee_collected"
+    );
     if (!hasDateFeeCollected) {
-      await db.execAsync("ALTER TABLE Cases ADD COLUMN date_fee_collected REAL DEFAULT 0;");
-      console.log("Migration: Added column date_fee_collected to Cases table successfully.");
+      await db.execAsync(
+        "ALTER TABLE Cases ADD COLUMN date_fee_collected REAL DEFAULT 0;"
+      );
+      console.log(
+        "Migration: Added column date_fee_collected to Cases table successfully."
+      );
     }
   } catch (migrationError) {
     console.error("Error migrating Cases table:", migrationError);
   }
-  
+
   // Create indexes on Cases table for O(log N) query lookup speed
-  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_user_id ON Cases(user_id);`);
-  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_next_date ON Cases(NextDate);`);
-  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_case_status ON Cases(CaseStatus);`);
-  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_updated_at ON Cases(updated_at);`);
+  await db.execAsync(
+    `CREATE INDEX IF NOT EXISTS idx_cases_user_id ON Cases(user_id);`
+  );
+  await db.execAsync(
+    `CREATE INDEX IF NOT EXISTS idx_cases_next_date ON Cases(NextDate);`
+  );
+  await db.execAsync(
+    `CREATE INDEX IF NOT EXISTS idx_cases_case_status ON Cases(CaseStatus);`
+  );
+  await db.execAsync(
+    `CREATE INDEX IF NOT EXISTS idx_cases_updated_at ON Cases(updated_at);`
+  );
 
   await db.execAsync(CREATE_CASE_DOCUMENTS_TABLE);
   await db.execAsync(CREATE_CASE_DOCUMENTS_CASE_ID_INDEX);
@@ -452,18 +493,28 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
 
   // Migration check for CaseTimeline columns
   try {
-    const timelineInfo = await db.getAllAsync<{ name: string }>("PRAGMA table_info(CaseTimeline);");
-    const hasEventType = timelineInfo.some(col => col.name === 'event_type');
+    const timelineInfo = await db.getAllAsync<{ name: string }>(
+      "PRAGMA table_info(CaseTimeline);"
+    );
+    const hasEventType = timelineInfo.some((col) => col.name === "event_type");
     if (!hasEventType) {
-      await db.execAsync("ALTER TABLE CaseTimeline ADD COLUMN event_type TEXT DEFAULT 'hearing_proceeding';");
+      await db.execAsync(
+        "ALTER TABLE CaseTimeline ADD COLUMN event_type TEXT DEFAULT 'hearing_proceeding';"
+      );
     }
-    const hasAmount = timelineInfo.some(col => col.name === 'amount');
+    const hasAmount = timelineInfo.some((col) => col.name === "amount");
     if (!hasAmount) {
-      await db.execAsync("ALTER TABLE CaseTimeline ADD COLUMN amount REAL DEFAULT 0;");
+      await db.execAsync(
+        "ALTER TABLE CaseTimeline ADD COLUMN amount REAL DEFAULT 0;"
+      );
     }
-    const hasPaymentMode = timelineInfo.some(col => col.name === 'payment_mode');
+    const hasPaymentMode = timelineInfo.some(
+      (col) => col.name === "payment_mode"
+    );
     if (!hasPaymentMode) {
-      await db.execAsync("ALTER TABLE CaseTimeline ADD COLUMN payment_mode TEXT;");
+      await db.execAsync(
+        "ALTER TABLE CaseTimeline ADD COLUMN payment_mode TEXT;"
+      );
     }
   } catch (tError) {
     console.error("Error migrating CaseTimeline table:", tError);
@@ -474,47 +525,73 @@ export const initializeSchema = async (db: SQLite.SQLiteDatabase): Promise<void>
   await initializeUserInformationDB(db);
 
   // Sanitize existing duplicates in lookup tables asynchronously in background
-  sanitizeLookupTable(db, 'CaseTypes', 'case_type_id', ['user_id']);
-  sanitizeLookupTable(db, 'Courts', 'court_id', ['user_id']);
-  sanitizeLookupTable(db, 'PoliceStations', 'police_station_id', ['district_id', 'user_id']);
+  sanitizeLookupTable(db, "CaseTypes", "case_type_id", ["user_id"]);
+  sanitizeLookupTable(db, "Courts", "court_id", ["user_id"]);
+  sanitizeLookupTable(db, "PoliceStations", "police_station_id", [
+    "district_id",
+    "user_id",
+  ]);
 
   // Migrate existing date strings stored in DD-MM-YYYY format to YYYY-MM-DD
   try {
-    const casesToMigrate = await db.getAllAsync<{ id: number, NextDate: string | null, PreviousDate: string | null, dateFiled: string | null, StatuteOfLimitations: string | null }>(
+    const casesToMigrate = await db.getAllAsync<{
+      id: number;
+      NextDate: string | null;
+      PreviousDate: string | null;
+      dateFiled: string | null;
+      StatuteOfLimitations: string | null;
+    }>(
       "SELECT id, NextDate, PreviousDate, dateFiled, StatuteOfLimitations FROM Cases WHERE " +
-      "NextDate LIKE '__-__-____' OR PreviousDate LIKE '__-__-____' OR dateFiled LIKE '__-__-____' OR StatuteOfLimitations LIKE '__-__-____';"
+        "NextDate LIKE '__-__-____' OR PreviousDate LIKE '__-__-____' OR dateFiled LIKE '__-__-____' OR StatuteOfLimitations LIKE '__-__-____';"
     );
     for (const c of casesToMigrate) {
       const updates: string[] = [];
       const params: any[] = [];
-      
+
       const convert = (dateStr: string | null) => {
         if (dateStr && /^\d{2}-\d{2}-\d{4}$/.test(dateStr.trim())) {
-          const [day, month, year] = dateStr.trim().split('-');
+          const [day, month, year] = dateStr.trim().split("-");
           return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
         }
         return null;
       };
 
       const newNext = convert(c.NextDate);
-      if (newNext) { updates.push("NextDate = ?"); params.push(newNext); }
-      
+      if (newNext) {
+        updates.push("NextDate = ?");
+        params.push(newNext);
+      }
+
       const newPrev = convert(c.PreviousDate);
-      if (newPrev) { updates.push("PreviousDate = ?"); params.push(newPrev); }
-      
+      if (newPrev) {
+        updates.push("PreviousDate = ?");
+        params.push(newPrev);
+      }
+
       const newFiled = convert(c.dateFiled);
-      if (newFiled) { updates.push("dateFiled = ?"); params.push(newFiled); }
-      
+      if (newFiled) {
+        updates.push("dateFiled = ?");
+        params.push(newFiled);
+      }
+
       const newSol = convert(c.StatuteOfLimitations);
-      if (newSol) { updates.push("StatuteOfLimitations = ?"); params.push(newSol); }
+      if (newSol) {
+        updates.push("StatuteOfLimitations = ?");
+        params.push(newSol);
+      }
 
       if (updates.length > 0) {
         params.push(c.id);
-        await db.runAsync(`UPDATE Cases SET ${updates.join(', ')} WHERE id = ?`, params);
+        await db.runAsync(
+          `UPDATE Cases SET ${updates.join(", ")} WHERE id = ?`,
+          params
+        );
       }
     }
     if (casesToMigrate.length > 0) {
-      console.log(`Migration: Converted ${casesToMigrate.length} cases from DD-MM-YYYY to YYYY-MM-DD date format.`);
+      console.log(
+        `Migration: Converted ${casesToMigrate.length} cases from DD-MM-YYYY to YYYY-MM-DD date format.`
+      );
     }
   } catch (migrationError) {
     console.error("Error migrating case dates format:", migrationError);
@@ -531,9 +608,11 @@ const sanitizeLookupTable = async (
   extraGroupingCols: string[] = []
 ): Promise<void> => {
   try {
-    const grouping = ['LOWER(name)', ...extraGroupingCols].join(', ');
-    const selectCols = ['LOWER(name) as name_lower', ...extraGroupingCols].join(', ');
-    
+    const grouping = ["LOWER(name)", ...extraGroupingCols].join(", ");
+    const selectCols = ["LOWER(name) as name_lower", ...extraGroupingCols].join(
+      ", "
+    );
+
     const duplicateGroups = await db.getAllAsync<any>(
       `SELECT ${selectCols} FROM ${tableName} GROUP BY ${grouping} HAVING COUNT(*) > 1`
     );
@@ -541,7 +620,7 @@ const sanitizeLookupTable = async (
     for (const group of duplicateGroups) {
       const whereClauses = [`LOWER(name) = ?`];
       const params: any[] = [group.name_lower];
-      
+
       for (const col of extraGroupingCols) {
         if (group[col] === null || group[col] === undefined) {
           whereClauses.push(`${col} IS NULL`);
@@ -550,16 +629,16 @@ const sanitizeLookupTable = async (
           params.push(group[col]);
         }
       }
-      
-      const rows = await db.getAllAsync<{ id: number, name: string }>(
-        `SELECT id, name FROM ${tableName} WHERE ${whereClauses.join(' AND ')} ORDER BY id ASC`,
+
+      const rows = await db.getAllAsync<{ id: number; name: string }>(
+        `SELECT id, name FROM ${tableName} WHERE ${whereClauses.join(" AND ")} ORDER BY id ASC`,
         params
       );
 
       if (rows.length > 1) {
         const primaryRow = rows[0];
-        const duplicateIds = rows.slice(1).map(r => r.id);
-        const placeholders = duplicateIds.map(() => '?').join(', ');
+        const duplicateIds = rows.slice(1).map((r) => r.id);
+        const placeholders = duplicateIds.map(() => "?").join(", ");
 
         // Update cases referencing duplicate IDs to reference primary ID
         await db.runAsync(
@@ -572,7 +651,9 @@ const sanitizeLookupTable = async (
           `DELETE FROM ${tableName} WHERE id IN (${placeholders})`,
           duplicateIds
         );
-        console.log(`Sanitization: Merged duplicates in ${tableName} to primary ID ${primaryRow.id} (name: "${primaryRow.name}")`);
+        console.log(
+          `Sanitization: Merged duplicates in ${tableName} to primary ID ${primaryRow.id} (name: "${primaryRow.name}")`
+        );
       }
     }
   } catch (error) {
@@ -580,9 +661,11 @@ const sanitizeLookupTable = async (
   }
 };
 
-
 // Utility to check if a table exists
-export const tableExists = async (db: SQLite.SQLiteDatabase, tableName: string): Promise<boolean> => {
+export const tableExists = async (
+  db: SQLite.SQLiteDatabase,
+  tableName: string
+): Promise<boolean> => {
   const result = await db.getFirstAsync<{ count: number }>(
     "SELECT COUNT(*) as count FROM sqlite_master WHERE type='table' AND name=?;",
     [tableName]
@@ -591,7 +674,9 @@ export const tableExists = async (db: SQLite.SQLiteDatabase, tableName: string):
 };
 
 // Function to seed initial data
-export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> => {
+export const seedInitialData = async (
+  db: SQLite.SQLiteDatabase
+): Promise<void> => {
   console.log("Seeding initial data...");
 
   // Seed Districts
@@ -620,12 +705,19 @@ export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> 
   // Seed Police Stations for Delhi, Maharashtra, and Uttar Pradesh
   try {
     const targetStates = ["Delhi (NCT)", "Maharashtra", "Uttar Pradesh"];
-    const districts = await db.getAllAsync<{ id: number; name: string; state: string }>(
+    const districts = await db.getAllAsync<{
+      id: number;
+      name: string;
+      state: string;
+    }>(
       "SELECT id, name, state FROM Districts WHERE state IN (?, ?, ?)",
       targetStates
     );
 
-    const mappings = (policeStationsData.mappings || {}) as Record<string, string[]>;
+    const mappings = (policeStationsData.mappings || {}) as Record<
+      string,
+      string[]
+    >;
 
     for (const dist of districts) {
       let stations: string[] = [];
@@ -637,7 +729,7 @@ export const seedInitialData = async (db: SQLite.SQLiteDatabase): Promise<void> 
         stations = [
           `${dist.name} Sadar Police Station`,
           `${dist.name} ${cityOrKotwali} Police Station`,
-          `${dist.name} Mahila Police Station`
+          `${dist.name} Mahila Police Station`,
         ];
       }
 

@@ -1,7 +1,9 @@
 // utils/ocrService.ts
+import TextRecognition, {
+  TextRecognitionScript,
+} from "@react-native-ml-kit/text-recognition";
 import * as FileSystem from "expo-file-system";
 import * as ImageManipulator from "expo-image-manipulator";
-import TextRecognition, { TextRecognitionScript } from "@react-native-ml-kit/text-recognition";
 
 export { TextRecognitionScript };
 
@@ -15,9 +17,7 @@ export interface OcrResult {
  * Pre-process image for optimal Google ML Kit OCR text vision
  * Normalizes resolution (1600px width), adjusts contrast, and optimizes.
  */
-export const preprocessImageForOcr = async (
-  uri: string
-): Promise<string> => {
+export const preprocessImageForOcr = async (uri: string): Promise<string> => {
   try {
     let cleanUri = uri;
     if (
@@ -27,9 +27,7 @@ export const preprocessImageForOcr = async (
     ) {
       cleanUri = "file://" + cleanUri;
     }
-    const actions: ImageManipulator.Action[] = [
-      { resize: { width: 1600 } },
-    ];
+    const actions: ImageManipulator.Action[] = [{ resize: { width: 1600 } }];
     const manipulated = await ImageManipulator.manipulateAsync(
       cleanUri,
       actions,
@@ -105,12 +103,19 @@ export const extractTextFromImages = async (
       // Perform Google ML Kit On-Device Optical Character Recognition
       let pageText = "";
       try {
-        if (TextRecognition && typeof TextRecognition.recognize === "function") {
+        if (
+          TextRecognition &&
+          typeof TextRecognition.recognize === "function"
+        ) {
           const result = await TextRecognition.recognize(targetUri, script);
           pageText = result?.text || "";
         }
       } catch (mlKitErr) {
-        console.warn("ML Kit text recognition error for page:", targetUri, mlKitErr);
+        console.warn(
+          "ML Kit text recognition error for page:",
+          targetUri,
+          mlKitErr
+        );
       }
 
       if (pageText && pageText.trim().length > 0) {
@@ -120,7 +125,9 @@ export const extractTextFromImages = async (
         }
       } else {
         const fileName = cleanUri.split("/").pop() || "scanned_document.jpg";
-        extractedParagraphs.push(formatOcrTextForDocument(`[Scanned Image: ${fileName}]`));
+        extractedParagraphs.push(
+          formatOcrTextForDocument(`[Scanned Image: ${fileName}]`)
+        );
       }
     } catch (err) {
       console.error("Error processing OCR for image:", rawUri, err);

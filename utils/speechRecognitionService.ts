@@ -1,6 +1,7 @@
 // utils/speechRecognitionService.ts
-import { LEGAL_VOCABULARY } from "./legalVocabulary";
 import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
+
+import { LEGAL_VOCABULARY } from "./legalVocabulary";
 
 export interface SpeechRecognitionCallbacks {
   onStart?: () => void;
@@ -14,13 +15,13 @@ export interface SpeechRecognitionCallbacks {
  * Common phonetic / STT misinterpretations mapped to standard legal terminology
  */
 const LEGAL_PHONETIC_CORRECTIONS: Record<string, string> = {
-  "affedavit": "Affidavit",
-  "affidavid": "Affidavit",
-  "effidavit": "Affidavit",
-  "vacalatnama": "Vakalatnama",
-  "wakalatnama": "Vakalatnama",
+  affedavit: "Affidavit",
+  affidavid: "Affidavit",
+  effidavit: "Affidavit",
+  vacalatnama: "Vakalatnama",
+  wakalatnama: "Vakalatnama",
   "vakalat nama": "Vakalatnama",
-  "suomoto": "Suo Moto",
+  suomoto: "Suo Moto",
   "suo moto": "Suo Moto",
   "ip c": "IPC",
   "i p c": "IPC",
@@ -29,13 +30,13 @@ const LEGAL_PHONETIC_CORRECTIONS: Record<string, string> = {
   "c p c": "CPC",
   "n i act": "NI Act",
   "ni act": "NI Act",
-  "highcourt": "High Court",
-  "supremecourt": "Supreme Court",
-  "bailapp": "Bail Application",
+  highcourt: "High Court",
+  supremecourt: "Supreme Court",
+  bailapp: "Bail Application",
   "bail app": "Bail Application",
   "stay order": "Stay Order",
   "interim order": "Interim Order",
-  "sheweth": "SHEWETH",
+  sheweth: "SHEWETH",
   "sheweth as under": "SHEWETH AS UNDER:",
   "prayed that": "PRAYED THAT",
 };
@@ -88,9 +89,12 @@ class SpeechRecognitionService {
         return false;
       }
 
-      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      const permission =
+        await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!permission.granted) {
-        callbacks.onError?.("Microphone permission required for voice dictation");
+        callbacks.onError?.(
+          "Microphone permission required for voice dictation"
+        );
         return false;
       }
 
@@ -102,38 +106,51 @@ class SpeechRecognitionService {
       callbacks.onStart?.();
 
       const moduleAny = ExpoSpeechRecognitionModule as any;
-      const resultSub = moduleAny.addListener ? moduleAny.addListener("result", (event: any) => {
-        if (event.results && event.results.length > 0) {
-          const rawResult = (event.results[0]?.transcript || "").trim();
-          if (rawResult) {
-            const correctedFull = applyLegalVocabularyCorrection(rawResult);
-            callbacks.onFullResult?.(correctedFull);
+      const resultSub = moduleAny.addListener
+        ? moduleAny.addListener("result", (event: any) => {
+            if (event.results && event.results.length > 0) {
+              const rawResult = (event.results[0]?.transcript || "").trim();
+              if (rawResult) {
+                const correctedFull = applyLegalVocabularyCorrection(rawResult);
+                callbacks.onFullResult?.(correctedFull);
 
-            let delta = "";
-            if (this.lastProcessedTranscript && rawResult.toLowerCase().startsWith(this.lastProcessedTranscript.toLowerCase())) {
-              delta = rawResult.slice(this.lastProcessedTranscript.length).trim();
-            } else if (!this.lastProcessedTranscript) {
-              delta = rawResult;
+                let delta = "";
+                if (
+                  this.lastProcessedTranscript &&
+                  rawResult
+                    .toLowerCase()
+                    .startsWith(this.lastProcessedTranscript.toLowerCase())
+                ) {
+                  delta = rawResult
+                    .slice(this.lastProcessedTranscript.length)
+                    .trim();
+                } else if (!this.lastProcessedTranscript) {
+                  delta = rawResult;
+                }
+
+                if (delta.length > 0) {
+                  const correctedDelta = applyLegalVocabularyCorrection(delta);
+                  callbacks.onResult?.(correctedDelta);
+                  this.lastProcessedTranscript = rawResult;
+                }
+              }
             }
+          })
+        : null;
 
-            if (delta.length > 0) {
-              const correctedDelta = applyLegalVocabularyCorrection(delta);
-              callbacks.onResult?.(correctedDelta);
-              this.lastProcessedTranscript = rawResult;
-            }
-          }
-        }
-      }) : null;
+      const errorSub = moduleAny.addListener
+        ? moduleAny.addListener("error", (event: any) => {
+            this.isListening = false;
+            callbacks.onError?.(event?.error || "Speech recognition error");
+          })
+        : null;
 
-      const errorSub = moduleAny.addListener ? moduleAny.addListener("error", (event: any) => {
-        this.isListening = false;
-        callbacks.onError?.(event?.error || "Speech recognition error");
-      }) : null;
-
-      const endSub = moduleAny.addListener ? moduleAny.addListener("end", () => {
-        this.isListening = false;
-        callbacks.onEnd?.();
-      }) : null;
+      const endSub = moduleAny.addListener
+        ? moduleAny.addListener("end", () => {
+            this.isListening = false;
+            callbacks.onEnd?.();
+          })
+        : null;
 
       this.listeners.push(resultSub, errorSub, endSub);
 

@@ -1,5 +1,12 @@
 import React, { useContext } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from "react-native";
+
 import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface TabSelectorProps {
@@ -15,21 +22,27 @@ const TabSelector: React.FC<TabSelectorProps> = ({
 }) => {
   const { theme } = useContext(ThemeContext);
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollViewContent}>
+    <View
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollViewContent}
+      >
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[
               styles.tabButton,
-              { 
-                backgroundColor: theme.colors.cardBackground, 
+              {
+                backgroundColor: theme.colors.cardBackground,
                 borderColor: theme.colors.border,
-                borderWidth: 1
+                borderWidth: 1,
               },
-              selectedTab === tab && { 
-                backgroundColor: theme.colors.primary, 
-                borderColor: theme.colors.primary 
+              selectedTab === tab && {
+                backgroundColor: theme.colors.primary,
+                borderColor: theme.colors.primary,
               },
             ]}
             onPress={() => onSelectTab(tab)}
@@ -57,7 +70,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   scrollViewContent: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   tabButton: {
     paddingVertical: 8,

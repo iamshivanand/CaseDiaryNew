@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import React from "react";
+import { View, StyleSheet, Text } from "react-native";
 
 const Advertisement = () => {
   return (
@@ -11,33 +11,33 @@ const Advertisement = () => {
 
 const styles = StyleSheet.create({
   adBanner: {
-    backgroundColor: '#F3F3F3',
+    backgroundColor: "#F3F3F3",
     borderRadius: 12,
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 24,
   },
   adLabel: {
-    color: '#777',
+    color: "#777",
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 8,
   },
   adMessage: {
     fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
+    color: "#333",
+    textAlign: "center",
     marginBottom: 12,
   },
   adButton: {
-    backgroundColor: '#007BFF',
+    backgroundColor: "#007BFF",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
   },
   adButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+    color: "#FFFFFF",
+    fontWeight: "bold",
     fontSize: 14,
   },
 });

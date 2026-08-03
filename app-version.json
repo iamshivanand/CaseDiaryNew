@@ -1,9 +1,9 @@
 {
-  "latestAndroidVersion": "1.1.4",
-  "latestIosVersion": "1.0.0",
-  "minAndroidVersion": "1.1.4",
-  "minIosVersion": "1.0.0",
+  "latestAndroidVersion": "1.2.2",
+  "minAndroidVersion": "1.2.0",
   "playStoreUrl": "https://play.google.com/store/apps/details?id=com.iamshiv.CaseDiary",
-  "appStoreUrl": "https://apps.apple.com/app/your-app-id",
-  "releaseNotes": "Compatibility updates for latest Android OS version and performance enhancements."
+  "latestIosVersion": "1.2.2",
+  "minIosVersion": "1.2.0",
+  "appStoreUrl": "",
+  "releaseNotes": "• Android 16 (API 36+) and 16 KB memory page size compatibility.\n• Performance optimizations and smooth Skeleton Loaders across screen transitions.\n• Dark & Light mode polish for Voice Dictation and Next Date Hearing modal."
 }

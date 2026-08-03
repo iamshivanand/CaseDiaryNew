@@ -1,12 +1,11 @@
 // Screens/CaseDetailsScreen/EditDraftScreen.tsx
 import { Ionicons, FontAwesome } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import * as ImagePicker from "expo-image-picker";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import * as ImagePicker from "expo-image-picker";
 import React, { useState, useEffect, useRef, useContext } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import ActionButton from "../CommonComponents/ActionButton";
 import {
   View,
   StyleSheet,
@@ -25,15 +24,6 @@ import {
 import { WebView } from "react-native-webview";
 import { v4 as uuidv4 } from "uuid";
 
-import { saveDocumentDraft, getDocumentDraftById } from "../../DataBase";
-import { useTranslation } from "../../Providers/LanguageProvider";
-import { ThemeContext } from "../../Providers/ThemeProvider";
-import { HomeStackParamList } from "../../Types/navigationtypes";
-import { LEGAL_VOCABULARY } from "../../utils/legalVocabulary";
-import { getOfflineEditorHtml } from "../../utils/offlineEditorTemplate";
-import { extractTextFromImages } from "../../utils/ocrService";
-import { extractLegalEntities, ExtractedLegalEntities } from "../../utils/legalNerService";
-import { speechRecognitionService } from "../../utils/speechRecognitionService";
 import { legalAutocompleteService } from "../../utils/legalAutocompleteService";
 import { PlaceholderBottomSheet } from "./components/PlaceholderBottomSheet";
 import { SignatureCanvasModal } from "./components/SignatureCanvasModal";
@@ -41,6 +31,16 @@ import { LegalAutocompleteBar } from "./components/LegalAutocompleteBar";
 import { TableConfigModal } from "./components/TableConfigModal";
 import { ElementContextModal } from "./components/ElementContextModal";
 import OcrReviewModal from "./components/OcrReviewModal";
+import { saveDocumentDraft, getDocumentDraftById } from "../../DataBase";
+import { useTranslation } from "../../Providers/LanguageProvider";
+import { ThemeContext } from "../../Providers/ThemeProvider";
+import { HomeStackParamList } from "../../Types/navigationtypes";
+import { extractLegalEntities, ExtractedLegalEntities } from "../../utils/legalNerService";
+import { LEGAL_VOCABULARY } from "../../utils/legalVocabulary";
+import { extractTextFromImages } from "../../utils/ocrService";
+import { getOfflineEditorHtml } from "../../utils/offlineEditorTemplate";
+import { speechRecognitionService } from "../../utils/speechRecognitionService";
+import ActionButton from "../CommonComponents/ActionButton";
 
 type EditDraftScreenRouteProp = RouteProp<HomeStackParamList, "EditDraft">;
 
@@ -101,10 +101,10 @@ const EditDraftScreen: React.FC = () => {
   // Page setup state
   const [font, setFont] = useState("Times New Roman");
   const [lineHeight, setLineHeight] = useState("1.6");
-  const [topMargin, setTopMargin] = useState(24);
-  const [bottomMargin, setBottomMargin] = useState(24);
-  const [leftMargin, setLeftMargin] = useState(55);
-  const [rightMargin, setRightMargin] = useState(24);
+  const [topMargin, setTopMargin] = useState(16);
+  const [bottomMargin, setBottomMargin] = useState(16);
+  const [leftMargin, setLeftMargin] = useState(36);
+  const [rightMargin, setRightMargin] = useState(16);
   const [letterheadSpace, setLetterheadSpace] = useState(0);
   const [unitMode, setUnitMode] = useState<"in" | "mm" | "px">("in");
   const [isPageSetupVisible, setIsPageSetupVisible] = useState(false);
@@ -138,57 +138,76 @@ const EditDraftScreen: React.FC = () => {
   const [activePlaceholderLabel, setActivePlaceholderLabel] = useState("");
   const [activePlaceholderClean, setActivePlaceholderClean] = useState("");
   const [signatureModalVisible, setSignatureModalVisible] = useState(false);
-  const [extractedEntities, setExtractedEntities] = useState<ExtractedLegalEntities | null>(null);
+  const [extractedEntities, setExtractedEntities] =
+    useState<ExtractedLegalEntities | null>(null);
   const [showEntitiesCard, setShowEntitiesCard] = useState(false);
   const [isDictating, setIsDictating] = useState(false);
-  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<
+    string[]
+  >([]);
   const [isRibbonCollapsed, setIsRibbonCollapsed] = useState(false);
   const [tableConfigModalVisible, setTableConfigModalVisible] = useState(false);
-  const [elementContextModalVisible, setElementContextModalVisible] = useState(false);
-  const [selectedElementType, setSelectedElementType] = useState<"table" | "signature" | null>(null);
+  const [elementContextModalVisible, setElementContextModalVisible] =
+    useState(false);
+  const [selectedElementType, setSelectedElementType] = useState<
+    "table" | "signature" | null
+  >(null);
   const [shapeModalVisible, setShapeModalVisible] = useState(false);
 
   const tourSteps = [
     {
-      title: locale === "hi" ? "दस्तावेज़ संपादक मार्गदर्शिका" : "Document Editor Guide",
-      description: locale === "hi"
-        ? "आपका स्वागत है! आइए इस नए लाइव एडिटर की मुख्य विशेषताओं का जल्दी से परिचय लें।"
-        : "Welcome! Let's take a quick tour of the key features in this document editor.",
+      title:
+        locale === "hi"
+          ? "दस्तावेज़ संपादक मार्गदर्शिका"
+          : "Document Editor Guide",
+      description:
+        locale === "hi"
+          ? "आपका स्वागत है! आइए इस नए लाइव एडिटर की मुख्य विशेषताओं का जल्दी से परिचय लें।"
+          : "Welcome! Let's take a quick tour of the key features in this document editor.",
       icon: "book-outline",
     },
     {
-      title: locale === "hi" ? "लाइव स्वरूपण (Formatting) उपकरण" : "Formatting Tools",
-      description: locale === "hi"
-        ? "बोल्ड, इटैलिक, अंडरलाइन, संरेखण (alignment), और बुलेट/नंबर सूचियों का उपयोग करके अपने दस्तावेज़ को तुरंत स्वरूपित करें।"
-        : "Format your text instantly using Bold, Italic, Underline, alignments, and lists in the formatting toolbar.",
+      title:
+        locale === "hi"
+          ? "लाइव स्वरूपण (Formatting) उपकरण"
+          : "Formatting Tools",
+      description:
+        locale === "hi"
+          ? "बोल्ड, इटैलिक, अंडरलाइन, संरेखण (alignment), और बुलेट/नंबर सूचियों का उपयोग करके अपने दस्तावेज़ को तुरंत स्वरूपित करें।"
+          : "Format your text instantly using Bold, Italic, Underline, alignments, and lists in the formatting toolbar.",
       icon: "text-outline",
     },
     {
       title: locale === "hi" ? "पेज सेटअप और मार्जिन" : "Page Setup & Margins",
-      description: locale === "hi"
-        ? "पेज साइज (A4 बनाम Legal), फ़ॉन्ट आकार, लाइन स्पेसिंग, और रेड लेज़र मार्जिन लाइनों को आवश्यकतानुसार समायोजित करें।"
-        : "Configure paper size (A4 vs Legal), active fonts, margins, line spacing, and print properties easily.",
+      description:
+        locale === "hi"
+          ? "पेज साइज (A4 बनाम Legal), फ़ॉन्ट आकार, लाइन स्पेसिंग, और रेड लेज़र मार्जिन लाइनों को आवश्यकतानुसार समायोजित करें।"
+          : "Configure paper size (A4 vs Legal), active fonts, margins, line spacing, and print properties easily.",
       icon: "settings-outline",
     },
     {
       title: locale === "hi" ? "पेज ब्रेक जोड़ना" : "Insert Page Breaks",
-      description: locale === "hi"
-        ? "नई 'पेज ब्रेक' सुविधा से दस्तावेज़ को अलग-अलग पेजों में विभाजित करें ताकि प्रिंट या पीडीएफ में पेज सही जगह से कटें।"
-        : "Use the new Page Break feature to insert page dividers. The generated PDF will cleanly break the page at these points.",
+      description:
+        locale === "hi"
+          ? "नई 'पेज ब्रेक' सुविधा से दस्तावेज़ को अलग-अलग पेजों में विभाजित करें ताकि प्रिंट या पीडीएफ में पेज सही जगह से कटें।"
+          : "Use the new Page Break feature to insert page dividers. The generated PDF will cleanly break the page at these points.",
       icon: "layers-outline",
     },
     {
       title: locale === "hi" ? "स्मार्ट प्लेसहोल्डर्स" : "Smart Placeholders",
-      description: locale === "hi"
-        ? "दस्तावेज़ में मौजूद [Client Name] जैसे कोष्ठक वाले शब्दों पर केवल एक बार टैप करके उन्हें आसानी से बदलें।"
-        : "Tap on any bracketed text like [Client Name] or lines like _____ to open a quick fill popup and replace them instantly.",
+      description:
+        locale === "hi"
+          ? "दस्तावेज़ में मौजूद [Client Name] जैसे कोष्ठक वाले शब्दों पर केवल एक बार टैप करके उन्हें आसानी से बदलें।"
+          : "Tap on any bracketed text like [Client Name] or lines like _____ to open a quick fill popup and replace them instantly.",
       icon: "create-outline",
     },
     {
-      title: locale === "hi" ? "टेम्पलेट के रूप में सहेजें" : "Save as Template",
-      description: locale === "hi"
-        ? "इस दस्तावेज़ को एक नए कस्टम टेम्पलेट के रूप में सहेजें, ताकि भविष्य में किसी भी केस के लिए इसका पुनः उपयोग किया जा सके!"
-        : "Save your customized drafts as reusable custom templates. Next time, they will automatically fill in details for new cases!",
+      title:
+        locale === "hi" ? "टेम्पलेट के रूप में सहेजें" : "Save as Template",
+      description:
+        locale === "hi"
+          ? "इस दस्तावेज़ को एक नए कस्टम टेम्पलेट के रूप में सहेजें, ताकि भविष्य में किसी भी केस के लिए इसका पुनः उपयोग किया जा सके!"
+          : "Save your customized drafts as reusable custom templates. Next time, they will automatically fill in details for new cases!",
       icon: "save-outline",
     },
   ];
@@ -346,15 +365,56 @@ const EditDraftScreen: React.FC = () => {
   // Handle formatted command triggers
   const triggerFormat = (command: string, value: string | null = null) => {
     // Optimistic state toggle for instant active button highlight UI
-    if (command === "bold") setEditorState((prev) => ({ ...prev, bold: !prev.bold }));
-    if (command === "italic") setEditorState((prev) => ({ ...prev, italic: !prev.italic }));
-    if (command === "underline") setEditorState((prev) => ({ ...prev, underline: !prev.underline }));
-    if (command === "justifyLeft") setEditorState((prev) => ({ ...prev, alignLeft: true, alignCenter: false, alignRight: false, alignJustify: false }));
-    if (command === "justifyCenter") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: true, alignRight: false, alignJustify: false }));
-    if (command === "justifyRight") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: false, alignRight: true, alignJustify: false }));
-    if (command === "justifyFull") setEditorState((prev) => ({ ...prev, alignLeft: false, alignCenter: false, alignRight: false, alignJustify: true }));
-    if (command === "insertUnorderedList") setEditorState((prev) => ({ ...prev, unorderedList: !prev.unorderedList, orderedList: false }));
-    if (command === "insertOrderedList") setEditorState((prev) => ({ ...prev, orderedList: !prev.orderedList, unorderedList: false }));
+    if (command === "bold")
+      setEditorState((prev) => ({ ...prev, bold: !prev.bold }));
+    if (command === "italic")
+      setEditorState((prev) => ({ ...prev, italic: !prev.italic }));
+    if (command === "underline")
+      setEditorState((prev) => ({ ...prev, underline: !prev.underline }));
+    if (command === "justifyLeft")
+      setEditorState((prev) => ({
+        ...prev,
+        alignLeft: true,
+        alignCenter: false,
+        alignRight: false,
+        alignJustify: false,
+      }));
+    if (command === "justifyCenter")
+      setEditorState((prev) => ({
+        ...prev,
+        alignLeft: false,
+        alignCenter: true,
+        alignRight: false,
+        alignJustify: false,
+      }));
+    if (command === "justifyRight")
+      setEditorState((prev) => ({
+        ...prev,
+        alignLeft: false,
+        alignCenter: false,
+        alignRight: true,
+        alignJustify: false,
+      }));
+    if (command === "justifyFull")
+      setEditorState((prev) => ({
+        ...prev,
+        alignLeft: false,
+        alignCenter: false,
+        alignRight: false,
+        alignJustify: true,
+      }));
+    if (command === "insertUnorderedList")
+      setEditorState((prev) => ({
+        ...prev,
+        unorderedList: !prev.unorderedList,
+        orderedList: false,
+      }));
+    if (command === "insertOrderedList")
+      setEditorState((prev) => ({
+        ...prev,
+        orderedList: !prev.orderedList,
+        unorderedList: false,
+      }));
 
     postMessageToWebView({
       type: "exec",
@@ -387,7 +447,10 @@ const EditDraftScreen: React.FC = () => {
             const words = data.stats.text.trim().split(/\s+/);
             const lastWord = words.length > 0 ? words[words.length - 1] : "";
             if (lastWord.length >= 2) {
-              const matches = legalAutocompleteService.getSuggestions(lastWord, 5);
+              const matches = legalAutocompleteService.getSuggestions(
+                lastWord,
+                5
+              );
               setAutocompleteSuggestions(matches);
             } else {
               setAutocompleteSuggestions([]);
@@ -435,19 +498,26 @@ const EditDraftScreen: React.FC = () => {
     );
   };
 
-  const processOcrFromSource = async (source: "camera" | "gallery" | "scanner") => {
+  const processOcrFromSource = async (
+    source: "camera" | "gallery" | "scanner"
+  ) => {
     let scannedUris: string[] = [];
     try {
       setIsLoading(true);
 
       if (source === "scanner") {
         try {
-          const DocumentScanner = require("react-native-document-scanner-plugin").default;
+          const DocumentScanner =
+            require("react-native-document-scanner-plugin").default;
           const result = await DocumentScanner.scanDocument({
             croppedImageQuality: 100,
             maxNumDocuments: 10,
           });
-          if (result && result.scannedImages && Array.isArray(result.scannedImages)) {
+          if (
+            result &&
+            result.scannedImages &&
+            Array.isArray(result.scannedImages)
+          ) {
             scannedUris = result.scannedImages;
           }
         } catch (scanErr) {
@@ -460,25 +530,40 @@ const EditDraftScreen: React.FC = () => {
             quality: 1.0,
             allowsEditing: true,
           });
-          if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets[0]?.uri) {
+          if (
+            !pickerResult.canceled &&
+            pickerResult.assets &&
+            pickerResult.assets[0]?.uri
+          ) {
             scannedUris = [pickerResult.assets[0].uri];
           }
         } else {
-          Alert.alert("Permission Required", "Camera permission is required to take photo for OCR.");
+          Alert.alert(
+            "Permission Required",
+            "Camera permission is required to take photo for OCR."
+          );
         }
       } else if (source === "gallery") {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status === "granted") {
           const pickerResult = await ImagePicker.launchImageLibraryAsync({
             quality: 1.0,
             allowsMultipleSelection: true,
             selectionLimit: 5,
           });
-          if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets.length > 0) {
+          if (
+            !pickerResult.canceled &&
+            pickerResult.assets &&
+            pickerResult.assets.length > 0
+          ) {
             scannedUris = pickerResult.assets.map((asset) => asset.uri);
           }
         } else {
-          Alert.alert("Permission Required", "Gallery permission is required to select photos for OCR.");
+          Alert.alert(
+            "Permission Required",
+            "Gallery permission is required to select photos for OCR."
+          );
         }
       }
 
@@ -511,27 +596,31 @@ const EditDraftScreen: React.FC = () => {
       setIsDictating(false);
     } else {
       setIsDictating(true);
-      const dictationLocale = (docDraftLanguage === "hi" || locale === "hi") ? "hi-IN" : "en-IN";
-      const started = await speechRecognitionService.startListening(dictationLocale, {
-        onStart: () => setIsDictating(true),
-        onResult: (text) => {
-          if (text) {
-            let processed = text
-              .replace(/\b(full stop|period)\b/gi, ".")
-              .replace(/\b(पूर्ण विराम)\b/gi, "।")
-              .replace(/\b(comma)\b/gi, ",")
-              .replace(/\b(अल्पविराम)\b/gi, ",")
-              .replace(/\b(new paragraph|next paragraph)\b/gi, "\n\n")
-              .replace(/\b(नया पैराग्राफ|नया पैरा)\b/gi, "\n\n");
-            triggerFormat("insertText", processed + " ");
-          }
-        },
-        onError: (err) => {
-          setIsDictating(false);
-          Alert.alert("Dictation Error", err || "Speech recognition error");
-        },
-        onEnd: () => setIsDictating(false),
-      });
+      const dictationLocale =
+        docDraftLanguage === "hi" || locale === "hi" ? "hi-IN" : "en-IN";
+      const started = await speechRecognitionService.startListening(
+        dictationLocale,
+        {
+          onStart: () => setIsDictating(true),
+          onResult: (text) => {
+            if (text) {
+              const processed = text
+                .replace(/\b(full stop|period)\b/gi, ".")
+                .replace(/\b(पूर्ण विराम)\b/gi, "।")
+                .replace(/\b(comma)\b/gi, ",")
+                .replace(/\b(अल्पविराम)\b/gi, ",")
+                .replace(/\b(new paragraph|next paragraph)\b/gi, "\n\n")
+                .replace(/\b(नया पैराग्राफ|नया पैरा)\b/gi, "\n\n");
+              triggerFormat("insertText", processed + " ");
+            }
+          },
+          onError: (err) => {
+            setIsDictating(false);
+            Alert.alert("Dictation Error", err || "Speech recognition error");
+          },
+          onEnd: () => setIsDictating(false),
+        }
+      );
       if (!started) {
         setIsDictating(false);
       }
@@ -539,7 +628,10 @@ const EditDraftScreen: React.FC = () => {
   };
 
   // 3. Update Placeholder Value Handler
-  const handleApplyPlaceholderValue = (originalLabel: string, newValue: string) => {
+  const handleApplyPlaceholderValue = (
+    originalLabel: string,
+    newValue: string
+  ) => {
     postMessageToWebView({
       type: "exec",
       command: "replacePlaceholderValue",
@@ -610,57 +702,51 @@ const EditDraftScreen: React.FC = () => {
       const contentWithMetadata = metadataComment + html;
 
       // Ask advocate where/how they want to save
-      Alert.alert(
-        "Save Draft",
-        "Choose how you want to save this document:",
-        [
-          {
-            text: caseId
-              ? "Save to current Case"
-              : "Save as Standalone Draft",
-            onPress: async () => {
-              await saveDocumentDraft({
-                id: idToSave,
-                case_id: caseId || null,
-                title,
-                template_type: templateType,
-                html_content: contentWithMetadata,
-                is_custom_template: 0,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              });
-              Alert.alert("Success", "Draft saved successfully.", [
-                { text: "OK", onPress: () => navigation.goBack() },
-              ]);
-              setIsSaving(false);
-            },
+      Alert.alert("Save Draft", "Choose how you want to save this document:", [
+        {
+          text: caseId ? "Save to current Case" : "Save as Standalone Draft",
+          onPress: async () => {
+            await saveDocumentDraft({
+              id: idToSave,
+              case_id: caseId || null,
+              title,
+              template_type: templateType,
+              html_content: contentWithMetadata,
+              is_custom_template: 0,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+            Alert.alert("Success", "Draft saved successfully.", [
+              { text: "OK", onPress: () => navigation.goBack() },
+            ]);
+            setIsSaving(false);
           },
-          {
-            text: "Save as Reusable Template",
-            onPress: async () => {
-              await saveDocumentDraft({
-                id: idToSave,
-                case_id: null,
-                title: `${title} (Template)`,
-                template_type: templateType,
-                html_content: contentWithMetadata,
-                is_custom_template: 1,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              });
-              Alert.alert("Success", "Custom template saved successfully.", [
-                { text: "OK", onPress: () => navigation.goBack() },
-              ]);
-              setIsSaving(false);
-            },
+        },
+        {
+          text: "Save as Reusable Template",
+          onPress: async () => {
+            await saveDocumentDraft({
+              id: idToSave,
+              case_id: null,
+              title: `${title} (Template)`,
+              template_type: templateType,
+              html_content: contentWithMetadata,
+              is_custom_template: 1,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+            Alert.alert("Success", "Custom template saved successfully.", [
+              { text: "OK", onPress: () => navigation.goBack() },
+            ]);
+            setIsSaving(false);
           },
-          {
-            text: "Cancel",
-            style: "cancel",
-            onPress: () => setIsSaving(false),
-          },
-        ]
-      );
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => setIsSaving(false),
+        },
+      ]);
     } catch (err) {
       console.error("Error saving draft to SQLite database:", err);
       Alert.alert("Error", "Could not write draft to SQLite.");
@@ -738,11 +824,12 @@ const EditDraftScreen: React.FC = () => {
             }
             hr.page-break {
               display: block;
-              page-break-before: always;
-              break-before: page;
-              border: none;
+              page-break-after: always;
+              break-after: page;
               height: 0;
+              border: 0;
               margin: 0;
+              padding: 0;
             }
             .page-margin-guide, #red-margin-line, #margin-guide-overlay {
               display: none !important;
@@ -775,52 +862,75 @@ const EditDraftScreen: React.FC = () => {
       });
 
       setIsExporting(false);
-      Alert.alert(
-        title || "Draft Document",
-        "Choose an action for this PDF:",
-        [
-          {
-            text: "Open in App",
-            onPress: () => {
-              // @ts-ignore
-              navigation.navigate("PdfViewer", {
-                pdfUri: uri,
-                title: title || "Draft",
+      Alert.alert(title || "Draft Document", "Choose an action for this PDF:", [
+        {
+          text: "Open in App",
+          onPress: () => {
+            // @ts-ignore
+            navigation.navigate("PdfViewer", {
+              pdfUri: uri,
+              title: title || "Draft",
+            });
+          },
+        },
+        {
+          text: "Share PDF",
+          onPress: async () => {
+            if (await Sharing.isAvailableAsync()) {
+              await Sharing.shareAsync(uri, {
+                mimeType: "application/pdf",
+                dialogTitle: title,
+                UTI: "com.adobe.pdf",
               });
-            },
+            }
           },
-          {
-            text: "Share PDF",
-            onPress: async () => {
-              if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, {
-                  mimeType: "application/pdf",
-                  dialogTitle: title,
-                  UTI: "com.adobe.pdf",
-                });
-              }
-            },
-          },
-          {
-            text: "Link to Case",
-            onPress: () => {
+        },
+        {
+          text: "Link to Case",
+          onPress: async () => {
+            try {
+              const latestHtml = await getLatestHtml();
+              const effectiveId = draftId || uuidv4();
+              const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
+              const contentWithMetadata = metadataComment + latestHtml;
+              await saveDocumentDraft({
+                id: effectiveId,
+                case_id: caseId || null,
+                title,
+                template_type: templateType,
+                html_content: contentWithMetadata,
+                is_custom_template: 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+              setHasUnsavedChanges(false);
               // @ts-ignore
-              navigation.navigate("DraftsHub", { draftId: draftId, action: "attach" });
-            },
-          },
-          {
-            text: "Go to Document Hub",
-            onPress: () => {
+              navigation.navigate("DraftsHub", {
+                draftId: effectiveId,
+                action: "attach",
+              });
+            } catch (e) {
+              console.error("Error saving before linking:", e);
               // @ts-ignore
-              navigation.navigate("DraftsHub");
-            },
+              navigation.navigate("DraftsHub", {
+                draftId,
+                action: "attach",
+              });
+            }
           },
-          {
-            text: "Cancel",
-            style: "cancel",
+        },
+        {
+          text: "Go to Document Hub",
+          onPress: () => {
+            // @ts-ignore
+            navigation.navigate("DraftsHub");
           },
-        ]
-      );
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]);
     } catch (error) {
       setIsExporting(false);
       console.error("Error generating PDF in editor screen:", error);
@@ -859,6 +969,41 @@ const EditDraftScreen: React.FC = () => {
         />
 
         <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            style={[
+              styles.headerButton,
+              {
+                marginRight: 6,
+                backgroundColor: isDictating
+                  ? "#EF4444"
+                  : `${theme.colors.primary}15`,
+                borderRadius: 16,
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                flexDirection: "row",
+                alignItems: "center",
+              },
+            ]}
+            onPress={toggleVoiceDictation}
+          >
+            <Ionicons
+              name={isDictating ? "mic-off" : "mic"}
+              size={18}
+              color={isDictating ? "#FFFFFF" : theme.colors.primary}
+            />
+            {isDictating && (
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: "bold",
+                  color: "#FFFFFF",
+                  marginLeft: 4,
+                }}
+              >
+                Rec
+              </Text>
+            )}
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.headerButton, { marginRight: 6 }]}
             onPress={() => triggerFormat("undo")}
@@ -993,7 +1138,8 @@ const EditDraftScreen: React.FC = () => {
                 color: theme.colors.primary,
               }}
             >
-              ~{docStats.estimatedPages} {docStats.estimatedPages === 1 ? "Page" : "Pages"}
+              ~{docStats.estimatedPages}{" "}
+              {docStats.estimatedPages === 1 ? "Page" : "Pages"}
             </Text>
           </View>
 
@@ -1043,7 +1189,10 @@ const EditDraftScreen: React.FC = () => {
                 paddingHorizontal: 8,
                 paddingVertical: 2,
                 borderRadius: 10,
-                backgroundColor: docDraftLanguage === "en" ? theme.colors.primary : "transparent",
+                backgroundColor:
+                  docDraftLanguage === "en"
+                    ? theme.colors.primary
+                    : "transparent",
               }}
               onPress={() => {
                 setDocDraftLanguage("en");
@@ -1051,7 +1200,16 @@ const EditDraftScreen: React.FC = () => {
               }}
               testID="lang-en-btn"
             >
-              <Text style={{ fontSize: 11, fontWeight: "bold", color: docDraftLanguage === "en" ? "#ffffff" : theme.colors.textSecondary }}>
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: "bold",
+                  color:
+                    docDraftLanguage === "en"
+                      ? "#ffffff"
+                      : theme.colors.textSecondary,
+                }}
+              >
                 EN
               </Text>
             </TouchableOpacity>
@@ -1060,7 +1218,10 @@ const EditDraftScreen: React.FC = () => {
                 paddingHorizontal: 8,
                 paddingVertical: 2,
                 borderRadius: 10,
-                backgroundColor: docDraftLanguage === "hi" ? theme.colors.primary : "transparent",
+                backgroundColor:
+                  docDraftLanguage === "hi"
+                    ? theme.colors.primary
+                    : "transparent",
               }}
               onPress={() => {
                 setDocDraftLanguage("hi");
@@ -1068,7 +1229,16 @@ const EditDraftScreen: React.FC = () => {
               }}
               testID="lang-hi-btn"
             >
-              <Text style={{ fontSize: 11, fontWeight: "bold", color: docDraftLanguage === "hi" ? "#ffffff" : theme.colors.textSecondary }}>
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: "bold",
+                  color:
+                    docDraftLanguage === "hi"
+                      ? "#ffffff"
+                      : theme.colors.textSecondary,
+                }}
+              >
                 हिंदी
               </Text>
             </TouchableOpacity>
@@ -1246,421 +1416,314 @@ const EditDraftScreen: React.FC = () => {
               fontWeight: "600",
             }}
           >
-            {pageSize === "legal"
-              ? "Legal Paper"
-              : "A4 Paper"}
+            {pageSize === "legal" ? "Legal Paper" : "A4 Paper"}
           </Text>
         </View>
 
         {/* Dynamic Native Formatting Ribbon */}
-        {!isRibbonCollapsed && (
-          toolbarMode === "format" ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.toolbarScroll}
-            contentContainerStyle={styles.toolbarContent}
-          >
-            <TouchableOpacity
-              style={[
-                styles.toolbarButton,
-                editorState.bold && styles.activeToolbarButton,
-              ]}
-              onPress={() => triggerFormat("bold")}
+        {!isRibbonCollapsed &&
+          (toolbarMode === "format" ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.toolbarScroll}
+              contentContainerStyle={styles.toolbarContent}
             >
-              <FontAwesome
-                name="bold"
-                size={18}
-                color={editorState.bold ? "#fff" : theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.toolbarButton,
-                editorState.italic && styles.activeToolbarButton,
-              ]}
-              onPress={() => triggerFormat("italic")}
-            >
-              <FontAwesome
-                name="italic"
-                size={18}
-                color={editorState.italic ? "#fff" : theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.toolbarButton,
-                editorState.underline && styles.activeToolbarButton,
-              ]}
-              onPress={() => triggerFormat("underline")}
-            >
-              <FontAwesome
-                name="underline"
-                size={18}
-                color={editorState.underline ? "#fff" : theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            {/* Alignment Buttons */}
-            <TouchableOpacity
-              style={[
-                styles.toolbarButton,
-                editorState.alignLeft && styles.activeToolbarButton,
-              ]}
-              onPress={() => triggerFormat("justifyLeft")}
-            >
-              <FontAwesome
-                name="align-left"
-                size={18}
-                color={editorState.alignLeft ? "#fff" : theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.toolbarButton,
-                editorState.alignCenter && styles.activeToolbarButton,
-              ]}
-              onPress={() => triggerFormat("justifyCenter")}
-            >
-              <FontAwesome
-                name="align-center"
-                size={18}
-                color={editorState.alignCenter ? "#fff" : theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.toolbarButton,
-                editorState.alignRight && styles.activeToolbarButton,
-              ]}
-              onPress={() => triggerFormat("justifyRight")}
-            >
-              <FontAwesome
-                name="align-right"
-                size={18}
-                color={editorState.alignRight ? "#fff" : theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.toolbarButton,
-                editorState.alignJustify && styles.activeToolbarButton,
-              ]}
-              onPress={() => triggerFormat("justifyFull")}
-            >
-              <FontAwesome
-                name="align-justify"
-                size={18}
-                color={editorState.alignJustify ? "#fff" : theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            {/* List Buttons */}
-            <TouchableOpacity
-              style={[
-                styles.toolbarButton,
-                editorState.unorderedList && styles.activeToolbarButton,
-              ]}
-              onPress={() => triggerFormat("insertUnorderedList")}
-            >
-              <FontAwesome
-                name="list-ul"
-                size={18}
-                color={editorState.unorderedList ? "#fff" : theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.toolbarButton,
-                editorState.orderedList && styles.activeToolbarButton,
-              ]}
-              onPress={() => triggerFormat("insertOrderedList")}
-            >
-              <FontAwesome
-                name="list-ol"
-                size={18}
-                color={editorState.orderedList ? "#fff" : theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            {/* New Paragraph Button */}
-            <TouchableOpacity
-              style={styles.toolbarButton}
-              onPress={() => triggerFormat("insertParagraph")}
-              title="Add Paragraph"
-            >
-              <Ionicons
-                name="add-circle-outline"
-                size={18}
-                color={theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            {/* Scan-to-Editor OCR Button */}
-            <TouchableOpacity
-              style={styles.toolbarButton}
-              onPress={handleScanToEditorOcr}
-              title="Scan Document OCR"
-              testID="scan-to-editor-btn"
-            >
-              <Ionicons
-                name="scan-outline"
-                size={18}
-                color={theme.colors.primary}
-              />
-            </TouchableOpacity>
-
-            {/* Offline SpeechRecognizer Dictation Button */}
-            <TouchableOpacity
-              style={[
-                styles.toolbarButton,
-                isDictating && { backgroundColor: theme.colors.error || "#ef4444" },
-              ]}
-              onPress={toggleVoiceDictation}
-              title="Voice Dictation"
-              testID="voice-dictation-btn"
-            >
-              <Ionicons
-                name={isDictating ? "mic" : "mic-outline"}
-                size={18}
-                color={isDictating ? "#ffffff" : theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            {/* Insert Court Table Button */}
-            <TouchableOpacity
-              style={styles.toolbarButton}
-              onPress={() => setTableConfigModalVisible(true)}
-              title="Insert Table"
-              testID="insert-table-btn"
-            >
-              <Ionicons
-                name="grid-outline"
-                size={18}
-                color={theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            {/* Advocate Signature Stamp Button */}
-            <TouchableOpacity
-              style={styles.toolbarButton}
-              onPress={() => setSignatureModalVisible(true)}
-              title="Attach Signature Stamp"
-              testID="attach-signature-btn"
-            >
-              <Ionicons
-                name="ribbon-outline"
-                size={18}
-                color={theme.colors.text}
-              />
-            </TouchableOpacity>
-
-            {/* Insert Interactive Shape & Legal Stamp Button */}
-            <TouchableOpacity
-              style={styles.toolbarButton}
-              onPress={() => setShapeModalVisible(true)}
-              title="Insert Geometry Shape / Legal Stamp"
-              testID="insert-shape-btn"
-            >
-              <Ionicons
-                name="shapes-outline"
-                size={18}
-                color={theme.colors.primary}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.toolbarButton}
-              onPress={() => {
-                setTourStepIndex(0);
-                setShowTour(true);
-              }}
-              title="Help Tour"
-            >
-              <Ionicons
-                name="help-circle-outline"
-                size={18}
-                color={theme.colors.text}
-              />
-            </TouchableOpacity>
-          </ScrollView>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingVertical: 8,
-              paddingHorizontal: 12,
-              gap: 8,
-            }}
-            style={{
-              backgroundColor: theme.colors.inputBackground,
-              borderBottomWidth: 1,
-              borderBottomColor: theme.colors.border,
-              width: "100%",
-              maxHeight: 50,
-            }}
-          >
-            {/* Symbols */}
-            {["§", "¶", "Δ", "π", "№"].map((sym) => (
               <TouchableOpacity
-                key={sym}
-                style={{
-                  padding: 8,
-                  borderRadius: 6,
-                  backgroundColor: theme.colors.cardBackground,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                  minWidth: 34,
-                  alignItems: "center",
-                }}
-                onPress={() => triggerFormat("insertText", sym)}
+                style={[
+                  styles.toolbarButton,
+                  editorState.bold && styles.activeToolbarButton,
+                ]}
+                onPress={() => triggerFormat("bold")}
               >
-                <Text
-                  style={{
-                    color: theme.colors.text,
-                    fontWeight: "bold",
-                    fontSize: 14,
-                  }}
-                >
-                  {sym}
-                </Text>
+                <FontAwesome
+                  name="bold"
+                  size={18}
+                  color={editorState.bold ? "#fff" : theme.colors.text}
+                />
               </TouchableOpacity>
-            ))}
 
-            <View
-              style={{
-                width: 1,
-                height: 20,
-                backgroundColor: theme.colors.border,
-              }}
-            />
-
-            {/* Outlining Toggle (Legal List) */}
-            <TouchableOpacity
-              style={{
-                padding: 7,
-                paddingHorizontal: 8,
-                borderRadius: 6,
-                backgroundColor: theme.colors.cardBackground,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-              onPress={() => triggerFormat("toggleLegalList")}
-            >
-              <FontAwesome
-                name="list-ol"
-                size={14}
-                color={theme.colors.primary}
-                style={{ marginRight: 4 }}
-              />
-              <Text
-                style={{
-                  color: theme.colors.text,
-                  fontSize: 11,
-                  fontWeight: "600",
-                }}
-              >
-                Legal List
-              </Text>
-            </TouchableOpacity>
-
-            {/* Signature Block */}
-            <TouchableOpacity
-              style={{
-                padding: 7,
-                paddingHorizontal: 8,
-                borderRadius: 6,
-                backgroundColor: theme.colors.cardBackground,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-              onPress={() => setIsSignatureListVisible(true)}
-            >
-              <Ionicons
-                name="pencil"
-                size={14}
-                color={theme.colors.primary}
-                style={{ marginRight: 4 }}
-              />
-              <Text
-                style={{
-                  color: theme.colors.text,
-                  fontSize: 11,
-                  fontWeight: "600",
-                }}
-              >
-                Signature
-              </Text>
-            </TouchableOpacity>
-
-            {/* Legal Dictionary (Vocabulary) */}
-            <TouchableOpacity
-              style={{
-                padding: 7,
-                paddingHorizontal: 8,
-                borderRadius: 6,
-                backgroundColor: theme.colors.cardBackground,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-              onPress={() => setIsVocabularyVisible(true)}
-            >
-              <Ionicons
-                name="book-outline"
-                size={14}
-                color={theme.colors.primary}
-                style={{ marginRight: 4 }}
-              />
-              <Text
-                style={{
-                  color: theme.colors.text,
-                  fontSize: 11,
-                  fontWeight: "600",
-                }}
-              >
-                Dictionary
-              </Text>
-            </TouchableOpacity>
-
-            <View
-              style={{
-                width: 1,
-                height: 20,
-                backgroundColor: theme.colors.border,
-              }}
-            />
-
-            {/* Case Converters */}
-            {[
-              { label: "UPPER", value: "upper" },
-              { label: "lower", value: "lower" },
-              { label: "Title", value: "title" },
-            ].map((c) => (
               <TouchableOpacity
-                key={c.value}
+                style={[
+                  styles.toolbarButton,
+                  editorState.italic && styles.activeToolbarButton,
+                ]}
+                onPress={() => triggerFormat("italic")}
+              >
+                <FontAwesome
+                  name="italic"
+                  size={18}
+                  color={editorState.italic ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toolbarButton,
+                  editorState.underline && styles.activeToolbarButton,
+                ]}
+                onPress={() => triggerFormat("underline")}
+              >
+                <FontAwesome
+                  name="underline"
+                  size={18}
+                  color={editorState.underline ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
+
+              {/* Alignment Buttons */}
+              <TouchableOpacity
+                style={[
+                  styles.toolbarButton,
+                  editorState.alignLeft && styles.activeToolbarButton,
+                ]}
+                onPress={() => triggerFormat("justifyLeft")}
+              >
+                <FontAwesome
+                  name="align-left"
+                  size={18}
+                  color={editorState.alignLeft ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toolbarButton,
+                  editorState.alignCenter && styles.activeToolbarButton,
+                ]}
+                onPress={() => triggerFormat("justifyCenter")}
+              >
+                <FontAwesome
+                  name="align-center"
+                  size={18}
+                  color={editorState.alignCenter ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toolbarButton,
+                  editorState.alignRight && styles.activeToolbarButton,
+                ]}
+                onPress={() => triggerFormat("justifyRight")}
+              >
+                <FontAwesome
+                  name="align-right"
+                  size={18}
+                  color={editorState.alignRight ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toolbarButton,
+                  editorState.alignJustify && styles.activeToolbarButton,
+                ]}
+                onPress={() => triggerFormat("justifyFull")}
+              >
+                <FontAwesome
+                  name="align-justify"
+                  size={18}
+                  color={editorState.alignJustify ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
+
+              {/* List Buttons */}
+              <TouchableOpacity
+                style={[
+                  styles.toolbarButton,
+                  editorState.unorderedList && styles.activeToolbarButton,
+                ]}
+                onPress={() => triggerFormat("insertUnorderedList")}
+              >
+                <FontAwesome
+                  name="list-ul"
+                  size={18}
+                  color={editorState.unorderedList ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toolbarButton,
+                  editorState.orderedList && styles.activeToolbarButton,
+                ]}
+                onPress={() => triggerFormat("insertOrderedList")}
+              >
+                <FontAwesome
+                  name="list-ol"
+                  size={18}
+                  color={editorState.orderedList ? "#fff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
+
+              {/* New Paragraph Button */}
+              <TouchableOpacity
+                style={styles.toolbarButton}
+                onPress={() => triggerFormat("insertParagraph")}
+                title="Add Paragraph"
+              >
+                <Ionicons
+                  name="add-circle-outline"
+                  size={18}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
+
+              {/* Scan-to-Editor OCR Button */}
+              <TouchableOpacity
+                style={styles.toolbarButton}
+                onPress={handleScanToEditorOcr}
+                title="Scan Document OCR"
+                testID="scan-to-editor-btn"
+              >
+                <Ionicons
+                  name="scan-outline"
+                  size={18}
+                  color={theme.colors.primary}
+                />
+              </TouchableOpacity>
+
+              {/* Offline SpeechRecognizer Dictation Button */}
+              <TouchableOpacity
+                style={[
+                  styles.toolbarButton,
+                  isDictating && {
+                    backgroundColor: theme.colors.error || "#ef4444",
+                  },
+                ]}
+                onPress={toggleVoiceDictation}
+                title="Voice Dictation"
+                testID="voice-dictation-btn"
+              >
+                <Ionicons
+                  name={isDictating ? "mic" : "mic-outline"}
+                  size={18}
+                  color={isDictating ? "#ffffff" : theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              {/* Insert Court Table Button */}
+              <TouchableOpacity
+                style={styles.toolbarButton}
+                onPress={() => setTableConfigModalVisible(true)}
+                title="Insert Table"
+                testID="insert-table-btn"
+              >
+                <Ionicons
+                  name="grid-outline"
+                  size={18}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              {/* Advocate Signature Stamp Button */}
+              <TouchableOpacity
+                style={styles.toolbarButton}
+                onPress={() => setSignatureModalVisible(true)}
+                title="Attach Signature Stamp"
+                testID="attach-signature-btn"
+              >
+                <Ionicons
+                  name="ribbon-outline"
+                  size={18}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+
+              {/* Insert Interactive Shape & Legal Stamp Button */}
+              <TouchableOpacity
+                style={styles.toolbarButton}
+                onPress={() => setShapeModalVisible(true)}
+                title="Insert Geometry Shape / Legal Stamp"
+                testID="insert-shape-btn"
+              >
+                <Ionicons
+                  name="shapes-outline"
+                  size={18}
+                  color={theme.colors.primary}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.toolbarButton}
+                onPress={() => {
+                  setTourStepIndex(0);
+                  setShowTour(true);
+                }}
+                title="Help Tour"
+              >
+                <Ionicons
+                  name="help-circle-outline"
+                  size={18}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+            </ScrollView>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                gap: 8,
+              }}
+              style={{
+                backgroundColor: theme.colors.inputBackground,
+                borderBottomWidth: 1,
+                borderBottomColor: theme.colors.border,
+                width: "100%",
+                maxHeight: 50,
+              }}
+            >
+              {/* Symbols */}
+              {["§", "¶", "Δ", "π", "№"].map((sym) => (
+                <TouchableOpacity
+                  key={sym}
+                  style={{
+                    padding: 8,
+                    borderRadius: 6,
+                    backgroundColor: theme.colors.cardBackground,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    minWidth: 34,
+                    alignItems: "center",
+                  }}
+                  onPress={() => triggerFormat("insertText", sym)}
+                >
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontWeight: "bold",
+                      fontSize: 14,
+                    }}
+                  >
+                    {sym}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              <View
+                style={{
+                  width: 1,
+                  height: 20,
+                  backgroundColor: theme.colors.border,
+                }}
+              />
+
+              {/* Outlining Toggle (Legal List) */}
+              <TouchableOpacity
                 style={{
                   padding: 7,
                   paddingHorizontal: 8,
@@ -1668,9 +1731,17 @@ const EditDraftScreen: React.FC = () => {
                   backgroundColor: theme.colors.cardBackground,
                   borderWidth: 1,
                   borderColor: theme.colors.border,
+                  flexDirection: "row",
+                  alignItems: "center",
                 }}
-                onPress={() => triggerFormat("changeCase", c.value)}
+                onPress={() => triggerFormat("toggleLegalList")}
               >
+                <FontAwesome
+                  name="list-ol"
+                  size={14}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
                 <Text
                   style={{
                     color: theme.colors.text,
@@ -1678,41 +1749,142 @@ const EditDraftScreen: React.FC = () => {
                     fontWeight: "600",
                   }}
                 >
-                  {c.label}
+                  Legal List
                 </Text>
               </TouchableOpacity>
-            ))}
 
-            <View
-              style={{
-                width: 1,
-                height: 20,
-                backgroundColor: theme.colors.border,
-              }}
-            />
+              {/* Signature Block */}
+              <TouchableOpacity
+                style={{
+                  padding: 7,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                  backgroundColor: theme.colors.cardBackground,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+                onPress={() => setIsSignatureListVisible(true)}
+              >
+                <Ionicons
+                  name="pencil"
+                  size={14}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={{
+                    color: theme.colors.text,
+                    fontSize: 11,
+                    fontWeight: "600",
+                  }}
+                >
+                  Signature
+                </Text>
+              </TouchableOpacity>
 
-            {/* Placeholder Navigator */}
-            <TouchableOpacity
-              style={{
-                padding: 7,
-                paddingHorizontal: 10,
-                borderRadius: 6,
-                backgroundColor: theme.colors.primary,
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-              onPress={() => triggerFormat("nextPlaceholder")}
-            >
-              <Ionicons
-                name="play-skip-forward-outline"
-                size={12}
-                color="#fff"
-                style={{ marginRight: 4 }}
+              {/* Legal Dictionary (Vocabulary) */}
+              <TouchableOpacity
+                style={{
+                  padding: 7,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                  backgroundColor: theme.colors.cardBackground,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+                onPress={() => setIsVocabularyVisible(true)}
+              >
+                <Ionicons
+                  name="book-outline"
+                  size={14}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={{
+                    color: theme.colors.text,
+                    fontSize: 11,
+                    fontWeight: "600",
+                  }}
+                >
+                  Dictionary
+                </Text>
+              </TouchableOpacity>
+
+              <View
+                style={{
+                  width: 1,
+                  height: 20,
+                  backgroundColor: theme.colors.border,
+                }}
               />
-              <Text style={{ color: "#fff", fontSize: 11, fontWeight: "bold" }}>
-                {t ? t("Next") || "Next" : "Next"}
-              </Text>
-            </TouchableOpacity>
+
+              {/* Case Converters */}
+              {[
+                { label: "UPPER", value: "upper" },
+                { label: "lower", value: "lower" },
+                { label: "Title", value: "title" },
+              ].map((c) => (
+                <TouchableOpacity
+                  key={c.value}
+                  style={{
+                    padding: 7,
+                    paddingHorizontal: 8,
+                    borderRadius: 6,
+                    backgroundColor: theme.colors.cardBackground,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                  }}
+                  onPress={() => triggerFormat("changeCase", c.value)}
+                >
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontSize: 11,
+                      fontWeight: "600",
+                    }}
+                  >
+                    {c.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              <View
+                style={{
+                  width: 1,
+                  height: 20,
+                  backgroundColor: theme.colors.border,
+                }}
+              />
+
+              {/* Placeholder Navigator */}
+              <TouchableOpacity
+                style={{
+                  padding: 7,
+                  paddingHorizontal: 10,
+                  borderRadius: 6,
+                  backgroundColor: theme.colors.primary,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+                onPress={() => triggerFormat("nextPlaceholder")}
+              >
+                <Ionicons
+                  name="play-skip-forward-outline"
+                  size={12}
+                  color="#fff"
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={{ color: "#fff", fontSize: 11, fontWeight: "bold" }}
+                >
+                  {t ? t("Next") || "Next" : "Next"}
+                </Text>
+              </TouchableOpacity>
             </ScrollView>
           ))}
 
@@ -1745,7 +1917,9 @@ const EditDraftScreen: React.FC = () => {
         <LegalAutocompleteBar
           suggestions={autocompleteSuggestions}
           theme={theme}
-          onSelectSuggestion={(phrase) => triggerFormat("insertText", phrase + " ")}
+          onSelectSuggestion={(phrase) =>
+            triggerFormat("insertText", phrase + " ")
+          }
         />
       </KeyboardAvoidingView>
 
@@ -1779,139 +1953,268 @@ const EditDraftScreen: React.FC = () => {
 
             <ScrollView
               style={{ maxHeight: 380 }}
-              showsVerticalScrollIndicator={true}
+              showsVerticalScrollIndicator
               contentContainerStyle={{ paddingBottom: 16 }}
             >
               <View style={styles.modalForm}>
-              {/* Font Selection */}
-              <Text
-                style={[
-                  styles.modalLabel,
-                  { color: theme.colors.textSecondary },
-                ]}
-              >
-                {t ? t("Font Family") || "Font Family" : "Font Family"}
-              </Text>
-              <View style={styles.optionGroup}>
-                {[
-                  {
-                    label: "Times New Roman",
-                    value: "'Times New Roman', Georgia, serif",
-                  },
-                  {
-                    label: "Georgia",
-                    value: "Georgia, 'Times New Roman', serif",
-                  },
-                  { label: "Arial", value: "Arial, Helvetica, sans-serif" },
-                ].map((item) => {
-                  const isSelected = font === item.value;
-                  return (
-                    <TouchableOpacity
-                      key={item.label}
-                      style={[
-                        styles.optionButton,
-                        { borderColor: theme.colors.border },
-                        isSelected && {
-                          backgroundColor: theme.colors.primary,
-                          borderColor: theme.colors.primary,
-                        },
-                      ]}
-                      onPress={() => {
-                        setFont(item.value);
-                        applyLayoutSettings(item.value, lineHeight, pageSize);
-                      }}
-                    >
-                      <Text
+                {/* Font Selection */}
+                <Text
+                  style={[
+                    styles.modalLabel,
+                    { color: theme.colors.textSecondary },
+                  ]}
+                >
+                  {t ? t("Font Family") || "Font Family" : "Font Family"}
+                </Text>
+                <View style={styles.optionGroup}>
+                  {[
+                    {
+                      label: "Times New Roman",
+                      value: "'Times New Roman', Georgia, serif",
+                    },
+                    {
+                      label: "Georgia",
+                      value: "Georgia, 'Times New Roman', serif",
+                    },
+                    { label: "Arial", value: "Arial, Helvetica, sans-serif" },
+                  ].map((item) => {
+                    const isSelected = font === item.value;
+                    return (
+                      <TouchableOpacity
+                        key={item.label}
                         style={[
-                          styles.optionText,
-                          { color: isSelected ? "#ffffff" : theme.colors.text },
+                          styles.optionButton,
+                          { borderColor: theme.colors.border },
+                          isSelected && {
+                            backgroundColor: theme.colors.primary,
+                            borderColor: theme.colors.primary,
+                          },
                         ]}
+                        onPress={() => {
+                          setFont(item.value);
+                          applyLayoutSettings(item.value, lineHeight, pageSize);
+                        }}
                       >
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                        <Text
+                          style={[
+                            styles.optionText,
+                            {
+                              color: isSelected ? "#ffffff" : theme.colors.text,
+                            },
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
-              {/* Line Spacing Selection */}
-              <Text
-                style={[
-                  styles.modalLabel,
-                  { color: theme.colors.textSecondary, marginTop: 12 },
-                ]}
-              >
-                {t ? t("Line Spacing") || "Line Spacing" : "Line Spacing"}
-              </Text>
-              <View style={styles.optionGroup}>
-                {[
-                  { label: "1.15 (Single)", value: "1.15" },
-                  { label: "1.5 (Standard)", value: "1.5" },
-                  { label: "2.0 (Double)", value: "2.0" },
-                ].map((item) => {
-                  const isSelected = lineHeight === item.value;
-                  return (
-                    <TouchableOpacity
-                      key={item.label}
-                      style={[
-                        styles.optionButton,
-                        { borderColor: theme.colors.border },
-                        isSelected && {
-                          backgroundColor: theme.colors.primary,
-                          borderColor: theme.colors.primary,
-                        },
-                      ]}
-                      onPress={() => {
-                        setLineHeight(item.value);
-                        applyLayoutSettings(font, item.value, pageSize);
-                      }}
-                    >
-                      <Text
+                {/* Line Spacing Selection */}
+                <Text
+                  style={[
+                    styles.modalLabel,
+                    { color: theme.colors.textSecondary, marginTop: 12 },
+                  ]}
+                >
+                  {t ? t("Line Spacing") || "Line Spacing" : "Line Spacing"}
+                </Text>
+                <View style={styles.optionGroup}>
+                  {[
+                    { label: "1.15 (Single)", value: "1.15" },
+                    { label: "1.5 (Standard)", value: "1.5" },
+                    { label: "2.0 (Double)", value: "2.0" },
+                  ].map((item) => {
+                    const isSelected = lineHeight === item.value;
+                    return (
+                      <TouchableOpacity
+                        key={item.label}
                         style={[
-                          styles.optionText,
-                          { color: isSelected ? "#ffffff" : theme.colors.text },
+                          styles.optionButton,
+                          { borderColor: theme.colors.border },
+                          isSelected && {
+                            backgroundColor: theme.colors.primary,
+                            borderColor: theme.colors.primary,
+                          },
                         ]}
+                        onPress={() => {
+                          setLineHeight(item.value);
+                          applyLayoutSettings(font, item.value, pageSize);
+                        }}
                       >
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                        <Text
+                          style={[
+                            styles.optionText,
+                            {
+                              color: isSelected ? "#ffffff" : theme.colors.text,
+                            },
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
-              {/* Paper Size Selection */}
-              <Text
-                style={[
-                  styles.modalLabel,
-                  { color: theme.colors.textSecondary, marginTop: 12 },
-                ]}
-              >
-                {t ? t("Paper Size") || "Paper Size" : "Paper Size"}
-              </Text>
-              <View style={styles.optionGroup}>
-                {[
-                  { label: "A4 Size", value: "a4" },
-                  { label: "Legal Size", value: "legal" },
-                ].map((item) => {
-                  const isSelected = pageSize === item.value;
-                  return (
+                {/* Paper Size Selection */}
+                <Text
+                  style={[
+                    styles.modalLabel,
+                    { color: theme.colors.textSecondary, marginTop: 12 },
+                  ]}
+                >
+                  {t ? t("Paper Size") || "Paper Size" : "Paper Size"}
+                </Text>
+                <View style={styles.optionGroup}>
+                  {[
+                    { label: "A4 Size", value: "a4" },
+                    { label: "Legal Size", value: "legal" },
+                  ].map((item) => {
+                    const isSelected = pageSize === item.value;
+                    return (
+                      <TouchableOpacity
+                        key={item.value}
+                        style={[
+                          styles.optionButton,
+                          { borderColor: theme.colors.border },
+                          isSelected && {
+                            backgroundColor: theme.colors.primary,
+                            borderColor: theme.colors.primary,
+                          },
+                        ]}
+                        onPress={() => {
+                          setPageSize(item.value as "a4" | "legal");
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            item.value as "a4" | "legal",
+                            topMargin,
+                            bottomMargin,
+                            leftMargin,
+                            rightMargin,
+                            letterheadSpace
+                          );
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            {
+                              color: isSelected ? "#ffffff" : theme.colors.text,
+                            },
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Unit System Selector (Inches / MM / Pixels) */}
+                <Text
+                  style={[
+                    styles.modalLabel,
+                    {
+                      color: theme.colors.textSecondary,
+                      marginTop: 16,
+                      marginBottom: 8,
+                    },
+                  ]}
+                >
+                  Measurement Unit System
+                </Text>
+                <View style={styles.optionGroup}>
+                  {[
+                    { label: "Inches (in)", value: "in" },
+                    { label: "Millimeters (mm)", value: "mm" },
+                    { label: "Pixels (px)", value: "px" },
+                  ].map((item) => {
+                    const isSelected = unitMode === item.value;
+                    return (
+                      <TouchableOpacity
+                        key={item.label}
+                        style={[
+                          styles.optionButton,
+                          { borderColor: theme.colors.border },
+                          isSelected && {
+                            backgroundColor: theme.colors.primary,
+                            borderColor: theme.colors.primary,
+                          },
+                        ]}
+                        onPress={() => setUnitMode(item.value as any)}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            {
+                              color: isSelected ? "#ffffff" : theme.colors.text,
+                            },
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Margins Steppers Selection */}
+                <Text
+                  style={[
+                    styles.modalLabel,
+                    {
+                      color: theme.colors.textSecondary,
+                      marginTop: 16,
+                      marginBottom: 8,
+                    },
+                  ]}
+                >
+                  {t
+                    ? t("Document Margins") || "Document Margins"
+                    : "Document Margins"}
+                </Text>
+
+                {/* Top Margin */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginVertical: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontSize: 13,
+                      fontWeight: "500",
+                    }}
+                  >
+                    Top Margin
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
                     <TouchableOpacity
-                      key={item.value}
-                      style={[
-                        styles.optionButton,
-                        { borderColor: theme.colors.border },
-                        isSelected && {
-                          backgroundColor: theme.colors.primary,
-                          borderColor: theme.colors.primary,
-                        },
-                      ]}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
                       onPress={() => {
-                        setPageSize(item.value as "a4" | "legal");
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.max(0, topMargin - step);
+                        setTopMargin(v);
                         applyLayoutSettings(
                           font,
                           lineHeight,
-                          item.value as "a4" | "legal",
-                          topMargin,
+                          pageSize,
+                          v,
                           bottomMargin,
                           leftMargin,
                           rightMargin,
@@ -1919,557 +2222,456 @@ const EditDraftScreen: React.FC = () => {
                         );
                       }}
                     >
-                      <Text
-                        style={[
-                          styles.optionText,
-                          { color: isSelected ? "#ffffff" : theme.colors.text },
-                        ]}
-                      >
-                        {item.label}
-                      </Text>
+                      <Ionicons
+                        name="remove"
+                        size={14}
+                        color={theme.colors.text}
+                      />
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Unit System Selector (Inches / MM / Pixels) */}
-              <Text
-                style={[
-                  styles.modalLabel,
-                  {
-                    color: theme.colors.textSecondary,
-                    marginTop: 16,
-                    marginBottom: 8,
-                  },
-                ]}
-              >
-                Measurement Unit System
-              </Text>
-              <View style={styles.optionGroup}>
-                {[
-                  { label: "Inches (in)", value: "in" },
-                  { label: "Millimeters (mm)", value: "mm" },
-                  { label: "Pixels (px)", value: "px" },
-                ].map((item) => {
-                  const isSelected = unitMode === item.value;
-                  return (
-                    <TouchableOpacity
-                      key={item.label}
-                      style={[
-                        styles.optionButton,
-                        { borderColor: theme.colors.border },
-                        isSelected && {
-                          backgroundColor: theme.colors.primary,
-                          borderColor: theme.colors.primary,
-                        },
-                      ]}
-                      onPress={() => setUnitMode(item.value as any)}
+                    <Text
+                      style={{
+                        width: 76,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color: theme.colors.text,
+                        fontSize: 12,
+                      }}
                     >
-                      <Text
-                        style={[
-                          styles.optionText,
-                          { color: isSelected ? "#ffffff" : theme.colors.text },
-                        ]}
-                      >
-                        {item.label}
-                      </Text>
+                      {formatMarginValue(topMargin, unitMode)}
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.min(200, topMargin + step);
+                        setTopMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          v,
+                          bottomMargin,
+                          leftMargin,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={14}
+                        color={theme.colors.text}
+                      />
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
+                  </View>
+                </View>
 
-              {/* Margins Steppers Selection */}
-              <Text
-                style={[
-                  styles.modalLabel,
-                  {
-                    color: theme.colors.textSecondary,
-                    marginTop: 16,
-                    marginBottom: 8,
-                  },
-                ]}
-              >
-                {t
-                  ? t("Document Margins") || "Document Margins"
-                  : "Document Margins"}
-              </Text>
-
-              {/* Top Margin */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginVertical: 6,
-                }}
-              >
-                <Text
+                {/* Left Margin */}
+                <View
                   style={{
-                    color: theme.colors.text,
-                    fontSize: 13,
-                    fontWeight: "500",
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginVertical: 6,
                   }}
                 >
-                  Top Margin
-                </Text>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <TouchableOpacity
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      backgroundColor: theme.colors.cardBackground,
-                    }}
-                    onPress={() => {
-                      const step = getMarginStepPx(unitMode);
-                      const v = Math.max(0, topMargin - step);
-                      setTopMargin(v);
-                      applyLayoutSettings(
-                        font,
-                        lineHeight,
-                        pageSize,
-                        v,
-                        bottomMargin,
-                        leftMargin,
-                        rightMargin,
-                        letterheadSpace
-                      );
-                    }}
-                  >
-                    <Ionicons
-                      name="remove"
-                      size={14}
-                      color={theme.colors.text}
-                    />
-                  </TouchableOpacity>
                   <Text
                     style={{
-                      width: 76,
-                      textAlign: "center",
-                      fontWeight: "bold",
                       color: theme.colors.text,
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontWeight: "500",
                     }}
                   >
-                    {formatMarginValue(topMargin, unitMode)}
+                    Left Margin
                   </Text>
-                  <TouchableOpacity
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      backgroundColor: theme.colors.cardBackground,
-                    }}
-                    onPress={() => {
-                      const step = getMarginStepPx(unitMode);
-                      const v = Math.min(200, topMargin + step);
-                      setTopMargin(v);
-                      applyLayoutSettings(
-                        font,
-                        lineHeight,
-                        pageSize,
-                        v,
-                        bottomMargin,
-                        leftMargin,
-                        rightMargin,
-                        letterheadSpace
-                      );
-                    }}
-                  >
-                    <Ionicons name="add" size={14} color={theme.colors.text} />
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.max(20, leftMargin - step);
+                        setLeftMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          v,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="remove"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                    <Text
+                      style={{
+                        width: 76,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color: theme.colors.text,
+                        fontSize: 12,
+                      }}
+                    >
+                      {formatMarginValue(leftMargin, unitMode)}
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.min(200, leftMargin + step);
+                        setLeftMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          v,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
 
-              {/* Left Margin */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginVertical: 6,
-                }}
-              >
-                <Text
+                {/* Right Margin */}
+                <View
                   style={{
-                    color: theme.colors.text,
-                    fontSize: 13,
-                    fontWeight: "500",
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginVertical: 6,
                   }}
                 >
-                  Left Margin
-                </Text>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <TouchableOpacity
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      backgroundColor: theme.colors.cardBackground,
-                    }}
-                    onPress={() => {
-                      const step = getMarginStepPx(unitMode);
-                      const v = Math.max(20, leftMargin - step);
-                      setLeftMargin(v);
-                      applyLayoutSettings(
-                        font,
-                        lineHeight,
-                        pageSize,
-                        topMargin,
-                        bottomMargin,
-                        v,
-                        rightMargin,
-                        letterheadSpace
-                      );
-                    }}
-                  >
-                    <Ionicons
-                      name="remove"
-                      size={14}
-                      color={theme.colors.text}
-                    />
-                  </TouchableOpacity>
                   <Text
                     style={{
-                      width: 76,
-                      textAlign: "center",
-                      fontWeight: "bold",
                       color: theme.colors.text,
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontWeight: "500",
                     }}
                   >
-                    {formatMarginValue(leftMargin, unitMode)}
+                    Right Margin
                   </Text>
-                  <TouchableOpacity
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      backgroundColor: theme.colors.cardBackground,
-                    }}
-                    onPress={() => {
-                      const step = getMarginStepPx(unitMode);
-                      const v = Math.min(200, leftMargin + step);
-                      setLeftMargin(v);
-                      applyLayoutSettings(
-                        font,
-                        lineHeight,
-                        pageSize,
-                        topMargin,
-                        bottomMargin,
-                        v,
-                        rightMargin,
-                        letterheadSpace
-                      );
-                    }}
-                  >
-                    <Ionicons name="add" size={14} color={theme.colors.text} />
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.max(0, rightMargin - step);
+                        setRightMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          leftMargin,
+                          v,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="remove"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                    <Text
+                      style={{
+                        width: 76,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color: theme.colors.text,
+                        fontSize: 12,
+                      }}
+                    >
+                      {formatMarginValue(rightMargin, unitMode)}
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.min(200, rightMargin + step);
+                        setRightMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          leftMargin,
+                          v,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
 
-              {/* Right Margin */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginVertical: 6,
-                }}
-              >
-                <Text
+                {/* Bottom Margin */}
+                <View
                   style={{
-                    color: theme.colors.text,
-                    fontSize: 13,
-                    fontWeight: "500",
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginVertical: 6,
                   }}
                 >
-                  Right Margin
-                </Text>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <TouchableOpacity
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      backgroundColor: theme.colors.cardBackground,
-                    }}
-                    onPress={() => {
-                      const step = getMarginStepPx(unitMode);
-                      const v = Math.max(0, rightMargin - step);
-                      setRightMargin(v);
-                      applyLayoutSettings(
-                        font,
-                        lineHeight,
-                        pageSize,
-                        topMargin,
-                        bottomMargin,
-                        leftMargin,
-                        v,
-                        letterheadSpace
-                      );
-                    }}
-                  >
-                    <Ionicons
-                      name="remove"
-                      size={14}
-                      color={theme.colors.text}
-                    />
-                  </TouchableOpacity>
                   <Text
                     style={{
-                      width: 76,
-                      textAlign: "center",
-                      fontWeight: "bold",
                       color: theme.colors.text,
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontWeight: "500",
                     }}
                   >
-                    {formatMarginValue(rightMargin, unitMode)}
+                    Bottom Margin
                   </Text>
-                  <TouchableOpacity
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      backgroundColor: theme.colors.cardBackground,
-                    }}
-                    onPress={() => {
-                      const step = getMarginStepPx(unitMode);
-                      const v = Math.min(200, rightMargin + step);
-                      setRightMargin(v);
-                      applyLayoutSettings(
-                        font,
-                        lineHeight,
-                        pageSize,
-                        topMargin,
-                        bottomMargin,
-                        leftMargin,
-                        v,
-                        letterheadSpace
-                      );
-                    }}
-                  >
-                    <Ionicons name="add" size={14} color={theme.colors.text} />
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.max(0, bottomMargin - step);
+                        setBottomMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          v,
+                          leftMargin,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="remove"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                    <Text
+                      style={{
+                        width: 76,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color: theme.colors.text,
+                        fontSize: 12,
+                      }}
+                    >
+                      {formatMarginValue(bottomMargin, unitMode)}
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.min(200, bottomMargin + step);
+                        setBottomMargin(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          v,
+                          leftMargin,
+                          rightMargin,
+                          letterheadSpace
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
 
-              {/* Bottom Margin */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginVertical: 6,
-                }}
-              >
-                <Text
+                {/* Letterhead Top Space */}
+                <View
                   style={{
-                    color: theme.colors.text,
-                    fontSize: 13,
-                    fontWeight: "500",
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginVertical: 6,
                   }}
                 >
-                  Bottom Margin
-                </Text>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <TouchableOpacity
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      backgroundColor: theme.colors.cardBackground,
-                    }}
-                    onPress={() => {
-                      const step = getMarginStepPx(unitMode);
-                      const v = Math.max(0, bottomMargin - step);
-                      setBottomMargin(v);
-                      applyLayoutSettings(
-                        font,
-                        lineHeight,
-                        pageSize,
-                        topMargin,
-                        v,
-                        leftMargin,
-                        rightMargin,
-                        letterheadSpace
-                      );
-                    }}
-                  >
-                    <Ionicons
-                      name="remove"
-                      size={14}
-                      color={theme.colors.text}
-                    />
-                  </TouchableOpacity>
                   <Text
                     style={{
-                      width: 76,
-                      textAlign: "center",
-                      fontWeight: "bold",
                       color: theme.colors.text,
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontWeight: "500",
                     }}
                   >
-                    {formatMarginValue(bottomMargin, unitMode)}
+                    Letterhead Top Space
                   </Text>
-                  <TouchableOpacity
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      backgroundColor: theme.colors.cardBackground,
-                    }}
-                    onPress={() => {
-                      const step = getMarginStepPx(unitMode);
-                      const v = Math.min(200, bottomMargin + step);
-                      setBottomMargin(v);
-                      applyLayoutSettings(
-                        font,
-                        lineHeight,
-                        pageSize,
-                        topMargin,
-                        v,
-                        leftMargin,
-                        rightMargin,
-                        letterheadSpace
-                      );
-                    }}
-                  >
-                    <Ionicons name="add" size={14} color={theme.colors.text} />
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.max(0, letterheadSpace - step * 2);
+                        setLetterheadSpace(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          leftMargin,
+                          rightMargin,
+                          v
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="remove"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                    <Text
+                      style={{
+                        width: 76,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        color: theme.colors.text,
+                        fontSize: 12,
+                      }}
+                    >
+                      {formatMarginValue(letterheadSpace, unitMode)}
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: theme.colors.cardBackground,
+                      }}
+                      onPress={() => {
+                        const step = getMarginStepPx(unitMode);
+                        const v = Math.min(300, letterheadSpace + step * 2);
+                        setLetterheadSpace(v);
+                        applyLayoutSettings(
+                          font,
+                          lineHeight,
+                          pageSize,
+                          topMargin,
+                          bottomMargin,
+                          leftMargin,
+                          rightMargin,
+                          v
+                        );
+                      }}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={14}
+                        color={theme.colors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-
-              {/* Letterhead Top Space */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginVertical: 6,
-                }}
-              >
-                <Text
-                  style={{
-                    color: theme.colors.text,
-                    fontSize: 13,
-                    fontWeight: "500",
-                  }}
-                >
-                  Letterhead Top Space
-                </Text>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <TouchableOpacity
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      backgroundColor: theme.colors.cardBackground,
-                    }}
-                    onPress={() => {
-                      const step = getMarginStepPx(unitMode);
-                      const v = Math.max(0, letterheadSpace - step * 2);
-                      setLetterheadSpace(v);
-                      applyLayoutSettings(
-                        font,
-                        lineHeight,
-                        pageSize,
-                        topMargin,
-                        bottomMargin,
-                        leftMargin,
-                        rightMargin,
-                        v
-                      );
-                    }}
-                  >
-                    <Ionicons
-                      name="remove"
-                      size={14}
-                      color={theme.colors.text}
-                    />
-                  </TouchableOpacity>
-                  <Text
-                    style={{
-                      width: 76,
-                      textAlign: "center",
-                      fontWeight: "bold",
-                      color: theme.colors.text,
-                      fontSize: 12,
-                    }}
-                  >
-                    {formatMarginValue(letterheadSpace, unitMode)}
-                  </Text>
-                  <TouchableOpacity
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      backgroundColor: theme.colors.cardBackground,
-                    }}
-                    onPress={() => {
-                      const step = getMarginStepPx(unitMode);
-                      const v = Math.min(300, letterheadSpace + step * 2);
-                      setLetterheadSpace(v);
-                      applyLayoutSettings(
-                        font,
-                        lineHeight,
-                        pageSize,
-                        topMargin,
-                        bottomMargin,
-                        leftMargin,
-                        rightMargin,
-                        v
-                      );
-                    }}
-                  >
-                    <Ionicons name="add" size={14} color={theme.colors.text} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </ScrollView>
+            </ScrollView>
 
             <TouchableOpacity
               style={[
@@ -2478,13 +2680,13 @@ const EditDraftScreen: React.FC = () => {
               ]}
               onPress={() => setIsPageSetupVisible(false)}
             >
-                <Text style={{ color: "#ffffff", fontWeight: "bold" }}>
-                  {t ? t("Done") || "Done" : "Done"}
-                </Text>
-              </TouchableOpacity>
-            </View>
+              <Text style={{ color: "#ffffff", fontWeight: "bold" }}>
+                {t ? t("Done") || "Done" : "Done"}
+              </Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
       {/* Signature Modal */}
       <Modal
@@ -2572,7 +2774,12 @@ const EditDraftScreen: React.FC = () => {
         onRequestClose={() => setShapeModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: theme.colors.cardBackground },
+            ]}
+          >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                 Insert Geometry Shape / Legal Stamp
@@ -2584,10 +2791,26 @@ const EditDraftScreen: React.FC = () => {
 
             <View style={{ gap: 12, paddingVertical: 12 }}>
               {[
-                { title: "⏹️ Rectangle / Stamp Box", desc: "Standard bordered box for custom notes or fee seals", value: "rect" },
-                { title: "🏷️ Court Fee Stamp Frame", desc: "Double-bordered ₹10/₹100 Fee Stamp placeholder box", value: "stamp" },
-                { title: "⭕ Advocate Round Seal", desc: "Circular stamp frame for Advocate office / Notary seal", value: "circle" },
-                { title: "➡️ Process Arrow", desc: "Legal chronology flowchart process arrow node", value: "arrow" },
+                {
+                  title: "⏹️ Rectangle / Stamp Box",
+                  desc: "Standard bordered box for custom notes or fee seals",
+                  value: "rect",
+                },
+                {
+                  title: "🏷️ Court Fee Stamp Frame",
+                  desc: "Double-bordered ₹10/₹100 Fee Stamp placeholder box",
+                  value: "stamp",
+                },
+                {
+                  title: "⭕ Advocate Round Seal",
+                  desc: "Circular stamp frame for Advocate office / Notary seal",
+                  value: "circle",
+                },
+                {
+                  title: "➡️ Process Arrow",
+                  desc: "Legal chronology flowchart process arrow node",
+                  value: "arrow",
+                },
               ].map((item) => (
                 <TouchableOpacity
                   key={item.value}
@@ -2607,10 +2830,19 @@ const EditDraftScreen: React.FC = () => {
                     });
                   }}
                 >
-                  <Text style={{ fontSize: 14, fontWeight: "bold", color: theme.colors.text, marginBottom: 2 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "bold",
+                      color: theme.colors.text,
+                      marginBottom: 2,
+                    }}
+                  >
                     {item.title}
                   </Text>
-                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>
+                  <Text
+                    style={{ fontSize: 12, color: theme.colors.textSecondary }}
+                  >
                     {item.desc}
                   </Text>
                 </TouchableOpacity>
@@ -2879,7 +3111,13 @@ const EditDraftScreen: React.FC = () => {
               ))}
             </View>
 
-            <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
               {tourStepIndex > 0 ? (
                 <View style={{ flex: 1 }}>
                   <ActionButton
@@ -2907,8 +3145,12 @@ const EditDraftScreen: React.FC = () => {
                 <ActionButton
                   title={
                     tourStepIndex === tourSteps.length - 1
-                      ? locale === "hi" ? "समाप्त" : "Finish"
-                      : locale === "hi" ? "आगे" : "Next"
+                      ? locale === "hi"
+                        ? "समाप्त"
+                        : "Finish"
+                      : locale === "hi"
+                        ? "आगे"
+                        : "Next"
                   }
                   onPress={async () => {
                     if (tourStepIndex < tourSteps.length - 1) {
@@ -2992,8 +3234,9 @@ const getStyles = (theme: any) =>
     header: {
       flexDirection: "row",
       alignItems: "center",
-      height: (Platform.OS === "android" ? (StatusBar.currentHeight || 24) : 0) + 56,
-      paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 24) : 0,
+      height:
+        (Platform.OS === "android" ? StatusBar.currentHeight || 24 : 0) + 56,
+      paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 24 : 0,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
       backgroundColor: theme.colors.cardBackground,

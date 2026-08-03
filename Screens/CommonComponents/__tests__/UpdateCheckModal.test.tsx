@@ -1,8 +1,9 @@
-import React from "react";
 import { render, fireEvent } from "@testing-library/react-native";
+import React from "react";
 import { Linking, Platform } from "react-native";
-import UpdateCheckModal from "../UpdateCheckModal";
+
 import ThemeProvider from "../../../Providers/ThemeProvider";
+import UpdateCheckModal from "../UpdateCheckModal";
 
 // Mock Linking
 jest.spyOn(Linking, "openURL").mockImplementation(() => Promise.resolve(true));
@@ -47,7 +48,7 @@ describe("UpdateCheckModal Component", () => {
     const mockOnClose = jest.fn();
     const { getByText, queryByText } = renderWithTheme(
       <UpdateCheckModal
-        visible={true}
+        visible
         forceUpdate={false}
         onClose={mockOnClose}
         playStoreUrl="https://play.google.com/store/details?id=com.casediary"
@@ -68,8 +69,8 @@ describe("UpdateCheckModal Component", () => {
   it("renders 'Update Required' and hides 'Later' button for forced updates", () => {
     const { getByText, queryByText } = renderWithTheme(
       <UpdateCheckModal
-        visible={true}
-        forceUpdate={true}
+        visible
+        forceUpdate
         playStoreUrl="https://play.google.com/store/details?id=com.casediary"
         appStoreUrl="https://apps.apple.com/app/casediary"
         latestVersion="1.1.0"
@@ -83,7 +84,7 @@ describe("UpdateCheckModal Component", () => {
   it("opens store link when 'Update Now' is pressed", () => {
     const { getByText } = renderWithTheme(
       <UpdateCheckModal
-        visible={true}
+        visible
         forceUpdate={false}
         playStoreUrl="https://play.google.com/store/details?id=com.casediary"
         appStoreUrl="https://apps.apple.com/app/casediary"

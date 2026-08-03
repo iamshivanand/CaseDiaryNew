@@ -9,8 +9,9 @@ import {
   Text,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { ThemeContext } from "../../Providers/ThemeProvider";
+
 import { useTranslation } from "../../Providers/LanguageProvider";
+import { ThemeContext } from "../../Providers/ThemeProvider";
 import speechRecognitionService from "../../utils/speechRecognitionService";
 
 interface VoiceSearchBarProps {
@@ -18,6 +19,9 @@ interface VoiceSearchBarProps {
   onChangeText: (text: string) => void;
   placeholder?: string;
   onClear?: () => void;
+  autoFocus?: boolean;
+  onFocus?: () => void;
+  onSubmitEditing?: () => void;
 }
 
 export const VoiceSearchBar: React.FC<VoiceSearchBarProps> = ({
@@ -25,6 +29,9 @@ export const VoiceSearchBar: React.FC<VoiceSearchBarProps> = ({
   onChangeText,
   placeholder = "Search cases, CNR, client name...",
   onClear,
+  autoFocus = false,
+  onFocus,
+  onSubmitEditing,
 }) => {
   const { theme } = useContext(ThemeContext);
   const { locale } = useTranslation();
@@ -37,19 +44,22 @@ export const VoiceSearchBar: React.FC<VoiceSearchBarProps> = ({
     } else {
       setIsListening(true);
       const dictationLocale = locale === "hi" ? "hi-IN" : "en-IN";
-      const started = await speechRecognitionService.startListening(dictationLocale, {
-        onStart: () => setIsListening(true),
-        onResult: (text) => {
-          if (text) {
-            onChangeText(text.trim());
-          }
-        },
-        onError: (err) => {
-          setIsListening(false);
-          console.warn("Voice search error:", err);
-        },
-        onEnd: () => setIsListening(false),
-      });
+      const started = await speechRecognitionService.startListening(
+        dictationLocale,
+        {
+          onStart: () => setIsListening(true),
+          onResult: (text) => {
+            if (text) {
+              onChangeText(text.trim());
+            }
+          },
+          onError: (err) => {
+            setIsListening(false);
+            console.warn("Voice search error:", err);
+          },
+          onEnd: () => setIsListening(false),
+        }
+      );
 
       if (!started) {
         setIsListening(false);
@@ -89,10 +99,17 @@ export const VoiceSearchBar: React.FC<VoiceSearchBarProps> = ({
         placeholder={placeholder}
         placeholderTextColor={theme.colors.textSecondary}
         returnKeyType="search"
+        autoFocus={autoFocus}
+        onFocus={onFocus}
+        onSubmitEditing={onSubmitEditing}
       />
       {value ? (
         <TouchableOpacity onPress={handleClear} style={styles.iconButton}>
-          <Icon name="close-circle" size={18} color={theme.colors.textSecondary} />
+          <Icon
+            name="close-circle"
+            size={18}
+            color={theme.colors.textSecondary}
+          />
         </TouchableOpacity>
       ) : null}
 
@@ -115,11 +132,7 @@ export const VoiceSearchBar: React.FC<VoiceSearchBarProps> = ({
             <Text style={styles.listeningText}>Rec</Text>
           </View>
         ) : (
-          <Icon
-            name="microphone"
-            size={20}
-            color={theme.colors.primary}
-          />
+          <Icon name="microphone" size={20} color={theme.colors.primary} />
         )}
       </TouchableOpacity>
     </View>

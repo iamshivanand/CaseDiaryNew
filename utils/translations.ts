@@ -52,7 +52,8 @@ export const translations = {
 
     // Onboarding
     onboarding_welcome_title: "Welcome to Advocase!",
-    onboarding_welcome_desc: "Let's get you set up for a seamless case management experience.",
+    onboarding_welcome_desc:
+      "Let's get you set up for a seamless case management experience.",
     onboarding_start_btn: "Let's Get Started",
     onboarding_step_1_of_4: "Step 1 of 4",
     onboarding_full_name: "Full Name",
@@ -83,7 +84,8 @@ export const translations = {
     onboarding_license_placeholder: "Enter your license number",
     onboarding_location: "Location",
     onboarding_location_placeholder: "Enter your city and state",
-    onboarding_err_prof_title: "Please enter your professional title and years of experience.",
+    onboarding_err_prof_title:
+      "Please enter your professional title and years of experience.",
     onboarding_step_4_of_4: "Step 4 of 4",
     onboarding_select_areas: "Select Practice Areas",
     onboarding_other_area: "Other Practice Area",
@@ -170,7 +172,8 @@ export const translations = {
     btn_close_view: "Close (Just View)",
     btn_delete_case: "Delete",
     ecourts_importer_title: "eCourts Case Importer",
-    ecourts_instructions: "Search for your case, solve the CAPTCHA, and tap search. Once the case table displays, tap 'Extract'.",
+    ecourts_instructions:
+      "Search for your case, solve the CAPTCHA, and tap search. Once the case table displays, tap 'Extract'.",
     ecourts_extract: "Extract",
     option_status_open: "Open",
     option_status_in_progress: "In Progress",
@@ -191,11 +194,13 @@ export const translations = {
     btn_share_history: "Share History",
     casedetails_history_pdf_title: "Case History",
     casedetails_delete_title: "Delete Case",
-    casedetails_delete_confirm: "Are you sure you want to permanently delete this case? This action cannot be undone.",
+    casedetails_delete_confirm:
+      "Are you sure you want to permanently delete this case? This action cannot be undone.",
     casedetails_delete_btn: "Delete",
     doc_btn_capture: "Capture Document",
     doc_select_picker_title: "Select Document Source",
-    doc_select_picker_desc: "Choose whether to upload a document from your files or capture it using the camera.",
+    doc_select_picker_desc:
+      "Choose whether to upload a document from your files or capture it using the camera.",
     doc_select_picker_camera: "Take Photo / Camera",
     doc_select_picker_file: "Choose from Files",
     reminder_modal_title: "Client Reminder Details",
@@ -203,23 +208,28 @@ export const translations = {
     reminder_send_sms: "Send via SMS",
     reminder_copy_clipboard: "Copy text",
     reminder_copy_success: "Reminder copied to clipboard!",
-    reminder_template: "Dear {clientName},\n\nThis is a reminder regarding your case \"{caseTitle}\" (Case Number: {caseNumber}) listed for hearing on {nextDate} in {courtName}.\n\nKindly be present. Let us know if you have any questions.\n\nRegards,\n{advocateName}",
-    onboarding_import_link: "Already using another Case Management tool? Import data in 1 click",
+    reminder_template:
+      'Dear {clientName},\n\nThis is a reminder regarding your case "{caseTitle}" (Case Number: {caseNumber}) listed for hearing on {nextDate} in {courtName}.\n\nKindly be present. Let us know if you have any questions.\n\nRegards,\n{advocateName}',
+    onboarding_import_link:
+      "Already using another Case Management tool? Import data in 1 click",
     import_title: "Import & Migrate Data",
     import_btn_select: "Select CSV/JSON File",
     import_step_mapping: "Map Columns to CaseDiary Fields",
-    import_mapping_desc: "We parsed the headers from your file. Match each CaseDiary field below to a column in your file. Common fields have been auto-matched.",
+    import_mapping_desc:
+      "We parsed the headers from your file. Match each CaseDiary field below to a column in your file. Common fields have been auto-matched.",
     import_mapping_preview: "Preview Row 1:",
     import_btn_start: "Start Import",
     import_progress_title: "Migrating Cases",
-    import_progress_desc: "Please wait while we import cases into your diary...",
+    import_progress_desc:
+      "Please wait while we import cases into your diary...",
     import_success_title: "Import Complete",
     import_success_desc: "Cases imported successfully!",
     import_success_detail: "{count} cases have been added to your database.",
     import_btn_dashboard: "Go to Dashboard",
     import_btn_duplicates: "Scan for Duplicates",
     duplicate_title: "Duplicate Cases Review",
-    duplicate_desc: "The following potential duplicates were found in your database. Review and delete duplicate entries below.",
+    duplicate_desc:
+      "The following potential duplicates were found in your database. Review and delete duplicate entries below.",
     duplicate_no_found: "No duplicate cases found in your database.",
     duplicate_row_cnr: "CNR Number: {cnr}",
     duplicate_row_num_court: "Number: {num} | Court: {court}",
@@ -227,11 +237,14 @@ export const translations = {
     duplicate_delete_side: "Delete",
     duplicate_btn_done: "Done",
     settings_restore_btn: "Restore Database Backup (.db)",
-    settings_restore_desc: "Restore and overwrite active database from a backup file",
+    settings_restore_desc:
+      "Restore and overwrite active database from a backup file",
     settings_import_csv_btn: "Import Cases (CSV/JSON)",
-    settings_import_csv_desc: "Import cases from spreadsheets or other app exports",
+    settings_import_csv_desc:
+      "Import cases from spreadsheets or other app exports",
     settings_scan_duplicates_btn: "Find & Merge Duplicates",
-    settings_scan_duplicates_desc: "Scan the database to resolve duplicate case records",
+    settings_scan_duplicates_desc:
+      "Scan the database to resolve duplicate case records",
 
     // Document Upload
     doc_err_load: "Could not load documents.",
@@ -268,7 +281,8 @@ export const translations = {
     editcase_success_updated: "Case data updated.",
     editcase_success_saved: "Case saved.",
     editcase_partial_success: "Partial Success",
-    editcase_partial_success_desc: "Case data saved, but some sub-item operations failed.",
+    editcase_partial_success_desc:
+      "Case data saved, but some sub-item operations failed.",
     editcase_err_save_details: "Failed to save case details.",
     editcase_err_general: "An error occurred.",
     editcase_doc_added: "Document Added",
@@ -304,7 +318,8 @@ export const translations = {
     casedetails_export_failed: "Export Failed",
     casedetails_export_failed_desc: "Could not compile case details PDF.",
     casedetails_no_contact: "No Contact Number",
-    casedetails_no_contact_desc: "No client contact number is available for this case.",
+    casedetails_no_contact_desc:
+      "No client contact number is available for this case.",
     casedetails_file_not_found: "File not found at: ",
     casedetails_sharing_unavailable: "Sharing is not available.",
     casedetails_open_doc: "Open Document",
@@ -340,7 +355,8 @@ export const translations = {
     docgen_btn_export_share_short: "Export & Share PDF",
     docgen_btn_save_draft_short: "Save Draft",
     docgen_alert_saved_title: "Draft Saved",
-    docgen_alert_saved_desc: "This document has been saved to your Drafts Hub. You can view, share, or attach it to a case later.",
+    docgen_alert_saved_desc:
+      "This document has been saved to your Drafts Hub. You can view, share, or attach it to a case later.",
     docgen_alert_go_drafts: "Go to Drafts Hub",
     docgen_alert_close: "Close",
     docgen_preparing: "Preparing document metadata...",
@@ -373,9 +389,11 @@ export const translations = {
     docgen_opt_rent_agreement: "Rent Agreement",
     docgen_opt_power_of_attorney: "Power of Attorney (POA)",
 
-    docgen_field_client_label: "Client Name / Deponent / Notice Sender / Plaintiff*",
+    docgen_field_client_label:
+      "Client Name / Deponent / Notice Sender / Plaintiff*",
     docgen_field_opposite_label: "Opposite Party Name / Defendant / Respondent",
-    docgen_field_parties_label: "Full Case Parties Title (or Client vs Defendant)",
+    docgen_field_parties_label:
+      "Full Case Parties Title (or Client vs Defendant)",
     docgen_field_court_label: "Court / Forum Name*",
     docgen_field_case_num_label: "Case/Suit Number",
     docgen_field_case_year_label: "Case Year",
@@ -394,7 +412,8 @@ export const translations = {
     docgen_placeholder_addr: "Enter Advocate Office/chamber address",
 
     docgen_field_adjournment_reason: "Reason for Adjournment*",
-    docgen_placeholder_adjournment_reason: "e.g. Advocate is indisposed / out of town",
+    docgen_placeholder_adjournment_reason:
+      "e.g. Advocate is indisposed / out of town",
     docgen_field_bank_name: "Drawer Bank Name*",
     docgen_field_police_station: "Police Station*",
     docgen_placeholder_bank_name: "e.g. State Bank of India",
@@ -405,9 +424,11 @@ export const translations = {
     docgen_placeholder_fir_year: "e.g. 2026",
     docgen_field_quashing_grounds: "Grounds of FIR Quashing*",
     docgen_field_bail_grounds: "Grounds for Bail",
-    docgen_placeholder_bail_grounds: "e.g. False accusation, no evidence connecting applicant",
+    docgen_placeholder_bail_grounds:
+      "e.g. False accusation, no evidence connecting applicant",
     docgen_field_apprehension_reason: "Reason for Apprehension of Arrest*",
-    docgen_placeholder_apprehension_reason: "e.g. Threats from opposite party, political motives",
+    docgen_placeholder_apprehension_reason:
+      "e.g. Threats from opposite party, political motives",
     docgen_field_deponent_name: "Deponent Name*",
     docgen_placeholder_deponent_name: "Enter Deponent's Full Name",
     docgen_field_deponent_age: "Deponent Age",
@@ -425,13 +446,17 @@ export const translations = {
     docgen_field_suit_facts: "Suit Facts Statements (One per line)*",
     docgen_field_incident_facts: "Incident Facts Statements (One per line)*",
     docgen_field_facts: "Facts / Statements (One per line)*",
-    docgen_placeholder_facts: "Enter facts or statements, one statement per line.",
+    docgen_placeholder_facts:
+      "Enter facts or statements, one statement per line.",
     docgen_field_prelim_objections: "Preliminary Objections (One per line)",
-    docgen_placeholder_prelim_objections: "Objection 1: The suit is barred by limitation...",
+    docgen_placeholder_prelim_objections:
+      "Objection 1: The suit is barred by limitation...",
     docgen_field_reply_merits: "Reply on Merits (One per line)",
-    docgen_placeholder_reply_merits: "Reply 1: The contents of paragraph 1 are false...",
+    docgen_placeholder_reply_merits:
+      "Reply 1: The contents of paragraph 1 are false...",
     docgen_field_demand_text: "Final Demand Instructions / Claims*",
-    docgen_placeholder_demand_text: "e.g. pay the outstanding dues / return cheque amount of Rs. 1,50,000",
+    docgen_placeholder_demand_text:
+      "e.g. pay the outstanding dues / return cheque amount of Rs. 1,50,000",
     docgen_field_suit_relief: "Specific Relief/Prayer*",
     docgen_field_exec_relief: "Relief Sought / Mode of Execution*",
     docgen_field_interim_relief: "Interim Protection Relief*",
@@ -446,7 +471,8 @@ export const translations = {
     docgen_field_monthly_rent: "Monthly Rent Amount*",
     docgen_placeholder_valuation: "e.g. 5,00,000",
     docgen_field_rejoinder_reply: "Rejoinder Reply Points (One per line)*",
-    docgen_placeholder_rejoinder_reply: "Point 1: The defendant's plea of oral partition is false...",
+    docgen_placeholder_rejoinder_reply:
+      "Point 1: The defendant's plea of oral partition is false...",
     docgen_field_exec_decree_date: "Date of Decree*",
     docgen_field_cheque_date: "Date of Cheque*",
     docgen_field_incident_date: "Date of Incident*",
@@ -467,15 +493,21 @@ export const translations = {
     docgen_field_witness2: "Witness 2 Details (Name & Address)",
     docgen_placeholder_witness: "e.g. Suresh Kumar, Delhi",
     docgen_field_exemption_reason: "Reason for Exemption Application*",
-    docgen_placeholder_exemption_reason: "e.g. Accused is hospitalized / currently out of country",
-    docgen_field_deficiency_details: "Deficiency of Service / Product Defects details*",
-    docgen_placeholder_deficiency_details: "e.g. Product screen was broken on delivery and replacement was refused",
+    docgen_placeholder_exemption_reason:
+      "e.g. Accused is hospitalized / currently out of country",
+    docgen_field_deficiency_details:
+      "Deficiency of Service / Product Defects details*",
+    docgen_placeholder_deficiency_details:
+      "e.g. Product screen was broken on delivery and replacement was refused",
     lock_title: "Case Action Limit Reached",
-    lock_description: "To help keep Advocase free, please watch a short video to unlock 10 more case additions or edits.",
+    lock_description:
+      "To help keep Advocase free, please watch a short video to unlock 10 more case additions or edits.",
     lock_btn_watch: "Watch Video to Unlock",
     lock_btn_back: "Go Back",
-    lock_success_msg: "Action limit unlocked! You can now add or edit 10 more cases.",
-    lock_warn_msg: "You must watch the full video to unlock more case additions or edits.",
+    lock_success_msg:
+      "Action limit unlocked! You can now add or edit 10 more cases.",
+    lock_warn_msg:
+      "You must watch the full video to unlock more case additions or edits.",
   },
   hi: {
     // Navigation / Tabs
@@ -529,7 +561,8 @@ export const translations = {
 
     // Onboarding
     onboarding_welcome_title: "एडवोकेस में आपका स्वागत है!",
-    onboarding_welcome_desc: "आइए आपको एक सहज केस प्रबंधन अनुभव के लिए तैयार करें।",
+    onboarding_welcome_desc:
+      "आइए आपको एक सहज केस प्रबंधन अनुभव के लिए तैयार करें।",
     onboarding_start_btn: "आइए शुरू करें",
     onboarding_step_1_of_4: "चरण १/४",
     onboarding_full_name: "पूरा नाम",
@@ -560,7 +593,8 @@ export const translations = {
     onboarding_license_placeholder: "अपना लाइसेंस नंबर दर्ज करें",
     onboarding_location: "स्थान",
     onboarding_location_placeholder: "अपना शहर और राज्य दर्ज करें",
-    onboarding_err_prof_title: "कृपया अपना पेशेवर शीर्षक और अनुभव के वर्ष दर्ज करें।",
+    onboarding_err_prof_title:
+      "कृपया अपना पेशेवर शीर्षक और अनुभव के वर्ष दर्ज करें।",
     onboarding_step_4_of_4: "चरण ४/४",
     onboarding_select_areas: "अभ्यास क्षेत्र चुनें",
     onboarding_other_area: "अन्य अभ्यास क्षेत्र",
@@ -628,7 +662,8 @@ export const translations = {
     placeholder_judge_name: "न्यायाधीश का नाम दर्ज करें",
     placeholder_opposing_counsel: "विपक्षी वकील का नाम दर्ज करें",
     placeholder_opposite_advocate: "विपक्षी अधिवक्ता का नाम दर्ज करें",
-    placeholder_opp_advocate_contact: "विपक्षी अधिवक्ता का संपर्क नंबर दर्ज करें",
+    placeholder_opp_advocate_contact:
+      "विपक्षी अधिवक्ता का संपर्क नंबर दर्ज करें",
     placeholder_status: "स्थिति चुनें...",
     placeholder_priority: "प्राथमिकता चुनें...",
     placeholder_hearing_date: "अगली सुनवाई तिथि चुनें",
@@ -647,7 +682,8 @@ export const translations = {
     btn_close_view: "बंद करें (केवल देखें)",
     btn_delete_case: "हटाएं",
     ecourts_importer_title: "eCourts केस आयातक",
-    ecourts_instructions: "अपने केस की खोज करें, कैप्चा हल करें, और खोजें पर टैप करें। केस विवरण तालिका दिखने पर 'निकालें' पर टैप करें।",
+    ecourts_instructions:
+      "अपने केस की खोज करें, कैप्चा हल करें, और खोजें पर टैप करें। केस विवरण तालिका दिखने पर 'निकालें' पर टैप करें।",
     ecourts_extract: "निकालें",
     option_status_open: "खुला",
     option_status_in_progress: "प्रगति पर",
@@ -668,11 +704,13 @@ export const translations = {
     btn_share_history: "इतिहास साझा करें",
     casedetails_history_pdf_title: "केस इतिहास",
     casedetails_delete_title: "केस हटाएं",
-    casedetails_delete_confirm: "क्या आप वाकई इस केस को स्थायी रूप से हटाना चाहते हैं? यह कार्रवाई वापस नहीं ली जा सकती।",
+    casedetails_delete_confirm:
+      "क्या आप वाकई इस केस को स्थायी रूप से हटाना चाहते हैं? यह कार्रवाई वापस नहीं ली जा सकती।",
     casedetails_delete_btn: "हटाएं",
     doc_btn_capture: "दस्तावेज़ कैप्चर करें",
     doc_select_picker_title: "दस्तावेज़ स्रोत चुनें",
-    doc_select_picker_desc: "चुनें कि आप अपने फ़ाइलों से दस्तावेज़ अपलोड करना चाहते हैं या कैमरे का उपयोग करके इसे कैप्चर करना चाहते हैं।",
+    doc_select_picker_desc:
+      "चुनें कि आप अपने फ़ाइलों से दस्तावेज़ अपलोड करना चाहते हैं या कैमरे का उपयोग करके इसे कैप्चर करना चाहते हैं।",
     doc_select_picker_camera: "फोटो लें / कैमरा",
     doc_select_picker_file: "फ़ाइलों से चुनें",
     reminder_modal_title: "क्लाइंट अनुस्मारक विवरण",
@@ -680,23 +718,28 @@ export const translations = {
     reminder_send_sms: "एसएमएस द्वारा भेजें",
     reminder_copy_clipboard: "टेक्स्ट कॉपी करें",
     reminder_copy_success: "अनुस्मारक क्लिपबोर्ड पर कॉपी किया गया!",
-    reminder_template: "प्रिय {clientName},\n\nयह आपके केस \"{caseTitle}\" (केस संख्या: {caseNumber}) के संबंध में एक अनुस्मारक है, जो कि न्यायालय {courtName} में {nextDate} को सुनवाई के लिए सूचीबद्ध है।\n\nकृपया उपस्थित रहें। यदि आपके कोई प्रश्न हैं तो हमें बताएं।\n\nसादर,\n{advocateName}",
-    onboarding_import_link: "पहले से ही किसी अन्य केस प्रबंधन उपकरण का उपयोग कर रहे हैं? १ क्लिक में डेटा आयात करें",
+    reminder_template:
+      'प्रिय {clientName},\n\nयह आपके केस "{caseTitle}" (केस संख्या: {caseNumber}) के संबंध में एक अनुस्मारक है, जो कि न्यायालय {courtName} में {nextDate} को सुनवाई के लिए सूचीबद्ध है।\n\nकृपया उपस्थित रहें। यदि आपके कोई प्रश्न हैं तो हमें बताएं।\n\nसादर,\n{advocateName}',
+    onboarding_import_link:
+      "पहले से ही किसी अन्य केस प्रबंधन उपकरण का उपयोग कर रहे हैं? १ क्लिक में डेटा आयात करें",
     import_title: "डेटा आयात और माइग्रेट करें",
     import_btn_select: "CSV/JSON फ़ाइल चुनें",
     import_step_mapping: "कॉलम को केसडायरी फ़ील्ड से मैप करें",
-    import_mapping_desc: "हमने आपकी फ़ाइल से हेडर को पार्स किया है। नीचे दिए गए प्रत्येक केसडायरी फ़ील्ड को अपनी फ़ाइल के कॉलम से मिलाएं। सामान्य फ़ील्ड स्वतः-मैप कर दिए गए हैं।",
+    import_mapping_desc:
+      "हमने आपकी फ़ाइल से हेडर को पार्स किया है। नीचे दिए गए प्रत्येक केसडायरी फ़ील्ड को अपनी फ़ाइल के कॉलम से मिलाएं। सामान्य फ़ील्ड स्वतः-मैप कर दिए गए हैं।",
     import_mapping_preview: "पूर्वावलोकन पंक्ति १:",
     import_btn_start: "आयात शुरू करें",
     import_progress_title: "मुकदमे माइग्रेट हो रहे हैं",
-    import_progress_desc: "कृपया प्रतीक्षा करें जब तक हम आपकी डायरी में मामलों को आयात करते हैं...",
+    import_progress_desc:
+      "कृपया प्रतीक्षा करें जब तक हम आपकी डायरी में मामलों को आयात करते हैं...",
     import_success_title: "आयात पूरा हुआ",
     import_success_desc: "मामले सफलतापूर्वक आयात किए गए!",
     import_success_detail: "आपके डेटाबेस में {count} मुकदमे जोड़े गए हैं।",
     import_btn_dashboard: "डैशबोर्ड पर जाएं",
     import_btn_duplicates: "डुप्लिकेट खोजें",
     duplicate_title: "डुप्लिकेट मुकदमों की समीक्षा",
-    duplicate_desc: "आपके डेटाबेस में निम्नलिखित संभावित डुप्लिकेट पाए गए हैं। नीचे दी गई डुप्लिकेट प्रविष्टियों की समीक्षा करें और उन्हें हटाएं।",
+    duplicate_desc:
+      "आपके डेटाबेस में निम्नलिखित संभावित डुप्लिकेट पाए गए हैं। नीचे दी गई डुप्लिकेट प्रविष्टियों की समीक्षा करें और उन्हें हटाएं।",
     duplicate_no_found: "आपके डेटाबेस में कोई डुप्लिकेट मुकदमे नहीं मिले।",
     duplicate_row_cnr: "CNR नंबर: {cnr}",
     duplicate_row_num_court: "संख्या: {num} | न्यायालय: {court}",
@@ -704,11 +747,14 @@ export const translations = {
     duplicate_delete_side: "हटाएं",
     duplicate_btn_done: "पूर्ण",
     settings_restore_btn: "डेटाबेस बैकअप पुनर्स्थापित करें (.db)",
-    settings_restore_desc: "बैकअप फ़ाइल से सक्रिय डेटाबेस को पुनर्स्थापित और अधिलेखित करें",
+    settings_restore_desc:
+      "बैकअप फ़ाइल से सक्रिय डेटाबेस को पुनर्स्थापित और अधिलेखित करें",
     settings_import_csv_btn: "मुकदमे आयात करें (CSV/JSON)",
-    settings_import_csv_desc: "स्प्रेडशीट या अन्य ऐप निर्यात से मुकदमे आयात करें",
+    settings_import_csv_desc:
+      "स्प्रेडशीट या अन्य ऐप निर्यात से मुकदमे आयात करें",
     settings_scan_duplicates_btn: "डुप्लिकेट ढूंढें और हटाएं",
-    settings_scan_duplicates_desc: "डुप्लिकेट केस रिकॉर्ड को हल करने के लिए डेटाबेस को स्कैन करें",
+    settings_scan_duplicates_desc:
+      "डुप्लिकेट केस रिकॉर्ड को हल करने के लिए डेटाबेस को स्कैन करें",
 
     // Document Upload
     doc_err_load: "दस्तावेज़ लोड नहीं किए जा सके।",
@@ -719,7 +765,8 @@ export const translations = {
     doc_err_path: "दस्तावेज़ पथ नहीं मिला।",
     doc_err_construct_path: "दस्तावेज़ पथ का निर्माण नहीं किया जा सका।",
     doc_err_not_exist: "निर्दिष्ट पथ पर फ़ाइल मौजूद नहीं है।",
-    doc_err_download: "दस्तावेज़ डाउनलोड नहीं किया जा सका। कृपया पुनः प्रयास करें।",
+    doc_err_download:
+      "दस्तावेज़ डाउनलोड नहीं किया जा सका। कृपया पुनः प्रयास करें।",
     doc_dialog_title: "दस्तावेज़ डाउनलोड करें",
     doc_btn_add: "दस्तावेज़ जोड़ें",
     doc_no_documents: "अभी कोई दस्तावेज़ नहीं हैं",
@@ -745,11 +792,13 @@ export const translations = {
     editcase_success_updated: "केस डेटा अपडेट हो गया।",
     editcase_success_saved: "केस सहेज लिया गया।",
     editcase_partial_success: "आंशिक सफलता",
-    editcase_partial_success_desc: "केस डेटा सहेजा गया, लेकिन कुछ उप-मद संचालन विफल रहे।",
+    editcase_partial_success_desc:
+      "केस डेटा सहेजा गया, लेकिन कुछ उप-मद संचालन विफल रहे।",
     editcase_err_save_details: "केस विवरण सहेजने में विफल।",
     editcase_err_general: "एक त्रुटि हुई।",
     editcase_doc_added: "दस्तावेज़ जोड़ा गया",
-    editcase_doc_added_desc: "जोड़ा गया। सहेजने के लिए बदलावों को सुरक्षित करें।",
+    editcase_doc_added_desc:
+      "जोड़ा गया। सहेजने के लिए बदलावों को सुरक्षित करें।",
     editcase_err_pick_doc: "दस्तावेज़ चुनने में त्रुटि।",
     editcase_view_doc: "दस्तावेज़ देखें",
     editcase_edit_doc_meta: "दस्तावेज़ मेटाडेटा संपादित करें",
@@ -781,7 +830,8 @@ export const translations = {
     casedetails_export_failed: "निर्यात विफल",
     casedetails_export_failed_desc: "केस विवरण पीडीएफ संकलित नहीं की जा सकी।",
     casedetails_no_contact: "कोई संपर्क नंबर नहीं",
-    casedetails_no_contact_desc: "इस केस के लिए कोई मुवक्किल संपर्क नंबर उपलब्ध नहीं है।",
+    casedetails_no_contact_desc:
+      "इस केस के लिए कोई मुवक्किल संपर्क नंबर उपलब्ध नहीं है।",
     casedetails_file_not_found: "फ़ाइल यहाँ नहीं मिली: ",
     casedetails_sharing_unavailable: "साझाकरण उपलब्ध नहीं है।",
     casedetails_open_doc: "दस्तावेज़ खोलें",
@@ -817,7 +867,8 @@ export const translations = {
     docgen_btn_export_share_short: "पीडीएफ निर्यात करें और साझा करें",
     docgen_btn_save_draft_short: "ड्राफ्ट सहेजें",
     docgen_alert_saved_title: "ड्राफ्ट सहेजा गया",
-    docgen_alert_saved_desc: "यह दस्तावेज़ आपके ड्राफ्ट हब में सफलतापूर्वक सहेज लिया गया है। आप इसे बाद में देख, साझा या किसी केस से जोड़ सकते हैं।",
+    docgen_alert_saved_desc:
+      "यह दस्तावेज़ आपके ड्राफ्ट हब में सफलतापूर्वक सहेज लिया गया है। आप इसे बाद में देख, साझा या किसी केस से जोड़ सकते हैं।",
     docgen_alert_go_drafts: "ड्राफ्ट हब पर जाएं",
     docgen_alert_close: "बंद करें",
     docgen_preparing: "दस्तावेज़ मेटाडेटा तैयार किया जा रहा है...",
@@ -852,7 +903,8 @@ export const translations = {
 
     docgen_field_client_label: "क्लाइंट नाम / शपथी / नोटिस प्रेषक / वादी*",
     docgen_field_opposite_label: "विपक्षी पक्ष का नाम / प्रतिवादी / प्रत्यर्थी",
-    docgen_field_parties_label: "केस पक्षों का पूरा शीर्षक (या क्लाइंट बनाम प्रतिवादी)",
+    docgen_field_parties_label:
+      "केस पक्षों का पूरा शीर्षक (या क्लाइंट बनाम प्रतिवादी)",
     docgen_field_court_label: "न्यायालय / फोरम का नाम*",
     docgen_field_case_num_label: "केस/सूट नंबर",
     docgen_field_case_year_label: "केस का वर्ष",
@@ -871,7 +923,8 @@ export const translations = {
     docgen_placeholder_addr: "अधिवक्ता का कार्यालय/चैंबर का पता दर्ज करें",
 
     docgen_field_adjournment_reason: "स्थगन का कारण*",
-    docgen_placeholder_adjournment_reason: "जैसे: अधिवक्ता अस्वस्थ हैं / शहर से बाहर हैं",
+    docgen_placeholder_adjournment_reason:
+      "जैसे: अधिवक्ता अस्वस्थ हैं / शहर से बाहर हैं",
     docgen_field_bank_name: "अदाकर्ता बैंक का नाम*",
     docgen_field_police_station: "पुलिस स्टेशन*",
     docgen_placeholder_bank_name: "जैसे: भारतीय स्टेट बैंक",
@@ -882,9 +935,11 @@ export const translations = {
     docgen_placeholder_fir_year: "जैसे: 2026",
     docgen_field_quashing_grounds: "एफआईआर निरस्तीकरण के आधार*",
     docgen_field_bail_grounds: "जमानत के आधार",
-    docgen_placeholder_bail_grounds: "जैसे: झूठा आरोप, आवेदक को जोड़ने वाला कोई सबूत नहीं",
+    docgen_placeholder_bail_grounds:
+      "जैसे: झूठा आरोप, आवेदक को जोड़ने वाला कोई सबूत नहीं",
     docgen_field_apprehension_reason: "गिरफ्तारी की आशंका का कारण*",
-    docgen_placeholder_apprehension_reason: "जैसे: विपक्षी पक्ष से धमकियां, राजनीतिक मकसद",
+    docgen_placeholder_apprehension_reason:
+      "जैसे: विपक्षी पक्ष से धमकियां, राजनीतिक मकसद",
     docgen_field_deponent_name: "शपथी का नाम*",
     docgen_placeholder_deponent_name: "शपथी का पूरा नाम दर्ज करें",
     docgen_field_deponent_age: "शपथी की आयु",
@@ -904,18 +959,22 @@ export const translations = {
     docgen_field_facts: "तथ्य / कथन (प्रति पंक्ति एक)*",
     docgen_placeholder_facts: "तथ्य या कथन दर्ज करें, प्रति पंक्ति एक कथन।",
     docgen_field_prelim_objections: "प्रारंभिक आपत्तियां (प्रति पंक्ति एक)",
-    docgen_placeholder_prelim_objections: "आपत्ति 1: वाद परिसीमा द्वारा वर्जित है...",
+    docgen_placeholder_prelim_objections:
+      "आपत्ति 1: वाद परिसीमा द्वारा वर्जित है...",
     docgen_field_reply_merits: "गुण-दोष पर जवाब (प्रति पंक्ति एक)",
-    docgen_placeholder_reply_merits: "जवाब 1: पैराग्राफ 1 की सामग्री झूठी है...",
+    docgen_placeholder_reply_merits:
+      "जवाब 1: पैराग्राफ 1 की सामग्री झूठी है...",
     docgen_field_demand_text: "अंतिम मांग निर्देश / दावे*",
-    docgen_placeholder_demand_text: "जैसे: बकाया राशि का भुगतान करें / चेक राशि 1,50,000 रुपये लौटाएं",
+    docgen_placeholder_demand_text:
+      "जैसे: बकाया राशि का भुगतान करें / चेक राशि 1,50,000 रुपये लौटाएं",
     docgen_field_suit_relief: "विशिष्ट अनुतोष/प्रार्थना*",
     docgen_field_exec_relief: "चाहा गया अनुतोष / निष्पादन का तरीका*",
     docgen_field_interim_relief: "अंतरिम सुरक्षा राहत*",
     docgen_field_consumer_relief: "मुआवजा और धनवापसी का दावा*",
     docgen_field_poa_powers: "प्रदत्त शक्तियां और कर्तव्य*",
     docgen_field_injunction_prayer: "व्यादेश रोक हेतु प्रार्थना*",
-    docgen_placeholder_relief: "प्रार्थना, शक्तियों या मांगे गए अनुतोष को निर्दिष्ट करें।",
+    docgen_placeholder_relief:
+      "प्रार्थना, शक्तियों या मांगे गए अनुतोष को निर्दिष्ट करें।",
     docgen_field_suit_valuation: "वाद का मूल्यांकन मूल्य*",
     docgen_field_exec_decree_amount: "डिक्री की राशि*",
     docgen_field_cheque_amount: "चेक की राशि*",
@@ -923,7 +982,8 @@ export const translations = {
     docgen_field_monthly_rent: "मासिक किराया राशि*",
     docgen_placeholder_valuation: "जैसे: 5,00,000",
     docgen_field_rejoinder_reply: "प्रत्युत्तर के बिंदु (प्रति पंक्ति एक)*",
-    docgen_placeholder_rejoinder_reply: "बिंदु 1: मौखिक विभाजन की प्रतिवादी की दलील झूठी है...",
+    docgen_placeholder_rejoinder_reply:
+      "बिंदु 1: मौखिक विभाजन की प्रतिवादी की दलील झूठी है...",
     docgen_field_exec_decree_date: "डिक्री की तारीख*",
     docgen_field_cheque_date: "चेक की तारीख*",
     docgen_field_incident_date: "घटना की तारीख*",
@@ -944,15 +1004,20 @@ export const translations = {
     docgen_field_witness2: "गवाह २ विवरण (नाम और पता)",
     docgen_placeholder_witness: "जैसे: सुरेश कुमार, दिल्ली",
     docgen_field_exemption_reason: "हाजिरी माफी का कारण*",
-    docgen_placeholder_exemption_reason: "जैसे: अभियुक्त अस्पताल में भर्ती है / वर्तमान में देश से बाहर है",
+    docgen_placeholder_exemption_reason:
+      "जैसे: अभियुक्त अस्पताल में भर्ती है / वर्तमान में देश से बाहर है",
     docgen_field_deficiency_details: "सेवा में कमी / उत्पाद दोष का विवरण*",
-    docgen_placeholder_deficiency_details: "जैसे: डिलीवरी पर उत्पाद की स्क्रीन टूटी हुई थी और बदलने से मना कर दिया गया",
+    docgen_placeholder_deficiency_details:
+      "जैसे: डिलीवरी पर उत्पाद की स्क्रीन टूटी हुई थी और बदलने से मना कर दिया गया",
     lock_title: "केस सीमा समाप्त",
-    lock_description: "एडवोकेस को मुफ्त रखने में मदद करने के लिए, कृपया 10 और मामले जोड़ने या संपादित करने के लिए एक छोटा वीडियो देखें।",
+    lock_description:
+      "एडवोकेस को मुफ्त रखने में मदद करने के लिए, कृपया 10 और मामले जोड़ने या संपादित करने के लिए एक छोटा वीडियो देखें।",
     lock_btn_watch: "अनलॉक करने के लिए वीडियो देखें",
     lock_btn_back: "वापस जाएं",
-    lock_success_msg: "सीमा अनलॉक हो गई है! अब आप 10 और मामले जोड़ या संपादित कर सकते हैं।",
-    lock_warn_msg: "अधिक मामले जोड़ने या संपादित करने के लिए आपको पूरा वीडियो देखना होगा।",
+    lock_success_msg:
+      "सीमा अनलॉक हो गई है! अब आप 10 और मामले जोड़ या संपादित कर सकते हैं।",
+    lock_warn_msg:
+      "अधिक मामले जोड़ने या संपादित करने के लिए आपको पूरा वीडियो देखना होगा।",
   },
 };
 

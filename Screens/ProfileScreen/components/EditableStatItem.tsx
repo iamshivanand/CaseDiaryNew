@@ -1,8 +1,15 @@
-import React, { useContext } from 'react';
-import { Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ThemeContext } from '../../../Providers/ThemeProvider';
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useContext } from "react";
+import {
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+
+import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface EditableStatItemProps {
   label: string;
@@ -13,8 +20,6 @@ interface EditableStatItemProps {
   onTempValueChange: (text: string) => void;
 }
 
-import { View } from 'react-native';
-
 const EditableStatItem: React.FC<EditableStatItemProps> = ({
   label,
   value,
@@ -24,7 +29,7 @@ const EditableStatItem: React.FC<EditableStatItemProps> = ({
   onTempValueChange,
 }) => {
   const { theme } = useContext(ThemeContext);
-  const cardGradient = theme.dark 
+  const cardGradient = theme.dark
     ? ["#1E293B", "#0F172A"] // Slate-800 to Slate-900 for dark mode
     : ["#FFFFFF", "#F1F5F9"]; // Slate-50 gradient for light mode
 
@@ -37,14 +42,19 @@ const EditableStatItem: React.FC<EditableStatItemProps> = ({
         {
           borderColor: theme.colors.border,
           borderWidth: theme.dark ? 1 : 0,
-        }
+        },
       ]}
     >
       {isEditing ? (
         <>
-          <Text style={[styles.labelEditing, { color: theme.colors.text }]}>{label}</Text>
+          <Text style={[styles.labelEditing, { color: theme.colors.text }]}>
+            {label}
+          </Text>
           <TextInput
-            style={[styles.textInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+            style={[
+              styles.textInput,
+              { color: theme.colors.text, borderColor: theme.colors.border },
+            ]}
             value={tempValue}
             onChangeText={onTempValueChange}
             placeholder="Years"
@@ -56,9 +66,18 @@ const EditableStatItem: React.FC<EditableStatItemProps> = ({
         <>
           <Text style={[styles.valueText, { color: theme.colors.primary }]}>
             {value}
-            {unit && <Text style={[styles.unitText, { color: theme.colors.primary }]}> {unit}</Text>}
+            {unit && (
+              <Text style={[styles.unitText, { color: theme.colors.primary }]}>
+                {" "}
+                {unit}
+              </Text>
+            )}
           </Text>
-          <Text style={[styles.labelText, { color: theme.colors.textSecondary }]}>{label}</Text>
+          <Text
+            style={[styles.labelText, { color: theme.colors.textSecondary }]}
+          >
+            {label}
+          </Text>
         </>
       )}
     </LinearGradient>
@@ -67,88 +86,88 @@ const EditableStatItem: React.FC<EditableStatItemProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 8,
     paddingVertical: 15,
     paddingHorizontal: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     flex: 1,
     marginHorizontal: 5,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 3,
-    position: 'relative', // For edit icon
+    position: "relative", // For edit icon
   },
   editingCard: {
     paddingVertical: 20, // More space when editing
   },
   editIcon: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
     padding: 4,
   },
   valueText: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#3B82F6',
+    fontWeight: "bold",
+    color: "#3B82F6",
     marginBottom: 5,
   },
   unitText: {
     fontSize: 12,
-    fontWeight: 'normal',
-    color: '#3B82F6',
+    fontWeight: "normal",
+    color: "#3B82F6",
   },
   labelText: {
     fontSize: 13,
-    color: '#6B7280',
-    textAlign: 'center',
+    color: "#6B7280",
+    textAlign: "center",
   },
   labelEditing: {
     fontSize: 14,
-    color: '#4B5563',
+    color: "#4B5563",
     marginBottom: 8,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   textInput: {
     fontSize: 18,
-    color: '#1F2937',
+    color: "#1F2937",
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: "#D1D5DB",
     borderRadius: 6,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    width: '80%', // Adjust width as needed
-    textAlign: 'center',
+    width: "80%", // Adjust width as needed
+    textAlign: "center",
     marginBottom: 15,
   },
   editControlsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    width: '100%', // Take full width for controls
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    width: "100%", // Take full width for controls
   },
   button: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
     minWidth: 90, // Smaller buttons for stat item
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   saveButton: {
-    backgroundColor: '#22C55E',
+    backgroundColor: "#22C55E",
   },
   cancelButton: {
-    backgroundColor: '#EF4444',
+    backgroundColor: "#EF4444",
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     marginLeft: 5,
-    fontWeight: '500',
+    fontWeight: "500",
     fontSize: 13,
   },
 });

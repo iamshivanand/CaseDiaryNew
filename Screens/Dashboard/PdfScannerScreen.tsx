@@ -1,6 +1,11 @@
 // Screens/Dashboard/PdfScannerScreen.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
+import {
+  useNavigation,
+  useRoute,
+  RouteProp,
+  useFocusEffect,
+} from "@react-navigation/native";
 import * as FileSystem from "expo-file-system";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
@@ -20,14 +25,14 @@ import {
   Platform,
   StatusBar,
 } from "react-native";
-import * as db from "../../DataBase";
-import { ThemeContext } from "../../Providers/ThemeProvider";
-import { useTranslation } from "../../Providers/LanguageProvider";
-import { HomeStackParamList } from "../../Types/navigationtypes";
-import { Theme } from "../../Providers/ThemeProvider";
 import DocumentScanner from "react-native-document-scanner-plugin";
-import { useAdTrigger } from "../CommonComponents/AdManager";
+
+import * as db from "../../DataBase";
+import { useTranslation } from "../../Providers/LanguageProvider";
+import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
+import { HomeStackParamList } from "../../Types/navigationtypes";
 import AdBanner from "../CommonComponents/AdBanner";
+import { useAdTrigger } from "../CommonComponents/AdManager";
 
 type PdfScannerRouteProp = RouteProp<HomeStackParamList, "PdfScanner">;
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -42,7 +47,9 @@ const PdfScannerScreen: React.FC = () => {
   const { showAdWithPreload } = useAdTrigger();
 
   // Mode: "saved" (hub list) or "capture" (triggers native scanning)
-  const [mode, setMode] = useState<"saved" | "capture">(targetCaseId ? "capture" : "saved");
+  const [mode, setMode] = useState<"saved" | "capture">(
+    targetCaseId ? "capture" : "saved"
+  );
 
   // Saved Hub states
   const [savedPdfs, setSavedPdfs] = useState<db.ScannedPdfRow[]>([]);
@@ -156,7 +163,7 @@ const PdfScannerScreen: React.FC = () => {
 
       if (scannedImages && scannedImages.length > 0) {
         setScannedImageUris(scannedImages);
-        
+
         // Auto-generate a descriptive file name
         const now = new Date();
         const dateStr = now.toLocaleDateString("en-GB").replace(/\//g, "-");
@@ -313,10 +320,13 @@ const PdfScannerScreen: React.FC = () => {
   // Directly compile HTML & export PDF with A4 Page boundaries after showing an ad
   const compileDirectPdf = async () => {
     if (scannedImageUris.length === 0) return;
-    
+
     const linkId = targetCaseId || selectedCaseId;
     if (!linkId) {
-      Alert.alert("Case Required", "Please select a case to link this scanned document to.");
+      Alert.alert(
+        "Case Required",
+        "Please select a case to link this scanned document to."
+      );
       return;
     }
 
@@ -325,7 +335,10 @@ const PdfScannerScreen: React.FC = () => {
         await performPdfCompilation(linkId);
       });
     } catch (adError) {
-      console.warn("Ad preloading or display encountered an error, compiling PDF anyway:", adError);
+      console.warn(
+        "Ad preloading or display encountered an error, compiling PDF anyway:",
+        adError
+      );
       await performPdfCompilation(linkId);
     }
   };
@@ -358,7 +371,10 @@ const PdfScannerScreen: React.FC = () => {
     const fp = db.getFullDocumentPath(item.stored_filename);
     if (fp) {
       // @ts-ignore
-      navigation.navigate("PdfViewer", { pdfUri: fp, title: item.original_display_name });
+      navigation.navigate("PdfViewer", {
+        pdfUri: fp,
+        title: item.original_display_name,
+      });
     }
   };
 
@@ -392,12 +408,22 @@ const PdfScannerScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0 }]}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        { paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0 },
+      ]}
+    >
       <View style={styles.screenHeader}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+        >
           <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.screenHeaderTitle, { color: theme.colors.text }]}>PDF Scanner</Text>
+        <Text style={[styles.screenHeaderTitle, { color: theme.colors.text }]}>
+          PDF Scanner
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -414,13 +440,22 @@ const PdfScannerScreen: React.FC = () => {
           }}
         >
           <Ionicons name="scan" size={18} color={theme.colors.textSecondary} />
-          <Text style={[styles.tabBtnText, { color: theme.colors.textSecondary }]}>Scan Document</Text>
+          <Text
+            style={[styles.tabBtnText, { color: theme.colors.textSecondary }]}
+          >
+            Scan Document
+          </Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.searchBarContainer}>
         <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={20} color={theme.colors.textSecondary} style={{ marginRight: 8 }} />
+          <Ionicons
+            name="search-outline"
+            size={20}
+            color={theme.colors.textSecondary}
+            style={{ marginRight: 8 }}
+          />
           <TextInput
             placeholder="Search saved scanned PDFs..."
             placeholderTextColor={theme.colors.textSecondary}
@@ -430,7 +465,11 @@ const PdfScannerScreen: React.FC = () => {
           />
           {pdfSearchQuery !== "" && (
             <TouchableOpacity onPress={() => setPdfSearchQuery("")}>
-              <Ionicons name="close-circle" size={18} color={theme.colors.textSecondary} />
+              <Ionicons
+                name="close-circle"
+                size={18}
+                color={theme.colors.textSecondary}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -442,9 +481,22 @@ const PdfScannerScreen: React.FC = () => {
         </View>
       ) : filteredPdfs.length === 0 ? (
         <View style={styles.centered}>
-          <Ionicons name="file-tray-outline" size={60} color={theme.colors.textSecondary} style={{ opacity: 0.6 }} />
-          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>No Scanned PDFs found</Text>
-          <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>Link documents to your cases using Scan Document.</Text>
+          <Ionicons
+            name="file-tray-outline"
+            size={60}
+            color={theme.colors.textSecondary}
+            style={{ opacity: 0.6 }}
+          />
+          <Text
+            style={[styles.emptyText, { color: theme.colors.textSecondary }]}
+          >
+            No Scanned PDFs found
+          </Text>
+          <Text
+            style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}
+          >
+            Link documents to your cases using Scan Document.
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -452,35 +504,104 @@ const PdfScannerScreen: React.FC = () => {
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={{ padding: 16, paddingBottom: 80 }}
           renderItem={({ item }) => (
-            <View style={[styles.pdfCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
+            <View
+              style={[
+                styles.pdfCard,
+                {
+                  backgroundColor: theme.colors.cardBackground,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
               <View style={styles.pdfCardInfoRow}>
                 <View style={styles.pdfIconCircle}>
                   <Ionicons name="document-text" size={26} color="#ef4444" />
                 </View>
                 <View style={{ flex: 1, marginRight: 10 }}>
-                  <Text style={[styles.pdfCardTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                  <Text
+                    style={[styles.pdfCardTitle, { color: theme.colors.text }]}
+                    numberOfLines={1}
+                  >
                     {item.original_display_name}
                   </Text>
-                  <Text style={[styles.pdfCardSub, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                    {item.CaseTitle ? `Case: ${item.CaseTitle}` : "Unlinked / Draft"}
+                  <Text
+                    style={[
+                      styles.pdfCardSub,
+                      { color: theme.colors.textSecondary },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.CaseTitle
+                      ? `Case: ${item.CaseTitle}`
+                      : "Unlinked / Draft"}
                   </Text>
-                  <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2 }}>
-                    {item.created_at ? item.created_at.split(" ")[0].split("-").reverse().join("-") : ""}
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: theme.colors.textSecondary,
+                      marginTop: 2,
+                    }}
+                  >
+                    {item.created_at
+                      ? item.created_at
+                          .split(" ")[0]
+                          .split("-")
+                          .reverse()
+                          .join("-")
+                      : ""}
                   </Text>
                 </View>
               </View>
-              <View style={[styles.pdfActionsRow, { borderTopColor: theme.colors.border }]}>
-                <TouchableOpacity style={styles.pdfActionBtn} onPress={() => viewSavedPdf(item)}>
-                  <Ionicons name="eye-outline" size={16} color={theme.colors.primary} />
-                  <Text style={[styles.pdfActionBtnText, { color: theme.colors.primary }]}>Open</Text>
+              <View
+                style={[
+                  styles.pdfActionsRow,
+                  { borderTopColor: theme.colors.border },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.pdfActionBtn}
+                  onPress={() => viewSavedPdf(item)}
+                >
+                  <Ionicons
+                    name="eye-outline"
+                    size={16}
+                    color={theme.colors.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.pdfActionBtnText,
+                      { color: theme.colors.primary },
+                    ]}
+                  >
+                    Open
+                  </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.pdfActionBtn} onPress={() => shareSavedPdf(item)}>
-                  <Ionicons name="share-social-outline" size={16} color={theme.colors.primary} />
-                  <Text style={[styles.pdfActionBtnText, { color: theme.colors.primary }]}>Share</Text>
+                <TouchableOpacity
+                  style={styles.pdfActionBtn}
+                  onPress={() => shareSavedPdf(item)}
+                >
+                  <Ionicons
+                    name="share-social-outline"
+                    size={16}
+                    color={theme.colors.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.pdfActionBtnText,
+                      { color: theme.colors.primary },
+                    ]}
+                  >
+                    Share
+                  </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.pdfActionBtn} onPress={() => deleteSavedPdf(item)}>
+                <TouchableOpacity
+                  style={styles.pdfActionBtn}
+                  onPress={() => deleteSavedPdf(item)}
+                >
                   <Ionicons name="trash-outline" size={16} color="#ef4444" />
-                  <Text style={[styles.pdfActionBtnText, { color: "#ef4444" }]}>Delete</Text>
+                  <Text style={[styles.pdfActionBtnText, { color: "#ef4444" }]}>
+                    Delete
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -489,22 +610,47 @@ const PdfScannerScreen: React.FC = () => {
       )}
 
       {/* Save PDF Naming Modal */}
-      <Modal visible={isSaveModalVisible} animationType="slide" transparent onRequestClose={handleCancelSave}>
+      <Modal
+        visible={isSaveModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCancelSave}
+      >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.colors.background }]}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: theme.colors.background },
+            ]}
+          >
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Save Document</Text>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                Save Document
+              </Text>
               <TouchableOpacity onPress={handleCancelSave}>
                 <Ionicons name="close" size={24} color={theme.colors.text} />
               </TouchableOpacity>
             </View>
 
             <View style={{ marginBottom: 16 }}>
-              <Text style={{ color: theme.colors.textSecondary, fontSize: 12, fontWeight: "600", marginBottom: 6 }}>
+              <Text
+                style={{
+                  color: theme.colors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: "600",
+                  marginBottom: 6,
+                }}
+              >
                 Document Name
               </Text>
               <TextInput
-                style={[styles.nameInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                style={[
+                  styles.nameInput,
+                  {
+                    color: theme.colors.text,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
                 placeholder="Enter document name..."
                 placeholderTextColor={theme.dark ? "#475569" : "#cbd5e1"}
                 value={documentName}
@@ -513,24 +659,60 @@ const PdfScannerScreen: React.FC = () => {
             </View>
 
             {targetCaseId ? (
-              <View style={[styles.caseRowActive, { borderColor: theme.colors.border, backgroundColor: theme.colors.cardBackground }]}>
+              <View
+                style={[
+                  styles.caseRowActive,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.cardBackground,
+                  },
+                ]}
+              >
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.colors.textSecondary, fontSize: 11, fontWeight: "600" }}>
+                  <Text
+                    style={{
+                      color: theme.colors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: "600",
+                    }}
+                  >
                     Linked Case
                   </Text>
-                  <Text style={[styles.caseTitle, { color: theme.colors.text, marginTop: 2 }]}>
+                  <Text
+                    style={[
+                      styles.caseTitle,
+                      { color: theme.colors.text, marginTop: 2 },
+                    ]}
+                  >
                     {targetCaseTitle || "Loading case info..."}
                   </Text>
                 </View>
-                <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
+                <Ionicons
+                  name="checkmark-circle"
+                  size={20}
+                  color={theme.colors.primary}
+                />
               </View>
             ) : (
               <View style={{ flex: 1, marginBottom: 12 }}>
-                <Text style={{ color: theme.colors.textSecondary, fontSize: 12, fontWeight: "600", marginBottom: 6 }}>
+                <Text
+                  style={{
+                    color: theme.colors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: "600",
+                    marginBottom: 6,
+                  }}
+                >
                   Link to Case
                 </Text>
                 <TextInput
-                  style={[styles.searchInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                  style={[
+                    styles.searchInput,
+                    {
+                      color: theme.colors.text,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
                   placeholder="Search case title or number..."
                   placeholderTextColor={theme.dark ? "#475569" : "#cbd5e1"}
                   value={caseSearchQuery}
@@ -547,38 +729,72 @@ const PdfScannerScreen: React.FC = () => {
                         onPress={() => handleCaseSelect(item)}
                         style={[
                           styles.caseRow,
-                          isSelected && { backgroundColor: theme.colors.cardBackground, borderRadius: 8, paddingHorizontal: 8 }
+                          isSelected && {
+                            backgroundColor: theme.colors.cardBackground,
+                            borderRadius: 8,
+                            paddingHorizontal: 8,
+                          },
                         ]}
                       >
                         <View style={{ flex: 1 }}>
-                          <Text style={[styles.caseTitle, { color: theme.colors.text }]}>
+                          <Text
+                            style={[
+                              styles.caseTitle,
+                              { color: theme.colors.text },
+                            ]}
+                          >
                             {item.CaseTitle}
                           </Text>
-                          <Text style={[styles.caseSub, { color: theme.colors.textSecondary }]}>
-                            {item.ClientName} • {item.case_number || "No Case No"}
+                          <Text
+                            style={[
+                              styles.caseSub,
+                              { color: theme.colors.textSecondary },
+                            ]}
+                          >
+                            {item.ClientName} •{" "}
+                            {item.case_number || "No Case No"}
                           </Text>
                         </View>
                         {isSelected ? (
-                          <Ionicons name="checkmark-circle" size={20} color={theme.colors.primary} />
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={20}
+                            color={theme.colors.primary}
+                          />
                         ) : (
-                          <Ionicons name="circle-outline" size={20} color={theme.colors.textSecondary} />
+                          <Ionicons
+                            name="circle-outline"
+                            size={20}
+                            color={theme.colors.textSecondary}
+                          />
                         )}
                       </TouchableOpacity>
                     );
                   }}
-                  ListEmptyComponent={<Text style={styles.emptyModal}>No matching cases found.</Text>}
+                  ListEmptyComponent={
+                    <Text style={styles.emptyModal}>
+                      No matching cases found.
+                    </Text>
+                  }
                 />
               </View>
             )}
 
             <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
-              <TouchableOpacity onPress={handleCancelSave} style={[styles.actionBtn, styles.cancelBtn]}>
+              <TouchableOpacity
+                onPress={handleCancelSave}
+                style={[styles.actionBtn, styles.cancelBtn]}
+              >
                 <Text style={styles.cancelBtnText}>Discard</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={compileDirectPdf}
                 disabled={isCompiling}
-                style={[styles.actionBtn, styles.saveBtn, { backgroundColor: theme.colors.primary }]}
+                style={[
+                  styles.actionBtn,
+                  styles.saveBtn,
+                  { backgroundColor: theme.colors.primary },
+                ]}
               >
                 {isCompiling ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -598,7 +814,12 @@ const PdfScannerScreen: React.FC = () => {
 const getStyles = (theme: Theme) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
-    centered: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
+    centered: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    },
     screenHeader: {
       flexDirection: "row",
       alignItems: "center",
@@ -606,9 +827,15 @@ const getStyles = (theme: Theme) =>
       paddingHorizontal: 12,
       paddingVertical: 10,
       borderBottomWidth: 0.5,
-      borderBottomColor: "rgba(128,128,128,0.25)"
+      borderBottomColor: "rgba(128,128,128,0.25)",
     },
-    backBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 20 },
+    backBtn: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 20,
+    },
     screenHeaderTitle: { fontSize: 18, fontWeight: "700", letterSpacing: 0.3 },
 
     tabHeader: {
@@ -619,14 +846,27 @@ const getStyles = (theme: Theme) =>
       borderBottomColor: theme.colors.border,
       paddingHorizontal: 8,
       paddingVertical: 6,
-      gap: 12
+      gap: 12,
     },
-    tabBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", borderRadius: 20, height: 36, gap: 6 },
+    tabBtn: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 20,
+      height: 36,
+      gap: 6,
+    },
     tabActive: { backgroundColor: theme.colors.primary },
     tabBtnText: { fontSize: 13, fontWeight: "bold" },
     tabBtnTextActive: { fontSize: 13, fontWeight: "bold", color: "#fff" },
 
-    searchBarContainer: { padding: 12, backgroundColor: theme.colors.cardBackground, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+    searchBarContainer: {
+      padding: 12,
+      backgroundColor: theme.colors.cardBackground,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
     searchBar: {
       flexDirection: "row",
       alignItems: "center",
@@ -635,12 +875,27 @@ const getStyles = (theme: Theme) =>
       paddingHorizontal: 10,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      height: 42
+      height: 42,
     },
-    searchInputField: { flex: 1, color: theme.colors.text, fontSize: 14, padding: 0 },
+    searchInputField: {
+      flex: 1,
+      color: theme.colors.text,
+      fontSize: 14,
+      padding: 0,
+    },
 
-    emptyText: { fontSize: 16, fontWeight: "bold", textAlign: "center", marginTop: 12 },
-    emptySubtext: { fontSize: 13, textAlign: "center", marginTop: 4, paddingHorizontal: 30 },
+    emptyText: {
+      fontSize: 16,
+      fontWeight: "bold",
+      textAlign: "center",
+      marginTop: 12,
+    },
+    emptySubtext: {
+      fontSize: 13,
+      textAlign: "center",
+      marginTop: 4,
+      paddingHorizontal: 30,
+    },
 
     pdfCard: {
       borderRadius: 12,
@@ -651,9 +906,13 @@ const getStyles = (theme: Theme) =>
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.05,
-      shadowRadius: 3
+      shadowRadius: 3,
     },
-    pdfCardInfoRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+    pdfCardInfoRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 10,
+    },
     pdfIconCircle: {
       width: 44,
       height: 44,
@@ -661,38 +920,92 @@ const getStyles = (theme: Theme) =>
       backgroundColor: "rgba(239,68,68,0.12)",
       alignItems: "center",
       justifyContent: "center",
-      marginRight: 12
+      marginRight: 12,
     },
     pdfCardTitle: { fontSize: 14, fontWeight: "700" },
     pdfCardSub: { fontSize: 12, marginTop: 2 },
-    pdfActionsRow: { flexDirection: "row", justifyContent: "space-around", borderTopWidth: 0.5, paddingTop: 10 },
+    pdfActionsRow: {
+      flexDirection: "row",
+      justifyContent: "space-around",
+      borderTopWidth: 0.5,
+      paddingTop: 10,
+    },
     pdfActionBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
     pdfActionBtnText: { fontSize: 13, fontWeight: "600" },
 
-    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-    modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, height: SCREEN_HEIGHT * 0.72, padding: 20 },
-    modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "flex-end",
+    },
+    modalContent: {
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      height: SCREEN_HEIGHT * 0.72,
+      padding: 20,
+    },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    },
     modalTitle: { fontSize: 18, fontWeight: "bold" },
-    
-    nameInput: { height: 46, borderRadius: 8, borderWidth: 1, paddingHorizontal: 12, fontSize: 14 },
-    searchInput: { height: 46, borderRadius: 8, borderWidth: 1, paddingHorizontal: 12, fontSize: 14, marginBottom: 10 },
-    caseRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: "rgba(128,128,128,0.15)" },
+
+    nameInput: {
+      height: 46,
+      borderRadius: 8,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      fontSize: 14,
+    },
+    searchInput: {
+      height: 46,
+      borderRadius: 8,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      fontSize: 14,
+      marginBottom: 10,
+    },
+    caseRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 12,
+      borderBottomWidth: 0.5,
+      borderBottomColor: "rgba(128,128,128,0.15)",
+    },
     caseRowActive: {
       flexDirection: "row",
       alignItems: "center",
       padding: 12,
       borderWidth: 1,
       borderRadius: 10,
-      marginBottom: 16
+      marginBottom: 16,
     },
     caseTitle: { fontSize: 14, fontWeight: "bold", marginBottom: 2 },
     caseSub: { fontSize: 12 },
     emptyModal: { textAlign: "center", marginTop: 40, color: "grey" },
 
-    actionBtn: { flex: 1, height: 48, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+    actionBtn: {
+      flex: 1,
+      height: 48,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    },
     cancelBtn: { backgroundColor: "rgba(128,128,128,0.15)" },
-    cancelBtnText: { fontWeight: "700", fontSize: 14, color: theme.colors.text },
-    saveBtn: { elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3 },
+    cancelBtnText: {
+      fontWeight: "700",
+      fontSize: 14,
+      color: theme.colors.text,
+    },
+    saveBtn: {
+      elevation: 2,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+    },
     saveBtnText: { fontWeight: "700", fontSize: 14, color: "#fff" },
   });
 

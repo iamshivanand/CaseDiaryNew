@@ -1,6 +1,7 @@
 // Screens/CaseDetailsScreen/components/__tests__/PlaceholderBottomSheet.test.tsx
-import React from "react";
 import { render, fireEvent } from "@testing-library/react-native";
+import React from "react";
+
 import { PlaceholderBottomSheet } from "../PlaceholderBottomSheet";
 
 const mockTheme: any = {
@@ -18,7 +19,7 @@ describe("PlaceholderBottomSheet", () => {
   it("should render placeholder label and clean label when visible", () => {
     const { getByText } = render(
       <PlaceholderBottomSheet
-        visible={true}
+        visible
         placeholderLabel="[Petitioner Name]"
         cleanLabel="Petitioner Name"
         theme={mockTheme}
@@ -37,7 +38,7 @@ describe("PlaceholderBottomSheet", () => {
 
     const { getByTestId } = render(
       <PlaceholderBottomSheet
-        visible={true}
+        visible
         placeholderLabel="[Petitioner Name]"
         cleanLabel="Petitioner Name"
         theme={mockTheme}

@@ -1,6 +1,7 @@
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useContext } from "react";
 import { Text, StyleSheet } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+
 import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface StatCardProps {
@@ -11,7 +12,7 @@ interface StatCardProps {
 
 const StatCard: React.FC<StatCardProps> = ({ label, value, unit }) => {
   const { theme } = useContext(ThemeContext);
-  const cardGradient = theme.dark 
+  const cardGradient = theme.dark
     ? ["#1E293B", "#0F172A"] // Slate-800 to Slate-900 for dark mode
     : ["#FFFFFF", "#F1F5F9"]; // Slate-50 gradient for light mode
 
@@ -23,14 +24,21 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, unit }) => {
         {
           borderColor: theme.colors.border,
           borderWidth: theme.dark ? 1 : 0,
-        }
+        },
       ]}
     >
       <Text style={[styles.valueText, { color: theme.colors.primary }]}>
         {value}
-        {unit && <Text style={[styles.unitText, { color: theme.colors.primary }]}> {unit}</Text>}
+        {unit && (
+          <Text style={[styles.unitText, { color: theme.colors.primary }]}>
+            {" "}
+            {unit}
+          </Text>
+        )}
       </Text>
-      <Text style={[styles.labelText, { color: theme.colors.textSecondary }]}>{label}</Text>
+      <Text style={[styles.labelText, { color: theme.colors.textSecondary }]}>
+        {label}
+      </Text>
     </LinearGradient>
   );
 };

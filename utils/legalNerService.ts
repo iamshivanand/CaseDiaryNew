@@ -14,7 +14,9 @@ export interface ExtractedLegalEntities {
 /**
  * Extracts structured legal entities from raw typed draft text offline using pattern recognition and NLP heuristics
  */
-export const extractLegalEntities = (draftText: string): ExtractedLegalEntities => {
+export const extractLegalEntities = (
+  draftText: string
+): ExtractedLegalEntities => {
   if (!draftText) {
     return { actsAndSections: [], dates: [], amounts: [] };
   }
@@ -60,22 +62,30 @@ export const extractLegalEntities = (draftText: string): ExtractedLegalEntities 
     entities.respondent = versusMatch[2].replace(/\s+/g, " ").trim();
   } else {
     // Fallback: search for "Petitioner:" or "Respondent:" labels
-    const petMatch = text.match(/(?:Petitioner|Appellant|Applicant|Plaintiff)\s*[:\-]\s*([A-Z0-9\s.,]+?)(?=\n|$|,)/i);
+    const petMatch = text.match(
+      /(?:Petitioner|Appellant|Applicant|Plaintiff)\s*[:\-]\s*([A-Z0-9\s.,]+?)(?=\n|$|,)/i
+    );
     if (petMatch) entities.petitioner = petMatch[1].trim();
 
-    const resMatch = text.match(/(?:Respondent|Defendant|Opposite Party)\s*[:\-]\s*([A-Z0-9\s.,]+?)(?=\n|$|,)/i);
+    const resMatch = text.match(
+      /(?:Respondent|Defendant|Opposite Party)\s*[:\-]\s*([A-Z0-9\s.,]+?)(?=\n|$|,)/i
+    );
     if (resMatch) entities.respondent = resMatch[1].trim();
   }
 
   // 5. Extract Acts and Sections (e.g., "Section 420 IPC", "Section 138 NI Act", "Sec. 439 Cr.P.C.", "Article 226")
-  const actSectionRegex = /\b((?:Section|Sec\.?|Article|Art\.?)\s*\d+[A-Z]?(?:\s+(?:read with|r\/w)\s+\d+[A-Z]?)?\s+(?:of\s+)?(?:IPC|Cr\.?P\.?C\.?|C\.?P\.?C\.?|N\.?I\.?\s*Act|Indian Penal Code|Constitution|Evidence Act|POCSO|NDPS|Motor Vehicles Act|MVA))\b/gi;
+  const actSectionRegex =
+    /\b((?:Section|Sec\.?|Article|Art\.?)\s*\d+[A-Z]?(?:\s+(?:read with|r\/w)\s+\d+[A-Z]?)?\s+(?:of\s+)?(?:IPC|Cr\.?P\.?C\.?|C\.?P\.?C\.?|N\.?I\.?\s*Act|Indian Penal Code|Constitution|Evidence Act|POCSO|NDPS|Motor Vehicles Act|MVA))\b/gi;
   const actMatches = text.match(actSectionRegex);
   if (actMatches) {
-    entities.actsAndSections = Array.from(new Set(actMatches.map((m) => m.trim())));
+    entities.actsAndSections = Array.from(
+      new Set(actMatches.map((m) => m.trim()))
+    );
   }
 
   // 6. Extract Dates (DD/MM/YYYY, DD-MM-YYYY, DDth Month YYYY)
-  const dateRegex = /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b/gi;
+  const dateRegex =
+    /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b/gi;
   const dateMatches = text.match(dateRegex);
   if (dateMatches) {
     entities.dates = Array.from(new Set(dateMatches.map((d) => d.trim())));

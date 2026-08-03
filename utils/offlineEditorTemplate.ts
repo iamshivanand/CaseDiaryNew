@@ -19,7 +19,7 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
     }
     body {
       margin: 0;
-      padding: 16px 12px 60px 12px;
+      padding: 8px 4px 40px 4px;
       background-color: #e5e7eb; /* Neutral gray background void between page sheets */
       display: flex;
       justify-content: center;
@@ -27,13 +27,13 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
     }
     .page-container {
       position: relative;
-      width: 100%;
-      max-width: 840px;
+      margin: 0 auto;
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
       border-radius: 6px;
       overflow: hidden;
       background-color: #fcf9f2;
       border: 1px solid #e2e8f0;
+      box-sizing: border-box;
     }
     .page-margin-guide {
       position: absolute;
@@ -51,6 +51,9 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       background-color: #fcf9f2; /* Professional Court Green/Yellowish Ledger Paper */
       padding: 28px 28px 48px 58px; /* Leave space for left red ledger line */
       box-sizing: border-box;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      word-break: break-word;
       font-family: 'Times New Roman', Georgia, serif;
       font-size: 16px;
       line-height: 1.8;
@@ -71,25 +74,41 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       line-height: inherit;
       color: inherit;
     }
-    hr.page-break {
-      border: none;
-      border-top: 1px dashed #cbd5e1;
-      border-bottom: 1px dashed #cbd5e1;
-      height: 24px;
-      margin: 16px -55px 16px -55px;
-      background: #f1f5f9;
+    hr.page-break, .legal-page-break {
+      display: block;
+      page-break-before: always;
+      break-before: page;
+      height: 0;
+      margin: 20px 0;
+      border: 0;
+      border-top: 1px dashed #94a3b8;
       position: relative;
       user-select: none;
-      -webkit-user-modify: read-only;
+    }
+    hr.page-break:after, .legal-page-break:after {
+      content: "--- Page Break ---";
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #f1f5f9;
+      padding: 0 10px;
+      font-size: 10px;
+      color: #64748b;
+      font-weight: bold;
+      font-family: sans-serif;
     }
     @media print {
-      hr.page-break {
-        page-break-after: always;
-        break-after: page;
-        border: none;
+      hr.page-break, .legal-page-break {
+        page-break-before: always;
+        break-before: page;
         height: 0;
+        border: 0;
         margin: 0;
-        visibility: hidden;
+        padding: 0;
+      }
+      hr.page-break:after, .legal-page-break:after {
+        display: none !important;
       }
     }
     ul, ol {
@@ -183,6 +202,12 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       font-weight: 700;
       text-align: center;
       border-radius: 4px;
+    }
+    .editor-table, .signature-stamp, .interactive-shape {
+      cursor: grab;
+    }
+    .editor-table:active, .signature-stamp:active, .interactive-shape:active {
+      cursor: grabbing;
     }
     .active-selected-element {
       outline: 2.5px solid #2563eb !important;
@@ -308,7 +333,7 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
 
     // Custom Table Generator
     function insertTable(rows = 3, cols = 3) {
-      let tableHtml = '<table class="editor-table"><thead><tr>';
+      let tableHtml = '<table class="editor-table" draggable="true"><thead><tr>';
       for (let c = 1; c <= cols; c++) {
         tableHtml += '<th>Header ' + c + '</th>';
       }
@@ -334,7 +359,6 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
           editor.focus();
         } else if (data.type === 'saveSelection') {
           saveEditorSelection();
-        }
         } else if (data.type === 'exec') {
           editor.focus();
           if (data.command === 'insertText') {
@@ -343,23 +367,24 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
           } else if (data.command === 'insertHTML') {
             insertHTMLAtCursor(data.value);
           } else if (data.command === 'insertPageBreak') {
-            insertHTMLAtCursor('<hr class="page-break" /><p><br></p>');
+            document.execCommand('insertHTML', false, '<div class="legal-page-break" style="break-before: page; page-break-before: always;"></div><p><br></p>');
+            sendStateToRN();
           } else if (data.command === 'insertTable') {
             insertTable(data.rows || 3, data.cols || 3);
           } else if (data.command === 'insertSignature') {
-            const sigHtml = '<img src="' + data.value + '" class="signature-stamp" alt="Advocate Signature" /><p><b>(Advocate Signature)</b></p>';
+            const sigHtml = '<img src="' + data.value + '" class="signature-stamp" draggable="true" alt="Advocate Signature" /><p><b>(Advocate Signature)</b></p>';
             insertHTMLAtCursor(sigHtml);
           } else if (data.command === 'insertShape') {
             let shapeHtml = '';
             const shapeType = data.value || 'rect';
             if (shapeType === 'rect') {
-              shapeHtml = '<div class="interactive-shape shape-rect" contenteditable="true"><b>Rectangle / Stamp Box</b></div><p><br></p>';
+              shapeHtml = '<div class="interactive-shape shape-rect" contenteditable="true" draggable="true"><b>Rectangle / Stamp Box</b></div><p><br></p>';
             } else if (shapeType === 'circle') {
-              shapeHtml = '<div class="interactive-shape shape-circle" contenteditable="true"><b>Round Seal Frame</b></div><p><br></p>';
+              shapeHtml = '<div class="interactive-shape shape-circle" contenteditable="true" draggable="true"><b>Round Seal Frame</b></div><p><br></p>';
             } else if (shapeType === 'arrow') {
-              shapeHtml = '<div class="interactive-shape shape-arrow" contenteditable="true"><b>➔ Process Arrow</b></div><p><br></p>';
+              shapeHtml = '<div class="interactive-shape shape-arrow" contenteditable="true" draggable="true"><b>➔ Process Arrow</b></div><p><br></p>';
             } else if (shapeType === 'stamp') {
-              shapeHtml = '<div class="interactive-shape shape-stamp" contenteditable="true"><b>[ AFFIX COURT FEE STAMP HERE - ₹10/- ]</b></div><p><br></p>';
+              shapeHtml = '<div class="interactive-shape shape-stamp" contenteditable="true" draggable="true"><b>[ AFFIX COURT FEE STAMP HERE - ₹10/- ]</b></div><p><br></p>';
             }
             insertHTMLAtCursor(shapeHtml);
           } else if (data.command === 'duplicateSelectedElement') {
@@ -369,8 +394,10 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
               sendStateToRN();
             }
           } else if (data.command === 'setFontSize') {
-            const sizeVal = data.value || '3';
-            document.execCommand('fontSize', false, sizeVal);
+            const sizeVal = data.value || '14';
+            const numSize = parseInt(sizeVal, 10) || 14;
+            window.userFontSize = numSize;
+            updateDynamicPaperRatio();
             sendStateToRN();
           } else if (data.command === 'deleteSelectedElement') {
             if (selectedElement) {
@@ -425,7 +452,7 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
                 } else if (data.value === 'lower') {
                   converted = text.toLowerCase();
                 } else if (data.value === 'title') {
-                  converted = text.replace(/\\b\\w/g, c => c.toUpperCase());
+                  converted = text.replace(/\b\w/g, c => c.toUpperCase());
                 }
                 document.execCommand('insertText', false, converted);
                 sendStateToRN();
@@ -442,7 +469,10 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
           }
         } else if (data.type === 'layout') {
           editor.style.fontFamily = data.font || 'Times New Roman';
-          editor.style.lineHeight = data.lineHeight || '1.8';
+          if (data.userFontSize) window.userFontSize = data.userFontSize;
+          if (data.lineHeight) window.userLineHeightRatio = parseFloat(data.lineHeight) || 1.8;
+          if (data.letterSpacing !== undefined) window.userLetterSpacing = data.letterSpacing;
+          if (data.wordSpacing !== undefined) window.userWordSpacing = data.wordSpacing;
           
           window.userTopMargin = data.topMargin !== undefined ? data.topMargin : 24;
           window.userBottomMargin = data.bottomMargin !== undefined ? data.bottomMargin : 24;
@@ -452,9 +482,6 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
           
           if (data.pageSize) {
             editor.className = data.pageSize === 'legal' ? 'page-legal' : 'page-a4';
-            if (!data.lineHeight) {
-              editor.style.lineHeight = data.pageSize === 'legal' ? '1.8' : '1.5';
-            }
           }
           updateDynamicPaperRatio();
         } else if (data.type === 'setContent') {
@@ -481,99 +508,76 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       }
     };
 
-    let isPaginationChecking = false;
-
-    function checkAutoPagination() {
-      if (!editor || isPaginationChecking) return;
-      isPaginationChecking = true;
-
-      try {
-        const container = document.querySelector('.page-container');
-        if (!container) {
-          isPaginationChecking = false;
-          return;
-        }
-
-        const paperWidth = container.clientWidth || window.innerWidth;
-        const isLegal = editor.classList.contains('page-legal');
-        const heightRatio = isLegal ? 1.6470 : 1.4142;
-        const singleSheetHeight = Math.round(paperWidth * heightRatio);
-        const scaleRatio = Math.min(1.2, Math.max(0.40, paperWidth / 794));
-
-        const configuredBottomMargin = window.userBottomMargin !== undefined ? window.userBottomMargin : 24;
-        const bottomThresholdPx = Math.round(configuredBottomMargin * scaleRatio);
-
-        const children = Array.from(editor.children);
-        let currentPageIndex = 0;
-        let currentPageTop = 0;
-
-        for (let i = 0; i < children.length; i++) {
-          const child = children[i];
-          if (child.tagName === 'HR' && child.classList.contains('page-break')) {
-            currentPageIndex++;
-            currentPageTop = currentPageIndex * singleSheetHeight;
-            continue;
-          }
-
-          const childBottom = child.offsetTop + child.offsetHeight;
-          const currentLimit = currentPageTop + singleSheetHeight - bottomThresholdPx;
-
-          if (childBottom > currentLimit && child.offsetHeight > 0) {
-            const prev = child.previousElementSibling;
-            if (!prev || !(prev.tagName === 'HR' && prev.classList.contains('page-break'))) {
-              const hr = document.createElement('hr');
-              hr.className = 'page-break';
-              editor.insertBefore(hr, child);
-              currentPageIndex++;
-              currentPageTop = currentPageIndex * singleSheetHeight;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Auto pagination error:', e);
-      } finally {
-        isPaginationChecking = false;
-      }
+    function getPaperMetrics() {
+      const container = document.querySelector('.page-container');
+      const outerPadding = 8;
+      const availableWidth = container ? Math.max(300, (container.clientWidth || window.innerWidth) - outerPadding) : window.innerWidth - outerPadding;
+      const isLegal = editor ? editor.classList.contains('page-legal') : true;
+      const referenceWidth = isLegal ? 816 : 794;
+      const paperWidth = Math.min(referenceWidth, availableWidth);
+      const scaleRatio = paperWidth / referenceWidth;
+      const heightRatio = isLegal ? 1.6470 : 1.4142;
+      const singleSheetHeight = Math.round(paperWidth * heightRatio);
+      return { paperWidth, referenceWidth, scaleRatio, heightRatio, singleSheetHeight, isLegal };
     }
 
     function updateDynamicPaperRatio() {
       const container = document.querySelector('.page-container');
       if (!container || !editor) return;
       
-      const paperWidth = container.clientWidth || window.innerWidth;
-      const isLegal = editor.classList.contains('page-legal');
-      // Aspect ratio: A4 (1 : 1.4142), Legal (1 : 1.6470)
-      const heightRatio = isLegal ? 1.6470 : 1.4142;
-      const singleSheetHeight = Math.round(paperWidth * heightRatio);
-      
-      checkAutoPagination();
+      const metrics = getPaperMetrics();
+      const paperWidth = metrics.paperWidth;
+      const singleSheetHeight = metrics.singleSheetHeight;
+      const scaleRatio = metrics.scaleRatio;
 
-      // Calculate total discrete page count from explicit page breaks or content overflow
-      const pageBreakCount = editor.querySelectorAll('hr.page-break').length;
-      const totalPages = Math.max(1, pageBreakCount + 1);
+      const configuredLeftMargin = window.userLeftMargin !== undefined ? window.userLeftMargin : 36;
+      const configuredRightMargin = window.userRightMargin !== undefined ? window.userRightMargin : 16;
+      const configuredTopMargin = window.userTopMargin !== undefined ? window.userTopMargin : 16;
+      const configuredBottomMargin = window.userBottomMargin !== undefined ? window.userBottomMargin : 16;
+      const configuredLetterhead = window.userLetterheadSpace !== undefined ? window.userLetterheadSpace : 0;
       
-      const sheetHeight = singleSheetHeight * totalPages;
-      editor.style.minHeight = sheetHeight + 'px';
-      container.style.minHeight = sheetHeight + 'px';
+      const dynamicLeftMargin = Math.round(configuredLeftMargin * scaleRatio);
+      const dynamicRightMargin = Math.round(configuredRightMargin * scaleRatio);
+      const dynamicTopMargin = Math.round((configuredTopMargin + configuredLetterhead) * scaleRatio);
+      const dynamicBottomMargin = Math.round(configuredBottomMargin * scaleRatio);
 
-      // Anchor each page break void gap to the exact bottom edge of its physical page sheet
-      const allBreaks = Array.from(editor.querySelectorAll('hr.page-break'));
-      allBreaks.forEach((hr, idx) => {
-        const targetTop = (idx + 1) * singleSheetHeight - 24;
-        const prev = hr.previousElementSibling;
-        if (prev) {
-          const prevBottom = prev.offsetTop + prev.offsetHeight;
-          const gapSpacer = Math.max(16, targetTop - prevBottom);
-          hr.style.marginTop = gapSpacer + 'px';
-        } else {
-          hr.style.marginTop = '16px';
-        }
-      });
+      // MS Word Page Count Calculation (Non-Destructive)
+      const printableSheetHeight = Math.max(100, singleSheetHeight - (dynamicTopMargin + dynamicBottomMargin));
+      const pageBreakCount = editor.querySelectorAll('.legal-page-break, hr.page-break').length;
+
+      // Temporarily set minHeight to 0px to accurately measure content scrollHeight without feedback loop
+      editor.style.minHeight = '0px';
+      const actualScrollHeight = editor.scrollHeight;
+
+      const overflowPages = Math.ceil(actualScrollHeight / printableSheetHeight) || 1;
+      const totalPages = Math.max(1, pageBreakCount + 1, overflowPages);
       
-      // Proportional font & padding scale based on standard 794px canvas width
-      const scaleRatio = Math.min(1.2, Math.max(0.40, paperWidth / 794));
-      const basePx = Math.max(10, Math.round(13.5 * scaleRatio));
+      const pageGap = Math.round(20 * scaleRatio);
+      const canvasHeight = Math.round((singleSheetHeight * totalPages) + (pageGap * (totalPages - 1)));
+      container.style.width = paperWidth + 'px';
+      container.style.margin = '0 auto';
+      editor.style.minHeight = canvasHeight + 'px';
+      container.style.height = canvasHeight + 'px';
       
+      // Proportional font, line-height, spacing & padding derived strictly from scaleRatio
+      const baseFontSize = window.userFontSize || 14;
+      const renderFontPx = Math.max(10, Math.round(baseFontSize * scaleRatio));
+
+      const baseLineRatio = window.userLineHeightRatio || (metrics.isLegal ? 1.8 : 1.5);
+      const renderLineHeightPx = (renderFontPx * baseLineRatio).toFixed(1);
+
+      const baseLetterSpace = window.userLetterSpacing || 0;
+      const renderLetterSpacePx = (baseLetterSpace * scaleRatio).toFixed(2);
+
+      const baseWordSpace = window.userWordSpacing || 0;
+      const renderWordSpacePx = (baseWordSpace * scaleRatio).toFixed(2);
+
+      const titlePx = Math.round(renderFontPx * 1.25);
+      const headerPx = Math.round(renderFontPx * 1.15);
+      const sectionPx = Math.round(renderFontPx * 1.08);
+      const paragraphMb = Math.max(4, Math.round(10 * scaleRatio));
+      const padBottomPx = Math.round(30 * scaleRatio);
+
       let dynamicStyle = document.getElementById('dynamic-paper-scale-style');
       if (!dynamicStyle) {
         dynamicStyle = document.createElement('style');
@@ -581,32 +585,13 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
         document.head.appendChild(dynamicStyle);
       }
       
-      const titlePx = Math.round(basePx * 1.18);
-      const titleMb = Math.max(4, Math.round(8 * scaleRatio));
-      const headerPx = Math.round(basePx * 1.10);
-      const headerMb = Math.max(6, Math.round(12 * scaleRatio));
-      const sectionPx = Math.round(basePx * 1.05);
-      const paragraphMb = Math.max(4, Math.round(8 * scaleRatio));
-      const padBottomPx = Math.round(30 * scaleRatio);
-
       dynamicStyle.innerHTML = 
-        '#editor { font-size: ' + basePx + 'px !important; padding-bottom: ' + padBottomPx + 'px !important; } ' +
-        '#editor p, #editor div, #editor td, #editor th, #editor li, #editor span { font-size: ' + basePx + 'px !important; line-height: 1.65 !important; margin-bottom: ' + paragraphMb + 'px !important; } ' +
-        '#editor .title, #editor h1 { font-size: ' + titlePx + 'px !important; margin-bottom: ' + titleMb + 'px !important; line-height: 1.35 !important; } ' +
-        '#editor .court-header, #editor h2 { font-size: ' + headerPx + 'px !important; margin-bottom: ' + headerMb + 'px !important; line-height: 1.45 !important; } ' +
+        '#editor { font-size: ' + renderFontPx + 'px !important; line-height: ' + renderLineHeightPx + 'px !important; letter-spacing: ' + renderLetterSpacePx + 'px !important; word-spacing: ' + renderWordSpacePx + 'px !important; padding-bottom: ' + padBottomPx + 'px !important; word-wrap: break-word !important; overflow-wrap: break-word !important; word-break: break-word !important; } ' +
+        '#editor p, #editor div, #editor td, #editor th, #editor li, #editor span, #editor blockquote, #editor caption, #editor .footnote { font-size: ' + renderFontPx + 'px !important; line-height: ' + renderLineHeightPx + 'px !important; letter-spacing: ' + renderLetterSpacePx + 'px !important; word-spacing: ' + renderWordSpacePx + 'px !important; margin-bottom: ' + paragraphMb + 'px !important; word-wrap: break-word !important; overflow-wrap: break-word !important; word-break: break-word !important; } ' +
+        '#editor .title, #editor h1 { font-size: ' + titlePx + 'px !important; margin-bottom: ' + Math.round(10 * scaleRatio) + 'px !important; line-height: ' + (titlePx * 1.3).toFixed(1) + 'px !important; } ' +
+        '#editor .court-header, #editor h2 { font-size: ' + headerPx + 'px !important; margin-bottom: ' + Math.round(12 * scaleRatio) + 'px !important; line-height: ' + (headerPx * 1.35).toFixed(1) + 'px !important; } ' +
         '#editor .section-title, #editor h3 { font-size: ' + sectionPx + 'px !important; } ' +
-        '#editor hr.page-break + * { margin-top: ' + Math.round((window.userTopMargin || 24) * scaleRatio) + 'px !important; }';
-      
-      const configuredLeftMargin = window.userLeftMargin !== undefined ? window.userLeftMargin : 55;
-      const configuredRightMargin = window.userRightMargin !== undefined ? window.userRightMargin : 24;
-      const configuredTopMargin = window.userTopMargin !== undefined ? window.userTopMargin : 24;
-      const configuredBottomMargin = window.userBottomMargin !== undefined ? window.userBottomMargin : 24;
-      const configuredLetterhead = window.userLetterheadSpace !== undefined ? window.userLetterheadSpace : 0;
-      
-      const dynamicLeftMargin = Math.round(configuredLeftMargin * scaleRatio);
-      const dynamicRightMargin = Math.round(configuredRightMargin * scaleRatio);
-      const dynamicTopMargin = Math.round((configuredTopMargin + configuredLetterhead) * scaleRatio);
-      const dynamicBottomMargin = Math.round(configuredBottomMargin * scaleRatio);
+        '#editor .legal-page-break + *, #editor hr.page-break + * { margin-top: ' + Math.round((window.userTopMargin || 16) * scaleRatio) + 'px !important; }';
       
       editor.style.paddingLeft = dynamicLeftMargin + 'px';
       editor.style.paddingRight = dynamicRightMargin + 'px';
@@ -614,7 +599,7 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       
       const redMargin = document.getElementById('red-margin-line');
       if (redMargin) {
-        redMargin.style.left = Math.max(8, Math.round(dynamicLeftMargin - 15)) + 'px';
+        redMargin.style.left = Math.max(4, Math.round(dynamicLeftMargin - (10 * scaleRatio))) + 'px';
       }
 
       // Render 4-sided dashed margin guide boxes for each physical page sheet
@@ -634,7 +619,7 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
 
       guideOverlay.innerHTML = '';
       for (let i = 0; i < totalPages; i++) {
-        const sheetTop = i * singleSheetHeight;
+        const sheetTop = i * (singleSheetHeight + pageGap);
         const guide = document.createElement('div');
         guide.className = 'page-margin-guide';
         guide.style.left = dynamicLeftMargin + 'px';
@@ -657,9 +642,10 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
               currentNode = currentNode.parentElement;
             }
             const prev = currentNode ? currentNode.previousElementSibling : null;
-            if (prev && prev.tagName === 'HR' && prev.classList.contains('page-break')) {
+            if (prev && (prev.classList.contains('legal-page-break') || (prev.tagName === 'HR' && prev.classList.contains('page-break')))) {
               e.preventDefault();
               const prevPageNode = prev.previousElementSibling;
+              prev.remove();
               if (prevPageNode) {
                 const newRange = document.createRange();
                 newRange.selectNodeContents(prevPageNode);
@@ -667,6 +653,8 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
                 selection.removeAllRanges();
                 selection.addRange(newRange);
               }
+              sendStateToRN();
+              updateDynamicPaperRatio();
               return;
             }
           }
@@ -674,30 +662,37 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       }
 
       if (e.key === 'Enter' || e.keyCode === 13) {
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          let blockNode = range.startContainer;
-          if (blockNode.nodeType === Node.TEXT_NODE) blockNode = blockNode.parentElement;
-          blockNode = blockNode ? blockNode.closest('p, div, h1, h2, h3, blockquote') : null;
-          
-          if (blockNode && (blockNode.querySelector('hr') || blockNode.style.border || blockNode.style.backgroundColor || blockNode.tagName.startsWith('H'))) {
-            e.preventDefault();
-            const newP = document.createElement('p');
-            newP.innerHTML = '<br>';
-            if (blockNode.nextSibling) {
-              blockNode.parentNode.insertBefore(newP, blockNode.nextSibling);
-            } else {
-              blockNode.parentNode.appendChild(newP);
-            }
+        let range;
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) range = sel.getRangeAt(0);
+
+        let blockNode = range ? range.startContainer : null;
+        if (!blockNode || blockNode === editor) {
+          blockNode = (sel && sel.focusNode) ? sel.focusNode : (document.activeElement || editor.lastElementChild || editor);
+        }
+        if (blockNode && blockNode.nodeType === Node.TEXT_NODE) blockNode = blockNode.parentElement;
+
+        const containerBlock = blockNode ? (blockNode.closest('.signature-row, .sig-row, .signature-block, [style*="display: flex"], [style*="display:flex"], .editor-table') || blockNode.closest('.sig-col, [style*="flex"], .signature-stamp, .interactive-shape, h1, h2, h3, blockquote')) : null;
+
+        if (containerBlock || (blockNode && (blockNode.querySelector('hr') || blockNode.style.border || blockNode.style.backgroundColor || (blockNode.tagName && blockNode.tagName.startsWith('H'))))) {
+          e.preventDefault();
+          const targetEscBlock = containerBlock || blockNode;
+          const newP = document.createElement('p');
+          newP.innerHTML = '<br>';
+          if (targetEscBlock.nextSibling) {
+            targetEscBlock.parentNode.insertBefore(newP, targetEscBlock.nextSibling);
+          } else {
+            targetEscBlock.parentNode.appendChild(newP);
+          }
+          if (sel) {
             const newRange = document.createRange();
             newRange.setStart(newP, 0);
             newRange.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(newRange);
-            sendStateToRN();
-            return;
+            sel.removeAllRanges();
+            sel.addRange(newRange);
           }
+          sendStateToRN();
+          return;
         }
       }
     });
@@ -714,12 +709,13 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       const cleanText = text.trim();
       const wordCount = cleanText ? cleanText.split(/\\s+/).length : 0;
       const charCount = cleanText.length;
-      const pageBreaks = editor.querySelectorAll('hr.page-break').length;
+      const pageBreaks = editor.querySelectorAll('.legal-page-break, hr.page-break').length;
       const estimatedPages = Math.max(1 + pageBreaks, Math.ceil(wordCount / 350) || 1);
       return { wordCount, charCount, estimatedPages, text: cleanText };
     }
 
     function sendStateToRN() {
+      updateDynamicPaperRatio();
       const state = {
         bold: document.queryCommandState('bold'),
         italic: document.queryCommandState('italic'),
@@ -822,8 +818,118 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       }
     });
 
-    // Scan initial placeholders on load
+    // Scan initial placeholders and initialize dynamic paper ratio on load
     scanAndHighlightPlaceholders();
+    updateDynamicPaperRatio();
+
+    // Drag and Drop Repositioning for Tables, Shapes, and Signatures
+    let draggedItem = null;
+    document.addEventListener('dragstart', function(e) {
+      const target = e.target.closest('.interactive-shape, .signature-stamp, .editor-table');
+      if (target) {
+        draggedItem = target;
+        e.dataTransfer.setData('text/plain', '');
+        e.dataTransfer.effectAllowed = 'move';
+        target.style.opacity = '0.5';
+      }
+    });
+
+    document.addEventListener('dragend', function(e) {
+      if (draggedItem) {
+        draggedItem.style.opacity = '1.0';
+        draggedItem = null;
+      }
+    });
+
+    editor.addEventListener('dragover', function(e) {
+      if (draggedItem) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }
+    });
+
+    editor.addEventListener('drop', function(e) {
+      if (draggedItem) {
+        e.preventDefault();
+        draggedItem.style.opacity = '1.0';
+        
+        let dropRange = null;
+        if (document.caretRangeFromPoint) {
+          dropRange = document.caretRangeFromPoint(e.clientX, e.clientY);
+        } else if (e.rangeParent) {
+          dropRange = document.createRange();
+          dropRange.setStart(e.rangeParent, e.rangeOffset);
+          dropRange.collapse(true);
+        }
+        
+        if (dropRange && editor.contains(dropRange.startContainer)) {
+          let targetBlock = dropRange.startContainer;
+          if (targetBlock.nodeType === Node.TEXT_NODE) targetBlock = targetBlock.parentElement;
+          targetBlock = targetBlock.closest('p, div, blockquote, td, th') || targetBlock;
+          if (targetBlock && targetBlock !== draggedItem && !draggedItem.contains(targetBlock)) {
+            targetBlock.parentNode.insertBefore(draggedItem, targetBlock.nextSibling || targetBlock);
+            sendStateToRN();
+          }
+        }
+        draggedItem = null;
+      }
+    });
+
+    // Paste Sanitization (strips MS Word Mso classes and aggressive inline styles)
+    editor.addEventListener('paste', function(e) {
+      e.preventDefault();
+      let html = (e.clipboardData || window.clipboardData).getData('text/html');
+      let text = (e.clipboardData || window.clipboardData).getData('text/plain');
+
+      if (html) {
+        html = html.replace(/<!--[\s\S]*?-->/g, '');
+        html = html.replace(new RegExp('<xml[\\s\\S]*?<\\/xml>', 'gi'), '');
+        html = html.replace(new RegExp('<\\/?[owm]:[^>]*>', 'gi'), '');
+        html = html.replace(/font-size\s*:[^;"]*;?/gi, '');
+        html = html.replace(/width\s*:[^;"]*;?/gi, '');
+        html = html.replace(/class\s*=\s*"[^"]*Mso[^"]*"/gi, '');
+        html = html.replace(/\bMso\w+/g, '');
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        const allEls = [doc.body, ...Array.from(doc.body.querySelectorAll('*'))];
+        allEls.forEach(el => {
+          if (el.className && (typeof el.className === 'string') && el.className.includes('Mso')) {
+            el.className = el.className.replace(/\bMso\w+/g, '').trim();
+            if (!el.className || el.className === '') {
+              el.removeAttribute('class');
+            }
+          }
+          if (el.getAttribute('class') && el.getAttribute('class').includes('Mso')) {
+            el.removeAttribute('class');
+          }
+
+          if (el.style) {
+            el.style.fontSize = '';
+            el.style.fontFamily = '';
+            el.style.lineHeight = '';
+            el.style.letterSpacing = '';
+            el.style.wordSpacing = '';
+            if (el.tagName !== 'TABLE' && el.tagName !== 'TD' && el.tagName !== 'TH' && !el.classList.contains('signature-stamp') && !el.classList.contains('interactive-shape')) {
+              el.style.width = '';
+              el.style.height = '';
+            }
+            if (!el.getAttribute('style') || el.getAttribute('style').trim() === '') {
+              el.removeAttribute('style');
+            }
+          }
+        });
+
+        const cleanHtml = doc.body.innerHTML;
+        document.execCommand('insertHTML', false, cleanHtml);
+      } else if (text) {
+        document.execCommand('insertText', false, text);
+      }
+
+      scanAndHighlightPlaceholders();
+      sendStateToRN();
+    });
 
     editor.addEventListener('mouseup', sendStateToRN);
     editor.addEventListener('keyup', sendStateToRN);

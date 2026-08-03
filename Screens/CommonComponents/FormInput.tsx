@@ -1,4 +1,6 @@
 // Screens/CommonComponents/FormInput.tsx
+import { Ionicons } from "@expo/vector-icons";
+import * as Contacts from "expo-contacts";
 import React, { useContext, useState, useRef, useEffect } from "react";
 import {
   View,
@@ -11,14 +13,16 @@ import {
   Platform,
   Alert,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { getFormInputStyles } from "./FormInputStyle";
-import { ThemeContext } from "../../Providers/ThemeProvider";
-import SuggestionInput from "./SuggestionsInput";
-import { getHindiCandidates } from "../../utils/transliterationService";
-import * as Contacts from "expo-contacts";
 
-interface FormInputProps extends Omit<TextInputProps, 'onChangeText' | 'value'> {
+import { getFormInputStyles } from "./FormInputStyle";
+import SuggestionInput from "./SuggestionsInput";
+import { ThemeContext } from "../../Providers/ThemeProvider";
+import { getHindiCandidates } from "../../utils/transliterationService";
+
+interface FormInputProps extends Omit<
+  TextInputProps,
+  "onChangeText" | "value"
+> {
   label: string;
   value?: string;
   onChangeText?: (text: string) => void;
@@ -70,7 +74,7 @@ const FormInput: React.FC<FormInputProps> = ({
   const allowTransliteration =
     explicitAllowTransliteration !== undefined
       ? explicitAllowTransliteration
-      : (keyboardType === "default" && !secureTextEntry && !suggestions);
+      : keyboardType === "default" && !secureTextEntry && !suggestions;
 
   if (suggestions !== undefined) {
     return (
@@ -107,7 +111,8 @@ const FormInput: React.FC<FormInputProps> = ({
         const textWithoutSpace = text.substring(0, text.length - 1);
         const index = textWithoutSpace.lastIndexOf(currentEnglishWord);
         if (index !== -1) {
-          const newText = textWithoutSpace.substring(0, index) + topCandidate + " ";
+          const newText =
+            textWithoutSpace.substring(0, index) + topCandidate + " ";
           onChangeText(newText);
         }
         setCandidates([]);
@@ -176,11 +181,17 @@ const FormInput: React.FC<FormInputProps> = ({
               onChangeText(selectedNumber);
             }
           } else {
-            Alert.alert("No Phone Number", "The selected contact does not have a phone number.");
+            Alert.alert(
+              "No Phone Number",
+              "The selected contact does not have a phone number."
+            );
           }
         }
       } else {
-        Alert.alert("Permission Denied", "Permission to access contacts is required to use this option.");
+        Alert.alert(
+          "Permission Denied",
+          "Permission to access contacts is required to use this option."
+        );
       }
     } catch (e) {
       console.error("Error picking contact", e);
@@ -190,8 +201,19 @@ const FormInput: React.FC<FormInputProps> = ({
 
   return (
     <View style={styles.inputContainer}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <Text style={[styles.label, { marginBottom: 0, flex: 1, marginRight: 8 }]}>{label}</Text>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 8,
+        }}
+      >
+        <Text
+          style={[styles.label, { marginBottom: 0, flex: 1, marginRight: 8 }]}
+        >
+          {label}
+        </Text>
         {allowTransliteration && (
           <TouchableOpacity
             onPress={() => {
@@ -201,26 +223,36 @@ const FormInput: React.FC<FormInputProps> = ({
             style={{
               flexDirection: "row",
               alignItems: "center",
-              backgroundColor: isTransliterationActive ? theme.colors.primary + "15" : "transparent",
+              backgroundColor: isTransliterationActive
+                ? theme.colors.primary + "15"
+                : "transparent",
               paddingHorizontal: 8,
               paddingVertical: 4,
               borderRadius: 12,
               borderWidth: 1,
-              borderColor: isTransliterationActive ? theme.colors.primary : "transparent",
+              borderColor: isTransliterationActive
+                ? theme.colors.primary
+                : "transparent",
             }}
             activeOpacity={0.7}
           >
             <Ionicons
               name="language-outline"
               size={14}
-              color={isTransliterationActive ? theme.colors.primary : theme.colors.textSecondary}
+              color={
+                isTransliterationActive
+                  ? theme.colors.primary
+                  : theme.colors.textSecondary
+              }
               style={{ marginRight: 4 }}
             />
             <Text
               style={{
                 fontSize: 11,
                 fontWeight: "bold",
-                color: isTransliterationActive ? theme.colors.primary : theme.colors.textSecondary,
+                color: isTransliterationActive
+                  ? theme.colors.primary
+                  : theme.colors.textSecondary,
               }}
             >
               {isTransliterationActive ? "Hindi (अ)" : "English"}
@@ -260,11 +292,15 @@ const FormInput: React.FC<FormInputProps> = ({
               borderColor: theme.colors.primary,
               height: 48,
               alignItems: "center",
-              justifyContent: "center"
+              justifyContent: "center",
             }}
             activeOpacity={0.7}
           >
-            <Ionicons name="person-add-outline" size={20} color={theme.colors.primary} />
+            <Ionicons
+              name="person-add-outline"
+              size={20}
+              color={theme.colors.primary}
+            />
           </TouchableOpacity>
         )}
       </View>
@@ -293,7 +329,8 @@ const FormInput: React.FC<FormInputProps> = ({
 
       {isTransliterationActive && (
         <Text style={styles.dictationHintText}>
-          Tip: You can also tap the keyboard microphone (🎙️) for native English/Hindi dictation.
+          Tip: You can also tap the keyboard microphone (🎙️) for native
+          English/Hindi dictation.
         </Text>
       )}
 

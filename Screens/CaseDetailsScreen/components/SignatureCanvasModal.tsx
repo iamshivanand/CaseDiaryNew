@@ -1,4 +1,5 @@
 // Screens/CaseDetailsScreen/components/SignatureCanvasModal.tsx
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import {
   Modal,
@@ -8,7 +9,7 @@ import {
   StyleSheet,
   Image,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+
 import { Theme } from "../../../Providers/ThemeProvider";
 
 interface SignatureCanvasModalProps {
@@ -53,7 +54,11 @@ export const SignatureCanvasModal: React.FC<SignatureCanvasModalProps> = ({
         <View style={styles.content}>
           <View style={styles.header}>
             <View style={styles.titleRow}>
-              <Ionicons name="ribbon-outline" size={22} color={theme.colors.primary} />
+              <Ionicons
+                name="ribbon-outline"
+                size={22}
+                color={theme.colors.primary}
+              />
               <Text style={styles.title}>Attach Advocate Signature Stamp</Text>
             </View>
             <TouchableOpacity onPress={onClose} testID="close-signature-modal">
@@ -62,7 +67,8 @@ export const SignatureCanvasModal: React.FC<SignatureCanvasModalProps> = ({
           </View>
 
           <Text style={styles.subtitle}>
-            Select a verified advocate stamp or digital signature seal to embed in your draft:
+            Select a verified advocate stamp or digital signature seal to embed
+            in your draft:
           </Text>
 
           {SAMPLE_SIGNATURE_STAMPS.map((stamp) => (
@@ -75,7 +81,11 @@ export const SignatureCanvasModal: React.FC<SignatureCanvasModalProps> = ({
               }}
               testID={`stamp-option-${stamp.id}`}
             >
-              <Ionicons name="checkmark-circle-outline" size={20} color={theme.colors.primary} />
+              <Ionicons
+                name="checkmark-circle-outline"
+                size={20}
+                color={theme.colors.primary}
+              />
               <Text style={styles.stampTitle}>{stamp.title}</Text>
             </TouchableOpacity>
           ))}

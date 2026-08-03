@@ -1,6 +1,13 @@
 import React, { useContext } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+} from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+
 import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface ContactItemProps {
@@ -28,10 +35,18 @@ const ContactItem: React.FC<ContactItemProps> = ({
 
   const content = (
     <View style={styles.itemContainer}>
-      <Icon name={iconName} size={22} color={theme.colors.primary} style={styles.icon} />
+      <Icon
+        name={iconName}
+        size={22}
+        color={theme.colors.primary}
+        style={styles.icon}
+      />
       {isEditing ? (
         <TextInput
-          style={[styles.textInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+          style={[
+            styles.textInput,
+            { color: theme.colors.text, borderColor: theme.colors.border },
+          ]}
           value={editText}
           onChangeText={onEditTextChange}
           placeholder={placeholder}
@@ -40,7 +55,9 @@ const ContactItem: React.FC<ContactItemProps> = ({
           autoCapitalize="none"
         />
       ) : (
-        <Text style={[styles.text, { color: theme.colors.text }]}>{text || "Not specified"}</Text>
+        <Text style={[styles.text, { color: theme.colors.text }]}>
+          {text || "Not specified"}
+        </Text>
       )}
     </View>
   );
@@ -57,8 +74,7 @@ const ContactItem: React.FC<ContactItemProps> = ({
 };
 
 const styles = StyleSheet.create({
-  touchable: {
-  },
+  touchable: {},
   itemContainer: {
     flexDirection: "row",
     alignItems: "center",

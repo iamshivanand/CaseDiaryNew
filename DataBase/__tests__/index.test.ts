@@ -1,11 +1,24 @@
-import * as SQLite from 'expo-sqlite'; // This will be the mock
-import * as dbFunctions from '../index'; // Import your database functions
-// Import the specific function directly for clarity and to ensure it's resolved
-import { getDb, getCaseTypes, addCaseType, updateCaseType, deleteCaseType, addCase, getCaseById, updateCase, deleteCase, uploadCaseDocument, getCaseDocuments, deleteCaseDocument } from '../index';
-import { __TEST_ONLY_resetDbInstance } from '../connection';
-import { CaseInsertData, CaseUpdateData } from '../index'; // Import types
-import { CaseType, CaseDocument, Case as CaseRow } from '../schema'; // Import schema types
+import * as SQLite from "expo-sqlite"; // This will be the mock
 
+import { __TEST_ONLY_resetDbInstance } from "../connection";
+import * as dbFunctions from "../index"; // Import your database functions
+// Import the specific function directly for clarity and to ensure it's resolved
+import {
+  getDb,
+  getCaseTypes,
+  addCaseType,
+  updateCaseType,
+  deleteCaseType,
+  addCase,
+  getCaseById,
+  updateCase,
+  deleteCase,
+  uploadCaseDocument,
+  getCaseDocuments,
+  deleteCaseDocument,
+} from "../index";
+import { CaseInsertData, CaseUpdateData } from "../index"; // Import types
+import { CaseType, CaseDocument, Case as CaseRow } from "../schema"; // Import schema types
 
 // Helper to access the mock's internal state if needed for assertions or reset
 const mockSQLite = SQLite as any; // Access to __resetAllMockDatabases etc.
@@ -33,82 +46,94 @@ beforeEach(async () => {
   // openDatabaseAsync is called IF dbInstance was reset.
 });
 
-describe('Database Module Tests', () => {
-
-  describe('CaseTypes CRUD', () => {
+describe("Database Module Tests", () => {
+  describe("CaseTypes CRUD", () => {
     const testUserId = 1;
-    it('should add a new case type', async () => {
-      const addCaseTypeSpy = jest.spyOn(dbFunctions, 'addCaseType');
-      await dbFunctions.addCaseType('Test Custom Type', testUserId);
-      expect(addCaseTypeSpy).toHaveBeenCalledWith('Test Custom Type', testUserId);
+    it("should add a new case type", async () => {
+      const addCaseTypeSpy = jest.spyOn(dbFunctions, "addCaseType");
+      await dbFunctions.addCaseType("Test Custom Type", testUserId);
+      expect(addCaseTypeSpy).toHaveBeenCalledWith(
+        "Test Custom Type",
+        testUserId
+      );
     });
 
-    it('should get case types', async () => {
-      const getCaseTypesSpy = jest.spyOn(dbFunctions, 'getCaseTypes');
+    it("should get case types", async () => {
+      const getCaseTypesSpy = jest.spyOn(dbFunctions, "getCaseTypes");
       await dbFunctions.getCaseTypes(testUserId);
       expect(getCaseTypesSpy).toHaveBeenCalledWith(testUserId);
     });
 
-    it('should update a case type', async () => {
-      const updateCaseTypeSpy = jest.spyOn(dbFunctions, 'updateCaseType');
-      await dbFunctions.updateCaseType(1, 'Updated Custom Type', testUserId);
-      expect(updateCaseTypeSpy).toHaveBeenCalledWith(1, 'Updated Custom Type', testUserId);
+    it("should update a case type", async () => {
+      const updateCaseTypeSpy = jest.spyOn(dbFunctions, "updateCaseType");
+      await dbFunctions.updateCaseType(1, "Updated Custom Type", testUserId);
+      expect(updateCaseTypeSpy).toHaveBeenCalledWith(
+        1,
+        "Updated Custom Type",
+        testUserId
+      );
     });
 
-    it('should delete a case type', async () => {
-      const deleteCaseTypeSpy = jest.spyOn(dbFunctions, 'deleteCaseType');
+    it("should delete a case type", async () => {
+      const deleteCaseTypeSpy = jest.spyOn(dbFunctions, "deleteCaseType");
       await dbFunctions.deleteCaseType(1, testUserId);
       expect(deleteCaseTypeSpy).toHaveBeenCalledWith(1, testUserId);
     });
   });
 
-  describe('Cases CRUD', () => {
+  describe("Cases CRUD", () => {
     const testUserId = 1;
-    const caseUniqueId = 'test-case-uuid-123';
+    const caseUniqueId = "test-case-uuid-123";
     let sampleCaseData: CaseInsertData;
 
     beforeEach(async () => {
       sampleCaseData = {
         uniqueId: caseUniqueId,
         user_id: testUserId,
-        CNRNumber: 'CNR123',
-        case_number: '101',
+        CNRNumber: "CNR123",
+        case_number: "101",
         case_year: 2024,
-        FirstParty: 'Plaintiff Test',
-        OppositeParty: 'Defendant Test',
+        FirstParty: "Plaintiff Test",
+        OppositeParty: "Defendant Test",
       };
     });
 
-    it('should add a case', async () => {
-      const addCaseSpy = jest.spyOn(dbFunctions, 'addCase');
+    it("should add a case", async () => {
+      const addCaseSpy = jest.spyOn(dbFunctions, "addCase");
       await dbFunctions.addCase(sampleCaseData);
       expect(addCaseSpy).toHaveBeenCalledWith(sampleCaseData);
     });
 
-    it('should update a case', async () => {
-      const updateCaseSpy = jest.spyOn(dbFunctions, 'updateCase');
-      const updates: CaseUpdateData = { CaseStatus: 'Hearing', NextDate: '2024-12-25' };
+    it("should update a case", async () => {
+      const updateCaseSpy = jest.spyOn(dbFunctions, "updateCase");
+      const updates: CaseUpdateData = {
+        CaseStatus: "Hearing",
+        NextDate: "2024-12-25",
+      };
       await dbFunctions.updateCase(1, updates, testUserId);
       expect(updateCaseSpy).toHaveBeenCalledWith(1, updates, testUserId);
     });
 
-    it('should delete a case', async () => {
-      const deleteCaseSpy = jest.spyOn(dbFunctions, 'deleteCase');
+    it("should delete a case", async () => {
+      const deleteCaseSpy = jest.spyOn(dbFunctions, "deleteCase");
       await dbFunctions.deleteCase(1, testUserId);
       expect(deleteCaseSpy).toHaveBeenCalledWith(1, testUserId);
     });
   });
 
-  describe('CaseDocuments CRUD', () => {
+  describe("CaseDocuments CRUD", () => {
     const testUserId = 1;
-    let caseId: number | null = 1;
+    const caseId: number | null = 1;
 
-    it('should upload a case document', async () => {
-      const uploadCaseDocumentSpy = jest.spyOn(dbFunctions, 'uploadCaseDocument');
+    it("should upload a case document", async () => {
+      const uploadCaseDocumentSpy = jest.spyOn(
+        dbFunctions,
+        "uploadCaseDocument"
+      );
       const docOptions = {
-        originalFileName: 'test_document.pdf',
-        fileType: 'application/pdf',
-        fileUri: 'file:///path/to/mock/document.pdf',
+        originalFileName: "test_document.pdf",
+        fileType: "application/pdf",
+        fileUri: "file:///path/to/mock/document.pdf",
         caseId: caseId!,
         userId: testUserId,
         fileSize: 10240,
@@ -117,14 +142,17 @@ describe('Database Module Tests', () => {
       expect(uploadCaseDocumentSpy).toHaveBeenCalledWith(docOptions);
     });
 
-    it('should delete a case document', async () => {
-      const deleteCaseDocumentSpy = jest.spyOn(dbFunctions, 'deleteCaseDocument');
+    it("should delete a case document", async () => {
+      const deleteCaseDocumentSpy = jest.spyOn(
+        dbFunctions,
+        "deleteCaseDocument"
+      );
       await dbFunctions.deleteCaseDocument(1);
       expect(deleteCaseDocumentSpy).toHaveBeenCalledWith(1);
     });
   });
 
-  describe('CaseHistoryLog', () => {
+  describe("CaseHistoryLog", () => {
     const testUserId = 1; // Case owner
     const actorUserId = 2; // Different user making the change
     let caseId: number | null;
@@ -133,18 +161,20 @@ describe('Database Module Tests', () => {
       const initialCaseData: CaseInsertData = {
         uniqueId: `case-hist-test-${Date.now()}`,
         user_id: actorUserId,
-        CaseStatus: 'New',
-        NextDate: '2024-01-01',
+        CaseStatus: "New",
+        NextDate: "2024-01-01",
       };
       caseId = await addCase(initialCaseData);
     });
 
-    it('should add a history entry when a tracked case field is updated', async () => {
-      const updateCaseSpy = jest.spyOn(dbFunctions, 'updateCase');
-      const updates: CaseUpdateData = { CaseStatus: 'Pending', NextDate: '2024-02-01' };
+    it("should add a history entry when a tracked case field is updated", async () => {
+      const updateCaseSpy = jest.spyOn(dbFunctions, "updateCase");
+      const updates: CaseUpdateData = {
+        CaseStatus: "Pending",
+        NextDate: "2024-02-01",
+      };
       await dbFunctions.updateCase(caseId!, updates, actorUserId);
       expect(updateCaseSpy).toHaveBeenCalledWith(caseId, updates, actorUserId);
     });
   });
-
 });

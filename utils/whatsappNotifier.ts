@@ -1,7 +1,8 @@
-import { Alert, Linking, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getCaseById, getUserProfile, getDb } from "../DataBase";
+import { Alert, Linking, Platform } from "react-native";
+
 import { formatDate } from "./commonFunctions";
+import { getCaseById, getUserProfile, getDb } from "../DataBase";
 
 /**
  * Prompts the advocate to send a WhatsApp notification to the client.
@@ -16,13 +17,17 @@ export const promptClientNotification = async (
     // 1. Fetch case details
     const caseDetails = await getCaseById(caseId);
     if (!caseDetails || !caseDetails.ClientContactNumber) {
-      console.log(`promptClientNotification: No contact number for case ID ${caseId}. Skipping.`);
+      console.log(
+        `promptClientNotification: No contact number for case ID ${caseId}. Skipping.`
+      );
       return;
     }
 
     let clientPhone = caseDetails.ClientContactNumber.replace(/\D/g, "");
     if (!clientPhone) {
-      console.log(`promptClientNotification: Sanitized contact number is empty. Skipping.`);
+      console.log(
+        `promptClientNotification: Sanitized contact number is empty. Skipping.`
+      );
       return;
     }
     if (clientPhone.length === 10) {
@@ -52,13 +57,19 @@ export const promptClientNotification = async (
 
     // 3. Resolve user language/locale templates or custom template
     const lang = (await AsyncStorage.getItem("@user_language")) || "en";
-    const customTemplate = await AsyncStorage.getItem("@whatsapp_custom_template");
+    const customTemplate = await AsyncStorage.getItem(
+      "@whatsapp_custom_template"
+    );
 
     const clientName = caseDetails.ClientName || "Client";
     const caseTitle = caseDetails.CaseTitle || "Legal Matter";
     const caseNumber = caseDetails.case_number || "N/A";
     const courtName = caseDetails.court_name || "N/A";
-    const dateFormatted = nextHearingDate ? formatDate(nextHearingDate) : (caseDetails.NextDate ? formatDate(caseDetails.NextDate) : "N/A");
+    const dateFormatted = nextHearingDate
+      ? formatDate(nextHearingDate)
+      : caseDetails.NextDate
+        ? formatDate(caseDetails.NextDate)
+        : "N/A";
 
     let message = "";
     if (customTemplate && customTemplate.trim()) {
@@ -87,7 +98,7 @@ export const promptClientNotification = async (
     // 4. Show Prompt Alert
     Alert.alert(
       lang === "hi" ? "मुवक्किल को सूचित करें" : "Notify Client",
-      lang === "hi" 
+      lang === "hi"
         ? "मामला सहेजा गया। क्या आप मुवक्किल को व्हाट्सएप के माध्यम से सूचित करना चाहते हैं?"
         : "Hearing saved. Would you like to notify the client via WhatsApp?",
       [
@@ -121,7 +132,9 @@ export const sendFeeReminderWhatsApp = async (
     if (supported) {
       await Linking.openURL(url);
     } else {
-      await Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+      await Linking.openURL(
+        `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+      );
     }
   } catch (err) {
     console.error("Failed to open WhatsApp URL:", err);

@@ -1,6 +1,7 @@
 // utils/__tests__/ocrService.test.ts
-import { formatOcrTextForDocument, extractTextFromImages } from "../ocrService";
 import * as FileSystem from "expo-file-system";
+
+import { formatOcrTextForDocument, extractTextFromImages } from "../ocrService";
 
 jest.mock("expo-file-system", () => ({
   getInfoAsync: jest.fn(),
@@ -17,7 +18,8 @@ describe("ocrService", () => {
     });
 
     it("should normalize line endings and rejoin hyphenated line breaks", () => {
-      const rawText = "IN THE HIGH COURT OF JUDICATURE AT BOMBAY\r\nPetiti-\noner vs Respon-\ndent\n\nPARAGRAPH TWO";
+      const rawText =
+        "IN THE HIGH COURT OF JUDICATURE AT BOMBAY\r\nPetiti-\noner vs Respon-\ndent\n\nPARAGRAPH TWO";
       const formatted = formatOcrTextForDocument(rawText);
       expect(formatted).toContain("Petitioner vs Respondent");
       expect(formatted).toContain("PARAGRAPH TWO");
@@ -31,7 +33,9 @@ describe("ocrService", () => {
     });
 
     it("should skip files that do not exist", async () => {
-      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({ exists: false });
+      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({
+        exists: false,
+      });
       const result = await extractTextFromImages(["file:///test/image.jpg"]);
       expect(result).toBe("");
     });

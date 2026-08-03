@@ -394,7 +394,8 @@ export function parseRawECourtsData(rawData: any): ExtractedCaseData {
   } else if (caseData.OppositeParty) {
     caseData.CaseTitle = `State vs. ${caseData.OppositeParty}`;
   } else {
-    caseData.CaseTitle = caseData.case_number || caseData.CNRNumber || "Imported Case";
+    caseData.CaseTitle =
+      caseData.case_number || caseData.CNRNumber || "Imported Case";
   }
 
   // 5. Fallback for crime_year if not explicitly set
@@ -498,26 +499,40 @@ export interface ParsedTextCase {
 
 export function checkDuplicateCases(
   parsedCases: ParsedTextCase[],
-  existingCases: { CNRNumber: string | null; case_number: string | null; court_name: string | null }[]
+  existingCases: {
+    CNRNumber: string | null;
+    case_number: string | null;
+    court_name: string | null;
+  }[]
 ): (ParsedTextCase & { alreadyExists: boolean })[] {
-  return parsedCases.map(c => {
-    const cnr = c.CNRNumber?.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-    const caseNo = c.case_number?.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  return parsedCases.map((c) => {
+    const cnr = c.CNRNumber?.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+    const caseNo = c.case_number
+      ?.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
     const court = c.court_name?.trim().toLowerCase().replace(/\s+/g, "");
 
     let alreadyExists = false;
 
     if (cnr && cnr !== "" && cnr !== "na" && cnr !== "n/a") {
-      const found = existingCases.some(e => {
-        const eCnr = e.CNRNumber?.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      const found = existingCases.some((e) => {
+        const eCnr = e.CNRNumber?.trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
         return eCnr && eCnr === cnr;
       });
       if (found) alreadyExists = true;
     }
 
     if (!alreadyExists && caseNo && caseNo !== "" && court && court !== "") {
-      const found = existingCases.some(e => {
-        const eCaseNo = e.case_number?.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      const found = existingCases.some((e) => {
+        const eCaseNo = e.case_number
+          ?.trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "");
         const eCourt = e.court_name?.trim().toLowerCase().replace(/\s+/g, "");
         return eCaseNo && eCaseNo === caseNo && eCourt && eCourt === court;
       });
@@ -526,7 +541,7 @@ export function checkDuplicateCases(
 
     return {
       ...c,
-      alreadyExists
+      alreadyExists,
     };
   });
 }
@@ -561,7 +576,10 @@ export function parseECourtsTxtFile(text: string): ParsedTextCase[] {
         }
       }
     } catch (err) {
-      console.log("Failed to parse as JSON backup, falling back to text regex parsing:", err);
+      console.log(
+        "Failed to parse as JSON backup, falling back to text regex parsing:",
+        err
+      );
     }
   }
 
@@ -592,10 +610,12 @@ export function parseECourtsTxtFile(text: string): ParsedTextCase[] {
           const cleanPart = part.replace(/\s+/g, "");
           const isCnr = /^[A-Za-z]{4}\d{12}$/.test(cleanPart);
           const isDate = /\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/.test(part);
-          const isTitle = part.toLowerCase().includes(" vs ") ||
-                          part.toLowerCase().includes(" v/s ") ||
-                          part.toLowerCase().includes(" versus ");
-          const isCaseNo = /[A-Za-z]+\s*\/\s*\d+/.test(part) || /^\d+\/\d{4}$/.test(part);
+          const isTitle =
+            part.toLowerCase().includes(" vs ") ||
+            part.toLowerCase().includes(" v/s ") ||
+            part.toLowerCase().includes(" versus ");
+          const isCaseNo =
+            /[A-Za-z]+\s*\/\s*\d+/.test(part) || /^\d+\/\d{4}$/.test(part);
 
           if (isCnr) {
             cnr = cleanPart.toUpperCase();

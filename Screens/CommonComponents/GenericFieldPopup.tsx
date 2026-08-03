@@ -3,11 +3,19 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import React, { useState, useContext } from "react";
-import { View, Text, TextInput, TouchableOpacity, Modal, StyleSheet } from "react-native";
-import { formatDate } from "../../utils/commonFunctions";
-import { ThemeContext } from "../../Providers/ThemeProvider";
-import ActionButton from "./ActionButton";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Modal,
+  StyleSheet,
+} from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+
+import ActionButton from "./ActionButton";
+import { ThemeContext } from "../../Providers/ThemeProvider";
+import { formatDate } from "../../utils/commonFunctions";
 
 interface FieldConfig {
   name: string;
@@ -61,13 +69,25 @@ const GenericModal: React.FC<GenericModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.border }]}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>Add Custom Field</Text>
-          
+        <View
+          style={[
+            styles.modalContent,
+            {
+              backgroundColor: theme.colors.cardBackground,
+              borderColor: theme.colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.title, { color: theme.colors.text }]}>
+            Add Custom Field
+          </Text>
+
           {fields.map((field) => (
             <View key={field.name} style={styles.fieldContainer}>
-              <Text style={[styles.label, { color: theme.colors.text }]}>{field.label}</Text>
-              
+              <Text style={[styles.label, { color: theme.colors.text }]}>
+                {field.label}
+              </Text>
+
               {field.type === "text" && (
                 <TextInput
                   style={[
@@ -83,7 +103,7 @@ const GenericModal: React.FC<GenericModalProps> = ({
                   onChangeText={(value) => handleChange(field.name, value)}
                 />
               )}
-              
+
               {field.type === "select" && (
                 <View
                   style={[
@@ -112,7 +132,7 @@ const GenericModal: React.FC<GenericModalProps> = ({
                   </Picker>
                 </View>
               )}
-              
+
               {field.type === "date" && (
                 <>
                   <TouchableOpacity
@@ -125,8 +145,19 @@ const GenericModal: React.FC<GenericModalProps> = ({
                       },
                     ]}
                   >
-                    <Icon name="calendar" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
-                    <Text style={{ color: formData[field.name] ? theme.colors.text : theme.colors.textSecondary }}>
+                    <Icon
+                      name="calendar"
+                      size={20}
+                      color={theme.colors.primary}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text
+                      style={{
+                        color: formData[field.name]
+                          ? theme.colors.text
+                          : theme.colors.textSecondary,
+                      }}
+                    >
                       {formData[field.name] || "Select Date"}
                     </Text>
                   </TouchableOpacity>
@@ -151,7 +182,11 @@ const GenericModal: React.FC<GenericModalProps> = ({
               <ActionButton title="Close" onPress={onClose} type="secondary" />
             </View>
             <View style={{ flex: 1, marginLeft: 8 }}>
-              <ActionButton title="Submit" onPress={handleFormSubmit} type="primary" />
+              <ActionButton
+                title="Submit"
+                onPress={handleFormSubmit}
+                type="primary"
+              />
             </View>
           </View>
         </View>

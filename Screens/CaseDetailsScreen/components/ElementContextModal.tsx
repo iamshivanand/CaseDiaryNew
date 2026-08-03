@@ -1,13 +1,8 @@
 // Screens/CaseDetailsScreen/components/ElementContextModal.tsx
-import React from "react";
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { Modal, View, Text, TouchableOpacity, StyleSheet } from "react-native";
+
 import { Theme } from "../../../Providers/ThemeProvider";
 
 interface ElementContextModalProps {
@@ -39,7 +34,11 @@ export const ElementContextModal: React.FC<ElementContextModalProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
         <View style={styles.content}>
           <View style={styles.header}>
             <View style={styles.titleRow}>
@@ -56,7 +55,8 @@ export const ElementContextModal: React.FC<ElementContextModalProps> = ({
           </View>
 
           <Text style={styles.subtitle}>
-            Select an action for the selected {isTable ? "table" : "signature stamp"}:
+            Select an action for the selected{" "}
+            {isTable ? "table" : "signature stamp"}:
           </Text>
 
           {/* Delete Element Action Button */}

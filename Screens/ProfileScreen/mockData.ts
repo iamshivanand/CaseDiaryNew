@@ -9,7 +9,7 @@ export const mockLawyerProfileData: LawyerProfileData = {
     totalCases: 125,
     upcomingHearings: 8,
     yearsOfPractice: 10,
-    yearsOfPracticeLastUpdated: new Date().toISOString().split('T')[0], // Set to today for calculation base
+    yearsOfPracticeLastUpdated: new Date().toISOString().split("T")[0], // Set to today for calculation base
   },
   aboutMe:
     "Dedicated and results-oriented Senior Legal Counsel with 10 years of experience in providing expert legal advice and representation. Proven ability to manage complex legal matters and achieve favorable outcomes for clients. Strong background in corporate law, litigation, and intellectual property rights.",
@@ -28,7 +28,8 @@ export const mockLawyerProfileData: LawyerProfileData = {
     {
       id: "2",
       date: "Oct 20, 2023",
-      description: 'Won a significant IP infringement lawsuit for "Innovatech Ltd."',
+      description:
+        'Won a significant IP infringement lawsuit for "Innovatech Ltd."',
     },
     {
       id: "3",
@@ -38,7 +39,8 @@ export const mockLawyerProfileData: LawyerProfileData = {
     {
       id: "4",
       date: "Oct 10, 2023",
-      description: "Attended Continuing Legal Education (CLE) seminar on AI in Law.",
+      description:
+        "Attended Continuing Legal Education (CLE) seminar on AI in Law.",
     },
   ],
 };

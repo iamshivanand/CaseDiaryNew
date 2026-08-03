@@ -1,11 +1,12 @@
 // Screens/EditCase/components/TimelineItem.tsx
-import React from 'react';
-import { View, Text } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { TimelineItemStyles } from './TimelineItemStyle';
-import IconOnlyButton from '../../CommonComponents/IconOnlyButton'; // Adjusted path
-import { TimelineEvent } from '../../../Types/appTypes'; // Adjusted path
-import { format, parseISO } from 'date-fns';
+import { MaterialIcons } from "@expo/vector-icons";
+import { format, parseISO } from "date-fns";
+import React from "react";
+import { View, Text } from "react-native";
+
+import { TimelineItemStyles } from "./TimelineItemStyle";
+import { TimelineEvent } from "../../../Types/appTypes"; // Adjusted path
+import IconOnlyButton from "../../CommonComponents/IconOnlyButton"; // Adjusted path
 
 interface TimelineItemProps {
   item: TimelineEvent;
@@ -14,20 +15,28 @@ interface TimelineItemProps {
   isLastItem?: boolean;
 }
 
-const TimelineItem: React.FC<TimelineItemProps> = ({ item, onEdit, onDelete, isLastItem = false }) => {
+const TimelineItem: React.FC<TimelineItemProps> = ({
+  item,
+  onEdit,
+  onDelete,
+  isLastItem = false,
+}) => {
   const displayDate = () => {
-    if (typeof item.date !== 'string' || !item.date) {
-      return 'Date N/A';
+    if (typeof item.date !== "string" || !item.date) {
+      return "Date N/A";
     }
     try {
       const date = parseISO(item.date);
       return format(date, "MMM dd, yyyy");
     } catch (error) {
-      return item.date.trim() !== '' ? item.date : 'Invalid Date Format';
+      return item.date.trim() !== "" ? item.date : "Invalid Date Format";
     }
   };
 
-  const displayDescription = typeof item.description === 'string' ? item.description : 'No description available.';
+  const displayDescription =
+    typeof item.description === "string"
+      ? item.description
+      : "No description available.";
 
   return (
     <View style={TimelineItemStyles.container}>

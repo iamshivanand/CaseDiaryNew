@@ -1,4 +1,5 @@
 // Screens/CommonComponents/CustomAlertModal.tsx
+import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   View,
@@ -13,10 +14,14 @@ import {
   Platform,
   Dimensions,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { ThemeContext } from "../../Providers/ThemeProvider";
-import { setCustomAlertHandler, AlertPayload, AlertButton } from "../../utils/AlertManager";
+
 import ActionButton from "./ActionButton";
+import { ThemeContext } from "../../Providers/ThemeProvider";
+import {
+  setCustomAlertHandler,
+  AlertPayload,
+  AlertButton,
+} from "../../utils/AlertManager";
 
 export const CustomAlertModal: React.FC = () => {
   const { theme } = useContext(ThemeContext);
@@ -77,7 +82,15 @@ export const CustomAlertModal: React.FC = () => {
 
   if (!payload) return null;
 
-  const { title, message, buttons, options, isPrompt, promptType, keyboardType } = payload;
+  const {
+    title,
+    message,
+    buttons,
+    options,
+    isPrompt,
+    promptType,
+    keyboardType,
+  } = payload;
 
   // Determine Alert Type / Status based on keywords in the title or message
   const getAlertType = (): "success" | "danger" | "warning" | "info" => {
@@ -120,31 +133,42 @@ export const CustomAlertModal: React.FC = () => {
   const alertType = getAlertType();
 
   // Map theme colors and icons
-  let statusIconName: keyof typeof Ionicons.prototype.props.name = "information-circle";
+  let statusIconName: keyof typeof Ionicons.prototype.props.name =
+    "information-circle";
   let statusColor = theme.colors.primary;
-  let statusBgColor = theme.colors.dark ? "rgba(129, 140, 248, 0.15)" : "rgba(99, 102, 241, 0.15)";
+  let statusBgColor = theme.colors.dark
+    ? "rgba(129, 140, 248, 0.15)"
+    : "rgba(99, 102, 241, 0.15)";
 
   switch (alertType) {
     case "success":
       statusIconName = "checkmark-circle";
       statusColor = theme.colors.success;
-      statusBgColor = theme.colors.dark ? "rgba(52, 211, 153, 0.15)" : "rgba(16, 185, 129, 0.15)";
+      statusBgColor = theme.colors.dark
+        ? "rgba(52, 211, 153, 0.15)"
+        : "rgba(16, 185, 129, 0.15)";
       break;
     case "danger":
       statusIconName = "alert-circle";
       statusColor = theme.colors.danger;
-      statusBgColor = theme.colors.dark ? "rgba(248, 113, 113, 0.15)" : "rgba(239, 68, 68, 0.15)";
+      statusBgColor = theme.colors.dark
+        ? "rgba(248, 113, 113, 0.15)"
+        : "rgba(239, 68, 68, 0.15)";
       break;
     case "warning":
       statusIconName = "warning";
       statusColor = theme.colors.warning;
-      statusBgColor = theme.colors.dark ? "rgba(251, 191, 36, 0.15)" : "rgba(245, 158, 11, 0.15)";
+      statusBgColor = theme.colors.dark
+        ? "rgba(251, 191, 36, 0.15)"
+        : "rgba(245, 158, 11, 0.15)";
       break;
     case "info":
     default:
       statusIconName = "information-circle";
       statusColor = theme.colors.primary;
-      statusBgColor = theme.colors.dark ? "rgba(129, 140, 248, 0.15)" : "rgba(99, 102, 241, 0.15)";
+      statusBgColor = theme.colors.dark
+        ? "rgba(129, 140, 248, 0.15)"
+        : "rgba(99, 102, 241, 0.15)";
       break;
   }
 
@@ -204,8 +228,13 @@ export const CustomAlertModal: React.FC = () => {
     if (buttons.length === 2) {
       // Typically Cancel and Action (Delete, Confirm, etc.)
       const isCancelFirst = buttons[0].style === "cancel";
-      const cancelButton = isCancelFirst ? buttons[0] : buttons[1].style === "cancel" ? buttons[1] : null;
-      const actionButton = cancelButton === buttons[0] ? buttons[1] : buttons[0];
+      const cancelButton = isCancelFirst
+        ? buttons[0]
+        : buttons[1].style === "cancel"
+          ? buttons[1]
+          : null;
+      const actionButton =
+        cancelButton === buttons[0] ? buttons[1] : buttons[0];
 
       return (
         <View style={styles.buttonRow}>
@@ -223,10 +252,16 @@ export const CustomAlertModal: React.FC = () => {
             onPress={() => handleButtonPress(actionButton)}
             style={[
               styles.rowButton,
-              actionButton.style === "destructive" && { backgroundColor: theme.colors.danger },
+              actionButton.style === "destructive" && {
+                backgroundColor: theme.colors.danger,
+              },
               !cancelButton && { marginLeft: 8 },
             ]}
-            textStyle={actionButton.style === "destructive" ? { color: "#FFF" } : undefined}
+            textStyle={
+              actionButton.style === "destructive"
+                ? { color: "#FFF" }
+                : undefined
+            }
           />
         </View>
       );
@@ -243,10 +278,14 @@ export const CustomAlertModal: React.FC = () => {
             onPress={() => handleButtonPress(btn)}
             style={[
               styles.fullWidthButton,
-              btn.style === "destructive" && { backgroundColor: theme.colors.danger },
+              btn.style === "destructive" && {
+                backgroundColor: theme.colors.danger,
+              },
               { marginVertical: 4 },
             ]}
-            textStyle={btn.style === "destructive" ? { color: "#FFF" } : undefined}
+            textStyle={
+              btn.style === "destructive" ? { color: "#FFF" } : undefined
+            }
           />
         ))}
       </View>
@@ -277,16 +316,40 @@ export const CustomAlertModal: React.FC = () => {
                 ]}
               >
                 {/* Status Icon */}
-                <View style={[styles.iconContainer, { backgroundColor: statusBgColor }]}>
-                  <Ionicons name={statusIconName as any} size={36} color={statusColor} />
+                <View
+                  style={[
+                    styles.iconContainer,
+                    { backgroundColor: statusBgColor },
+                  ]}
+                >
+                  <Ionicons
+                    name={statusIconName as any}
+                    size={36}
+                    color={statusColor}
+                  />
                 </View>
 
-                 {/* Title */}
-                <Text style={[styles.title, { fontFamily: theme.fonts.bold, color: theme.colors.text }]}>{title}</Text>
+                {/* Title */}
+                <Text
+                  style={[
+                    styles.title,
+                    { fontFamily: theme.fonts.bold, color: theme.colors.text },
+                  ]}
+                >
+                  {title}
+                </Text>
 
                 {/* Message */}
                 {message ? (
-                  <Text style={[styles.message, { fontFamily: theme.fonts.regular, color: theme.colors.textSecondary }]}>
+                  <Text
+                    style={[
+                      styles.message,
+                      {
+                        fontFamily: theme.fonts.regular,
+                        color: theme.colors.textSecondary,
+                      },
+                    ]}
+                  >
                     {message}
                   </Text>
                 ) : null}

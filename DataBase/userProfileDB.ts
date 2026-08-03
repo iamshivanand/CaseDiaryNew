@@ -1,5 +1,6 @@
 // DataBase/userProfileDB.ts
 import * as SQLite from "expo-sqlite";
+
 import { LawyerProfileData } from "../Types/appTypes";
 import { safeJsonParse } from "../utils/jsonUtils";
 
@@ -71,12 +72,22 @@ export const updateUserProfile = async (
   const languages = profileData.languages;
 
   const fullName = profileData.fullName || profileData.name;
-  const email = profileData.email || (profileData.contactInfo ? profileData.contactInfo.email : "");
-  const phone = profileData.phone || (profileData.contactInfo ? profileData.contactInfo.phone : "");
-  const address = profileData.address || profileData.location || (profileData.contactInfo ? profileData.contactInfo.address : "");
-  const experience = profileData.experience !== undefined 
-    ? profileData.experience 
-    : (profileData.stats && profileData.stats.yearsOfPractice !== undefined ? profileData.stats.yearsOfPractice : 0);
+  const email =
+    profileData.email ||
+    (profileData.contactInfo ? profileData.contactInfo.email : "");
+  const phone =
+    profileData.phone ||
+    (profileData.contactInfo ? profileData.contactInfo.phone : "");
+  const address =
+    profileData.address ||
+    profileData.location ||
+    (profileData.contactInfo ? profileData.contactInfo.address : "");
+  const experience =
+    profileData.experience !== undefined
+      ? profileData.experience
+      : profileData.stats && profileData.stats.yearsOfPractice !== undefined
+        ? profileData.stats.yearsOfPractice
+        : 0;
 
   // Retrieve existing stats to compare yearsOfPractice
   const existing = await db.getFirstAsync<{ stats: string }>(
@@ -85,14 +96,17 @@ export const updateUserProfile = async (
   );
   const oldStats = safeJsonParse<any>(existing?.stats || null, {});
 
-  const newYears = typeof experience === 'string' ? parseInt(experience, 10) : (experience || 0);
-  const oldYears = oldStats.yearsOfPractice !== undefined ? oldStats.yearsOfPractice : -1;
+  const newYears =
+    typeof experience === "string" ? parseInt(experience, 10) : experience || 0;
+  const oldYears =
+    oldStats.yearsOfPractice !== undefined ? oldStats.yearsOfPractice : -1;
 
   const stats = {
     yearsOfPractice: newYears,
-    yearsOfPracticeLastUpdated: newYears === oldYears 
-      ? (oldStats.yearsOfPracticeLastUpdated || new Date().toISOString())
-      : new Date().toISOString(),
+    yearsOfPracticeLastUpdated:
+      newYears === oldYears
+        ? oldStats.yearsOfPracticeLastUpdated || new Date().toISOString()
+        : new Date().toISOString(),
   };
 
   const contactInfo = {
@@ -101,9 +115,13 @@ export const updateUserProfile = async (
     address,
   };
 
-  const practiceAreasStr = Array.isArray(practiceAreas) ? JSON.stringify(practiceAreas) : JSON.stringify([]);
+  const practiceAreasStr = Array.isArray(practiceAreas)
+    ? JSON.stringify(practiceAreas)
+    : JSON.stringify([]);
   const contactInfoStr = JSON.stringify(contactInfo);
-  const languagesStr = Array.isArray(languages) ? JSON.stringify(languages) : JSON.stringify([]);
+  const languagesStr = Array.isArray(languages)
+    ? JSON.stringify(languages)
+    : JSON.stringify([]);
   const statsStr = JSON.stringify(stats);
 
   if (existing) {

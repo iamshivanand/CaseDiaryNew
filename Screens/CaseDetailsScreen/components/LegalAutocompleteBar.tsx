@@ -1,4 +1,5 @@
 // Screens/CaseDetailsScreen/components/LegalAutocompleteBar.tsx
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import {
   ScrollView,
@@ -7,7 +8,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+
 import { Theme } from "../../../Providers/ThemeProvider";
 
 interface LegalAutocompleteBarProps {

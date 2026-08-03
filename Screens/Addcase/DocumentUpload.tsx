@@ -35,7 +35,11 @@ export type DocumentUploadProps = {
   onDocumentUploaded?: () => void;
 };
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, showList = false, onDocumentUploaded }) => {
+const DocumentUpload: React.FC<DocumentUploadProps> = ({
+  caseId,
+  showList = false,
+  onDocumentUploaded,
+}) => {
   const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
   const navigation = useNavigation<any>();
@@ -324,8 +328,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, showList = fals
           Scan to PDF
         </Button>
       </View>
-      {showList && (
-        loading && documents.length === 0 ? (
+      {showList &&
+        (loading && documents.length === 0 ? (
           <ActivityIndicator animating size="large" style={styles.loader} />
         ) : (
           <FlatList
@@ -349,8 +353,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ caseId, showList = fals
             }
             contentContainerStyle={styles.listContentContainer}
           />
-        )
-      )}
+        ))}
     </View>
   );
 };

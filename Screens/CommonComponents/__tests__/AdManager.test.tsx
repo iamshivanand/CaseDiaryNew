@@ -1,15 +1,15 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
+import * as Network from "expo-network";
 import React from "react";
 import { View, Button } from "react-native";
-import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import LanguageProvider from "../../../Providers/LanguageProvider";
+import ThemeProvider from "../../../Providers/ThemeProvider";
+import { AdProvider, useAdTrigger } from "../AdManager";
 
 // Unmock AdManager to test the actual implementation
 jest.unmock("../AdManager");
-
-import { AdProvider, useAdTrigger } from "../AdManager";
-import ThemeProvider from "../../../Providers/ThemeProvider";
-import LanguageProvider from "../../../Providers/LanguageProvider";
-import * as Network from "expo-network";
 
 // Declare global storage for listeners
 declare global {
@@ -67,9 +67,13 @@ jest.mock("react-native-google-mobile-ads", () => {
   };
 });
 
-jest.mock("expo-network", () => ({
-  getNetworkStateAsync: jest.fn(() => Promise.resolve({ isConnected: true })),
-}), { virtual: true });
+jest.mock(
+  "expo-network",
+  () => ({
+    getNetworkStateAsync: jest.fn(() => Promise.resolve({ isConnected: true })),
+  }),
+  { virtual: true }
+);
 
 const getMockRewarded = () => {
   const { RewardedAd } = require("react-native-google-mobile-ads");
@@ -81,12 +85,22 @@ const getMockInterstitial = () => {
   return InterstitialAd.createForAdRequest();
 };
 
-const TestComponent = ({ onComplete }: { onComplete: (success: boolean) => void }) => {
+const TestComponent = ({
+  onComplete,
+}: {
+  onComplete: (success: boolean) => void;
+}) => {
   const { showAdWithPreload } = useAdTrigger();
   return (
     <View>
-      <Button title="Show Rewarded" onPress={() => showAdWithPreload("rewarded", onComplete)} />
-      <Button title="Show Interstitial" onPress={() => showAdWithPreload("interstitial", onComplete)} />
+      <Button
+        title="Show Rewarded"
+        onPress={() => showAdWithPreload("rewarded", onComplete)}
+      />
+      <Button
+        title="Show Interstitial"
+        onPress={() => showAdWithPreload("interstitial", onComplete)}
+      />
     </View>
   );
 };
@@ -127,7 +141,9 @@ describe("AdManager", () => {
 
   it("should warn user and not proceed if internet connection is offline", async () => {
     jest.spyOn(AsyncStorage, "getItem").mockResolvedValue("false");
-    (Network.getNetworkStateAsync as jest.Mock).mockResolvedValue({ isConnected: false });
+    (Network.getNetworkStateAsync as jest.Mock).mockResolvedValue({
+      isConnected: false,
+    });
     const alertSpy = jest.spyOn(require("react-native").Alert, "alert");
     const onComplete = jest.fn();
     const { getByText } = renderWithProviders(onComplete);
@@ -147,7 +163,9 @@ describe("AdManager", () => {
 
   it("should show ad immediately if it is already loaded", async () => {
     jest.spyOn(AsyncStorage, "getItem").mockResolvedValue("false");
-    (Network.getNetworkStateAsync as jest.Mock).mockResolvedValue({ isConnected: true });
+    (Network.getNetworkStateAsync as jest.Mock).mockResolvedValue({
+      isConnected: true,
+    });
     getMockRewarded().loaded = true;
     const onComplete = jest.fn();
     const { getByText } = renderWithProviders(onComplete);
@@ -161,7 +179,9 @@ describe("AdManager", () => {
 
   it("should show preloading modal if ad is not loaded, and show ad once it loads", async () => {
     jest.spyOn(AsyncStorage, "getItem").mockResolvedValue("false");
-    (Network.getNetworkStateAsync as jest.Mock).mockResolvedValue({ isConnected: true });
+    (Network.getNetworkStateAsync as jest.Mock).mockResolvedValue({
+      isConnected: true,
+    });
     getMockRewarded().loaded = false;
     const onComplete = jest.fn();
     const { getByText, queryByText } = renderWithProviders(onComplete);

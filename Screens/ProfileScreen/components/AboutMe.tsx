@@ -1,6 +1,13 @@
 import React, { useContext } from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+} from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+
 import { ThemeContext } from "../../../Providers/ThemeProvider";
 
 interface AboutMeProps {
@@ -19,28 +26,30 @@ const AboutMe: React.FC<AboutMeProps> = ({
   const { theme } = useContext(ThemeContext);
 
   return (
-    <View 
+    <View
       style={[
-        styles.container, 
-        { 
+        styles.container,
+        {
           backgroundColor: theme.colors.cardBackground,
           borderColor: theme.colors.border,
           borderWidth: 1,
-        }
+        },
       ]}
     >
       <View style={styles.headerContainer}>
-        <Text style={[styles.heading, { color: theme.colors.text }]}>About Me</Text>
+        <Text style={[styles.heading, { color: theme.colors.text }]}>
+          About Me
+        </Text>
       </View>
       {isEditing ? (
         <TextInput
           style={[
-            styles.textInput, 
-            { 
-              backgroundColor: theme.colors.inputBackground, 
-              color: theme.colors.text, 
-              borderColor: theme.colors.border 
-            }
+            styles.textInput,
+            {
+              backgroundColor: theme.colors.inputBackground,
+              color: theme.colors.text,
+              borderColor: theme.colors.border,
+            },
           ]}
           value={tempDescription}
           onChangeText={onTempDescriptionChange}
@@ -50,7 +59,12 @@ const AboutMe: React.FC<AboutMeProps> = ({
           numberOfLines={5}
         />
       ) : (
-        <Text style={[styles.descriptionText, { color: theme.colors.textSecondary }]}>
+        <Text
+          style={[
+            styles.descriptionText,
+            { color: theme.colors.textSecondary },
+          ]}
+        >
           {description || "Not specified."}
         </Text>
       )}
@@ -93,7 +107,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     minHeight: 100,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
     marginBottom: 15,
   },
   editControlsContainer: {
@@ -102,13 +116,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   button: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 25,
     minWidth: 120,
-    justifyContent: 'center',
+    justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
@@ -124,7 +138,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#fff",
     marginLeft: 8,
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 15,
   },
 });

@@ -1,4 +1,5 @@
 // Screens/CaseDetailsScreen/components/PlaceholderBottomSheet.tsx
+import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
 import {
   Modal,
@@ -10,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+
 import { Theme } from "../../../Providers/ThemeProvider";
 
 interface PlaceholderBottomSheetProps {
@@ -56,14 +57,25 @@ export const PlaceholderBottomSheet: React.FC<PlaceholderBottomSheetProps> = ({
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.overlay}
       >
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
         <View style={styles.content}>
           <View style={styles.header}>
             <View style={styles.titleRow}>
-              <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+              <Ionicons
+                name="create-outline"
+                size={20}
+                color={theme.colors.primary}
+              />
               <Text style={styles.title}>Fill Placeholder Details</Text>
             </View>
-            <TouchableOpacity onPress={onClose} testID="close-placeholder-modal">
+            <TouchableOpacity
+              onPress={onClose}
+              testID="close-placeholder-modal"
+            >
               <Ionicons name="close" size={22} color={theme.colors.subText} />
             </TouchableOpacity>
           </View>

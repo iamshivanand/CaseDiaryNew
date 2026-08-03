@@ -1,5 +1,6 @@
 // Screens/EditCase/EditCaseScreenStyle.ts
 import { StyleSheet, Dimensions } from "react-native";
+
 import { Theme } from "../../Providers/ThemeProvider"; // Import Theme type
 
 const { width } = Dimensions.get("window");

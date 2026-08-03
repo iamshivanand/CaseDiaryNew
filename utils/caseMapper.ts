@@ -1,52 +1,136 @@
-import { CaseDataScreen } from "../Types/appTypes";
-import { CaseWithDetails } from "../DataBase";
 import { formatDate } from "./commonFunctions";
 import { ParsedTextCase } from "./ecourtsParser";
+import { CaseWithDetails } from "../DataBase";
+import { CaseDataScreen } from "../Types/appTypes";
 
 /**
  * Maps a SQLite database case record (or search result) to the structure expected by UI components.
  * Consolidates the formatting of nextHearing, previousHearing, and lastUpdate dates.
- * 
+ *
  * @param dbCase The raw case data object from the database query
  * @returns A UI-ready CaseDataScreen representation
  */
-export const mapCaseDbToScreen = (dbCase: Partial<CaseWithDetails> & { id: number }): CaseDataScreen => {
+export const mapCaseDbToScreen = (
+  dbCase: Partial<CaseWithDetails> & { id: number }
+): CaseDataScreen => {
   return {
     ...dbCase,
     id: dbCase.id,
-    title: dbCase.CaseTitle || 'No Title',
-    client: dbCase.ClientName || 'Unknown Client',
-    status: (dbCase.CaseStatus === 'Active' || dbCase.CaseStatus === 'Closed' || dbCase.CaseStatus === 'Pending' ? dbCase.CaseStatus : 'Pending') as 'Active' | 'Pending' | 'Closed',
-    nextHearing: dbCase.NextDate ? formatDate(dbCase.NextDate) : 'N/A',
-    lastUpdate: dbCase.updated_at ? formatDate(dbCase.updated_at) : 'N/A',
-    previousHearing: dbCase.PreviousDate ? formatDate(dbCase.PreviousDate) : 'N/A',
-    priority: dbCase.Priority || 'Low',
+    title: dbCase.CaseTitle || "No Title",
+    client: dbCase.ClientName || "Unknown Client",
+    status: (dbCase.CaseStatus === "Active" ||
+    dbCase.CaseStatus === "Closed" ||
+    dbCase.CaseStatus === "Pending"
+      ? dbCase.CaseStatus
+      : "Pending") as "Active" | "Pending" | "Closed",
+    nextHearing: dbCase.NextDate ? formatDate(dbCase.NextDate) : "N/A",
+    lastUpdate: dbCase.updated_at ? formatDate(dbCase.updated_at) : "N/A",
+    previousHearing: dbCase.PreviousDate
+      ? formatDate(dbCase.PreviousDate)
+      : "N/A",
+    priority: dbCase.Priority || "Low",
   };
 };
 
 const FIELD_ALIASES: Record<string, string[]> = {
   CNRNumber: ["cino", "cnr", "cnrnumber", "cnr_no", "cnr_number"],
   CaseTitle: ["title", "case_title", "parties", "title_name"],
-  ClientName: ["clientname", "client", "client_name", "petparty_name", "petitioner"],
-  FirstParty: ["firstparty", "first_party", "petparty_name", "petitioner", "plaintiff"],
-  OppositeParty: ["oppositeparty", "opposite_party", "resparty_name", "respondent", "defendant"],
-  case_number: ["case_number", "case_no", "caseno", "reg_no", "registration_no", "reg_number"],
+  ClientName: [
+    "clientname",
+    "client",
+    "client_name",
+    "petparty_name",
+    "petitioner",
+  ],
+  FirstParty: [
+    "firstparty",
+    "first_party",
+    "petparty_name",
+    "petitioner",
+    "plaintiff",
+  ],
+  OppositeParty: [
+    "oppositeparty",
+    "opposite_party",
+    "resparty_name",
+    "respondent",
+    "defendant",
+  ],
+  case_number: [
+    "case_number",
+    "case_no",
+    "caseno",
+    "reg_no",
+    "registration_no",
+    "reg_number",
+  ],
   case_year: ["case_year", "year", "reg_year", "registration_year"],
-  court_name: ["court_name", "court", "court_no_desg_name", "establishment_name", "forum"],
-  case_type_name: ["case_type_name", "case_type", "type_name", "type", "ltype_name"],
-  NextDate: ["nextdate", "next_date", "date_next_list", "next_hearing", "hearing_date"],
-  PreviousDate: ["previousdate", "previous_date", "date_last_list", "last_date", "prev_date"],
-  CaseNotes: ["casenotes", "notes", "note", "remark", "remarks", "comment", "comments"],
+  court_name: [
+    "court_name",
+    "court",
+    "court_no_desg_name",
+    "establishment_name",
+    "forum",
+  ],
+  case_type_name: [
+    "case_type_name",
+    "case_type",
+    "type_name",
+    "type",
+    "ltype_name",
+  ],
+  NextDate: [
+    "nextdate",
+    "next_date",
+    "date_next_list",
+    "next_hearing",
+    "hearing_date",
+  ],
+  PreviousDate: [
+    "previousdate",
+    "previous_date",
+    "date_last_list",
+    "last_date",
+    "prev_date",
+  ],
+  CaseNotes: [
+    "casenotes",
+    "notes",
+    "note",
+    "remark",
+    "remarks",
+    "comment",
+    "comments",
+  ],
   Accussed: ["accussed", "accused", "accused_name", "accused_list"],
-  Undersection: ["undersection", "under_section", "section", "sections", "act", "acts"],
-  policeStationName: ["policestation", "police_station", "ps", "ps_name", "police_station_name"],
+  Undersection: [
+    "undersection",
+    "under_section",
+    "section",
+    "sections",
+    "act",
+    "acts",
+  ],
+  policeStationName: [
+    "policestation",
+    "police_station",
+    "ps",
+    "ps_name",
+    "police_station_name",
+  ],
   district: ["district", "district_name", "dist", "district_code"],
   state: ["state", "state_name", "state_code"],
   dateFiled: ["datefiled", "date_filed", "filing_date", "fil_date"],
   JudgeName: ["judgename", "judge", "judge_name", "presiding_judge"],
-  OpposingCounsel: ["opposingcounsel", "opposing_counsel", "counsel", "advocate", "opposing_advocate"],
+  OpposingCounsel: [
+    "opposingcounsel",
+    "opposing_counsel",
+    "counsel",
+    "advocate",
+    "opposing_advocate",
+  ],
   CaseDescription: ["casedescription", "description", "desc"],
-  CaseStatus: ["casestatus", "case_status", "status", "stage_of_case"]
+  CaseStatus: ["casestatus", "case_status", "status", "stage_of_case"],
 };
 
 function normalizeKey(str: string): string {
@@ -58,19 +142,23 @@ function normalizeKey(str: string): string {
  */
 export function fuzzyMapCaseKeys(rawCase: Record<string, any>): ParsedTextCase {
   const result: any = {};
-  
+
   // Normalize incoming keys for fast matching
   const normalizedIncoming: Record<string, any> = {};
-  Object.keys(rawCase).forEach(k => {
+  Object.keys(rawCase).forEach((k) => {
     normalizedIncoming[normalizeKey(k)] = rawCase[k];
   });
 
   // Loop through target fields and match aliases
-  Object.keys(FIELD_ALIASES).forEach(targetField => {
+  Object.keys(FIELD_ALIASES).forEach((targetField) => {
     // Combine court post and establishment name if both are present
     if (targetField === "court_name") {
-      const desg = normalizedIncoming["courtnodesgname"] || normalizedIncoming["court_no_desg_name"];
-      const est = normalizedIncoming["establishmentname"] || normalizedIncoming["establishment_name"];
+      const desg =
+        normalizedIncoming["courtnodesgname"] ||
+        normalizedIncoming["court_no_desg_name"];
+      const est =
+        normalizedIncoming["establishmentname"] ||
+        normalizedIncoming["establishment_name"];
       if (desg && est) {
         result.court_name = `${desg}, ${est}`;
         return;
@@ -161,7 +249,8 @@ export function fuzzyMapCaseKeys(rawCase: Record<string, any>): ParsedTextCase {
   };
 
   if (result.NextDate) result.NextDate = formatToISO(result.NextDate);
-  if (result.PreviousDate) result.PreviousDate = formatToISO(result.PreviousDate);
+  if (result.PreviousDate)
+    result.PreviousDate = formatToISO(result.PreviousDate);
   if (result.dateFiled) result.dateFiled = formatToISO(result.dateFiled);
 
   return result;
@@ -174,7 +263,7 @@ export function checkDuplicateAndDiffCases(
   scannedCases: ParsedTextCase[],
   existingCases: any[]
 ): ParsedTextCase[] {
-  return scannedCases.map(c => {
+  return scannedCases.map((c) => {
     let alreadyExists = false;
     let hasUpdates = false;
     let dbCaseId: number | undefined = undefined;
@@ -183,7 +272,7 @@ export function checkDuplicateAndDiffCases(
     const cleanStr = (s: any) => (s ? s.toString().trim().toLowerCase() : "");
 
     // Find matching case in DB
-    const matchingDbCase = existingCases.find(e => {
+    const matchingDbCase = existingCases.find((e) => {
       // Match by CNR Number first
       if (c.CNRNumber && e.CNRNumber) {
         const cCNR = cleanStr(c.CNRNumber).replace(/[^a-z0-9]/g, "");
@@ -206,7 +295,7 @@ export function checkDuplicateAndDiffCases(
       dbCaseId = matchingDbCase.id;
 
       // Compare fields to detect updates
-      const fieldsToCompare: Array<{ key: keyof ParsedTextCase; dbKey: string }> = [
+      const fieldsToCompare: { key: keyof ParsedTextCase; dbKey: string }[] = [
         { key: "NextDate", dbKey: "NextDate" },
         { key: "PreviousDate", dbKey: "PreviousDate" },
         { key: "CaseNotes", dbKey: "CaseNotes" },
@@ -218,7 +307,7 @@ export function checkDuplicateAndDiffCases(
         { key: "CaseStatus", dbKey: "CaseStatus" },
         { key: "JudgeName", dbKey: "JudgeName" },
         { key: "OpposingCounsel", dbKey: "OpposingCounsel" },
-        { key: "CaseDescription", dbKey: "CaseDescription" }
+        { key: "CaseDescription", dbKey: "CaseDescription" },
       ];
 
       for (const field of fieldsToCompare) {
@@ -226,7 +315,11 @@ export function checkDuplicateAndDiffCases(
         const oldValue = matchingDbCase[field.dbKey];
 
         // We only care if the new value is present and different
-        if (newValue !== undefined && newValue !== null && newValue.toString().trim() !== "") {
+        if (
+          newValue !== undefined &&
+          newValue !== null &&
+          newValue.toString().trim() !== ""
+        ) {
           const cleanNew = cleanStr(newValue);
           const cleanOld = cleanStr(oldValue);
 
@@ -234,7 +327,7 @@ export function checkDuplicateAndDiffCases(
             hasUpdates = true;
             changes[field.dbKey] = {
               oldValue: oldValue || "N/A",
-              newValue: newValue
+              newValue,
             };
           }
         }
@@ -246,7 +339,7 @@ export function checkDuplicateAndDiffCases(
       alreadyExists,
       hasUpdates,
       dbCaseId,
-      changes: Object.keys(changes).length > 0 ? changes : undefined
+      changes: Object.keys(changes).length > 0 ? changes : undefined,
     };
   });
 }
