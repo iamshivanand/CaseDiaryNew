@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Application from "expo-application";
+import Constants from "expo-constants";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState, useContext, useEffect, useCallback } from "react";
 import {
@@ -602,8 +603,12 @@ const ProfileScreen: React.FC = () => {
             { color: theme.colors.textSecondary || "#6B7280" },
           ]}
         >
-          App Version: {Application.nativeApplicationVersion || "1.0.0"} (
-          {Application.nativeBuildVersion || "1"})
+          App Version:{" "}
+          {Application.nativeApplicationVersion &&
+          Application.nativeApplicationVersion !== "1.0.0"
+            ? Application.nativeApplicationVersion
+            : Constants.expoConfig?.version || "1.2.2"}{" "}
+          ({Application.nativeBuildVersion || "12"})
         </Text>
       </View>
     </ScrollView>

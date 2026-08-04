@@ -9,6 +9,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { CardStyleInterpolators } from "@react-navigation/stack";
 import * as Application from "expo-application";
+import Constants from "expo-constants";
 import { StatusBar } from "expo-status-bar";
 import React, { useContext, useEffect, useState } from "react";
 import {
@@ -170,8 +171,12 @@ function AppContent() {
 
             if (response.ok) {
               const data = await response.json();
+              const nativeVer = Application.nativeApplicationVersion;
+              const appConfigVer = Constants.expoConfig?.version;
               const localVersion =
-                Application.nativeApplicationVersion || "1.0.0";
+                nativeVer && nativeVer !== "1.0.0"
+                  ? nativeVer
+                  : appConfigVer || "1.2.2";
 
               const minRequired =
                 Platform.OS === "ios"
@@ -187,12 +192,18 @@ function AppContent() {
               if (data.releaseNotes) setReleaseNotes(data.releaseNotes);
               setLatestVersion(latestAvailable);
 
-              if (isVersionOlder(localVersion, minRequired)) {
+              if (minRequired && isVersionOlder(localVersion, minRequired)) {
                 setForceUpdate(true);
                 setUpdateModalVisible(true);
-              } else if (isVersionOlder(localVersion, latestAvailable)) {
+              } else if (
+                latestAvailable &&
+                isVersionOlder(localVersion, latestAvailable)
+              ) {
                 setForceUpdate(false);
                 setUpdateModalVisible(true);
+              } else {
+                setForceUpdate(false);
+                setUpdateModalVisible(false);
               }
             }
           } catch (fetchErr) {

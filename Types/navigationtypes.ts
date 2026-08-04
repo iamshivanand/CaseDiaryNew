@@ -42,6 +42,8 @@ export type HomeStackParamList = {
   DuplicateReview: undefined;
   PdfViewer: { pdfUri: string; title: string };
   PdfScanner: { caseId?: number };
+  SettingsScreen: undefined;
+  Settings: undefined;
 };
 
 // Stack for the "Search" Tab
@@ -62,6 +64,7 @@ export type CalendarStackParamList = {
 export type ProfileStackParamList = {
   ProfileScreen: undefined;
   SettingsScreen: undefined;
+  Settings: undefined;
   ManageLookupCategoryScreen: {
     categoryName: "CaseTypes" | "Courts" | "Districts" | "PoliceStations";
     title: string;

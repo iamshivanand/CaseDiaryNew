@@ -44,9 +44,9 @@ describe("UpdateCheckModal Component", () => {
     expect(queryByText("Update Required")).toBeNull();
   });
 
-  it("renders 'Update Available' and 'Later' button for optional updates", () => {
+  it("renders 'Update Available' and 'Close' button for optional updates", () => {
     const mockOnClose = jest.fn();
-    const { getByText, queryByText } = renderWithTheme(
+    const { getByText } = renderWithTheme(
       <UpdateCheckModal
         visible
         forceUpdate={false}
@@ -60,17 +60,19 @@ describe("UpdateCheckModal Component", () => {
 
     expect(getByText("Update Available")).toBeTruthy();
     expect(getByText("New features and fixes.")).toBeTruthy();
-    expect(getByText("Later")).toBeTruthy();
+    expect(getByText("Close")).toBeTruthy();
 
-    fireEvent.press(getByText("Later"));
+    fireEvent.press(getByText("Close"));
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
-  it("renders 'Update Required' and hides 'Later' button for forced updates", () => {
-    const { getByText, queryByText } = renderWithTheme(
+  it("renders 'Update Required' and shows 'Close' button when onClose handler is passed", () => {
+    const mockOnClose = jest.fn();
+    const { getByText } = renderWithTheme(
       <UpdateCheckModal
         visible
         forceUpdate
+        onClose={mockOnClose}
         playStoreUrl="https://play.google.com/store/details?id=com.casediary"
         appStoreUrl="https://apps.apple.com/app/casediary"
         latestVersion="1.1.0"
@@ -78,7 +80,10 @@ describe("UpdateCheckModal Component", () => {
     );
 
     expect(getByText("Update Required")).toBeTruthy();
-    expect(queryByText("Later")).toBeNull();
+    expect(getByText("Close")).toBeTruthy();
+
+    fireEvent.press(getByText("Close"));
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
   it("opens store link when 'Update Now' is pressed", () => {

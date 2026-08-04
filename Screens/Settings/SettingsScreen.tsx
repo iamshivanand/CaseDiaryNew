@@ -261,6 +261,10 @@ const SettingsScreen = () => {
         if (success) {
           try {
             await exportDatabaseBackup();
+            await AsyncStorage.setItem(
+              "@last_backup_timestamp",
+              new Date().toISOString()
+            );
             Alert.alert(
               "Backup Complete",
               "Your database was successfully shared/saved."

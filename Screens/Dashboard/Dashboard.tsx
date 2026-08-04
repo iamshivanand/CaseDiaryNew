@@ -236,18 +236,29 @@ const BackupReminderBanner = () => {
   useEffect(() => {
     const checkBackupStatus = async () => {
       try {
+        const now = new Date();
+        const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+        // Weekly backup reminder is shown ONLY on weekends (Saturday/Sunday)
+        if (!isWeekend) {
+          setShowBanner(false);
+          return;
+        }
+
         const lastBackup = await AsyncStorage.getItem("@last_backup_timestamp");
         if (!lastBackup) {
           setShowBanner(true);
           return;
         }
         const lastDate = new Date(lastBackup);
-        const now = new Date();
         const diffDays = Math.floor(
           (now.getTime() - lastDate.getTime()) / (1000 * 3600 * 24)
         );
-        if (diffDays >= 7) {
+        if (diffDays >= 5) {
           setShowBanner(true);
+        } else {
+          setShowBanner(false);
         }
       } catch (e) {
         console.warn("Failed to check backup timestamp:", e);
@@ -262,7 +273,7 @@ const BackupReminderBanner = () => {
       new Date().toISOString()
     );
     setShowBanner(false);
-    navigation.navigate("Settings" as any);
+    navigation.navigate("SettingsScreen" as any);
   };
 
   if (!showBanner) return null;

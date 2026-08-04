@@ -159,6 +159,16 @@ const HomeStack = () => {
         component={PdfScannerScreen}
         options={{ headerShown: false }}
       />
+      <HomeStackNav.Screen
+        name="SettingsScreen"
+        component={SettingsScreen}
+        options={{ headerShown: true, title: "Settings" }}
+      />
+      <HomeStackNav.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ headerShown: true, title: "Settings" }}
+      />
     </HomeStackNav.Navigator>
   );
 };
@@ -266,6 +276,11 @@ const ProfileStack = () => {
         options={{ headerShown: true, title: "Settings" }}
       />
       <ProfileStackNav.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ headerShown: true, title: "Settings" }}
+      />
+      <ProfileStackNav.Screen
         name="ManageLookupCategoryScreen"
         component={ManageLookupCategoryScreen}
         options={({ route }) => ({
@@ -353,6 +368,7 @@ const Appro: React.FC = () => {
             "YesterdaysCases",
             "AllCases",
             "SettingsScreen",
+            "Settings",
             "ManageLookupCategoryScreen",
             "GenerateDocument",
             "DraftsHub",
