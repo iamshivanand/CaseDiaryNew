@@ -492,6 +492,7 @@ const GenerateDocumentScreen: React.FC = () => {
   const [ocrModalImageUri, setOcrModalImageUri] = useState<string | null>(null);
   const [ocrModalExtractedText, setOcrModalExtractedText] = useState("");
   const [docDraftLanguage, setDocDraftLanguage] = useState<"en" | "hi">("en");
+  const nerTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const formatMarginValue = (px: number, mode: "in" | "mm" | "px"): string => {
     if (mode === "in") return `${(px / 96).toFixed(2)} in`;
@@ -926,10 +927,12 @@ const GenerateDocumentScreen: React.FC = () => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === "openPlaceholderModal") {
+        postMessageToWebView({ type: "lockSelection" });
         setActivePlaceholderLabel(data.label || "");
         setActivePlaceholderClean(data.cleanLabel || "");
         setPlaceholderModalVisible(true);
       } else if (data.type === "openElementContextModal") {
+        postMessageToWebView({ type: "lockSelection" });
         setSelectedElementType(data.elementType || "table");
         setElementContextModalVisible(true);
       } else if (data.type === "state") {
@@ -937,20 +940,26 @@ const GenerateDocumentScreen: React.FC = () => {
         if (data.stats) {
           setDocStats(data.stats);
           if (data.stats.text) {
-            const entities = extractLegalEntities(data.stats.text);
-            setExtractedEntities(entities);
-
-            const words = data.stats.text.trim().split(/\s+/);
-            const lastWord = words.length > 0 ? words[words.length - 1] : "";
-            if (lastWord.length >= 2) {
-              const matches = legalAutocompleteService.getSuggestions(
-                lastWord,
-                5
-              );
-              setAutocompleteSuggestions(matches);
-            } else {
-              setAutocompleteSuggestions([]);
+            if (nerTimeoutRef.current) {
+              clearTimeout(nerTimeoutRef.current);
             }
+            const textToProcess = data.stats.text;
+            nerTimeoutRef.current = setTimeout(() => {
+              const entities = extractLegalEntities(textToProcess);
+              setExtractedEntities(entities);
+
+              const words = textToProcess.trim().split(/\s+/);
+              const lastWord = words.length > 0 ? words[words.length - 1] : "";
+              if (lastWord.length >= 2) {
+                const matches = legalAutocompleteService.getSuggestions(
+                  lastWord,
+                  5
+                );
+                setAutocompleteSuggestions(matches);
+              } else {
+                setAutocompleteSuggestions([]);
+              }
+            }, 600);
           }
         }
       } else if (data.type === "change") {
@@ -993,7 +1002,7 @@ const GenerateDocumentScreen: React.FC = () => {
 
   // Actions for Live Editor features
   const handleScanToEditorOcr = async () => {
-    postMessageToWebView({ type: "saveSelection" });
+    postMessageToWebView({ type: "lockSelection" });
     Alert.alert(
       "Extract Text (OCR)",
       "Choose how you want to capture or upload the court document photo:",

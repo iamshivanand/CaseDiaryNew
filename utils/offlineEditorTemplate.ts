@@ -267,8 +267,10 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
     }
 
     let savedEditorRange = null;
+    let isSelectionLocked = false;
 
     function saveEditorSelection() {
+      if (isSelectionLocked) return;
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0) {
         const range = sel.getRangeAt(0);
@@ -278,12 +280,23 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       }
     }
 
+    function lockEditorSelection() {
+      saveEditorSelection();
+      isSelectionLocked = true;
+    }
+
+    function unlockEditorSelection() {
+      isSelectionLocked = false;
+    }
+
     function restoreEditorSelection() {
       if (savedEditorRange) {
         const sel = window.getSelection();
         sel.removeAllRanges();
         sel.addRange(savedEditorRange);
+        return true;
       }
+      return false;
     }
 
     document.addEventListener('selectionchange', saveEditorSelection);
@@ -294,9 +307,19 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
     // Insert HTML cleanly at current cursor selection
     function insertHTMLAtCursor(html) {
       editor.focus();
-      restoreEditorSelection();
+      const restored = restoreEditorSelection();
       const sel = window.getSelection();
       let inserted = false;
+
+      // Ensure we have a valid selection inside editor. If not, position cursor at the END of editor content, NOT at index 0 (top)
+      if (!restored || !sel || !sel.rangeCount || !editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        const endRange = document.createRange();
+        endRange.selectNodeContents(editor);
+        endRange.collapse(false); // Collapse to end of document
+        sel.removeAllRanges();
+        sel.addRange(endRange);
+      }
+
       if (sel && sel.getRangeAt && sel.rangeCount) {
         try {
           const range = sel.getRangeAt(0);
@@ -314,7 +337,6 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
               range.setStartAfter(lastNode);
               sel.removeAllRanges();
               sel.addRange(range);
-              saveEditorSelection();
             }
             inserted = true;
           }
@@ -322,13 +344,16 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
           inserted = false;
         }
       }
+
       if (!inserted) {
         const div = document.createElement("div");
         div.innerHTML = html;
         editor.appendChild(div);
-        saveEditorSelection();
       }
-      sendStateToRN();
+
+      unlockEditorSelection();
+      saveEditorSelection();
+      sendStateToRN(true);
     }
 
     // Custom Table Generator
@@ -357,8 +382,10 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
           editor.innerHTML = data.html || '';
           scanAndHighlightPlaceholders();
           editor.focus();
-        } else if (data.type === 'saveSelection') {
-          saveEditorSelection();
+        } else if (data.type === 'saveSelection' || data.type === 'lockSelection') {
+          lockEditorSelection();
+        } else if (data.type === 'unlockSelection') {
+          unlockEditorSelection();
         } else if (data.type === 'exec') {
           editor.focus();
           if (data.command === 'insertText') {
@@ -541,15 +568,21 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       const dynamicTopMargin = Math.round((configuredTopMargin + configuredLetterhead) * scaleRatio);
       const dynamicBottomMargin = Math.round(configuredBottomMargin * scaleRatio);
 
-      // MS Word Page Count Calculation (Non-Destructive)
+      // MS Word Page Count Calculation (Non-Destructive & Stable)
       const printableSheetHeight = Math.max(100, singleSheetHeight - (dynamicTopMargin + dynamicBottomMargin));
-      const pageBreakCount = editor.querySelectorAll('.legal-page-break, hr.page-break').length;
+      const pageBreakElements = editor.querySelectorAll('.legal-page-break, hr.page-break');
+      const pageBreakCount = pageBreakElements.length;
 
-      // Temporarily set minHeight to 0px to accurately measure content scrollHeight without feedback loop
+      // Temporarily set minHeight to 0px to accurately measure content scrollHeight
       editor.style.minHeight = '0px';
-      const actualScrollHeight = editor.scrollHeight;
+      let manualBreaksHeight = 0;
+      pageBreakElements.forEach(function(el) {
+        manualBreaksHeight += el.offsetHeight || 40;
+      });
 
-      const overflowPages = Math.ceil(actualScrollHeight / printableSheetHeight) || 1;
+      const actualContentHeight = Math.max(0, editor.scrollHeight - manualBreaksHeight);
+
+      const overflowPages = Math.ceil(actualContentHeight / printableSheetHeight) || 1;
       const totalPages = Math.max(1, pageBreakCount + 1, overflowPages);
       
       const pageGap = Math.round(20 * scaleRatio);
@@ -586,12 +619,12 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       }
       
       dynamicStyle.innerHTML = 
-        '#editor { font-size: ' + renderFontPx + 'px !important; line-height: ' + renderLineHeightPx + 'px !important; letter-spacing: ' + renderLetterSpacePx + 'px !important; word-spacing: ' + renderWordSpacePx + 'px !important; padding-bottom: ' + padBottomPx + 'px !important; word-wrap: break-word !important; overflow-wrap: break-word !important; word-break: break-word !important; } ' +
-        '#editor p, #editor div, #editor td, #editor th, #editor li, #editor span, #editor blockquote, #editor caption, #editor .footnote { font-size: ' + renderFontPx + 'px !important; line-height: ' + renderLineHeightPx + 'px !important; letter-spacing: ' + renderLetterSpacePx + 'px !important; word-spacing: ' + renderWordSpacePx + 'px !important; margin-bottom: ' + paragraphMb + 'px !important; word-wrap: break-word !important; overflow-wrap: break-word !important; word-break: break-word !important; } ' +
-        '#editor .title, #editor h1 { font-size: ' + titlePx + 'px !important; margin-bottom: ' + Math.round(10 * scaleRatio) + 'px !important; line-height: ' + (titlePx * 1.3).toFixed(1) + 'px !important; } ' +
-        '#editor .court-header, #editor h2 { font-size: ' + headerPx + 'px !important; margin-bottom: ' + Math.round(12 * scaleRatio) + 'px !important; line-height: ' + (headerPx * 1.35).toFixed(1) + 'px !important; } ' +
-        '#editor .section-title, #editor h3 { font-size: ' + sectionPx + 'px !important; } ' +
-        '#editor .legal-page-break + *, #editor hr.page-break + * { margin-top: ' + Math.round((window.userTopMargin || 16) * scaleRatio) + 'px !important; }';
+        '#editor { font-size: ' + renderFontPx + 'px; line-height: ' + renderLineHeightPx + 'px; letter-spacing: ' + renderLetterSpacePx + 'px; word-spacing: ' + renderWordSpacePx + 'px; padding-bottom: ' + padBottomPx + 'px; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; } ' +
+        '#editor p, #editor div, #editor li, #editor blockquote { font-size: inherit; line-height: inherit; letter-spacing: inherit; word-spacing: inherit; margin-bottom: ' + paragraphMb + 'px; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; } ' +
+        '#editor .title, #editor h1 { font-size: ' + titlePx + 'px; margin-bottom: ' + Math.round(10 * scaleRatio) + 'px; line-height: ' + (titlePx * 1.3).toFixed(1) + 'px; } ' +
+        '#editor .court-header, #editor h2 { font-size: ' + headerPx + 'px; margin-bottom: ' + Math.round(12 * scaleRatio) + 'px; line-height: ' + (headerPx * 1.35).toFixed(1) + 'px; } ' +
+        '#editor .section-title, #editor h3 { font-size: ' + sectionPx + 'px; } ' +
+        '#editor .legal-page-break + *, #editor hr.page-break + * { margin-top: ' + Math.round((window.userTopMargin || 16) * scaleRatio) + 'px; }';
       
       editor.style.paddingLeft = dynamicLeftMargin + 'px';
       editor.style.paddingRight = dynamicRightMargin + 'px';
@@ -714,26 +747,41 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       return { wordCount, charCount, estimatedPages, text: cleanText };
     }
 
-    function sendStateToRN() {
+    let sendStateTimeout = null;
+
+    function sendStateToRN(immediate = false) {
       updateDynamicPaperRatio();
-      const state = {
-        bold: document.queryCommandState('bold'),
-        italic: document.queryCommandState('italic'),
-        underline: document.queryCommandState('underline'),
-        alignLeft: document.queryCommandState('justifyLeft') || (!document.queryCommandState('justifyCenter') && !document.queryCommandState('justifyRight') && !document.queryCommandState('justifyFull')),
-        alignCenter: document.queryCommandState('justifyCenter'),
-        alignRight: document.queryCommandState('justifyRight'),
-        alignJustify: document.queryCommandState('justifyFull'),
-        orderedList: document.queryCommandState('insertOrderedList'),
-        unorderedList: document.queryCommandState('insertUnorderedList')
-      };
+      if (sendStateTimeout) {
+        clearTimeout(sendStateTimeout);
+        sendStateTimeout = null;
+      }
       
-      postMessage({
-        type: 'state',
-        state: state,
-        stats: calculateStats(),
-        html: editor.innerHTML
-      });
+      const doSend = function() {
+        const state = {
+          bold: document.queryCommandState('bold'),
+          italic: document.queryCommandState('italic'),
+          underline: document.queryCommandState('underline'),
+          alignLeft: document.queryCommandState('justifyLeft') || (!document.queryCommandState('justifyCenter') && !document.queryCommandState('justifyRight') && !document.queryCommandState('justifyFull')),
+          alignCenter: document.queryCommandState('justifyCenter'),
+          alignRight: document.queryCommandState('justifyRight'),
+          alignJustify: document.queryCommandState('justifyFull'),
+          orderedList: document.queryCommandState('insertOrderedList'),
+          unorderedList: document.queryCommandState('insertUnorderedList')
+        };
+        
+        postMessage({
+          type: 'state',
+          state: state,
+          stats: calculateStats(),
+          html: editor.innerHTML
+        });
+      };
+
+      if (immediate) {
+        doSend();
+      } else {
+        sendStateTimeout = setTimeout(doSend, 150);
+      }
     }
 
     function scanAndHighlightPlaceholders() {

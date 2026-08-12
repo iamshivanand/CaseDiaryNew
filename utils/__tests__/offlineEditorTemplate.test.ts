@@ -231,10 +231,10 @@ describe("Non-Destructive MS Word Pagination", () => {
     expect(html).toContain("editor.scrollHeight");
   });
 
-  it("derives overflowPages from ceil(actualScrollHeight / printableSheetHeight)", () => {
+  it("derives overflowPages from ceil(actualContentHeight / printableSheetHeight)", () => {
     const html = getOfflineEditorHtml("");
     expect(html).toContain(
-      "Math.ceil(actualScrollHeight / printableSheetHeight)"
+      "Math.ceil(actualContentHeight / printableSheetHeight)"
     );
   });
 
