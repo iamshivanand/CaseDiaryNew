@@ -5561,12 +5561,18 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
         onClose={() => setTableConfigModalVisible(false)}
       />
 
-      {/* Selected Element Context Menu (Delete Table / Signature) */}
+      {/* Selected Element Context Menu (Table Controls / Delete Signature) */}
       <ElementContextModal
         visible={elementContextModalVisible}
         elementType={selectedElementType}
         theme={theme}
         onDeleteElement={handleDeleteSelectedElement}
+        onAddRowAbove={() => triggerFormat("tableAddRowAbove")}
+        onAddRowBelow={() => triggerFormat("tableAddRowBelow")}
+        onAddColLeft={() => triggerFormat("tableAddColLeft")}
+        onAddColRight={() => triggerFormat("tableAddColRight")}
+        onDeleteRow={() => triggerFormat("tableDeleteRow")}
+        onDeleteCol={() => triggerFormat("tableDeleteCol")}
         onClose={() => setElementContextModalVisible(false)}
       />
 

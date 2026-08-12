@@ -226,6 +226,48 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       font-style: italic;
       cursor: text;
     }
+    .court-running-header {
+      position: absolute;
+      left: 0;
+      right: 0;
+      font-family: sans-serif;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      text-align: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .court-running-footer {
+      position: absolute;
+      left: 0;
+      right: 0;
+      font-family: sans-serif;
+      font-weight: 600;
+      color: #64748b;
+      text-align: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .page-sheet-divider {
+      position: absolute;
+      left: 0;
+      right: 0;
+      background-color: #e5e7eb;
+      border-top: 1px dashed #cbd5e1;
+      border-bottom: 1px dashed #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.5px;
+      pointer-events: none;
+      z-index: 2;
+    }
   </style>
 </head>
 <body>
@@ -268,6 +310,7 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
 
     let savedEditorRange = null;
     let isSelectionLocked = false;
+    let activeTableCell = null;
 
     function saveEditorSelection() {
       if (isSelectionLocked) return;
@@ -283,18 +326,51 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
     function lockEditorSelection() {
       saveEditorSelection();
       isSelectionLocked = true;
+      try {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          if (editor.contains(range.commonAncestorContainer)) {
+            const oldBM = document.getElementById('editor-caret-bookmark');
+            if (oldBM) oldBM.remove();
+            const bm = document.createElement('span');
+            bm.id = 'editor-caret-bookmark';
+            bm.style.display = 'none';
+            range.insertNode(bm);
+          }
+        }
+      } catch (e) {}
     }
 
     function unlockEditorSelection() {
       isSelectionLocked = false;
+      const oldBM = document.getElementById('editor-caret-bookmark');
+      if (oldBM) oldBM.remove();
     }
 
     function restoreEditorSelection() {
+      const oldBM = document.getElementById('editor-caret-bookmark');
+      if (oldBM) {
+        try {
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.setStartAfter(oldBM);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          oldBM.remove();
+          return true;
+        } catch (e) {
+          oldBM.remove();
+        }
+      }
       if (savedEditorRange) {
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(savedEditorRange);
-        return true;
+        try {
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(savedEditorRange);
+          return true;
+        } catch (e) {}
       }
       return false;
     }
@@ -372,6 +448,116 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
       }
       tableHtml += '</tbody></table><p><br></p>';
       insertHTMLAtCursor(tableHtml);
+    }
+
+    function safeChangeCase(mode) {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      if (range.collapsed) return;
+
+      function convertStr(str) {
+        if (mode === 'upper') return str.toUpperCase();
+        if (mode === 'lower') return str.toLowerCase();
+        if (mode === 'title') return str.replace(/\b\w/g, c => c.toUpperCase());
+        return str;
+      }
+
+      const container = document.createElement("div");
+      container.appendChild(range.cloneContents());
+
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+      let textNode;
+      while ((textNode = walker.nextNode())) {
+        textNode.nodeValue = convertStr(textNode.nodeValue);
+      }
+
+      range.deleteContents();
+      const frag = document.createDocumentFragment();
+      let node, lastNode;
+      while ((node = container.firstChild)) {
+        lastNode = frag.appendChild(node);
+      }
+      range.insertNode(frag);
+      if (lastNode) {
+        range.setStartAfter(lastNode);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      sendStateToRN();
+    }
+
+    function modifyTableStructure(action) {
+      const table = selectedElement || (activeTableCell ? activeTableCell.closest('.editor-table') : null);
+      if (!table) return;
+
+      let targetRow = activeTableCell ? activeTableCell.closest('tr') : null;
+      if (!targetRow) targetRow = table.querySelector('tbody tr') || table.querySelector('tr');
+      if (!targetRow) return;
+
+      const targetCellIdx = activeTableCell ? activeTableCell.cellIndex : 0;
+
+      if (action === 'addRowAbove' || action === 'addRowBelow') {
+        const colCount = targetRow.children.length;
+        const newRow = document.createElement('tr');
+        for (let i = 0; i < colCount; i++) {
+          const isHeader = targetRow.parentNode.tagName === 'THEAD';
+          const cellType = (isHeader && action === 'addRowAbove') ? 'th' : 'td';
+          const cell = document.createElement(cellType);
+          cell.innerHTML = 'Cell';
+          newRow.appendChild(cell);
+        }
+        if (action === 'addRowAbove') {
+          targetRow.parentNode.insertBefore(newRow, targetRow);
+        } else {
+          if (targetRow.nextSibling) {
+            targetRow.parentNode.insertBefore(newRow, targetRow.nextSibling);
+          } else {
+            targetRow.parentNode.appendChild(newRow);
+          }
+        }
+      } else if (action === 'addColLeft' || action === 'addColRight') {
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(row => {
+          const isHeader = row.parentNode.tagName === 'THEAD';
+          const cellType = isHeader ? 'th' : 'td';
+          const newCell = document.createElement(cellType);
+          newCell.innerHTML = isHeader ? 'Header' : 'Cell';
+          const cells = row.children;
+          const refCell = cells[targetCellIdx] || cells[cells.length - 1];
+          if (refCell) {
+            if (action === 'addColLeft') {
+              row.insertBefore(newCell, refCell);
+            } else {
+              if (refCell.nextSibling) {
+                row.insertBefore(newCell, refCell.nextSibling);
+              } else {
+                row.appendChild(newCell);
+              }
+            }
+          } else {
+            row.appendChild(newCell);
+          }
+        });
+      } else if (action === 'deleteRow') {
+        targetRow.remove();
+        if (!table.querySelector('tr')) {
+          table.remove();
+          selectedElement = null;
+        }
+      } else if (action === 'deleteCol') {
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(row => {
+          if (row.children[targetCellIdx]) {
+            row.children[targetCellIdx].remove();
+          }
+        });
+        if (!table.querySelector('td, th')) {
+          table.remove();
+          selectedElement = null;
+        }
+      }
+      sendStateToRN();
     }
 
     // Direct message handler for React Native WebView communication
@@ -468,23 +654,19 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
               sendStateToRN();
             }
           } else if (data.command === 'changeCase') {
-            const selection = window.getSelection();
-            if (selection.rangeCount > 0) {
-              const range = selection.getRangeAt(0);
-              const text = selection.toString();
-              if (text) {
-                let converted = '';
-                if (data.value === 'upper') {
-                  converted = text.toUpperCase();
-                } else if (data.value === 'lower') {
-                  converted = text.toLowerCase();
-                } else if (data.value === 'title') {
-                  converted = text.replace(/\b\w/g, c => c.toUpperCase());
-                }
-                document.execCommand('insertText', false, converted);
-                sendStateToRN();
-              }
-            }
+            safeChangeCase(data.value);
+          } else if (data.command === 'tableAddRowAbove') {
+            modifyTableStructure('addRowAbove');
+          } else if (data.command === 'tableAddRowBelow') {
+            modifyTableStructure('addRowBelow');
+          } else if (data.command === 'tableAddColLeft') {
+            modifyTableStructure('addColLeft');
+          } else if (data.command === 'tableAddColRight') {
+            modifyTableStructure('addColRight');
+          } else if (data.command === 'tableDeleteRow') {
+            modifyTableStructure('deleteRow');
+          } else if (data.command === 'tableDeleteCol') {
+            modifyTableStructure('deleteCol');
           } else if (data.command === 'undo') {
             document.execCommand('undo', false, null);
             sendStateToRN();
@@ -500,6 +682,8 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
           if (data.lineHeight) window.userLineHeightRatio = parseFloat(data.lineHeight) || 1.8;
           if (data.letterSpacing !== undefined) window.userLetterSpacing = data.letterSpacing;
           if (data.wordSpacing !== undefined) window.userWordSpacing = data.wordSpacing;
+          if (data.headerText !== undefined) window.userHeaderText = data.headerText;
+          if (data.footerText !== undefined) window.userFooterText = data.footerText;
           
           window.userTopMargin = data.topMargin !== undefined ? data.topMargin : 24;
           window.userBottomMargin = data.bottomMargin !== undefined ? data.bottomMargin : 24;
@@ -635,7 +819,7 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
         redMargin.style.left = Math.max(4, Math.round(dynamicLeftMargin - (10 * scaleRatio))) + 'px';
       }
 
-      // Render 4-sided dashed margin guide boxes for each physical page sheet
+      // Render 4-sided dashed margin guide boxes, running headers, footers & sheet dividers for each physical page sheet
       let guideOverlay = document.getElementById('margin-guide-overlay');
       if (!guideOverlay) {
         guideOverlay = document.createElement('div');
@@ -660,6 +844,35 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
         guide.style.width = Math.max(10, paperWidth - (dynamicLeftMargin + dynamicRightMargin)) + 'px';
         guide.style.height = Math.max(10, singleSheetHeight - (dynamicTopMargin + dynamicBottomMargin)) + 'px';
         guideOverlay.appendChild(guide);
+
+        // Running Header per page sheet
+        const headerText = window.userHeaderText || "IN THE HIGH COURT OF JUDICATURE";
+        const runningHeader = document.createElement('div');
+        runningHeader.className = 'court-running-header';
+        runningHeader.style.top = (sheetTop + Math.max(4, dynamicTopMargin / 3)) + 'px';
+        runningHeader.style.fontSize = Math.max(8, Math.round(10 * scaleRatio)) + 'px';
+        runningHeader.textContent = headerText;
+        guideOverlay.appendChild(runningHeader);
+
+        // Running Footer per page sheet
+        const rawFooterText = window.userFooterText || "Page {page} of {total} | Advocate Draft";
+        const footerText = rawFooterText.replace('{page}', i + 1).replace('{total}', totalPages);
+        const runningFooter = document.createElement('div');
+        runningFooter.className = 'court-running-footer';
+        runningFooter.style.top = (sheetTop + singleSheetHeight - Math.max(14, dynamicBottomMargin * 0.8)) + 'px';
+        runningFooter.style.fontSize = Math.max(8, Math.round(10 * scaleRatio)) + 'px';
+        runningFooter.textContent = footerText;
+        guideOverlay.appendChild(runningFooter);
+
+        // Sheet Gap Divider (between physical paper pages)
+        if (i < totalPages - 1) {
+          const divider = document.createElement('div');
+          divider.className = 'page-sheet-divider';
+          divider.style.top = (sheetTop + singleSheetHeight) + 'px';
+          divider.style.height = pageGap + 'px';
+          divider.textContent = '--- Page Sheet ' + (i + 1) + ' of ' + totalPages + ' ---';
+          guideOverlay.appendChild(divider);
+        }
       }
     }
 
@@ -831,6 +1044,10 @@ export const getOfflineEditorHtml = (initialHtml: string): string => {
 
     // Tap to select elements (tables, signatures) or edit placeholders
     document.addEventListener('click', function(e) {
+      const cell = e.target.closest('td, th');
+      if (cell) {
+        activeTableCell = cell;
+      }
       const table = e.target.closest('.editor-table');
       const signature = e.target.closest('.signature-stamp');
       const placeholder = e.target.closest('.legal-placeholder');
