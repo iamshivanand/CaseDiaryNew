@@ -1,3 +1,4 @@
+import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useState, useEffect, useContext } from "react";
 import {
   Modal,
@@ -14,9 +15,9 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { ThemeContext } from "../../Providers/ThemeProvider";
+
 import { useTranslation } from "../../Providers/LanguageProvider";
+import { ThemeContext } from "../../Providers/ThemeProvider";
 import speechRecognitionService from "../../utils/speechRecognitionService";
 
 interface VoiceCaseNoteModalProps {
@@ -79,28 +80,32 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
       setIsDictating(false);
     } else {
       setIsDictating(true);
-      const targetLocale = dictationLang === "hi" || locale === "hi" ? "hi-IN" : "en-IN";
-      const started = await speechRecognitionService.startListening(targetLocale, {
-        onStart: () => setIsDictating(true),
-        onResult: (text) => {
-          if (text) {
-            let processed = text
-              .replace(/\b(full stop|period)\b/gi, ".")
-              .replace(/\b(पूर्ण विराम)\b/gi, "।")
-              .replace(/\b(comma)\b/gi, ",")
-              .replace(/\b(अल्पविराम)\b/gi, ",")
-              .replace(/\b(new paragraph|next paragraph)\b/gi, "\n\n")
-              .replace(/\b(नया पैराग्राफ|नया पैरा)\b/gi, "\n\n");
+      const targetLocale =
+        dictationLang === "hi" || locale === "hi" ? "hi-IN" : "en-IN";
+      const started = await speechRecognitionService.startListening(
+        targetLocale,
+        {
+          onStart: () => setIsDictating(true),
+          onResult: (text) => {
+            if (text) {
+              const processed = text
+                .replace(/\b(full stop|period)\b/gi, ".")
+                .replace(/\b(पूर्ण विराम)\b/gi, "।")
+                .replace(/\b(comma)\b/gi, ",")
+                .replace(/\b(अल्पविराम)\b/gi, ",")
+                .replace(/\b(new paragraph|next paragraph)\b/gi, "\n\n")
+                .replace(/\b(नया पैराग्राफ|नया पैरा)\b/gi, "\n\n");
 
-            setNotes((prev) => (prev ? prev + " " + processed : processed));
-          }
-        },
-        onError: (err) => {
-          setIsDictating(false);
-          console.warn("Dictation error:", err);
-        },
-        onEnd: () => setIsDictating(false),
-      });
+              setNotes((prev) => (prev ? prev + " " + processed : processed));
+            }
+          },
+          onError: (err) => {
+            setIsDictating(false);
+            console.warn("Dictation error:", err);
+          },
+          onEnd: () => setIsDictating(false),
+        }
+      );
 
       if (!started) {
         setIsDictating(false);
@@ -121,7 +126,10 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
 
   const handleSave = async () => {
     if (!notes.trim()) {
-      Alert.alert("Empty Note", "Please type or dictate proceeding notes first.");
+      Alert.alert(
+        "Empty Note",
+        "Please type or dictate proceeding notes first."
+      );
       return;
     }
 
@@ -151,7 +159,7 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={true}>
+    <Modal visible={visible} animationType="slide" transparent>
       <KeyboardAvoidingView
         style={styles.overlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -163,16 +171,23 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
           ]}
         >
           {/* HEADER */}
-          <View style={styles.modalHeader}>
-            <View style={{ flex: 1 }}>
+          <View
+            style={[
+              styles.modalHeader,
+              { borderBottomColor: theme.colors.border },
+            ]}
+          >
+            <View
+              style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+            >
+              <Icon
+                name="microphone"
+                size={20}
+                color={theme.colors.primary}
+                style={{ marginRight: 6 }}
+              />
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                🎙️ Case Proceeding Note
-              </Text>
-              <Text
-                style={[styles.caseSubTitle, { color: theme.colors.textSecondary }]}
-                numberOfLines={1}
-              >
-                {caseTitle}
+                Case Proceeding Note
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -207,7 +222,7 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
                       },
                     ]}
                   >
-                    🇬🇧 English
+                    English
                   </Text>
                 </TouchableOpacity>
 
@@ -234,7 +249,7 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
                       },
                     ]}
                   >
-                    🇮🇳 हिंदी (Devanagari)
+                    Hindi (Devanagari)
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -244,7 +259,9 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
                 style={[
                   styles.micBtn,
                   {
-                    backgroundColor: isDictating ? "#FF3B30" : theme.colors.primary,
+                    backgroundColor: isDictating
+                      ? "#FF3B30"
+                      : theme.colors.primary,
                   },
                 ]}
               >
@@ -260,7 +277,9 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
             </View>
 
             {/* NOTES INPUT */}
-            <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>
+            <Text
+              style={[styles.inputLabel, { color: theme.colors.textSecondary }]}
+            >
               Proceeding Notes / Court Action (Saved under Today's Date):
             </Text>
             <TextInput
@@ -269,7 +288,9 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
                 {
                   backgroundColor: theme.colors.inputBackground,
                   color: theme.colors.text,
-                  borderColor: isDictating ? theme.colors.primary : theme.colors.border,
+                  borderColor: isDictating
+                    ? theme.colors.primary
+                    : theme.colors.border,
                 },
               ]}
               multiline
@@ -293,10 +314,14 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
             >
               <View style={styles.switchRow}>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={[styles.switchTitle, { color: theme.colors.text }]}>
+                  <Text
+                    style={[styles.switchTitle, { color: theme.colors.text }]}
+                  >
                     Update Next Hearing Date
                   </Text>
-                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>
+                  <Text
+                    style={{ fontSize: 12, color: theme.colors.textSecondary }}
+                  >
                     {existingNextHearingDate
                       ? `Existing Date: ${existingNextHearingDate}`
                       : "Case is currently undated"}
@@ -305,7 +330,10 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
                 <Switch
                   value={updateNextDate}
                   onValueChange={setUpdateNextDate}
-                  trackColor={{ false: "#767577", true: `${theme.colors.primary}80` }}
+                  trackColor={{
+                    false: "#767577",
+                    true: `${theme.colors.primary}80`,
+                  }}
                   thumbColor={updateNextDate ? theme.colors.primary : "#f4f3f4"}
                 />
               </View>
@@ -321,8 +349,17 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
                     },
                   ]}
                 >
-                  <Icon name="calendar-month" size={20} color={theme.colors.primary} />
-                  <Text style={[styles.dateSelectText, { color: theme.colors.primary }]}>
+                  <Icon
+                    name="calendar-month"
+                    size={20}
+                    color={theme.colors.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.dateSelectText,
+                      { color: theme.colors.primary },
+                    ]}
+                  >
                     Next Date: {formatDateDisplay(selectedDate)}
                   </Text>
                 </TouchableOpacity>
@@ -348,7 +385,12 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
             ]}
           >
             <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
-              <Text style={[styles.cancelBtnText, { color: theme.colors.textSecondary }]}>
+              <Text
+                style={[
+                  styles.cancelBtnText,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
                 Cancel
               </Text>
             </TouchableOpacity>
@@ -365,7 +407,12 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
                 <>
-                  <Icon name="check" size={20} color="#FFF" style={{ marginRight: 4 }} />
+                  <Icon
+                    name="check"
+                    size={20}
+                    color="#FFF"
+                    style={{ marginRight: 4 }}
+                  />
                   <Text style={styles.saveBtnText}>Save Note</Text>
                 </>
               )}

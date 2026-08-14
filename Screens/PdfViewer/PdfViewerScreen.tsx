@@ -15,6 +15,7 @@ import {
 import { WebView } from "react-native-webview";
 
 import { ThemeContext } from "../../Providers/ThemeProvider";
+import { shareNamedPdf } from "../../utils/fileShareHelper";
 
 export const PdfViewerScreen: React.FC = () => {
   const route = useRoute<any>();
@@ -52,16 +53,12 @@ export const PdfViewerScreen: React.FC = () => {
 
   const handleShare = async () => {
     try {
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(pdfUri, {
-          mimeType: "application/pdf",
-          dialogTitle: title || "Share PDF",
-          UTI: "com.adobe.pdf",
-        });
+      if (pdfUri) {
+        await shareNamedPdf(pdfUri, title || "Document", title || "Share PDF");
       } else {
         Alert.alert(
           "Share Unavailable",
-          "Sharing is not supported on this device."
+          "No PDF file available to share."
         );
       }
     } catch (err) {

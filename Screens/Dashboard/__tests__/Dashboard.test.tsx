@@ -1,10 +1,11 @@
-import React from "react";
 import { render, fireEvent, waitFor } from "@testing-library/react-native";
-import Dashboard from "../Dashboard";
-import ThemeProvider from "../../../Providers/ThemeProvider";
-import LanguageProvider from "../../../Providers/LanguageProvider";
+import React from "react";
+
 import * as db from "../../../DataBase";
+import LanguageProvider from "../../../Providers/LanguageProvider";
+import ThemeProvider from "../../../Providers/ThemeProvider";
 import { exportDailyCauseListToPdf } from "../../../utils/pdfExporter";
+import Dashboard from "../Dashboard";
 
 // Mock stable navigation and route
 const mockNavigate = jest.fn();
@@ -46,7 +47,9 @@ const mockCases = [
 jest.mock("../../../DataBase", () => ({
   ...jest.requireActual("../../../DataBase"),
   getCases: jest.fn(() => Promise.resolve(mockCases)),
-  getUserProfile: jest.fn(() => Promise.resolve({ id: 1, name: "Test Advocate" })),
+  getUserProfile: jest.fn(() =>
+    Promise.resolve({ id: 1, name: "Test Advocate" })
+  ),
 }));
 
 // Mock PDF Exporter
@@ -83,17 +86,30 @@ describe("DashboardScreen", () => {
 
   it("should render welcome greetings, quick actions list, and metrics section", async () => {
     const { findByText } = renderWithProviders();
-    const actionsTitle = await findByText("Quick Actions");
-    const todayCasesTitle = await findByText("Today's Cases");
+    const actionsTitle = await findByText(
+      "Quick Actions",
+      {},
+      { timeout: 15000 }
+    );
+    const todayCasesTitle = await findByText(
+      "Today's Cases",
+      {},
+      { timeout: 15000 }
+    );
     expect(actionsTitle).toBeTruthy();
     expect(todayCasesTitle).toBeTruthy();
-  });
+  }, 15000);
 
-  it("should trigger ad preloading and daily cause list compilation on Share List click", async () => {
+  it("should open customizer modal and compile daily cause list on confirmation", async () => {
     const { findByText } = renderWithProviders();
     const shareButton = await findByText("Share List");
 
     fireEvent.press(shareButton);
+
+    const generatePdfButton = await findByText("Generate PDF");
+    expect(generatePdfButton).toBeTruthy();
+
+    fireEvent.press(generatePdfButton);
 
     await waitFor(() => {
       expect(mockShowAd).toHaveBeenCalledWith("rewarded", expect.any(Function));

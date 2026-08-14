@@ -1,13 +1,27 @@
-import React from "react";
-import { Alert } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { render, fireEvent, waitFor } from "@testing-library/react-native";
-import GenerateDocumentScreen from "../GenerateDocumentScreen";
-import ThemeProvider from "../../../Providers/ThemeProvider";
-import LanguageProvider from "../../../Providers/LanguageProvider";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import React from "react";
+import { Alert } from "react-native";
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import LanguageProvider from "../../../Providers/LanguageProvider";
+import ThemeProvider from "../../../Providers/ThemeProvider";
+import GenerateDocumentScreen from "../GenerateDocumentScreen";
+
+jest.mock("expo-speech-recognition", () => ({
+  ExpoSpeechRecognitionModule: {
+    requestPermissionsAsync: jest
+      .fn()
+      .mockResolvedValue({ status: "granted", granted: true }),
+    getStateAsync: jest.fn().mockResolvedValue("inactive"),
+    start: jest.fn(),
+    stop: jest.fn(),
+    abort: jest.fn(),
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+  },
+  useSpeechRecognitionEvent: jest.fn(),
+}));
 
 const mockNavigate = jest.fn();
 const mockNavigationObj = {
@@ -103,12 +117,15 @@ describe("GenerateDocumentScreen", () => {
 
   it("should render client details and document type selection options", async () => {
     mockRouteParams = { caseId: undefined, templateType: "bail" };
-    const { findAllByText, queryByText } = renderWithProviders();
-    
+    const { findAllByText, findByText, queryByText } = renderWithProviders();
+
     // Wait for the loading indicator to disappear
-    await waitFor(() => {
-      expect(queryByText("Preparing document...")).toBeNull();
-    }, { timeout: 15000 });
+    await waitFor(
+      () => {
+        expect(queryByText("Preparing document...")).toBeNull();
+      },
+      { timeout: 15000 }
+    );
 
     const sectionTitles = await findAllByText("Case/Client Details");
     expect(sectionTitles.length).toBeGreaterThan(0);
@@ -116,30 +133,43 @@ describe("GenerateDocumentScreen", () => {
 
   it("should request rewarded ad before generating PDF document", async () => {
     // Mock Alert.alert to auto-trigger the "Share PDF" option
-    const alertSpy = jest.spyOn(Alert, "alert").mockImplementation((title, message, buttons) => {
-      const shareBtn = buttons?.find((btn) => btn.text === "Share PDF" || btn.text === "Share");
-      if (shareBtn && shareBtn.onPress) {
-        shareBtn.onPress();
-      }
-    });
+    const alertSpy = jest
+      .spyOn(Alert, "alert")
+      .mockImplementation((title, message, buttons) => {
+        const shareBtn = buttons?.find(
+          (btn) => btn.text === "Share PDF" || btn.text === "Share"
+        );
+        if (shareBtn && shareBtn.onPress) {
+          shareBtn.onPress();
+        }
+      });
 
     mockRouteParams = { caseId: 1, templateType: "bail" };
     const { findByText, queryByText } = renderWithProviders();
 
     // Wait for the loading indicator to disappear
-    await waitFor(() => {
-      expect(queryByText("Preparing document...")).toBeNull();
-    }, { timeout: 15000 });
+    await waitFor(
+      () => {
+        expect(queryByText("Preparing document...")).toBeNull();
+      },
+      { timeout: 15000 }
+    );
 
     const exportButton = await findByText("Quick PDF Export");
 
     fireEvent.press(exportButton);
 
-    await waitFor(() => {
-      expect(mockShowAd).toHaveBeenCalledWith("rewarded", expect.any(Function));
-      expect(Print.printToFileAsync).toHaveBeenCalled();
-      expect(Sharing.shareAsync).toHaveBeenCalled();
-    }, { timeout: 15000 });
+    await waitFor(
+      () => {
+        expect(mockShowAd).toHaveBeenCalledWith(
+          "rewarded",
+          expect.any(Function)
+        );
+        expect(Print.printToFileAsync).toHaveBeenCalled();
+        expect(Sharing.shareAsync).toHaveBeenCalled();
+      },
+      { timeout: 15000 }
+    );
 
     alertSpy.mockRestore();
   }, 30000);

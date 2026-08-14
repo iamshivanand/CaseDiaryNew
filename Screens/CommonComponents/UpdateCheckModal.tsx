@@ -7,10 +7,12 @@ import {
   Linking,
   Platform,
   ScrollView,
+  TouchableOpacity,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { ThemeContext } from "../../Providers/ThemeProvider";
+
 import ActionButton from "./ActionButton";
+import { ThemeContext } from "../../Providers/ThemeProvider";
 
 interface UpdateCheckModalProps {
   visible: boolean;
@@ -48,7 +50,7 @@ const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({
       visible={visible}
       animationType="fade"
       onRequestClose={() => {
-        if (!forceUpdate && onClose) {
+        if (onClose) {
           onClose();
         }
       }}
@@ -60,6 +62,22 @@ const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({
             { backgroundColor: theme.colors.surface || "#FFFFFF" },
           ]}
         >
+          {/* Top-Right Close Icon Button */}
+          {onClose && (
+            <TouchableOpacity
+              style={styles.closeIconButton}
+              onPress={onClose}
+              accessibilityLabel="Close modal"
+              accessibilityRole="button"
+            >
+              <Icon
+                name="close"
+                size={22}
+                color={theme.colors.textSecondary || "#6B7280"}
+              />
+            </TouchableOpacity>
+          )}
+
           {/* Header Icon */}
           <View
             style={[
@@ -68,7 +86,9 @@ const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({
             ]}
           >
             <Icon
-              name={forceUpdate ? "alert-decagram-outline" : "rocket-launch-outline"}
+              name={
+                forceUpdate ? "alert-decagram-outline" : "rocket-launch-outline"
+              }
               size={44}
               color={theme.colors.primary || "#1E40AF"}
             />
@@ -76,10 +96,7 @@ const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({
 
           {/* Title */}
           <Text
-            style={[
-              styles.title,
-              { color: theme.colors.text || "#111827" },
-            ]}
+            style={[styles.title, { color: theme.colors.text || "#111827" }]}
           >
             {forceUpdate ? "Update Required" : "Update Available"}
           </Text>
@@ -129,9 +146,9 @@ const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({
 
           {/* Action Buttons */}
           <View style={styles.buttonContainer}>
-            {!forceUpdate && onClose && (
+            {onClose && (
               <ActionButton
-                title="Later"
+                title="Close"
                 type="secondary"
                 onPress={onClose}
                 style={styles.actionButton}
@@ -141,10 +158,7 @@ const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({
               title="Update Now"
               type="primary"
               onPress={handleUpdatePress}
-              style={[
-                styles.actionButton,
-                forceUpdate ? { flex: 1, width: "100%" } : {},
-              ]}
+              style={styles.actionButton}
             />
           </View>
         </View>
@@ -165,12 +179,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 24,
     alignItems: "center",
+    justifyContent: "center",
     elevation: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 10,
     maxHeight: "80%",
+    position: "relative",
+  },
+  closeIconButton: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    zIndex: 10,
+    padding: 6,
   },
   iconContainer: {
     width: 80,
@@ -199,6 +222,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 24,
     maxHeight: 120,
+    alignItems: "center",
   },
   notesTitle: {
     fontSize: 12,
@@ -206,21 +230,27 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 6,
     letterSpacing: 0.5,
+    textAlign: "center",
   },
   notesScroll: {
     maxHeight: 80,
+    width: "100%",
   },
   notesScrollContent: {
     paddingBottom: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
   notesText: {
     fontSize: 13,
     lineHeight: 18,
+    textAlign: "center",
   },
   buttonContainer: {
     flexDirection: "row",
     width: "100%",
-    justifyContent: "space-between",
+    justifyContent: "center",
+    alignItems: "center",
   },
   actionButton: {
     flex: 1,

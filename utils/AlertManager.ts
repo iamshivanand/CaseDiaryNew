@@ -114,14 +114,23 @@ export const initializeAlertInterceptor = () => {
       });
     } else {
       if (originalPrompt) {
-        originalPrompt(title, message, callbackOrButtons as any, type, defaultValue, keyboardType);
+        originalPrompt(
+          title,
+          message,
+          callbackOrButtons as any,
+          type,
+          defaultValue,
+          keyboardType
+        );
       } else {
-        console.warn("Native Alert.prompt is not available on this platform, falling back to Alert.alert.");
+        console.warn(
+          "Native Alert.prompt is not available on this platform, falling back to Alert.alert."
+        );
         // Fallback for Android in standard environment if no handler is registered
         originalAlert(title, message, [
           {
             text: "OK",
-          }
+          },
         ]);
       }
     }

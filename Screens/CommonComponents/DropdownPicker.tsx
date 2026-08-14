@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import React, { useContext, useState } from "react";
 import {
   View,
@@ -8,9 +9,9 @@ import {
   Modal,
   FlatList,
   StyleSheet,
-  SafeAreaView
+  SafeAreaView,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+
 import { getDropdownPickerStyles } from "./DropdownPickerStyle";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { DropdownOption } from "../../Types/appTypes";
@@ -48,12 +49,13 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [localOtherValue, setLocalOtherValue] = useState("");
 
-  const displayOtherValue = otherValue !== undefined ? otherValue : localOtherValue;
+  const displayOtherValue =
+    otherValue !== undefined ? otherValue : localOtherValue;
 
   const selectedOption = options.find((opt) => opt.value === selectedValue);
   const displayText = selectedOption
     ? selectedOption.label
-    : (placeholder || `Select ${label}...`);
+    : placeholder || `Select ${label}...`;
 
   const filteredOptions = options.filter((opt) =>
     opt.label.toString().toLowerCase().includes(searchQuery.toLowerCase())
@@ -81,7 +83,7 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
   return (
     <View style={styles.inputContainer} testID={testID}>
       <Text style={styles.label}>{label}</Text>
-      
+
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => enabled && setModalVisible(true)}
@@ -119,13 +121,13 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
           onChangeText={handleOtherTextChange}
         />
       )}
-      
+
       {error && <Text style={styles.errorText}>{error}</Text>}
 
       <Modal
         visible={modalVisible}
         animationType="slide"
-        transparent={true}
+        transparent
         onRequestClose={() => {
           setSearchQuery("");
           setModalVisible(false);
@@ -157,7 +159,9 @@ const DropdownPicker: React.FC<DropdownPickerProps> = ({
 
             <FlatList
               data={filteredOptions}
-              keyExtractor={(item, index) => item.value?.toString() || index.toString()}
+              keyExtractor={(item, index) =>
+                item.value?.toString() || index.toString()
+              }
               keyboardShouldPersistTaps="handled"
               renderItem={({ item, index }) => {
                 const isSelected = item.value === selectedValue;

@@ -19,11 +19,12 @@ import AddCaseDetails from "./Screens/Addcase/AddCaseDetails";
 import AddDocumentScreen from "./Screens/Addcase/AddDocument";
 import CalendarScreen from "./Screens/Calendar/Calendar";
 import CaseDetailsScreen from "./Screens/CaseDetailsScreen/CaseDetailsScreen"; // This is now the new, refactored screen
-import EditDraftScreen from "./Screens/CaseDetailsScreen/EditDraftScreen";
+import TiptapEditDraftScreen from "./Screens/CaseDetailsScreen/TiptapEditDraftScreen";
 import GenerateDocumentScreen from "./Screens/CaseDetailsScreen/GenerateDocumentScreen";
 import CasesList from "./Screens/CasesList/CasesList";
 import DashboardScreen from "./Screens/Dashboard/Dashboard";
 // import CaseDetailsScreenV2 from "./Screens/CaseDetailsScreenV2/CaseDetailsScreenV2"; // V2 Import removed
+import PdfScannerScreen from "./Screens/Dashboard/PdfScannerScreen";
 import EditCaseScreen from "./Screens/EditCase/EditCaseScreen";
 import DuplicateReviewScreen from "./Screens/Onboarding/DuplicateReviewScreen";
 import ImportMigrationScreen from "./Screens/Onboarding/ImportMigrationScreen";
@@ -37,7 +38,6 @@ import ManageLookupCategoryScreen from "./Screens/Settings/ManageLookupCategoryS
 import SettingsScreen from "./Screens/Settings/SettingsScreen";
 import UndatedCasesScreen from "./Screens/UndatedCases/UndatedCasesScreen";
 import YesterdaysCasesScreen from "./Screens/YesterdaysCases/YesterdaysCasesScreen";
-import PdfScannerScreen from "./Screens/Dashboard/PdfScannerScreen";
 
 // Import ParamList types
 import {
@@ -136,7 +136,12 @@ const HomeStack = () => {
       />
       <HomeStackNav.Screen
         name="EditDraft"
-        component={EditDraftScreen}
+        component={TiptapEditDraftScreen}
+        options={{ headerShown: false }}
+      />
+      <HomeStackNav.Screen
+        name="TiptapEditDraft"
+        component={TiptapEditDraftScreen}
         options={{ headerShown: false }}
       />
       <HomeStackNav.Screen
@@ -158,6 +163,16 @@ const HomeStack = () => {
         name="PdfScanner"
         component={PdfScannerScreen}
         options={{ headerShown: false }}
+      />
+      <HomeStackNav.Screen
+        name="SettingsScreen"
+        component={SettingsScreen}
+        options={{ headerShown: true, title: "Settings" }}
+      />
+      <HomeStackNav.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ headerShown: true, title: "Settings" }}
       />
     </HomeStackNav.Navigator>
   );
@@ -266,6 +281,11 @@ const ProfileStack = () => {
         options={{ headerShown: true, title: "Settings" }}
       />
       <ProfileStackNav.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ headerShown: true, title: "Settings" }}
+      />
+      <ProfileStackNav.Screen
         name="ManageLookupCategoryScreen"
         component={ManageLookupCategoryScreen}
         options={({ route }) => ({
@@ -353,9 +373,12 @@ const Appro: React.FC = () => {
             "YesterdaysCases",
             "AllCases",
             "SettingsScreen",
+            "Settings",
             "ManageLookupCategoryScreen",
             "GenerateDocument",
             "DraftsHub",
+            "EditDraft",
+            "TiptapEditDraft",
             "DatabaseImportScreen",
             "PdfScanner",
             "PdfViewer",

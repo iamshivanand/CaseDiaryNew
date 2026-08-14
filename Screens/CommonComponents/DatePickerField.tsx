@@ -1,10 +1,21 @@
 // Screens/CommonComponents/DatePickerField.tsx
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
+import { format } from "date-fns";
 import React, { useState, useContext } from "react"; // Added useContext
-import { View, Text, TouchableOpacity, Platform, Modal, Button, StyleSheet } from "react-native";
-import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Platform,
+  Modal,
+  Button,
+  StyleSheet,
+} from "react-native";
+
 import { getDatePickerFieldStyles } from "./DatePickerFieldStyle"; // Import function
 import { ThemeContext } from "../../Providers/ThemeProvider"; // Adjust path
-import { format } from 'date-fns';
 
 interface DatePickerFieldProps {
   label: string;
@@ -34,13 +45,16 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
   const [showPicker, setShowPicker] = useState(false);
   const [iosDate, setIosDate] = useState<Date>(value || new Date());
 
-  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
+  const handleDateChange = (
+    event: DateTimePickerEvent,
+    selectedDate?: Date
+  ) => {
+    if (Platform.OS === "android") {
       setShowPicker(false);
       if (event.type === "set" && selectedDate) {
         onChange(selectedDate);
       }
-    } else if (Platform.OS === 'ios') {
+    } else if (Platform.OS === "ios") {
       if (selectedDate) {
         setIosDate(selectedDate);
       }
@@ -60,58 +74,57 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
   const displayDate = value ? format(value, dateFormat) : placeholder;
 
   const openPicker = () => {
-    if (Platform.OS === 'ios') {
-        setIosDate(value || new Date());
+    if (Platform.OS === "ios") {
+      setIosDate(value || new Date());
     }
     setShowPicker(true);
-  }
+  };
 
   // Local styles for iOS modal, using theme where appropriate
   const localIosPickerStyles = StyleSheet.create({
     modalOverlay: {
-        flex: 1,
-        justifyContent: 'flex-end',
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: "rgba(15, 23, 42, 0.65)",
     },
     modalContainer: {
-        backgroundColor: theme.colors.cardBackground,
-        borderTopRightRadius: 24,
-        borderTopLeftRadius: 24,
-        padding: 20,
+      backgroundColor: theme.colors.cardBackground,
+      borderTopRightRadius: 24,
+      borderTopLeftRadius: 24,
+      padding: 20,
     },
     buttonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 20,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: 20,
     },
     iosButton: {
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-        minWidth: 100,
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      justifyContent: "center",
+      alignItems: "center",
+      minWidth: 100,
     },
     cancelButton: {
-        backgroundColor: theme.colors.danger + '1A', // 10% opacity
+      backgroundColor: theme.colors.danger + "1A", // 10% opacity
     },
     doneButton: {
-        backgroundColor: theme.colors.primary + '1A', // 10% opacity
+      backgroundColor: theme.colors.primary + "1A", // 10% opacity
     },
     iosButtonText: {
-        fontWeight: '600',
-        fontSize: 15,
-    }
+      fontWeight: "600",
+      fontSize: 15,
+    },
   });
-
 
   return (
     <View style={styles.inputContainer}>
       <Text style={styles.label}>{label}</Text>
       <TouchableOpacity
         style={[
-            styles.dateTouchable,
-            error ? { borderColor: theme.colors.danger } : {}
+          styles.dateTouchable,
+          error ? { borderColor: theme.colors.danger } : {},
         ]}
         onPress={openPicker}
         activeOpacity={0.7}
@@ -121,7 +134,7 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
         </Text>
       </TouchableOpacity>
 
-      {Platform.OS === 'android' && showPicker && (
+      {Platform.OS === "android" && showPicker && (
         <DateTimePicker
           value={value || new Date()}
           mode="date"
@@ -133,41 +146,61 @@ const DatePickerField: React.FC<DatePickerFieldProps> = ({
         />
       )}
 
-      {Platform.OS === 'ios' && showPicker && (
+      {Platform.OS === "ios" && showPicker && (
         <Modal
-            transparent={true}
-            animationType="slide"
-            visible={showPicker}
-            onRequestClose={cancelIosDate}
+          transparent
+          animationType="slide"
+          visible={showPicker}
+          onRequestClose={cancelIosDate}
         >
-            <View style={localIosPickerStyles.modalOverlay}>
-                <View style={localIosPickerStyles.modalContainer}>
-                    <DateTimePicker
-                        value={iosDate}
-                        mode="date"
-                        display="spinner"
-                        onChange={handleDateChange}
-                        minimumDate={minimumDate}
-                        maximumDate={maximumDate}
-                        textColor={theme.colors.text} // iOS picker text color
-                        // themeVariant={theme.isDarkMode ? "dark" : "light"} // If theme has isDarkMode
-                    />
-                    <View style={localIosPickerStyles.buttonContainer}>
-                      <TouchableOpacity
-                        onPress={cancelIosDate}
-                        style={[localIosPickerStyles.iosButton, localIosPickerStyles.cancelButton]}
-                      >
-                        <Text style={[localIosPickerStyles.iosButtonText, { color: theme.colors.danger }]}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={confirmIosDate}
-                        style={[localIosPickerStyles.iosButton, localIosPickerStyles.doneButton]}
-                      >
-                        <Text style={[localIosPickerStyles.iosButtonText, { color: theme.colors.primary }]}>Done</Text>
-                      </TouchableOpacity>
-                    </View>
-                </View>
+          <View style={localIosPickerStyles.modalOverlay}>
+            <View style={localIosPickerStyles.modalContainer}>
+              <DateTimePicker
+                value={iosDate}
+                mode="date"
+                display="spinner"
+                onChange={handleDateChange}
+                minimumDate={minimumDate}
+                maximumDate={maximumDate}
+                textColor={theme.colors.text} // iOS picker text color
+                // themeVariant={theme.isDarkMode ? "dark" : "light"} // If theme has isDarkMode
+              />
+              <View style={localIosPickerStyles.buttonContainer}>
+                <TouchableOpacity
+                  onPress={cancelIosDate}
+                  style={[
+                    localIosPickerStyles.iosButton,
+                    localIosPickerStyles.cancelButton,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      localIosPickerStyles.iosButtonText,
+                      { color: theme.colors.danger },
+                    ]}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={confirmIosDate}
+                  style={[
+                    localIosPickerStyles.iosButton,
+                    localIosPickerStyles.doneButton,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      localIosPickerStyles.iosButtonText,
+                      { color: theme.colors.primary },
+                    ]}
+                  >
+                    Done
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
+          </View>
         </Modal>
       )}
       {error && <Text style={styles.errorText}>{error}</Text>}

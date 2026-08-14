@@ -1,8 +1,9 @@
-import React from "react";
-import { render, fireEvent } from "@testing-library/react-native";
-import CasesList from "../CasesList";
-import { ThemeContext } from "../../../Providers/ThemeProvider";
 import { NavigationContainer, useRoute } from "@react-navigation/native";
+import { render, fireEvent } from "@testing-library/react-native";
+import React from "react";
+
+import { ThemeContext } from "../../../Providers/ThemeProvider";
+import CasesList from "../CasesList";
 
 // Mocking the database functions
 jest.mock("../../../DataBase", () => ({
@@ -13,7 +14,9 @@ jest.mock("../../../DataBase", () => ({
         CaseTitle: "Test Case 1",
         ClientName: "Test Client 1",
         CaseStatus: "Active",
-        NextDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        NextDate: new Date(
+          new Date().getTime() + 24 * 60 * 60 * 1000
+        ).toISOString(),
         updated_at: "2024-01-01",
         PreviousDate: "2023-12-01",
       },
@@ -37,8 +40,8 @@ jest.mock("../components/NewCaseCard", () => {
   );
 });
 
-jest.mock('@react-navigation/native', () => {
-  const actualNav = jest.requireActual('@react-navigation/native');
+jest.mock("@react-navigation/native", () => {
+  const actualNav = jest.requireActual("@react-navigation/native");
   return {
     ...actualNav,
     useRoute: () => ({
@@ -71,7 +74,7 @@ describe("CasesList", () => {
     const updateHearingButton = await findByText("Update Hearing");
     fireEvent.press(updateHearingButton);
 
-    const popupTitle = await findByText("Update Hearing & Payment Details");
+    const popupTitle = await findByText("Update Hearing & Fee Details");
     expect(popupTitle).toBeTruthy();
   });
 });

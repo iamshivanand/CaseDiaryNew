@@ -1,10 +1,21 @@
 // Screens/CommonComponents/ActionButton.tsx
 import React, { useContext } from "react";
-import { TouchableOpacity, Text, ActivityIndicator, View, ViewStyle, TextStyle } from "react-native";
+import {
+  TouchableOpacity,
+  Text,
+  ActivityIndicator,
+  View,
+  ViewStyle,
+  TextStyle,
+} from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
+
 import { getActionButtonStyles } from "./ActionButtonStyle";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider"; // Adjust path
-
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 
 interface ActionButtonProps {
   title: string;
@@ -40,7 +51,11 @@ const ActionButton: React.FC<ActionButtonProps> = ({
 
   const handlePressIn = () => {
     if (!disabled && !loading) {
-      scale.value = withSpring(0.96, { damping: 25, stiffness: 400, mass: 0.4 });
+      scale.value = withSpring(0.96, {
+        damping: 25,
+        stiffness: 400,
+        mass: 0.4,
+      });
     }
   };
 
@@ -56,17 +71,20 @@ const ActionButton: React.FC<ActionButtonProps> = ({
     case "primary":
       buttonStyleConfig = styles.primaryButton;
       textStyleConfig = styles.primaryButtonText;
-      finalActivityIndicatorColor = textStyleConfig.color || theme.colors.background;
+      finalActivityIndicatorColor =
+        textStyleConfig.color || theme.colors.background;
       break;
     case "secondary":
       buttonStyleConfig = styles.secondaryButton;
       textStyleConfig = styles.secondaryButtonText;
-      finalActivityIndicatorColor = textStyleConfig.color || theme.colors.primary;
+      finalActivityIndicatorColor =
+        textStyleConfig.color || theme.colors.primary;
       break;
     case "dashed":
       buttonStyleConfig = styles.dashedButton;
       textStyleConfig = styles.dashedButtonText;
-      finalActivityIndicatorColor = textStyleConfig.color || theme.colors.primary;
+      finalActivityIndicatorColor =
+        textStyleConfig.color || theme.colors.primary;
       break;
     case "danger":
       buttonStyleConfig = styles.dangerButton;
@@ -76,7 +94,8 @@ const ActionButton: React.FC<ActionButtonProps> = ({
     default:
       buttonStyleConfig = styles.primaryButton;
       textStyleConfig = styles.primaryButtonText;
-      finalActivityIndicatorColor = textStyleConfig.color || theme.colors.background;
+      finalActivityIndicatorColor =
+        textStyleConfig.color || theme.colors.background;
   }
 
   return (
@@ -100,7 +119,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({
         {loading ? (
           <ActivityIndicator color={finalActivityIndicatorColor} />
         ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
             {leftIcon && <View style={styles.iconWrapper}>{leftIcon}</View>}
             <Text style={[styles.buttonText, textStyleConfig, textStyle]}>
               {title}

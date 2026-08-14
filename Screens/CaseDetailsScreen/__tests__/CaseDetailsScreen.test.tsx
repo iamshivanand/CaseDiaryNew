@@ -1,11 +1,12 @@
-import React from "react";
 import { render, fireEvent, waitFor } from "@testing-library/react-native";
+import React from "react";
 import { Alert, Linking } from "react-native";
-import CaseDetailsScreen from "../CaseDetailsScreen";
-import ThemeProvider from "../../../Providers/ThemeProvider";
-import LanguageProvider from "../../../Providers/LanguageProvider";
+
 import * as db from "../../../DataBase";
+import LanguageProvider from "../../../Providers/LanguageProvider";
+import ThemeProvider from "../../../Providers/ThemeProvider";
 import { exportCaseToPdf } from "../../../utils/pdfExporter";
+import CaseDetailsScreen from "../CaseDetailsScreen";
 
 const mockNavigate = jest.fn();
 const mockNavigationObj = {
@@ -96,14 +97,17 @@ describe("CaseDetailsScreen", () => {
 
     await waitFor(() => {
       expect(mockShowAd).toHaveBeenCalledWith("rewarded", expect.any(Function));
-      expect(exportCaseToPdf).toHaveBeenCalledWith(mockCaseData, mockNavigationObj);
+      expect(exportCaseToPdf).toHaveBeenCalledWith(
+        mockCaseData,
+        mockNavigationObj
+      );
     });
   });
 
   it("should open phone call link when client contact call icon is pressed", async () => {
     const linkingSpy = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     const { findByTestId } = renderWithProviders();
-    
+
     // In our component, we have phone call TouchableOpacity. Let's find it.
     // In CaseDetailsScreen.tsx line 298: it renders the call icon with press handler handlePhoneCall.
     // Let's find it using findByText or query it by mock test id if available, or just mock Linking.openURL and press.
@@ -133,6 +137,8 @@ describe("CaseDetailsScreen", () => {
     expect(mockNavigate).toHaveBeenCalledWith("EditCase", { caseId: 1 });
 
     fireEvent.press(generateButton);
-    expect(mockNavigate).toHaveBeenCalledWith("GenerateDocument", { caseId: 1 });
+    expect(mockNavigate).toHaveBeenCalledWith("GenerateDocument", {
+      caseId: 1,
+    });
   });
 });

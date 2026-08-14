@@ -38,6 +38,7 @@ import {
   getCaseTypes,
   addCaseTimelineEvent,
 } from "../../DataBase";
+import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 import {
   CaseDataScreen,
@@ -48,23 +49,20 @@ import {
   caseStageOptions,
 } from "../../Types/appTypes";
 import { HomeStackParamList } from "../../Types/navigationtypes";
-import { convertIndianDateToLocal } from "../../utils/ecourtsParser";
-import { promptClientNotification } from "../../utils/whatsappNotifier";
-import { useAdTrigger } from "../CommonComponents/AdManager";
-
-
-import { getUserState } from "../../utils/locationService";
 import {
   formatDate,
   getLocalDateString,
   parseLocalDate,
 } from "../../utils/commonFunctions";
+import { convertIndianDateToLocal } from "../../utils/ecourtsParser";
+import { getUserState } from "../../utils/locationService";
+import { promptClientNotification } from "../../utils/whatsappNotifier";
 import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen";
+import ActionButton from "../CommonComponents/ActionButton";
+import { useAdTrigger } from "../CommonComponents/AdManager";
 import DatePickerField from "../CommonComponents/DatePickerField";
 import DropdownPicker from "../CommonComponents/DropdownPicker";
 import FormInput from "../CommonComponents/FormInput";
-import ActionButton from "../CommonComponents/ActionButton";
-import { useTranslation } from "../../Providers/LanguageProvider";
 
 interface FieldDefinition {
   name: keyof CaseData;
@@ -618,7 +616,11 @@ const FormFieldRenderer: React.FC<{
             fieldConfig.suggestions ? suggestions[fieldName] || [] : undefined
           }
           maxLength={fieldConfig.maxLength}
-          keyboardType={fieldConfig.type === "number" ? "numeric" : (fieldConfig.keyboardType as any)}
+          keyboardType={
+            fieldConfig.type === "number"
+              ? "numeric"
+              : (fieldConfig.keyboardType as any)
+          }
           showContactPicker={
             fieldName === "ClientContactNumber" ||
             fieldName === "OppAdvocateContactNumber"
@@ -1339,12 +1341,20 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           CaseDescription: changedFields.CaseDescription,
         }),
         ...(changedFields.CaseNotes && { CaseNotes: changedFields.CaseNotes }),
-        ...(changedFields.case_stage && { case_stage: changedFields.case_stage }),
+        ...(changedFields.case_stage && {
+          case_stage: changedFields.case_stage,
+        }),
         ...(changedFields.total_fee !== undefined && {
-          total_fee: typeof changedFields.total_fee === 'string' ? parseFloat(changedFields.total_fee) : changedFields.total_fee,
+          total_fee:
+            typeof changedFields.total_fee === "string"
+              ? parseFloat(changedFields.total_fee)
+              : changedFields.total_fee,
         }),
         ...(changedFields.fee_paid !== undefined && {
-          fee_paid: typeof changedFields.fee_paid === 'string' ? parseFloat(changedFields.fee_paid) : changedFields.fee_paid,
+          fee_paid:
+            typeof changedFields.fee_paid === "string"
+              ? parseFloat(changedFields.fee_paid)
+              : changedFields.fee_paid,
         }),
       };
       Object.keys(updatePayload).forEach((key) => {
@@ -1388,7 +1398,11 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
       const insertPayload: CaseInsertData = {
         uniqueId: formValues.uniqueId || uniqueIdToUse,
         user_id: userId,
-        CaseTitle: formValues.CaseTitle || (formValues.FirstParty && formValues.OppositeParty ? `${formValues.FirstParty} vs. ${formValues.OppositeParty}` : null),
+        CaseTitle:
+          formValues.CaseTitle ||
+          (formValues.FirstParty && formValues.OppositeParty
+            ? `${formValues.FirstParty} vs. ${formValues.OppositeParty}`
+            : null),
         ClientName: formValues.ClientName || null,
         CNRNumber: formValues.CNRNumber || null,
         court_id: formValues.court_id || null,
@@ -1422,8 +1436,12 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         CaseDescription: formValues.CaseDescription || null,
         CaseNotes: formValues.CaseNotes || null,
         case_stage: formValues.case_stage || null,
-        total_fee: formValues.total_fee ? parseFloat(formValues.total_fee as any) : 0,
-        fee_paid: formValues.fee_paid ? parseFloat(formValues.fee_paid as any) : 0,
+        total_fee: formValues.total_fee
+          ? parseFloat(formValues.total_fee as any)
+          : 0,
+        fee_paid: formValues.fee_paid
+          ? parseFloat(formValues.fee_paid as any)
+          : 0,
       };
 
       console.log(
@@ -1460,181 +1478,135 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 20}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollViewStyle}
           contentContainerStyle={styles.scrollContentContainerStyle}
           keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled={true}
+          showsVerticalScrollIndicator={true}
         >
-        <View style={styles.formScreenContainer}>
-          <Formik
-            initialValues={prepareFormInitialValues()}
-            validationSchema={validationSchema}
-            onSubmit={handleSubmitForm}
-            enableReinitialize
-          >
-            {(formikProps) => (
-              <View>
-                <FormikErrorScroller
-                  errors={formikProps.errors}
-                  submitCount={formikProps.submitCount}
-                />
-                {!update && (
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: `${theme.colors.primary}0D`,
-                      borderColor: theme.colors.primary,
-                      borderWidth: 1.5,
-                      borderStyle: "dashed",
-                      borderRadius: 12,
-                      paddingVertical: 14,
-                      paddingHorizontal: 16,
-                      marginBottom: 16,
-                    }}
-                    onPress={() => setIsECourtsModalVisible(true)}
-                  >
-                    <Ionicons
-                      name="cloud-download-outline"
-                      size={22}
-                      color={theme.colors.primary}
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text
+          <View style={styles.formScreenContainer}>
+            <Formik
+              initialValues={prepareFormInitialValues()}
+              validationSchema={validationSchema}
+              onSubmit={handleSubmitForm}
+              enableReinitialize
+            >
+              {(formikProps) => (
+                <View>
+                  <FormikErrorScroller
+                    errors={formikProps.errors}
+                    submitCount={formikProps.submitCount}
+                  />
+                  {!update && (
+                    <TouchableOpacity
                       style={{
-                        color: theme.colors.primary,
-                        fontSize: 15,
-                        fontWeight: "bold",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: `${theme.colors.primary}0D`,
+                        borderColor: theme.colors.primary,
+                        borderWidth: 1.5,
+                        borderStyle: "dashed",
+                        borderRadius: 12,
+                        paddingVertical: 14,
+                        paddingHorizontal: 16,
+                        marginBottom: 16,
                       }}
-                    >
-                      {t("btn_import_ecourts") || "Import Details from eCourts"}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                {fieldGroups.map((group, groupIdx) => (
-                  <Animatable.View
-                    key={groupIdx}
-                    animation="fadeInUp"
-                    delay={groupIdx * 100}
-                    duration={500}
-                    useNativeDriver
-                    style={[
-                      styles.groupCard,
-                      {
-                        backgroundColor: theme.colors.cardBackground,
-                        borderColor: theme.colors.border,
-                        borderWidth: 1,
-                      },
-                    ]}
-                    onLayout={(event) => {
-                      cardLayouts.current[groupIdx] =
-                        event.nativeEvent.layout.y;
-                    }}
-                  >
-                    <View
-                      style={[
-                        styles.groupHeader,
-                        {
-                          borderBottomWidth: 1,
-                          borderBottomColor: theme.colors.border,
-                        },
-                      ]}
+                      onPress={() => setIsECourtsModalVisible(true)}
                     >
                       <Ionicons
-                        name={group.icon as any}
-                        size={20}
+                        name="cloud-download-outline"
+                        size={22}
                         color={theme.colors.primary}
                         style={{ marginRight: 8 }}
                       />
                       <Text
+                        style={{
+                          color: theme.colors.primary,
+                          fontSize: 15,
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {t("btn_import_ecourts") ||
+                          "Import Details from eCourts"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {fieldGroups.map((group, groupIdx) => (
+                    <Animatable.View
+                      key={groupIdx}
+                      animation="fadeInUp"
+                      delay={groupIdx * 100}
+                      duration={500}
+                      useNativeDriver
+                      style={[
+                        styles.groupCard,
+                        {
+                          backgroundColor: theme.colors.cardBackground,
+                          borderColor: theme.colors.border,
+                          borderWidth: 1,
+                        },
+                      ]}
+                      onLayout={(event) => {
+                        cardLayouts.current[groupIdx] =
+                          event.nativeEvent.layout.y;
+                      }}
+                    >
+                      <View
                         style={[
-                          styles.groupTitle,
-                          { color: theme.colors.text },
+                          styles.groupHeader,
+                          {
+                            borderBottomWidth: 1,
+                            borderBottomColor: theme.colors.border,
+                          },
                         ]}
                       >
-                        {t(getGroupTitleKey(group.title) as any) || group.title}
-                      </Text>
-                    </View>
-                    {formFieldsDefinition
-                      .filter(
-                        (f) =>
-                          group.fields.includes(f.name) &&
-                          f.name !== "crime_year" &&
-                          f.name !== "fee_paid"
-                      )
-                      .map((fieldConfig) => {
-                        if (fieldConfig.name === "crime_number") {
-                          const crimeYearConfig = formFieldsDefinition.find(
-                            (f) => f.name === "crime_year"
-                          )!;
-                          return (
-                            <View
-                              key="crime_row"
-                              style={{ flexDirection: "row", gap: 12 }}
-                              onLayout={(event) => {
-                                fieldLayouts.current[fieldConfig.name] =
-                                  event.nativeEvent.layout.y;
-                                fieldLayouts.current[crimeYearConfig.name] =
-                                  event.nativeEvent.layout.y;
-                              }}
-                            >
-                              <View style={{ flex: 2 }}>
-                                <FormFieldRenderer
-                                  fieldConfig={fieldConfig}
-                                  formik={formikProps}
-                                  otherValues={otherValues}
-                                  setOtherValue={setOtherValue}
-                                  suggestions={suggestions}
-                                  policeStationOptions={policeStationOptions}
-                                  districtOptions={districtOptions}
-                                  onDistrictChange={handleDistrictChange}
-                                  courtOptions={courtOptions}
-                                  caseTypeOptions={caseTypeOptions}
-                                />
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <FormFieldRenderer
-                                  fieldConfig={crimeYearConfig}
-                                  formik={formikProps}
-                                  otherValues={otherValues}
-                                  setOtherValue={setOtherValue}
-                                  suggestions={suggestions}
-                                  policeStationOptions={policeStationOptions}
-                                  districtOptions={districtOptions}
-                                  onDistrictChange={handleDistrictChange}
-                                  courtOptions={courtOptions}
-                                  caseTypeOptions={caseTypeOptions}
-                                />
-                              </View>
-                            </View>
-                          );
-                        }
-                        if (fieldConfig.name === "total_fee") {
-                          const feePaidConfig = formFieldsDefinition.find(
-                            (f) => f.name === "fee_paid"
-                          )!;
-                          const totFee = parseFloat(formikProps.values.total_fee as any) || 0;
-                          const pdFee = parseFloat(formikProps.values.fee_paid as any) || 0;
-                          const balance = Math.max(0, totFee - pdFee);
-
-                          return (
-                            <View key="fee_section">
+                        <Ionicons
+                          name={group.icon as any}
+                          size={20}
+                          color={theme.colors.primary}
+                          style={{ marginRight: 8 }}
+                        />
+                        <Text
+                          style={[
+                            styles.groupTitle,
+                            { color: theme.colors.text },
+                          ]}
+                        >
+                          {t(getGroupTitleKey(group.title) as any) ||
+                            group.title}
+                        </Text>
+                      </View>
+                      {formFieldsDefinition
+                        .filter(
+                          (f) =>
+                            group.fields.includes(f.name) &&
+                            f.name !== "crime_year" &&
+                            f.name !== "fee_paid"
+                        )
+                        .map((fieldConfig) => {
+                          if (fieldConfig.name === "crime_number") {
+                            const crimeYearConfig = formFieldsDefinition.find(
+                              (f) => f.name === "crime_year"
+                            )!;
+                            return (
                               <View
+                                key="crime_row"
                                 style={{ flexDirection: "row", gap: 12 }}
                                 onLayout={(event) => {
                                   fieldLayouts.current[fieldConfig.name] =
                                     event.nativeEvent.layout.y;
-                                  fieldLayouts.current[feePaidConfig.name] =
+                                  fieldLayouts.current[crimeYearConfig.name] =
                                     event.nativeEvent.layout.y;
                                 }}
                               >
-                                <View style={{ flex: 1 }}>
+                                <View style={{ flex: 2 }}>
                                   <FormFieldRenderer
                                     fieldConfig={fieldConfig}
                                     formik={formikProps}
@@ -1650,7 +1622,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
                                 </View>
                                 <View style={{ flex: 1 }}>
                                   <FormFieldRenderer
-                                    fieldConfig={feePaidConfig}
+                                    fieldConfig={crimeYearConfig}
                                     formik={formikProps}
                                     otherValues={otherValues}
                                     setOtherValue={setOtherValue}
@@ -1663,80 +1635,164 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
                                   />
                                 </View>
                               </View>
-                              {totFee > 0 && (
-                                <View style={{
-                                  flexDirection: 'row',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  backgroundColor: balance > 0 ? '#FEF2F2' : '#F0FDF4',
-                                  borderColor: balance > 0 ? '#FCA5A5' : '#86EFAC',
-                                  borderWidth: 1,
-                                  borderRadius: 10,
-                                  paddingHorizontal: 12,
-                                  paddingVertical: 10,
-                                  marginTop: 4,
-                                  marginBottom: 12,
-                                }}>
-                                  <Text style={{ fontSize: 13, fontWeight: '600', color: balance > 0 ? '#991B1B' : '#166534' }}>
-                                    Pending Balance:
-                                  </Text>
-                                  <Text style={{ fontSize: 14, fontWeight: '700', color: balance > 0 ? '#DC2626' : '#16A34A' }}>
-                                    ₹{balance.toLocaleString('en-IN')}
-                                  </Text>
+                            );
+                          }
+                          if (fieldConfig.name === "total_fee") {
+                            const feePaidConfig = formFieldsDefinition.find(
+                              (f) => f.name === "fee_paid"
+                            )!;
+                            const totFee =
+                              parseFloat(formikProps.values.total_fee as any) ||
+                              0;
+                            const pdFee =
+                              parseFloat(formikProps.values.fee_paid as any) ||
+                              0;
+                            const balance = Math.max(0, totFee - pdFee);
+
+                            return (
+                              <View key="fee_section">
+                                <View
+                                  style={{ flexDirection: "row", gap: 12 }}
+                                  onLayout={(event) => {
+                                    fieldLayouts.current[fieldConfig.name] =
+                                      event.nativeEvent.layout.y;
+                                    fieldLayouts.current[feePaidConfig.name] =
+                                      event.nativeEvent.layout.y;
+                                  }}
+                                >
+                                  <View style={{ flex: 1 }}>
+                                    <FormFieldRenderer
+                                      fieldConfig={fieldConfig}
+                                      formik={formikProps}
+                                      otherValues={otherValues}
+                                      setOtherValue={setOtherValue}
+                                      suggestions={suggestions}
+                                      policeStationOptions={
+                                        policeStationOptions
+                                      }
+                                      districtOptions={districtOptions}
+                                      onDistrictChange={handleDistrictChange}
+                                      courtOptions={courtOptions}
+                                      caseTypeOptions={caseTypeOptions}
+                                    />
+                                  </View>
+                                  <View style={{ flex: 1 }}>
+                                    <FormFieldRenderer
+                                      fieldConfig={feePaidConfig}
+                                      formik={formikProps}
+                                      otherValues={otherValues}
+                                      setOtherValue={setOtherValue}
+                                      suggestions={suggestions}
+                                      policeStationOptions={
+                                        policeStationOptions
+                                      }
+                                      districtOptions={districtOptions}
+                                      onDistrictChange={handleDistrictChange}
+                                      courtOptions={courtOptions}
+                                      caseTypeOptions={caseTypeOptions}
+                                    />
+                                  </View>
                                 </View>
-                              )}
+                                {totFee > 0 && (
+                                  <View
+                                    style={{
+                                      flexDirection: "row",
+                                      justifyContent: "space-between",
+                                      alignItems: "center",
+                                      backgroundColor:
+                                        balance > 0 ? "#FEF2F2" : "#F0FDF4",
+                                      borderColor:
+                                        balance > 0 ? "#FCA5A5" : "#86EFAC",
+                                      borderWidth: 1,
+                                      borderRadius: 10,
+                                      paddingHorizontal: 12,
+                                      paddingVertical: 10,
+                                      marginTop: 4,
+                                      marginBottom: 12,
+                                    }}
+                                  >
+                                    <Text
+                                      style={{
+                                        fontSize: 13,
+                                        fontWeight: "600",
+                                        color:
+                                          balance > 0 ? "#991B1B" : "#166534",
+                                      }}
+                                    >
+                                      Pending Balance:
+                                    </Text>
+                                    <Text
+                                      style={{
+                                        fontSize: 14,
+                                        fontWeight: "700",
+                                        color:
+                                          balance > 0 ? "#DC2626" : "#16A34A",
+                                      }}
+                                    >
+                                      ₹{balance.toLocaleString("en-IN")}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                            );
+                          }
+                          return (
+                            <View
+                              key={fieldConfig.name}
+                              onLayout={(event) => {
+                                fieldLayouts.current[fieldConfig.name] =
+                                  event.nativeEvent.layout.y;
+                              }}
+                            >
+                              <FormFieldRenderer
+                                fieldConfig={fieldConfig}
+                                formik={formikProps}
+                                otherValues={otherValues}
+                                setOtherValue={setOtherValue}
+                                suggestions={suggestions}
+                                policeStationOptions={policeStationOptions}
+                                districtOptions={districtOptions}
+                                onDistrictChange={handleDistrictChange}
+                                courtOptions={courtOptions}
+                                caseTypeOptions={caseTypeOptions}
+                              />
                             </View>
                           );
+                        })}
+                    </Animatable.View>
+                  ))}
+                  <View style={styles.actionButtonContainer}>
+                    <View style={{ flex: 1 }}>
+                      <ActionButton
+                        title={
+                          update ? t("btn_save_changes") : t("btn_save_case")
                         }
-                        return (
-                          <View
-                            key={fieldConfig.name}
-                            onLayout={(event) => {
-                              fieldLayouts.current[fieldConfig.name] =
-                                event.nativeEvent.layout.y;
-                            }}
-                          >
-                            <FormFieldRenderer
-                              fieldConfig={fieldConfig}
-                              formik={formikProps}
-                              otherValues={otherValues}
-                              setOtherValue={setOtherValue}
-                              suggestions={suggestions}
-                              policeStationOptions={policeStationOptions}
-                              districtOptions={districtOptions}
-                              onDistrictChange={handleDistrictChange}
-                              courtOptions={courtOptions}
-                              caseTypeOptions={caseTypeOptions}
-                            />
-                          </View>
-                        );
-                      })}
-                  </Animatable.View>
-                ))}
-                <View style={styles.actionButtonContainer}>
-                  <ActionButton
-                    title={update ? t("btn_save_changes") : t("btn_save_case")}
-                    onPress={() => formikProps.handleSubmit()}
-                    type="primary"
-                  />
-                  <ActionButton
-                    title={t("alert_cancel")}
-                    onPress={() => navigation.goBack()}
-                    type="secondary"
+                        onPress={() => formikProps.handleSubmit()}
+                        type="primary"
+                        style={{ width: "100%", marginVertical: 0 }}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <ActionButton
+                        title={t("alert_cancel")}
+                        onPress={() => navigation.goBack()}
+                        type="secondary"
+                        style={{ width: "100%", marginVertical: 0 }}
+                      />
+                    </View>
+                  </View>
+                  <ECourtsImportModal
+                    visible={isECourtsModalVisible}
+                    onClose={() => setIsECourtsModalVisible(false)}
+                    onImportSuccess={(data) =>
+                      handleImportSuccess(data, formikProps.setFieldValue)
+                    }
                   />
                 </View>
-                <ECourtsImportModal
-                  visible={isECourtsModalVisible}
-                  onClose={() => setIsECourtsModalVisible(false)}
-                  onImportSuccess={(data) =>
-                    handleImportSuccess(data, formikProps.setFieldValue)
-                  }
-                />
-              </View>
-            )}
-          </Formik>
-        </View>
-      </ScrollView>
+              )}
+            </Formik>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
 
       {isLocked && (

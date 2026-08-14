@@ -1,9 +1,10 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useState, useEffect, ReactNode } from "react";
 import { useColorScheme } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export interface Theme {
   dark: boolean;
+  isDark: boolean;
   colors: {
     primary: string;
     secondary: string;
@@ -34,6 +35,7 @@ interface ThemeContextType {
 
 const lightTheme: Theme = {
   dark: false,
+  isDark: false,
   colors: {
     primary: "#1E3A8A", // Royal Sapphire Blue
     secondary: "#D97706", // Champagne Gold
@@ -56,6 +58,7 @@ const lightTheme: Theme = {
 
 const darkTheme: Theme = {
   dark: true,
+  isDark: true,
   colors: {
     primary: "#6366F1", // Indigo Accent
     secondary: "#38BDF8", // Sky Cyan Accent
@@ -123,11 +126,12 @@ const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const activeTheme = getActiveTheme();
 
   return (
-    <ThemeContext.Provider value={{ theme: activeTheme, themeMode, setThemeMode }}>
+    <ThemeContext.Provider
+      value={{ theme: activeTheme, themeMode, setThemeMode }}
+    >
       {children}
     </ThemeContext.Provider>
   );
 };
 
 export default ThemeProvider;
-

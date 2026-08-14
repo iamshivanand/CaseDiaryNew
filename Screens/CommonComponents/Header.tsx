@@ -45,7 +45,11 @@ const Header: React.FC<CustomHeaderProps> = ({
         containerStyle,
       ]}
     >
-      <Text style={{ fontSize: 20, fontWeight: "bold", color: theme.colors.text }}>Welcome Back</Text>
+      <Text
+        style={{ fontSize: 20, fontWeight: "bold", color: theme.colors.text }}
+      >
+        Welcome Back
+      </Text>
       {onPress && (
         <TouchableOpacity onPress={onPress}>
           <FontAwesome name="user" size={34} color="green" />

@@ -1,3 +1,5 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
 import React, { useState, useContext } from "react";
 import {
   View,
@@ -7,17 +9,16 @@ import {
   Alert,
   Platform,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
-import { emitter } from "../../utils/event-emitter";
-import { ThemeContext } from "../../Providers/ThemeProvider";
+
 import { getDb, updateUserProfile, addUser } from "../../DataBase";
+import { ThemeContext } from "../../Providers/ThemeProvider";
 import { LawyerProfileData } from "../../Types/appTypes";
+import { emitter } from "../../utils/event-emitter";
 import ActionButton from "../CommonComponents/ActionButton";
 
 const OnboardingScreen = () => {
@@ -42,7 +43,14 @@ const OnboardingScreen = () => {
 
   const handleSave = async () => {
     console.log("Attempting to save onboarding data...");
-    if (!name || !designation || !phone || !email || !address || !yearsOfPractice) {
+    if (
+      !name ||
+      !designation ||
+      !phone ||
+      !email ||
+      !address ||
+      !yearsOfPractice
+    ) {
       Alert.alert("Error", "Please fill all the fields.");
       console.error("Validation failed: Not all fields are filled.");
       return;
@@ -51,7 +59,12 @@ const OnboardingScreen = () => {
       const db = await getDb();
       const userId = await addUser(name, email);
       if (userId) {
-        const newProfile: Omit<LawyerProfileData, 'stats' | 'avatarUrl'> & { stats: Omit<LawyerProfileData['stats'], 'totalCases' | 'upcomingHearings'> } = {
+        const newProfile: Omit<LawyerProfileData, "stats" | "avatarUrl"> & {
+          stats: Omit<
+            LawyerProfileData["stats"],
+            "totalCases" | "upcomingHearings"
+          >;
+        } = {
           name,
           designation,
           practiceAreas: [],

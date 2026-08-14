@@ -1,8 +1,9 @@
 import React, { useContext } from "react";
 import { View, Text, StyleSheet, FlatList } from "react-native";
+
 import ProfileTimelineItem from "./TimelineItem";
-import { ActivityItem } from "../../../Types/appTypes";
 import { ThemeContext } from "../../../Providers/ThemeProvider";
+import { ActivityItem } from "../../../Types/appTypes";
 
 interface RecentActivityProps {
   activities: ActivityItem[];
@@ -13,34 +14,42 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) => {
 
   if (!activities || activities.length === 0) {
     return (
-      <View 
+      <View
         style={[
-          styles.container, 
-          { 
+          styles.container,
+          {
             backgroundColor: theme.colors.cardBackground,
             borderColor: theme.colors.border,
             borderWidth: 1,
-          }
+          },
         ]}
       >
-        <Text style={[styles.heading, { color: theme.colors.text }]}>Recent Activity</Text>
-        <Text style={[styles.noActivityText, { color: theme.colors.textSecondary }]}>No recent activity to display.</Text>
+        <Text style={[styles.heading, { color: theme.colors.text }]}>
+          Recent Activity
+        </Text>
+        <Text
+          style={[styles.noActivityText, { color: theme.colors.textSecondary }]}
+        >
+          No recent activity to display.
+        </Text>
       </View>
     );
   }
 
   return (
-    <View 
+    <View
       style={[
-        styles.container, 
-        { 
+        styles.container,
+        {
           backgroundColor: theme.colors.cardBackground,
           borderColor: theme.colors.border,
           borderWidth: 1,
-        }
+        },
       ]}
     >
-      <Text style={[styles.heading, { color: theme.colors.text }]}>Recent Activity</Text>
+      <Text style={[styles.heading, { color: theme.colors.text }]}>
+        Recent Activity
+      </Text>
       <FlatList
         data={activities}
         renderItem={({ item, index }) => (

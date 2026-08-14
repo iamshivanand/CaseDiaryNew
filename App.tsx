@@ -9,6 +9,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { CardStyleInterpolators } from "@react-navigation/stack";
 import * as Application from "expo-application";
+import Constants from "expo-constants";
 import { StatusBar } from "expo-status-bar";
 import React, { useContext, useEffect, useState } from "react";
 import {
@@ -41,14 +42,13 @@ import DoneScreen from "./Screens/Onboarding/DoneScreen";
 import DuplicateReviewScreen from "./Screens/Onboarding/DuplicateReviewScreen";
 import GreetingScreen from "./Screens/Onboarding/GreetingScreen";
 import ImportMigrationScreen from "./Screens/Onboarding/ImportMigrationScreen";
+import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
 import PracticeAreasScreen from "./Screens/Onboarding/PracticeAreasScreen";
 import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
 import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
 import SplashScreen from "./Screens/SplashScreen/SplashScreen";
-import PersonalDetailsScreen from "./Screens/Onboarding/PersonalDetailsScreen";
 import { initializeAlertInterceptor } from "./utils/AlertManager";
 import { emitter } from "./utils/event-emitter";
-
 import { scheduleDailyMultiIntervalNotifications } from "./utils/notificationScheduler";
 
 // Initialize the global alert interceptor
@@ -165,14 +165,18 @@ function AppContent() {
               setTimeout(() => reject(new Error("Timeout")), 3000)
             );
             const response = (await Promise.race([
-              fetch("https://gangwar-shiv.github.io/app-version.json"),
+              fetch("https://iamshivanand.github.io/app-version.json"),
               timeoutPromise,
             ])) as Response;
 
             if (response.ok) {
               const data = await response.json();
+              const nativeVer = Application.nativeApplicationVersion;
+              const appConfigVer = Constants.expoConfig?.version;
               const localVersion =
-                Application.nativeApplicationVersion || "1.0.0";
+                nativeVer && nativeVer !== "1.0.0"
+                  ? nativeVer
+                  : appConfigVer || "1.2.2";
 
               const minRequired =
                 Platform.OS === "ios"
@@ -188,16 +192,25 @@ function AppContent() {
               if (data.releaseNotes) setReleaseNotes(data.releaseNotes);
               setLatestVersion(latestAvailable);
 
-              if (isVersionOlder(localVersion, minRequired)) {
+              if (minRequired && isVersionOlder(localVersion, minRequired)) {
                 setForceUpdate(true);
                 setUpdateModalVisible(true);
-              } else if (isVersionOlder(localVersion, latestAvailable)) {
+              } else if (
+                latestAvailable &&
+                isVersionOlder(localVersion, latestAvailable)
+              ) {
                 setForceUpdate(false);
                 setUpdateModalVisible(true);
+              } else {
+                setForceUpdate(false);
+                setUpdateModalVisible(false);
               }
             }
           } catch (fetchErr) {
-            console.warn("Failed to fetch remote app version data in background:", fetchErr);
+            console.warn(
+              "Failed to fetch remote app version data in background:",
+              fetchErr
+            );
           }
         };
         runUpdateCheck();
@@ -259,13 +272,10 @@ function AppContent() {
             }
           }, 1000);
 
-          unsubLoaded = appOpenAd.addAdEventListener(
-            AdEventType.LOADED,
-            () => {
-              clearTimeout(timeoutId);
-              showOpenAd();
-            }
-          );
+          unsubLoaded = appOpenAd.addAdEventListener(AdEventType.LOADED, () => {
+            clearTimeout(timeoutId);
+            showOpenAd();
+          });
 
           unsubError = appOpenAd.addAdEventListener(
             AdEventType.ERROR,
@@ -277,13 +287,10 @@ function AppContent() {
             }
           );
 
-          unsubClosed = appOpenAd.addAdEventListener(
-            AdEventType.CLOSED,
-            () => {
-              cleanup();
-              proceedToApp();
-            }
-          );
+          unsubClosed = appOpenAd.addAdEventListener(AdEventType.CLOSED, () => {
+            cleanup();
+            proceedToApp();
+          });
 
           appOpenAd.load();
         } else {

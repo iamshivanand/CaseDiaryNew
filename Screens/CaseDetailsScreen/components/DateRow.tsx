@@ -1,11 +1,12 @@
 // Screens/CaseDetailsScreen/components/DateRow.tsx
-import React, { useContext } from 'react'; // Added useContext
-import { View, Text } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { getDateRowStyles } from './DateRowStyle'; // Import function
-import { ThemeContext } from '../../../Providers/ThemeProvider'; // Adjust path
-import { parseISO, isValid } from 'date-fns';
-import { useTranslation } from '../../../Providers/LanguageProvider';
+import { parseISO, isValid } from "date-fns";
+import React, { useContext } from "react"; // Added useContext
+import { View, Text } from "react-native";
+import Icon from "react-native-vector-icons/MaterialIcons";
+
+import { getDateRowStyles } from "./DateRowStyle"; // Import function
+import { useTranslation } from "../../../Providers/LanguageProvider";
+import { ThemeContext } from "../../../Providers/ThemeProvider"; // Adjust path
 
 interface DateRowProps {
   label: string;
@@ -18,18 +19,21 @@ const DateRow: React.FC<DateRowProps> = ({ label, dateString, iconName }) => {
   const { locale } = useTranslation();
   const styles = getDateRowStyles(theme); // Generate styles
 
-  let displayDate = 'N/A';
+  let displayDate = "N/A";
   let valueStyle = styles.valueNotSet;
 
   if (dateString && dateString.trim() !== "") {
     try {
       const dateObj = parseISO(dateString);
       if (isValid(dateObj)) {
-        displayDate = dateObj.toLocaleDateString(locale === 'hi' ? 'hi-IN' : 'en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
+        displayDate = dateObj.toLocaleDateString(
+          locale === "hi" ? "hi-IN" : "en-US",
+          {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          }
+        );
         valueStyle = styles.value;
       } else {
         displayDate = dateString;
@@ -45,7 +49,9 @@ const DateRow: React.FC<DateRowProps> = ({ label, dateString, iconName }) => {
     <View style={styles.rowContainer}>
       <Icon name={iconName} size={18} style={styles.icon} />
       <Text style={styles.label}>{label}:</Text>
-      <Text style={[valueStyle, { flex: 1, flexWrap: 'wrap' }]}>{displayDate}</Text>
+      <Text style={[valueStyle, { flex: 1, flexWrap: "wrap" }]}>
+        {displayDate}
+      </Text>
     </View>
   );
 };

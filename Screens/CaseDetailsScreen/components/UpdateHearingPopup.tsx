@@ -1,3 +1,4 @@
+import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useState, useContext } from "react";
 import {
   View,
@@ -10,11 +11,11 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import ActionButton from "../../CommonComponents/ActionButton";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+
 import { ThemeContext } from "../../../Providers/ThemeProvider";
 import speechRecognitionService from "../../../utils/speechRecognitionService";
+import ActionButton from "../../CommonComponents/ActionButton";
 
 interface UpdateHearingPopupProps {
   visible: boolean;
@@ -29,6 +30,20 @@ interface UpdateHearingPopupProps {
   ) => void;
 }
 
+const QUICK_NOTES_BADGES = [
+  "Arguments Heard",
+  "Evidence / Cross-Exam",
+  "Notice Issued",
+  "Adjourned",
+  "Order Passed",
+  "Exemption Allowed",
+  "Bail Granted",
+  "Framing of Charge",
+  "WS / Reply Filed",
+  "Vakalatnama Filed",
+  "Final Arguments",
+];
+
 const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
   visible,
   onClose,
@@ -41,11 +56,14 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
   const [paymentNotes, setPaymentNotes] = useState("");
   const [nextHearingDate, setNextHearingDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dictationLang, setDictationLang] = useState<"en" | "hi">("hi");
   const [isDictating, setIsDictating] = useState(false);
   const [baseNotesForDictation, setBaseNotesForDictation] = useState("");
 
   const handleSave = () => {
-    const dateFeePaidNum = dateFeeToday.trim() ? parseFloat(dateFeeToday.trim()) : 0;
+    const dateFeePaidNum = dateFeeToday.trim()
+      ? parseFloat(dateFeeToday.trim())
+      : 0;
 
     if (!notes.trim() && dateFeePaidNum <= 0) {
       Alert.alert(
@@ -60,14 +78,28 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
             text: "Proceed",
             style: "destructive",
             onPress: () => {
-              onSave(notes, nextHearingDate, dateFeePaidNum, 0, paymentMode, paymentNotes);
+              onSave(
+                notes,
+                nextHearingDate,
+                dateFeePaidNum,
+                0,
+                paymentMode,
+                paymentNotes
+              );
               onClose();
             },
           },
         ]
       );
     } else {
-      onSave(notes, nextHearingDate, dateFeePaidNum, 0, paymentMode, paymentNotes);
+      onSave(
+        notes,
+        nextHearingDate,
+        dateFeePaidNum,
+        0,
+        paymentMode,
+        paymentNotes
+      );
       onClose();
     }
   };
@@ -78,7 +110,13 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
     setNextHearingDate(currentDate);
   };
 
-  const paymentModes = ["Cash", "UPI / GPay", "Bank Transfer", "Cheque", "Online"];
+  const paymentModes = [
+    "Cash",
+    "UPI / GPay",
+    "Bank Transfer",
+    "Cheque",
+    "Online",
+  ];
 
   const toggleDictation = async () => {
     if (isDictating) {
@@ -87,26 +125,34 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
     } else {
       setBaseNotesForDictation(notes);
       setIsDictating(true);
-      const started = await speechRecognitionService.startListening("hi-IN", {
-        onStart: () => setIsDictating(true),
-        onFullResult: (fullTxt) => {
-          if (fullTxt) {
-            let processed = fullTxt
-              .replace(/\b(full stop|period)\b/gi, ".")
-              .replace(/\b(पूर्ण विराम)\b/gi, "।")
-              .replace(/\b(comma)\b/gi, ",")
-              .replace(/\b(अल्पविराम)\b/gi, ",")
-              .replace(/\b(new paragraph|next paragraph)\b/gi, "\n\n")
-              .replace(/\b(नया पैराग्राफ|नया पैरा)\b/gi, "\n\n");
-            setNotes(baseNotesForDictation ? `${baseNotesForDictation.trim()} ${processed}` : processed);
-          }
-        },
-        onError: (err) => {
-          setIsDictating(false);
-          console.warn("Voice note error:", err);
-        },
-        onEnd: () => setIsDictating(false),
-      });
+      const targetLocale = dictationLang === "hi" ? "hi-IN" : "en-IN";
+      const started = await speechRecognitionService.startListening(
+        targetLocale,
+        {
+          onStart: () => setIsDictating(true),
+          onFullResult: (fullTxt) => {
+            if (fullTxt) {
+              const processed = fullTxt
+                .replace(/\b(full stop|period)\b/gi, ".")
+                .replace(/\b(पूर्ण विराम)\b/gi, "।")
+                .replace(/\b(comma)\b/gi, ",")
+                .replace(/\b(अल्पविराम)\b/gi, ",")
+                .replace(/\b(new paragraph|next paragraph)\b/gi, "\n\n")
+                .replace(/\b(नया पैराग्राफ|नया पैरा)\b/gi, "\n\n");
+              setNotes(
+                baseNotesForDictation
+                  ? `${baseNotesForDictation.trim()} ${processed}`
+                  : processed
+              );
+            }
+          },
+          onError: (err) => {
+            setIsDictating(false);
+            console.warn("Voice note error:", err);
+          },
+          onEnd: () => setIsDictating(false),
+        }
+      );
       if (!started) setIsDictating(false);
     }
   };
@@ -123,55 +169,231 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
             },
           ]}
         >
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={[styles.title, { color: theme.colors.text }]}>Update Hearing & Fee Details</Text>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={[styles.title, { color: theme.colors.text }]}>
+              Update Hearing & Fee Details
+            </Text>
 
             {/* SECTION 1: HEARING NOTES & STAGE */}
             <View style={styles.sectionHeader}>
-              <Icon name="notebook-outline" size={18} color={theme.colors.primary} style={{ marginRight: 6 }} />
-              <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>
+              <Icon
+                name="notebook-outline"
+                size={18}
+                color={theme.colors.primary}
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                style={[styles.sectionTitle, { color: theme.colors.primary }]}
+              >
                 Hearing & Proceedings Notes
               </Text>
             </View>
 
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8, marginTop: 4 }}>
-              <Text style={[styles.label, { color: theme.colors.textSecondary, marginBottom: 0 }]}>
-                Hearing Proceedings & Notes:
-              </Text>
-              <TouchableOpacity
-                onPress={toggleDictation}
-                activeOpacity={0.8}
-                style={{
+            {/* Quick Add Badges above notes */}
+            <View style={{ marginBottom: 10 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
                   flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: isDictating ? "#EF4444" : theme.colors.primary,
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 18,
+                  gap: 6,
+                  paddingVertical: 2,
                 }}
               >
-                <Icon name={isDictating ? "microphone-off" : "microphone"} size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                <Text style={{ fontSize: 12, fontWeight: "bold", color: "#FFFFFF" }}>
-                  {isDictating ? "Stop Dictating..." : "🎙️ Voice Dictate"}
-                </Text>
-              </TouchableOpacity>
+                {QUICK_NOTES_BADGES.map((badge) => (
+                  <TouchableOpacity
+                    key={badge}
+                    onPress={() => {
+                      if (!notes.trim()) {
+                        setNotes(badge);
+                      } else {
+                        setNotes(`${notes.trim()}, ${badge}`);
+                      }
+                    }}
+                    activeOpacity={0.7}
+                    style={{
+                      backgroundColor: theme.dark
+                        ? "rgba(99, 102, 241, 0.2)"
+                        : `${theme.colors.primary}12`,
+                      borderColor: theme.colors.primary,
+                      borderWidth: 1,
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 14,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "600",
+                        color: theme.colors.primary,
+                      }}
+                    >
+                      + {badge}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
 
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.colors.inputBackground,
-                  color: theme.colors.text,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-              placeholder="Dictate or type today's court hearing notes..."
-              placeholderTextColor={theme.colors.textSecondary}
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-            />
+            {/* INTEGRATED NOTES FIELD WITH VOICE CONTROL BAR */}
+            <View style={{ marginBottom: 14 }}>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.colors.inputBackground,
+                    color: theme.colors.text,
+                    borderColor: isDictating
+                      ? theme.colors.danger || "#EF4444"
+                      : theme.colors.border,
+                    borderBottomLeftRadius: 0,
+                    borderBottomRightRadius: 0,
+                    marginBottom: 0,
+                  },
+                ]}
+                placeholder="Dictate or type today's court hearing notes..."
+                placeholderTextColor={theme.colors.textSecondary}
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+              />
+
+              {/* DEDICATED VOICE DICTATION TOOLBAR */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  backgroundColor: isDictating
+                    ? theme.dark
+                      ? "#451A1A"
+                      : "#FEE2E2"
+                    : theme.dark
+                      ? "#1E293B"
+                      : "#F8FAFC",
+                  borderWidth: 1,
+                  borderTopWidth: 0,
+                  borderColor: isDictating
+                    ? theme.colors.danger || "#EF4444"
+                    : theme.colors.border,
+                  borderBottomLeftRadius: 10,
+                  borderBottomRightRadius: 10,
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                }}
+              >
+                {/* Language Switcher (EN | HI) */}
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Icon
+                    name="translate"
+                    size={16}
+                    color={theme.colors.textSecondary}
+                    style={{ marginRight: 6 }}
+                  />
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      backgroundColor: theme.dark
+                        ? "#334155"
+                        : theme.colors.border,
+                      borderRadius: 12,
+                      padding: 2,
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => setDictationLang("en")}
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 10,
+                        backgroundColor:
+                          dictationLang === "en"
+                            ? theme.colors.primary
+                            : "transparent",
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color:
+                            dictationLang === "en"
+                              ? "#FFFFFF"
+                              : theme.colors.textSecondary,
+                        }}
+                      >
+                        EN
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setDictationLang("hi")}
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 10,
+                        backgroundColor:
+                          dictationLang === "hi"
+                            ? theme.colors.primary
+                            : "transparent",
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color:
+                            dictationLang === "hi"
+                              ? "#FFFFFF"
+                              : theme.colors.textSecondary,
+                        }}
+                      >
+                        HI
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Primary Voice Action Trigger */}
+                <TouchableOpacity
+                  onPress={toggleDictation}
+                  activeOpacity={0.8}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: isDictating
+                      ? theme.colors.danger || "#DC2626"
+                      : theme.colors.primary,
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
+                    borderRadius: 16,
+                  }}
+                >
+                  <Icon
+                    name={isDictating ? "microphone-off" : "microphone"}
+                    size={16}
+                    color="#FFFFFF"
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "700",
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    {isDictating
+                      ? `Stop (${dictationLang === "hi" ? "Hindi" : "English"})`
+                      : `Voice Dictate (${dictationLang === "hi" ? "HI" : "EN"})`}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
             <TouchableOpacity
               onPress={() => setShowDatePicker(true)}
@@ -184,8 +406,15 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
                 },
               ]}
             >
-              <Icon name="calendar-month-outline" size={20} color={theme.colors.primary} style={{ marginRight: 8 }} />
-              <Text style={[styles.dateTriggerText, { color: theme.colors.text }]}>
+              <Icon
+                name="calendar-month-outline"
+                size={20}
+                color={theme.colors.primary}
+                style={{ marginRight: 8 }}
+              />
+              <Text
+                style={[styles.dateTriggerText, { color: theme.colors.text }]}
+              >
                 Next Date: {nextHearingDate.toDateString()}
               </Text>
             </TouchableOpacity>
@@ -202,14 +431,29 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
 
             {/* SECTION 2: FEE & PAYMENT DETAILS */}
             <View style={[styles.sectionHeader, { marginTop: 14 }]}>
-              <Icon name="cash-multiple" size={18} color="#16A34A" style={{ marginRight: 6 }} />
-              <Text style={[styles.sectionTitle, { color: theme.isDark ? '#34D399' : '#15803D' }]}>
+              <Icon
+                name="cash-multiple"
+                size={18}
+                color="#16A34A"
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: theme.dark ? "#34D399" : "#15803D" },
+                ]}
+              >
                 Hearing Date Fee Received Today
               </Text>
             </View>
 
             <View style={{ marginBottom: 12 }}>
-              <Text style={[styles.fieldLabel, { color: theme.colors.textSecondary, marginBottom: 4 }]}>
+              <Text
+                style={[
+                  styles.fieldLabel,
+                  { color: theme.colors.textSecondary, marginBottom: 4 },
+                ]}
+              >
                 Date Fee Received Today (₹)
               </Text>
               <TextInput
@@ -219,7 +463,7 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
                     backgroundColor: theme.colors.inputBackground,
                     color: theme.colors.text,
                     borderColor: theme.colors.border,
-                    width: '100%',
+                    width: "100%",
                   },
                 ]}
                 placeholder="e.g. 2000"
@@ -231,7 +475,12 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
             </View>
 
             {/* Payment Mode Selector Tags */}
-            <Text style={[styles.fieldLabel, { color: theme.colors.textSecondary, marginBottom: 6 }]}>
+            <Text
+              style={[
+                styles.fieldLabel,
+                { color: theme.colors.textSecondary, marginBottom: 6 },
+              ]}
+            >
               Payment Mode (If Received Today)
             </Text>
             <View style={{ marginBottom: 12 }}>
@@ -248,10 +497,15 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
                       onPress={() => setPaymentMode(mode)}
                       style={{
                         backgroundColor: isSelected
-                          ? (theme.isDark ? '#064E3B' : '#DCFCE7')
-                          : (theme.colors.inputBackground || (theme.isDark ? '#1E293B' : '#F1F5F9')),
+                          ? theme.dark
+                            ? "#064E3B"
+                            : "#DCFCE7"
+                          : theme.colors.inputBackground ||
+                            (theme.dark ? "#1E293B" : "#F1F5F9"),
                         borderWidth: 1,
-                        borderColor: isSelected ? '#16A34A' : theme.colors.border,
+                        borderColor: isSelected
+                          ? "#16A34A"
+                          : theme.colors.border,
                         borderRadius: 16,
                         paddingHorizontal: 12,
                         paddingVertical: 6,
@@ -263,11 +517,14 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
                           fontSize: 12,
                           fontWeight: isSelected ? "700" : "500",
                           color: isSelected
-                            ? (theme.isDark ? '#34D399' : '#15803D')
+                            ? theme.dark
+                              ? "#34D399"
+                              : "#15803D"
                             : theme.colors.text,
                         }}
                       >
-                        {isSelected ? "✓ " : ""}{mode}
+                        {isSelected ? "✓ " : ""}
+                        {mode}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -293,10 +550,18 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
 
             <View style={styles.buttonContainer}>
               <View style={{ flex: 1, marginRight: 8 }}>
-                <ActionButton title="Cancel" onPress={onClose} type="secondary" />
+                <ActionButton
+                  title="Cancel"
+                  onPress={onClose}
+                  type="secondary"
+                />
               </View>
               <View style={{ flex: 1, marginLeft: 8 }}>
-                <ActionButton title="Save" onPress={handleSave} type="primary" />
+                <ActionButton
+                  title="Save"
+                  onPress={handleSave}
+                  type="primary"
+                />
               </View>
             </View>
           </ScrollView>

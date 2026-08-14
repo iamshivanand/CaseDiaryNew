@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020", "DOM"],
+    "strict": false,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "outDir": "./dist-e2e",
+    "rootDir": ".",
+    "skipLibCheck": true
+  },
+  "include": [
+    "utils/e2e/**/*.ts",
+    "utils/realTiptapEditorTemplate.ts",
+    "playwright.config.ts"
+  ],
+  "exclude": ["node_modules", "android"]
+}

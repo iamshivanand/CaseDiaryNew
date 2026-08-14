@@ -1,3 +1,5 @@
+import { LinearGradient } from "expo-linear-gradient";
+import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import { View, Text, StyleSheet, Dimensions } from "react-native";
 import Animated, {
@@ -9,8 +11,6 @@ import Animated, {
   withDelay,
 } from "react-native-reanimated";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { LinearGradient } from "expo-linear-gradient";
-import { StatusBar } from "expo-status-bar";
 
 const SplashScreen = () => {
   const logoScale = useSharedValue(0);
@@ -23,7 +23,7 @@ const SplashScreen = () => {
   useEffect(() => {
     // 1. Logo container scales up with spring bounce
     logoScale.value = withSpring(1, { damping: 18, stiffness: 250, mass: 0.5 });
-    
+
     // 2. Ripple ring effect scaling out
     ringScale.value = withTiming(1.4, { duration: 1000 });
     ringOpacity.value = withSequence(
@@ -39,7 +39,10 @@ const SplashScreen = () => {
 
     // 4. Text slide-up & fade-in animations
     textOpacity.value = withDelay(350, withTiming(1, { duration: 400 }));
-    textTranslateY.value = withDelay(350, withSpring(0, { damping: 16, stiffness: 220, mass: 0.5 }));
+    textTranslateY.value = withDelay(
+      350,
+      withSpring(0, { damping: 16, stiffness: 220, mass: 0.5 })
+    );
   }, []);
 
   const logoAnimatedStyle = useAnimatedStyle(() => {

@@ -1,6 +1,7 @@
 // Screens/CaseDetailsScreen/components/__tests__/TableConfigModal.test.tsx
-import React from "react";
 import { render, fireEvent } from "@testing-library/react-native";
+import React from "react";
+
 import { TableConfigModal } from "../TableConfigModal";
 
 const mockTheme: any = {
@@ -18,7 +19,7 @@ describe("TableConfigModal", () => {
   it("should render table configuration modal with rows and columns controls", () => {
     const { getByText } = render(
       <TableConfigModal
-        visible={true}
+        visible
         theme={mockTheme}
         onInsertTable={jest.fn()}
         onClose={jest.fn()}
@@ -35,7 +36,7 @@ describe("TableConfigModal", () => {
 
     const { getByTestId, getByText } = render(
       <TableConfigModal
-        visible={true}
+        visible
         theme={mockTheme}
         onInsertTable={onInsertTable}
         onClose={onClose}

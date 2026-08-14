@@ -1,6 +1,7 @@
 // Screens/CommonComponents/SectionHeader.tsx
 import React, { useContext } from "react"; // Added useContext
 import { View, Text, ViewStyle, TextStyle } from "react-native";
+
 import { getSectionHeaderStyles } from "./SectionHeaderStyle"; // Import function
 import { ThemeContext } from "../../Providers/ThemeProvider"; // Adjust path
 
@@ -10,7 +11,11 @@ interface SectionHeaderProps {
   titleStyle?: TextStyle;
 }
 
-const SectionHeader: React.FC<SectionHeaderProps> = ({ title, containerStyle, titleStyle }) => {
+const SectionHeader: React.FC<SectionHeaderProps> = ({
+  title,
+  containerStyle,
+  titleStyle,
+}) => {
   const { theme } = useContext(ThemeContext);
   const styles = getSectionHeaderStyles(theme); // Generate styles
 

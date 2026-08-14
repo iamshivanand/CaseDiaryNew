@@ -1,14 +1,15 @@
-import React, { useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useContext } from "react";
+import { View, Text, StyleSheet, SafeAreaView } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withDelay,
-} from 'react-native-reanimated';
-import { useTranslation } from '../../Providers/LanguageProvider';
-import { ThemeContext } from '../../Providers/ThemeProvider';
+} from "react-native-reanimated";
+
+import { useTranslation } from "../../Providers/LanguageProvider";
+import { ThemeContext } from "../../Providers/ThemeProvider";
 
 const DoneScreen = ({ navigation }) => {
   const { t } = useTranslation();
@@ -25,18 +26,26 @@ const DoneScreen = ({ navigation }) => {
     opacity.value = withDelay(
       2000,
       withTiming(0, { duration: 500 }, () => {
-        navigation.navigate('MainApp');
+        navigation.navigate("MainApp");
       })
     );
   }, []);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+    >
       <Animated.View style={[styles.content, animatedStyle]}>
-        <Ionicons name="checkmark-circle-outline" size={100} color={theme.colors.success} />
-        <Text style={[styles.title, { color: theme.colors.text }]}>{t('onboarding_done_title')}</Text>
+        <Ionicons
+          name="checkmark-circle-outline"
+          size={100}
+          color={theme.colors.success}
+        />
+        <Text style={[styles.title, { color: theme.colors.text }]}>
+          {t("onboarding_done_title")}
+        </Text>
         <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-          {t('onboarding_done_desc')}
+          {t("onboarding_done_desc")}
         </Text>
       </Animated.View>
     </SafeAreaView>
@@ -46,21 +55,21 @@ const DoneScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 24,
   },
   content: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   title: {
     fontSize: 24,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 20,
   },
   subtitle: {
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 8,
     marginBottom: 20,
   },

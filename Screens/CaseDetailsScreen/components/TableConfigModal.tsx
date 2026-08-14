@@ -1,13 +1,8 @@
 // Screens/CaseDetailsScreen/components/TableConfigModal.tsx
-import React, { useState } from "react";
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import React, { useState } from "react";
+import { Modal, View, Text, TouchableOpacity, StyleSheet } from "react-native";
+
 import { Theme } from "../../../Providers/ThemeProvider";
 
 interface TableConfigModalProps {
@@ -44,7 +39,11 @@ export const TableConfigModal: React.FC<TableConfigModalProps> = ({
         <View style={styles.content}>
           <View style={styles.header}>
             <View style={styles.titleRow}>
-              <Ionicons name="grid-outline" size={22} color={theme.colors.primary} />
+              <Ionicons
+                name="grid-outline"
+                size={22}
+                color={theme.colors.primary}
+              />
               <Text style={styles.title}>Configure Court Table</Text>
             </View>
             <TouchableOpacity onPress={onClose} testID="close-table-modal">
@@ -53,7 +52,8 @@ export const TableConfigModal: React.FC<TableConfigModalProps> = ({
           </View>
 
           <Text style={styles.subtitle}>
-            Select the number of rows and columns for your schedule or hearing list:
+            Select the number of rows and columns for your schedule or hearing
+            list:
           </Text>
 
           {/* Rows Selector */}

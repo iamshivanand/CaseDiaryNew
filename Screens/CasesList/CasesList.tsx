@@ -18,7 +18,6 @@ import {
   Platform,
   DeviceEventEmitter,
 } from "react-native";
-import { CASE_UPDATED_EVENT } from "../../utils/caseEvents";
 
 import { ECourtsTextImportModal } from "./components/ECourtsTextImportModal";
 import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
@@ -28,19 +27,22 @@ import {
   updateCase,
   getCaseById,
 } from "../../DataBase";
-import { mapCaseDbToScreen } from "../../utils/caseMapper";
 import { Case } from "../../DataBase/schema";
 import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { CaseDataScreen } from "../../Types/appTypes"; // Import the new data type
+import { CASE_UPDATED_EVENT } from "../../utils/caseEvents";
+import { mapCaseDbToScreen } from "../../utils/caseMapper";
 import {
   formatDate,
   getCurrentUserId,
   getLocalDateString,
 } from "../../utils/commonFunctions";
+import dbCacheManager from "../../utils/dbCacheManager";
 import { promptClientNotification } from "../../utils/whatsappNotifier";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import AdBanner from "../CommonComponents/AdBanner";
+import { SkeletonList } from "../CommonComponents/SkeletonLoader";
 
 type FilterStatus = "Active" | "Closed";
 
@@ -111,9 +113,7 @@ const CasesList = () => {
           }
         );
 
-        const mapped = results
-          ? results.map(mapCaseDbToScreen)
-          : [];
+        const mapped = results ? results.map(mapCaseDbToScreen) : [];
 
         if (offset === 0) {
           setCases(mapped);
@@ -134,8 +134,16 @@ const CasesList = () => {
   // Fetch initial page on tab focus, filter change, or query change
   useFocusEffect(
     useCallback(() => {
-      fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
-    }, [debouncedSearchText, filterParam, activeFilter, fetchCasesList])
+      if (dbCacheManager.shouldRefreshCases(!isLoading)) {
+        fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
+      }
+    }, [
+      debouncedSearchText,
+      filterParam,
+      activeFilter,
+      fetchCasesList,
+      isLoading,
+    ])
   );
 
   useEffect(() => {
@@ -147,7 +155,7 @@ const CasesList = () => {
     });
     return () => {
       isMounted = false;
-      if (sub && typeof sub.remove === 'function') sub.remove();
+      if (sub && typeof sub.remove === "function") sub.remove();
     };
   }, [debouncedSearchText, filterParam, activeFilter, fetchCasesList]);
 
@@ -207,14 +215,17 @@ const CasesList = () => {
 
         const nowIso = new Date().toISOString();
         const modeTag = paymentMode ? paymentMode : "Cash";
-        const noteTag = paymentNotes && paymentNotes.trim() ? ` - ${paymentNotes.trim()}` : "";
+        const noteTag =
+          paymentNotes && paymentNotes.trim()
+            ? ` - ${paymentNotes.trim()}`
+            : "";
 
         if (notes && notes.trim()) {
           await addCaseTimelineEvent({
             case_id: caseId,
             hearing_date: nowIso,
             notes: notes.trim(),
-            event_type: 'hearing_proceeding',
+            event_type: "hearing_proceeding",
           });
         }
 
@@ -222,8 +233,8 @@ const CasesList = () => {
           await addCaseTimelineEvent({
             case_id: caseId,
             hearing_date: nowIso,
-            notes: `Fee Payment Received (Date Fee): ₹${dateFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`,
-            event_type: 'date_fee_payment',
+            notes: `Fee Payment Received (Date Fee): ₹${dateFeeCollectedToday.toLocaleString("en-IN")} [Mode: ${modeTag}]${noteTag}`,
+            event_type: "date_fee_payment",
             amount: dateFeeCollectedToday,
             payment_mode: modeTag,
           });
@@ -233,24 +244,36 @@ const CasesList = () => {
           await addCaseTimelineEvent({
             case_id: caseId,
             hearing_date: nowIso,
-            notes: `Fee Payment Received (Total Retainer): ₹${totalFeeCollectedToday.toLocaleString('en-IN')} [Mode: ${modeTag}]${noteTag}`,
-            event_type: 'total_fee_payment',
+            notes: `Fee Payment Received (Total Retainer): ₹${totalFeeCollectedToday.toLocaleString("en-IN")} [Mode: ${modeTag}]${noteTag}`,
+            event_type: "total_fee_payment",
             amount: totalFeeCollectedToday,
             payment_mode: modeTag,
           });
         }
 
-        const updatedDateFeeCollected = (caseExists.date_fee_collected || 0) + (dateFeeCollectedToday || 0);
-        const updatedTotalFeePaid = (caseExists.fee_paid || 0) + (totalFeeCollectedToday || 0);
+        const updatedDateFeeCollected =
+          (caseExists.date_fee_collected || 0) + (dateFeeCollectedToday || 0);
+        const updatedTotalFeePaid =
+          (caseExists.fee_paid || 0) + (totalFeeCollectedToday || 0);
         const targetDateFee = caseExists.date_fee || 0;
-        const isDateFeePaidNow = targetDateFee > 0 && updatedDateFeeCollected >= targetDateFee ? 1 : (caseExists.date_fee_paid || 0);
+        const isDateFeePaidNow =
+          targetDateFee > 0 && updatedDateFeeCollected >= targetDateFee
+            ? 1
+            : caseExists.date_fee_paid || 0;
 
         await updateCase(
           caseId,
           {
             NextDate: getLocalDateString(nextHearingDate),
-            ...(dateFeeCollectedToday && dateFeeCollectedToday > 0 ? { date_fee_collected: updatedDateFeeCollected, date_fee_paid: isDateFeePaidNow } : {}),
-            ...(totalFeeCollectedToday && totalFeeCollectedToday > 0 ? { fee_paid: updatedTotalFeePaid } : {}),
+            ...(dateFeeCollectedToday && dateFeeCollectedToday > 0
+              ? {
+                  date_fee_collected: updatedDateFeeCollected,
+                  date_fee_paid: isDateFeePaidNow,
+                }
+              : {}),
+            ...(totalFeeCollectedToday && totalFeeCollectedToday > 0
+              ? { fee_paid: updatedTotalFeePaid }
+              : {}),
           },
           userId
         );
@@ -293,7 +316,8 @@ const CasesList = () => {
   );
 
   const keyExtractor = useCallback(
-    (item: CaseDataScreen) => `${item.id}-${(item as any).updated_at || ''}-${(item as any).fee_paid || 0}-${(item as any).date_fee_collected || 0}-${(item as any).date_fee_paid || 0}-${(item as any).date_fee || 0}-${item.nextHearing || ''}`,
+    (item: CaseDataScreen) =>
+      `${item.id}-${(item as any).updated_at || ""}-${(item as any).fee_paid || 0}-${(item as any).date_fee_collected || 0}-${(item as any).date_fee_paid || 0}-${(item as any).date_fee || 0}-${item.nextHearing || ""}`,
     []
   );
 
@@ -403,74 +427,126 @@ const CasesList = () => {
         </View>
       )}
 
-      <FlatList
-        data={cases}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        getItemLayout={(data, index) => ({ length: 160, offset: 160 * index, index })}
-        initialNumToRender={6}
-        maxToRenderPerBatch={6}
-        windowSize={3}
-        removeClippedSubviews={true}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        refreshing={isRefreshing}
-        onRefresh={handleRefresh}
-        ListEmptyComponent={
-          !isLoading ? (
-            <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 50, paddingHorizontal: 24 }}>
-              <View style={{
-                width: 72,
-                height: 72,
-                borderRadius: 36,
-                backgroundColor: theme.isDark ? '#1E1B4B' : '#EEF2FF',
-                alignItems: 'center',
-                justify: 'center',
-                marginBottom: 16,
-                borderWidth: 1,
-                borderColor: theme.isDark ? '#4338CA' : '#C7D2FE',
-              }}>
-                <Ionicons name="briefcase-outline" size={36} color={theme.colors.primary} />
-              </View>
-              <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text, marginBottom: 6, textAlign: 'center' }}>
-                No Cases Found
-              </Text>
-              <Text style={{ fontSize: 13, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 20, lineHeight: 18 }}>
-                No matching case records found. Tap below to register a new case.
-              </Text>
-              <TouchableOpacity
-                onPress={navigateToAddCase}
-                activeOpacity={0.85}
+      {isLoading && cases.length === 0 ? (
+        <SkeletonList count={5} />
+      ) : (
+        <FlatList
+          data={cases}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          getItemLayout={(data, index) => ({
+            length: 160,
+            offset: 160 * index,
+            index,
+          })}
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={3}
+          removeClippedSubviews
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          ListEmptyComponent={
+            !isLoading ? (
+              <View
                 style={{
-                  backgroundColor: theme.colors.primary,
-                  paddingHorizontal: 20,
-                  paddingVertical: 10,
-                  borderRadius: 10,
-                  flexDirection: 'row',
-                  alignItems: 'center',
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 50,
+                  paddingHorizontal: 24,
                 }}
               >
-                <Ionicons name="add-circle" size={18} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFF' }}>Add New Case</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null
-        }
-        ListFooterComponent={
-          isLoading && cases.length > 0 ? (
-            <View style={{ paddingVertical: 16 }}>
-              <ActivityIndicator color={theme.colors.primary} />
-            </View>
-          ) : null
-        }
-        contentContainerStyle={styles.listContentContainer}
-      />
+                <View
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 36,
+                    backgroundColor: theme.isDark ? "#1E1B4B" : "#EEF2FF",
+                    alignItems: "center",
+                    justify: "center",
+                    marginBottom: 16,
+                    borderWidth: 1,
+                    borderColor: theme.isDark ? "#4338CA" : "#C7D2FE",
+                  }}
+                >
+                  <Ionicons
+                    name="briefcase-outline"
+                    size={36}
+                    color={theme.colors.primary}
+                  />
+                </View>
+                <Text
+                  style={{
+                    fontSize: 17,
+                    fontWeight: "700",
+                    color: theme.colors.text,
+                    marginBottom: 6,
+                    textAlign: "center",
+                  }}
+                >
+                  No Cases Found
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: theme.colors.textSecondary,
+                    textAlign: "center",
+                    marginBottom: 20,
+                    lineHeight: 18,
+                  }}
+                >
+                  No matching case records found. Tap below to register a new
+                  case.
+                </Text>
+                <TouchableOpacity
+                  onPress={navigateToAddCase}
+                  activeOpacity={0.85}
+                  style={{
+                    backgroundColor: theme.colors.primary,
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <Ionicons
+                    name="add-circle"
+                    size={18}
+                    color="#FFF"
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={{ fontSize: 13, fontWeight: "700", color: "#FFF" }}
+                  >
+                    Add New Case
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null
+          }
+          ListFooterComponent={
+            isLoading && cases.length > 0 ? (
+              <View style={{ paddingVertical: 16 }}>
+                <ActivityIndicator color={theme.colors.primary} />
+              </View>
+            ) : null
+          }
+          contentContainerStyle={styles.listContentContainer}
+        />
+      )}
       {selectedCase && (
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
           onSave={async (notes, nextHearingDate, feeReceivedToday) =>
-            handleSaveHearing(notes, nextHearingDate, await getCurrentUserId(), feeReceivedToday)
+            handleSaveHearing(
+              notes,
+              nextHearingDate,
+              await getCurrentUserId(),
+              feeReceivedToday
+            )
           }
         />
       )}

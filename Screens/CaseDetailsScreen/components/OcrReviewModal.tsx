@@ -15,8 +15,13 @@ import {
   Platform,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+
 import { ThemeContext } from "../../../Providers/ThemeProvider";
-import { formatOcrTextForDocument, extractTextFromImages, TextRecognitionScript } from "../../../utils/ocrService";
+import {
+  formatOcrTextForDocument,
+  extractTextFromImages,
+  TextRecognitionScript,
+} from "../../../utils/ocrService";
 
 interface OcrReviewModalProps {
   visible: boolean;
@@ -36,7 +41,9 @@ const OcrReviewModal: React.FC<OcrReviewModalProps> = ({
   const { theme } = useContext(ThemeContext);
   const [text, setText] = useState("");
   const [isEnhancing, setIsEnhancing] = useState(false);
-  const [selectedScript, setSelectedScript] = useState<TextRecognitionScript>(TextRecognitionScript.LATIN);
+  const [selectedScript, setSelectedScript] = useState<TextRecognitionScript>(
+    TextRecognitionScript.LATIN
+  );
 
   useEffect(() => {
     if (visible) {
@@ -47,10 +54,15 @@ const OcrReviewModal: React.FC<OcrReviewModalProps> = ({
   const handleAutoFormat = () => {
     const formatted = formatOcrTextForDocument(text);
     setText(formatted);
-    Alert.alert("Auto-Formatted", "Paragraphs and line endings cleaned for legal document layout.");
+    Alert.alert(
+      "Auto-Formatted",
+      "Paragraphs and line endings cleaned for legal document layout."
+    );
   };
 
-  const handleReExtract = async (targetScript: TextRecognitionScript = selectedScript) => {
+  const handleReExtract = async (
+    targetScript: TextRecognitionScript = selectedScript
+  ) => {
     if (!imageUri) return;
     setIsEnhancing(true);
     try {
@@ -64,7 +76,10 @@ const OcrReviewModal: React.FC<OcrReviewModalProps> = ({
             : "Re-extracted text using English (Latin) model."
         );
       } else {
-        Alert.alert("OCR Notice", "Re-scan finished, but no additional text found.");
+        Alert.alert(
+          "OCR Notice",
+          "Re-scan finished, but no additional text found."
+        );
       }
     } catch (err) {
       console.error("Re-extract OCR error:", err);
@@ -127,8 +142,16 @@ const OcrReviewModal: React.FC<OcrReviewModalProps> = ({
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
             Review & Edit OCR Text
           </Text>
-          <TouchableOpacity onPress={handleImport} style={styles.importHeaderBtn}>
-            <Icon name="check" size={22} color="#FFF" style={{ marginRight: 4 }} />
+          <TouchableOpacity
+            onPress={handleImport}
+            style={styles.importHeaderBtn}
+          >
+            <Icon
+              name="check"
+              size={22}
+              color="#FFF"
+              style={{ marginRight: 4 }}
+            />
             <Text style={styles.importHeaderBtnText}>Import</Text>
           </TouchableOpacity>
         </View>
@@ -150,7 +173,12 @@ const OcrReviewModal: React.FC<OcrReviewModalProps> = ({
                 },
               ]}
             >
-              <Text style={[styles.imageLabel, { color: theme.colors.textSecondary }]}>
+              <Text
+                style={[
+                  styles.imageLabel,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
                 📷 Scanned Document Preview
               </Text>
               <Image
@@ -162,34 +190,72 @@ const OcrReviewModal: React.FC<OcrReviewModalProps> = ({
           ) : null}
 
           {/* TOOLBAR ACTIONS */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbarRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.toolbarRow}
+          >
             {/* LANGUAGE SCRIPT SELECTOR */}
             <TouchableOpacity
               onPress={() => handleScriptToggle(TextRecognitionScript.LATIN)}
               style={[
                 styles.toolChip,
                 {
-                  backgroundColor: selectedScript === TextRecognitionScript.LATIN ? `${theme.colors.primary}25` : `${theme.colors.cardBackground}`,
-                  borderColor: selectedScript === TextRecognitionScript.LATIN ? theme.colors.primary : theme.colors.border,
+                  backgroundColor:
+                    selectedScript === TextRecognitionScript.LATIN
+                      ? `${theme.colors.primary}25`
+                      : `${theme.colors.cardBackground}`,
+                  borderColor:
+                    selectedScript === TextRecognitionScript.LATIN
+                      ? theme.colors.primary
+                      : theme.colors.border,
                 },
               ]}
             >
-              <Text style={[styles.toolChipText, { color: selectedScript === TextRecognitionScript.LATIN ? theme.colors.primary : theme.colors.text }]}>
+              <Text
+                style={[
+                  styles.toolChipText,
+                  {
+                    color:
+                      selectedScript === TextRecognitionScript.LATIN
+                        ? theme.colors.primary
+                        : theme.colors.text,
+                  },
+                ]}
+              >
                 🇬🇧 English
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => handleScriptToggle(TextRecognitionScript.DEVANAGARI)}
+              onPress={() =>
+                handleScriptToggle(TextRecognitionScript.DEVANAGARI)
+              }
               style={[
                 styles.toolChip,
                 {
-                  backgroundColor: selectedScript === TextRecognitionScript.DEVANAGARI ? `${theme.colors.primary}25` : `${theme.colors.cardBackground}`,
-                  borderColor: selectedScript === TextRecognitionScript.DEVANAGARI ? theme.colors.primary : theme.colors.border,
+                  backgroundColor:
+                    selectedScript === TextRecognitionScript.DEVANAGARI
+                      ? `${theme.colors.primary}25`
+                      : `${theme.colors.cardBackground}`,
+                  borderColor:
+                    selectedScript === TextRecognitionScript.DEVANAGARI
+                      ? theme.colors.primary
+                      : theme.colors.border,
                 },
               ]}
             >
-              <Text style={[styles.toolChipText, { color: selectedScript === TextRecognitionScript.DEVANAGARI ? theme.colors.primary : theme.colors.text }]}>
+              <Text
+                style={[
+                  styles.toolChipText,
+                  {
+                    color:
+                      selectedScript === TextRecognitionScript.DEVANAGARI
+                        ? theme.colors.primary
+                        : theme.colors.text,
+                  },
+                ]}
+              >
                 🇮🇳 हिंदी (Devanagari)
               </Text>
             </TouchableOpacity>
@@ -204,8 +270,15 @@ const OcrReviewModal: React.FC<OcrReviewModalProps> = ({
                 },
               ]}
             >
-              <Icon name="auto-fix" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
-              <Text style={[styles.toolChipText, { color: theme.colors.primary }]}>
+              <Icon
+                name="auto-fix"
+                size={16}
+                color={theme.colors.primary}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[styles.toolChipText, { color: theme.colors.primary }]}
+              >
                 Auto-Format
               </Text>
             </TouchableOpacity>
@@ -223,11 +296,22 @@ const OcrReviewModal: React.FC<OcrReviewModalProps> = ({
                 ]}
               >
                 {isEnhancing ? (
-                  <ActivityIndicator size="small" color={theme.colors.success} style={{ marginRight: 4 }} />
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.colors.success}
+                    style={{ marginRight: 4 }}
+                  />
                 ) : (
-                  <Icon name="contrast-box" size={16} color={theme.colors.success} style={{ marginRight: 4 }} />
+                  <Icon
+                    name="contrast-box"
+                    size={16}
+                    color={theme.colors.success}
+                    style={{ marginRight: 4 }}
+                  />
                 )}
-                <Text style={[styles.toolChipText, { color: theme.colors.success }]}>
+                <Text
+                  style={[styles.toolChipText, { color: theme.colors.success }]}
+                >
                   Enhance Contrast
                 </Text>
               </TouchableOpacity>
@@ -243,7 +327,12 @@ const OcrReviewModal: React.FC<OcrReviewModalProps> = ({
                 },
               ]}
             >
-              <Icon name="content-copy" size={16} color={theme.colors.text} style={{ marginRight: 4 }} />
+              <Icon
+                name="content-copy"
+                size={16}
+                color={theme.colors.text}
+                style={{ marginRight: 4 }}
+              />
               <Text style={[styles.toolChipText, { color: theme.colors.text }]}>
                 Copy Text
               </Text>
@@ -251,7 +340,9 @@ const OcrReviewModal: React.FC<OcrReviewModalProps> = ({
           </ScrollView>
 
           {/* EDITABLE TEXT AREA */}
-          <Text style={[styles.inputLabel, { color: theme.colors.textSecondary }]}>
+          <Text
+            style={[styles.inputLabel, { color: theme.colors.textSecondary }]}
+          >
             Extracted Document Text (Edit or type text below):
           </Text>
           <TextInput
@@ -286,13 +377,23 @@ const OcrReviewModal: React.FC<OcrReviewModalProps> = ({
             onPress={onClose}
             style={[styles.cancelBtn, { borderColor: theme.colors.border }]}
           >
-            <Text style={[styles.cancelBtnText, { color: theme.colors.textSecondary }]}>
+            <Text
+              style={[
+                styles.cancelBtnText,
+                { color: theme.colors.textSecondary },
+              ]}
+            >
               Cancel
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleImport} style={styles.mainImportBtn}>
-            <Icon name="file-import-outline" size={20} color="#FFF" style={{ marginRight: 6 }} />
+            <Icon
+              name="file-import-outline"
+              size={20}
+              color="#FFF"
+              style={{ marginRight: 6 }}
+            />
             <Text style={styles.mainImportBtnText}>Import into Document</Text>
           </TouchableOpacity>
         </View>

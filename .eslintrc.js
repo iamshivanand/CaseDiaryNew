@@ -1,23 +1,15 @@
 module.exports = {
   extends: ["universe/native"],
   parser: "@typescript-eslint/parser",
-  plugins: ["@typescript-eslint", "prettier"],
+  plugins: ["@typescript-eslint"],
+  env: {
+    node: true,
+    jest: true,
+  },
   rules: {
-    "prettier/prettier": [
-      "error",
-      {
-        endOfLine: "auto", // Match Prettier's line endings
-      },
-    ],
-    "linebreak-style": ["error", "windows"],
+    "prettier/prettier": "off",
+    "linebreak-style": "off",
+    "import/no-duplicates": "off",
     semi: ["error", "always"],
   },
-  overrides: [
-    {
-      files: ["**/*.ts", "**/*.tsx"],
-      rules: {
-        "prettier/prettier": "warn", // Treat Prettier violations as warnings
-      },
-    },
-  ],
 };

@@ -1,11 +1,16 @@
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import * as DocumentPicker from 'expo-document-picker';
-import * as SQLite from 'expo-sqlite';
-import { getDb, resetDbInstance, __TEST_ONLY_resetDbInstance } from '../DataBase/connection';
-import { Alert, Platform, DevSettings } from 'react-native';
-import { getCurrentUserId } from './commonFunctions';
-import { reScheduleAllNotifications } from './notificationScheduler';
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import * as SQLite from "expo-sqlite";
+import { Alert, Platform, DevSettings } from "react-native";
+
+import { getCurrentUserId } from "./commonFunctions";
+import { reScheduleAllNotifications } from "./notificationScheduler";
+import {
+  getDb,
+  resetDbInstance,
+  __TEST_ONLY_resetDbInstance,
+} from "../DataBase/connection";
 
 /**
  * Copies the local SQLite database file to a temporary location and opens the
@@ -13,28 +18,30 @@ import { reScheduleAllNotifications } from './notificationScheduler';
  * Google Drive, iCloud, local files, or send it via email/messages.
  */
 export const exportDatabaseBackup = async (): Promise<void> => {
-  const dbUri = FileSystem.documentDirectory + 'SQLite/CaseDiary.db';
+  const dbUri = FileSystem.documentDirectory + "SQLite/CaseDiary.db";
   try {
     const fileInfo = await FileSystem.getInfoAsync(dbUri);
     if (!fileInfo.exists) {
-      throw new Error("Database file does not exist yet. Please add a case first.");
+      throw new Error(
+        "Database file does not exist yet. Please add a case first."
+      );
     }
-    
+
     const timestamp = new Date().toISOString().slice(0, 10);
     const backupName = `CaseDiary_Backup_${timestamp}.db`;
     const tempBackupUri = FileSystem.cacheDirectory + backupName;
-    
+
     // Copy database file to temporary cache directory for sharing
     await FileSystem.copyAsync({
       from: dbUri,
-      to: tempBackupUri
+      to: tempBackupUri,
     });
-    
+
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(tempBackupUri, {
-        mimeType: 'application/x-sqlite3',
-        dialogTitle: 'Save Backup File (e.g. to Google Drive)',
-        UTI: 'public.database',
+        mimeType: "application/x-sqlite3",
+        dialogTitle: "Save Backup File (e.g. to Google Drive)",
+        UTI: "public.database",
       });
     } else {
       throw new Error("Sharing options are not available on this device.");
@@ -51,7 +58,7 @@ export const exportDatabaseBackup = async (): Promise<void> => {
 export const importDatabaseBackup = async (): Promise<void> => {
   try {
     const result = await DocumentPicker.getDocumentAsync({
-      type: ['application/x-sqlite3', 'application/octet-stream'],
+      type: ["application/x-sqlite3", "application/octet-stream"],
       copyToCacheDirectory: true,
     });
 
@@ -60,8 +67,8 @@ export const importDatabaseBackup = async (): Promise<void> => {
     }
 
     const selectedFileUri = result.assets[0].uri;
-    const dbDir = FileSystem.documentDirectory + 'SQLite/';
-    const dbPath = dbDir + 'CaseDiary.db';
+    const dbDir = FileSystem.documentDirectory + "SQLite/";
+    const dbPath = dbDir + "CaseDiary.db";
 
     const dirInfo = await FileSystem.getInfoAsync(dbDir);
     if (!dirInfo.exists) {
@@ -84,16 +91,19 @@ export const importDatabaseBackup = async (): Promise<void> => {
         {
           text: "OK",
           onPress: () => {
-            if (Platform.OS !== 'web') {
+            if (Platform.OS !== "web") {
               DevSettings.reload();
             }
-          }
-        }
+          },
+        },
       ]
     );
   } catch (error: any) {
     console.error("Database restore failed:", error);
-    Alert.alert("Restore Error", error.message || "Failed to restore database backup.");
+    Alert.alert(
+      "Restore Error",
+      error.message || "Failed to restore database backup."
+    );
   }
 };
 
@@ -105,11 +115,11 @@ export const parseCSV = (text: string): string[][] => {
   let row: string[] = [];
   let inQuotes = false;
   let entry = "";
-  
+
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     const nextChar = text[i + 1];
-    
+
     if (char === '"') {
       if (inQuotes && nextChar === '"') {
         entry += '"';
@@ -117,11 +127,11 @@ export const parseCSV = (text: string): string[][] => {
       } else {
         inQuotes = !inQuotes;
       }
-    } else if (char === ',' && !inQuotes) {
+    } else if (char === "," && !inQuotes) {
       row.push(entry.trim());
       entry = "";
-    } else if ((char === '\r' || char === '\n') && !inQuotes) {
-      if (char === '\r' && nextChar === '\n') {
+    } else if ((char === "\r" || char === "\n") && !inQuotes) {
+      if (char === "\r" && nextChar === "\n") {
         i++; // skip \n
       }
       row.push(entry.trim());
@@ -136,7 +146,7 @@ export const parseCSV = (text: string): string[][] => {
     row.push(entry.trim());
     result.push(row);
   }
-  return result.filter(r => r.length > 0 && r.some(cell => cell !== ""));
+  return result.filter((r) => r.length > 0 && r.some((cell) => cell !== ""));
 };
 
 export interface DuplicateCasePair {
@@ -148,9 +158,11 @@ export interface DuplicateCasePair {
  * Scans the database for potential duplicate cases:
  * Matches on CNRNumber OR (case_number AND court_name)
  */
-export const findDuplicatesInDatabase = async (): Promise<DuplicateCasePair[]> => {
+export const findDuplicatesInDatabase = async (): Promise<
+  DuplicateCasePair[]
+> => {
   const db = await getDb();
-  
+
   // Find cases with duplicate CNRNumbers
   const cnrQuery = `
     SELECT c1.*, ps1.name as policeStationName, d1.name as districtName
@@ -165,7 +177,7 @@ export const findDuplicatesInDatabase = async (): Promise<DuplicateCasePair[]> =
       )
     ORDER BY c1.CNRNumber ASC, c1.id ASC
   `;
-  
+
   // Find cases with duplicate case_number + court_name combinations
   const numCourtQuery = `
     SELECT c1.*, ps1.name as policeStationName, d1.name as districtName
@@ -192,13 +204,13 @@ export const findDuplicatesInDatabase = async (): Promise<DuplicateCasePair[]> =
 
     const processGroup = (casesList: any[], keyFn: (c: any) => string) => {
       const groups: { [key: string]: any[] } = {};
-      casesList.forEach(c => {
+      casesList.forEach((c) => {
         const key = keyFn(c).toLowerCase().trim();
         if (!groups[key]) groups[key] = [];
         groups[key].push(c);
       });
 
-      Object.values(groups).forEach(group => {
+      Object.values(groups).forEach((group) => {
         if (group.length < 2) return;
         for (let i = 0; i < group.length; i++) {
           for (let j = i + 1; j < group.length; j++) {
@@ -208,7 +220,7 @@ export const findDuplicatesInDatabase = async (): Promise<DuplicateCasePair[]> =
             if (!processedIds.has(id1) || !processedIds.has(id2)) {
               pairs.push({
                 case1: group[i],
-                case2: group[j]
+                case2: group[j],
               });
               processedIds.add(id1);
               processedIds.add(id2);
@@ -218,8 +230,8 @@ export const findDuplicatesInDatabase = async (): Promise<DuplicateCasePair[]> =
       });
     };
 
-    processGroup(cnrCases, c => c.CNRNumber);
-    processGroup(numCourtCases, c => `${c.case_number}|||${c.court_name}`);
+    processGroup(cnrCases, (c) => c.CNRNumber);
+    processGroup(numCourtCases, (c) => `${c.case_number}|||${c.court_name}`);
 
     return pairs;
   } catch (error) {
@@ -243,17 +255,19 @@ export const bulkInsertCases = async (
   const chunkSize = 100;
   for (let offset = 0; offset < total; offset += chunkSize) {
     const chunk = cases.slice(offset, offset + chunkSize);
-    
+
     await db.withTransactionAsync(async () => {
       for (let j = 0; j < chunk.length; j++) {
         const c = chunk[j];
-        const uniqueId = c.uniqueId || `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
+        const uniqueId =
+          c.uniqueId ||
+          `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
         let districtId: number | null = null;
         if (c.district && String(c.district).trim() !== "") {
           const distName = String(c.district).trim();
           const stateName = c.state ? String(c.state).trim() : null;
-          
+
           const dist = await db.getFirstAsync<{ id: number }>(
             "SELECT id FROM Districts WHERE LOWER(name) = LOWER(?)",
             [distName]
@@ -293,6 +307,42 @@ export const bulkInsertCases = async (
           }
         }
 
+        let courtId: number | null = c.court_id || null;
+        if (c.court_name && String(c.court_name).trim() !== "") {
+          const courtNameStr = String(c.court_name).trim();
+          const existingCourt = await db.getFirstAsync<{ id: number }>(
+            "SELECT id FROM Courts WHERE LOWER(name) = LOWER(?) AND (user_id IS NULL OR user_id = ?)",
+            [courtNameStr, userId ?? null]
+          );
+          if (existingCourt) {
+            courtId = existingCourt.id;
+          } else {
+            const res = await db.runAsync(
+              "INSERT INTO Courts (name, user_id) VALUES (?, ?)",
+              [courtNameStr, userId ?? null]
+            );
+            courtId = res.lastInsertRowId;
+          }
+        }
+
+        let caseTypeId: number | null = c.case_type_id || null;
+        if (c.case_type_name && String(c.case_type_name).trim() !== "") {
+          const caseTypeNameStr = String(c.case_type_name).trim();
+          const existingCaseType = await db.getFirstAsync<{ id: number }>(
+            "SELECT id FROM CaseTypes WHERE LOWER(name) = LOWER(?) AND (user_id IS NULL OR user_id = ?)",
+            [caseTypeNameStr, userId ?? null]
+          );
+          if (existingCaseType) {
+            caseTypeId = existingCaseType.id;
+          } else {
+            const res = await db.runAsync(
+              "INSERT INTO CaseTypes (name, user_id) VALUES (?, ?)",
+              [caseTypeNameStr, userId ?? null]
+            );
+            caseTypeId = res.lastInsertRowId;
+          }
+        }
+
         if (c.dbCaseId) {
           // Dynamic UPDATE for existing case updates/merging
           const updateFields: string[] = [];
@@ -309,7 +359,9 @@ export const bulkInsertCases = async (
           addUpdateField("PreviousDate", c.PreviousDate);
           addUpdateField("CaseNotes", c.CaseNotes);
           addUpdateField("court_name", c.court_name);
+          if (courtId) addUpdateField("court_id", courtId);
           addUpdateField("case_type_name", c.case_type_name);
+          if (caseTypeId) addUpdateField("case_type_id", caseTypeId);
           addUpdateField("Undersection", c.Undersection);
           addUpdateField("Accussed", c.Accussed);
           addUpdateField("ClientName", c.ClientName);
@@ -318,6 +370,9 @@ export const bulkInsertCases = async (
           addUpdateField("OpposingCounsel", c.OpposingCounsel);
           addUpdateField("CaseDescription", c.CaseDescription);
 
+          if (districtId) {
+            addUpdateField("district_id", districtId);
+          }
           if (c.policeStationName && policeStationId) {
             addUpdateField("police_station_id", policeStationId);
           }
@@ -335,22 +390,27 @@ export const bulkInsertCases = async (
           await db.runAsync(
             `INSERT INTO Cases (
               uniqueId, user_id, CaseTitle, ClientName, OnBehalfOf, CNRNumber,
-              case_number, case_year, court_name, case_type_name, dateFiled,
+              case_number, case_year, court_id, court_name, case_type_id, case_type_name, dateFiled,
               NextDate, PreviousDate, StatuteOfLimitations, crime_number, crime_year,
-              police_station_id, Undersection, FirstParty, OppositeParty, Accussed,
+              district_id, police_station_id, Undersection, FirstParty, OppositeParty, Accussed,
               ClientContactNumber, JudgeName, OpposingCounsel, CaseStatus, Priority,
               CaseDescription, CaseNotes, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               uniqueId,
               userId ?? null,
-              c.CaseTitle || (c.FirstParty && c.OppositeParty ? `${c.FirstParty} vs. ${c.OppositeParty}` : "Untitled Case"),
+              c.CaseTitle ||
+                (c.FirstParty && c.OppositeParty
+                  ? `${c.FirstParty} vs. ${c.OppositeParty}`
+                  : "Untitled Case"),
               c.ClientName || null,
               c.OnBehalfOf || null,
               c.CNRNumber || null,
               c.case_number || null,
               c.case_year ? parseInt(c.case_year.toString(), 10) : null,
+              courtId,
               c.court_name || null,
+              caseTypeId,
               c.case_type_name || null,
               c.dateFiled || null,
               c.NextDate || null,
@@ -358,6 +418,7 @@ export const bulkInsertCases = async (
               c.StatuteOfLimitations || null,
               c.crime_number || null,
               c.crime_year ? parseInt(c.crime_year.toString(), 10) : null,
+              districtId,
               policeStationId,
               c.Undersection || null,
               c.FirstParty || null,
@@ -371,7 +432,7 @@ export const bulkInsertCases = async (
               c.CaseDescription || null,
               c.CaseNotes || null,
               new Date().toISOString(),
-              new Date().toISOString()
+              new Date().toISOString(),
             ]
           );
         }
@@ -398,25 +459,29 @@ export interface BackupPreviewData {
  * Copies the picked .db backup to a temporary file, opens it, verifies the schema,
  * and fetches statistics and preview rows. Supports optional password for SQLCipher decryption.
  */
-export const previewDatabaseBackup = async (fileUri: string, password?: string): Promise<BackupPreviewData> => {
-  const tempDbPath = FileSystem.documentDirectory + 'SQLite/temp_import_preview.db';
-  
+export const previewDatabaseBackup = async (
+  fileUri: string,
+  password?: string
+): Promise<BackupPreviewData> => {
+  const tempDbPath =
+    FileSystem.documentDirectory + "SQLite/temp_import_preview.db";
+
   // Clean up any existing temp files first
   await FileSystem.deleteAsync(tempDbPath, { idempotent: true });
-  await FileSystem.deleteAsync(tempDbPath + '-journal', { idempotent: true });
-  await FileSystem.deleteAsync(tempDbPath + '-wal', { idempotent: true });
-  await FileSystem.deleteAsync(tempDbPath + '-shm', { idempotent: true });
+  await FileSystem.deleteAsync(tempDbPath + "-journal", { idempotent: true });
+  await FileSystem.deleteAsync(tempDbPath + "-wal", { idempotent: true });
+  await FileSystem.deleteAsync(tempDbPath + "-shm", { idempotent: true });
 
   // Copy the selected file to the temp database location
   await FileSystem.copyAsync({
     from: fileUri,
-    to: tempDbPath
+    to: tempDbPath,
   });
 
   let tempDb: SQLite.SQLiteDatabase | null = null;
   try {
-    tempDb = await SQLite.openDatabaseAsync('temp_import_preview.db');
-    
+    tempDb = await SQLite.openDatabaseAsync("temp_import_preview.db");
+
     if (password) {
       await tempDb.execAsync(`PRAGMA key = '${password.replace(/'/g, "''")}';`);
     }
@@ -428,7 +493,7 @@ export const previewDatabaseBackup = async (fileUri: string, password?: string):
     const casesTableExists = await tempDb.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) as count FROM sqlite_master WHERE type='table' AND name='Cases';"
     );
-    
+
     if (!casesTableExists || casesTableExists.count === 0) {
       throw new Error("Invalid backup file: 'Cases' table not found.");
     }
@@ -459,19 +524,25 @@ export const previewDatabaseBackup = async (fileUri: string, password?: string):
     return {
       caseCount,
       timelineCount,
-      previewCases
+      previewCases,
     };
   } catch (error: any) {
     console.error("Error previewing database backup:", error);
     const msg = error.message || "";
-    if (msg.includes("file is not a database") || msg.includes("malformed") || msg.includes("encrypted")) {
+    if (
+      msg.includes("file is not a database") ||
+      msg.includes("malformed") ||
+      msg.includes("encrypted")
+    ) {
       if (!password) {
         throw new Error("DATABASE_ENCRYPTED");
       } else {
         throw new Error("INVALID_PASSWORD");
       }
     }
-    throw new Error(error.message || "Failed to parse the backup database file.");
+    throw new Error(
+      error.message || "Failed to parse the backup database file."
+    );
   } finally {
     if (tempDb) {
       try {
@@ -487,19 +558,21 @@ export const previewDatabaseBackup = async (fileUri: string, password?: string):
  * Resets active DB connection, replaces current CaseDiary.db with the preview DB,
  * and recreates the connection and schedules notifications. Supports optional password decryption.
  */
-export const replaceDatabaseBackup = async (password?: string): Promise<void> => {
-  const dbDir = FileSystem.documentDirectory + 'SQLite/';
-  const dbPath = dbDir + 'CaseDiary.db';
-  const tempDbPath = dbDir + 'temp_import_preview.db';
+export const replaceDatabaseBackup = async (
+  password?: string
+): Promise<void> => {
+  const dbDir = FileSystem.documentDirectory + "SQLite/";
+  const dbPath = dbDir + "CaseDiary.db";
+  const tempDbPath = dbDir + "temp_import_preview.db";
 
   // 1. Reset active SQLite connection instance
   await resetDbInstance();
 
   // 2. Delete current database files to avoid WAL locks or corruption
   await FileSystem.deleteAsync(dbPath, { idempotent: true });
-  await FileSystem.deleteAsync(dbPath + '-journal', { idempotent: true });
-  await FileSystem.deleteAsync(dbPath + '-wal', { idempotent: true });
-  await FileSystem.deleteAsync(dbPath + '-shm', { idempotent: true });
+  await FileSystem.deleteAsync(dbPath + "-journal", { idempotent: true });
+  await FileSystem.deleteAsync(dbPath + "-wal", { idempotent: true });
+  await FileSystem.deleteAsync(dbPath + "-shm", { idempotent: true });
 
   const fileExists = await FileSystem.getInfoAsync(tempDbPath);
   if (!fileExists.exists) {
@@ -508,10 +581,10 @@ export const replaceDatabaseBackup = async (password?: string): Promise<void> =>
 
   if (password) {
     // If encrypted, decrypt on-the-fly via SQLCipher export to CaseDiary.db
-    let tempDb = await SQLite.openDatabaseAsync('temp_import_preview.db');
+    const tempDb = await SQLite.openDatabaseAsync("temp_import_preview.db");
     try {
       await tempDb.execAsync(`PRAGMA key = '${password.replace(/'/g, "''")}';`);
-      
+
       // Attach target database and export data unencrypted
       await tempDb.execAsync(`
         ATTACH DATABASE '${dbPath}' AS active_db KEY '';
@@ -531,9 +604,9 @@ export const replaceDatabaseBackup = async (password?: string): Promise<void> =>
 
   // Clean up temp DB
   await FileSystem.deleteAsync(tempDbPath, { idempotent: true });
-  await FileSystem.deleteAsync(tempDbPath + '-journal', { idempotent: true });
-  await FileSystem.deleteAsync(tempDbPath + '-wal', { idempotent: true });
-  await FileSystem.deleteAsync(tempDbPath + '-shm', { idempotent: true });
+  await FileSystem.deleteAsync(tempDbPath + "-journal", { idempotent: true });
+  await FileSystem.deleteAsync(tempDbPath + "-wal", { idempotent: true });
+  await FileSystem.deleteAsync(tempDbPath + "-shm", { idempotent: true });
 
   // 3. Re-open and verify the connection, then reschedule notifications
   try {
@@ -548,8 +621,11 @@ export const replaceDatabaseBackup = async (password?: string): Promise<void> =>
  * Merges cases, timeline hearings, and documents from temp_import_preview.db into CaseDiary.db,
  * skipping duplicate cases matching uniqueId or CNRNumber. Supports optional decryption password.
  */
-export const mergeDatabaseBackup = async (password?: string): Promise<{ insertedCount: number }> => {
-  const tempDbPath = FileSystem.documentDirectory + 'SQLite/temp_import_preview.db';
+export const mergeDatabaseBackup = async (
+  password?: string
+): Promise<{ insertedCount: number }> => {
+  const tempDbPath =
+    FileSystem.documentDirectory + "SQLite/temp_import_preview.db";
   const fileExists = await FileSystem.getInfoAsync(tempDbPath);
   if (!fileExists.exists) {
     throw new Error("Temporary preview database file not found.");
@@ -561,8 +637,8 @@ export const mergeDatabaseBackup = async (password?: string): Promise<{ inserted
 
   let tempDb: SQLite.SQLiteDatabase | null = null;
   try {
-    tempDb = await SQLite.openDatabaseAsync('temp_import_preview.db');
-    
+    tempDb = await SQLite.openDatabaseAsync("temp_import_preview.db");
+
     if (password) {
       await tempDb.execAsync(`PRAGMA key = '${password.replace(/'/g, "''")}';`);
     }
@@ -590,7 +666,7 @@ export const mergeDatabaseBackup = async (password?: string): Promise<{ inserted
     await db.withTransactionAsync(async () => {
       for (const c of backupCases) {
         let exists = false;
-        
+
         if (c.uniqueId) {
           const match = await db.getFirstAsync<{ id: number }>(
             "SELECT id FROM Cases WHERE uniqueId = ?",
@@ -599,7 +675,12 @@ export const mergeDatabaseBackup = async (password?: string): Promise<{ inserted
           if (match) exists = true;
         }
 
-        if (!exists && c.CNRNumber && c.CNRNumber.trim() !== "" && c.CNRNumber.trim() !== "N/A") {
+        if (
+          !exists &&
+          c.CNRNumber &&
+          c.CNRNumber.trim() !== "" &&
+          c.CNRNumber.trim() !== "N/A"
+        ) {
           const match = await db.getFirstAsync<{ id: number }>(
             "SELECT id FROM Cases WHERE CNRNumber = ?",
             [c.CNRNumber.trim()]
@@ -669,7 +750,9 @@ export const mergeDatabaseBackup = async (password?: string): Promise<{ inserted
           }
         }
 
-        const uniqueId = c.uniqueId || `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const uniqueId =
+          c.uniqueId ||
+          `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
         // Insert Case row into active database
         const insertRes = await db.runAsync(
@@ -717,14 +800,16 @@ export const mergeDatabaseBackup = async (password?: string): Promise<{ inserted
             c.updated_at || new Date().toISOString(),
             c.session_trial_number || null,
             c.OppositeAdvocate || null,
-            c.OppAdvocateContactNumber || null
+            c.OppAdvocateContactNumber || null,
           ]
         );
 
         const newCaseId = insertRes.lastInsertRowId;
 
         // Copy timeline events for this case
-        const timelineTableExists = await tempDb.getFirstAsync<{ count: number }>(
+        const timelineTableExists = await tempDb.getFirstAsync<{
+          count: number;
+        }>(
           "SELECT COUNT(*) as count FROM sqlite_master WHERE type='table' AND name='CaseTimeline';"
         );
         if (timelineTableExists && timelineTableExists.count > 0) {
@@ -741,7 +826,7 @@ export const mergeDatabaseBackup = async (password?: string): Promise<{ inserted
                 event.notes || "",
                 event.hearing_date,
                 event.created_at || new Date().toISOString(),
-                event.updated_at || new Date().toISOString()
+                event.updated_at || new Date().toISOString(),
               ]
             );
           }
@@ -768,7 +853,7 @@ export const mergeDatabaseBackup = async (password?: string): Promise<{ inserted
                 doc.file_type || null,
                 doc.file_size || null,
                 doc.created_at || new Date().toISOString(),
-                userId
+                userId,
               ]
             );
           }
@@ -795,9 +880,9 @@ export const mergeDatabaseBackup = async (password?: string): Promise<{ inserted
     }
     // Delete temp DB
     await FileSystem.deleteAsync(tempDbPath, { idempotent: true });
-    await FileSystem.deleteAsync(tempDbPath + '-journal', { idempotent: true });
-    await FileSystem.deleteAsync(tempDbPath + '-wal', { idempotent: true });
-    await FileSystem.deleteAsync(tempDbPath + '-shm', { idempotent: true });
+    await FileSystem.deleteAsync(tempDbPath + "-journal", { idempotent: true });
+    await FileSystem.deleteAsync(tempDbPath + "-wal", { idempotent: true });
+    await FileSystem.deleteAsync(tempDbPath + "-shm", { idempotent: true });
   }
 };
 
@@ -805,9 +890,10 @@ export const mergeDatabaseBackup = async (password?: string): Promise<{ inserted
  * Wipes temporary database preview files from file system.
  */
 export const cleanupTempDatabaseBackup = async (): Promise<void> => {
-  const tempDbPath = FileSystem.documentDirectory + 'SQLite/temp_import_preview.db';
+  const tempDbPath =
+    FileSystem.documentDirectory + "SQLite/temp_import_preview.db";
   await FileSystem.deleteAsync(tempDbPath, { idempotent: true });
-  await FileSystem.deleteAsync(tempDbPath + '-journal', { idempotent: true });
-  await FileSystem.deleteAsync(tempDbPath + '-wal', { idempotent: true });
-  await FileSystem.deleteAsync(tempDbPath + '-shm', { idempotent: true });
+  await FileSystem.deleteAsync(tempDbPath + "-journal", { idempotent: true });
+  await FileSystem.deleteAsync(tempDbPath + "-wal", { idempotent: true });
+  await FileSystem.deleteAsync(tempDbPath + "-shm", { idempotent: true });
 };

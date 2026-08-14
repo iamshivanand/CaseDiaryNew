@@ -1,19 +1,24 @@
-import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import AddCase from '../AddCase';
-import * as db from '../../../DataBase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
+import React from "react";
 
-jest.mock('../../../DataBase', () => ({
-  ...jest.requireActual('../../../DataBase'),
+import * as db from "../../../DataBase";
+import AddCase from "../AddCase";
+
+jest.mock("../../../DataBase", () => ({
+  ...jest.requireActual("../../../DataBase"),
   addCase: jest.fn(() => Promise.resolve(1)),
   addCaseType: jest.fn(() => Promise.resolve(1)),
   addDistrict: jest.fn(() => Promise.resolve(1)),
-  getDistricts: jest.fn(() => Promise.resolve([{ id: 1, name: 'Test District', state: 'Test State' }])),
-  getPoliceStations: jest.fn(() => Promise.resolve([{ id: 1, name: 'Test Police Station', district_id: 1 }])),
+  getDistricts: jest.fn(() =>
+    Promise.resolve([{ id: 1, name: "Test District", state: "Test State" }])
+  ),
+  getPoliceStations: jest.fn(() =>
+    Promise.resolve([{ id: 1, name: "Test Police Station", district_id: 1 }])
+  ),
   getSuggestionsForField: jest.fn((field) => {
-    if (field === 'JudgeName') {
-      return Promise.resolve([{ id: 1, name: 'Test Judge' }]);
+    if (field === "JudgeName") {
+      return Promise.resolve([{ id: 1, name: "Test Judge" }]);
     }
     return Promise.resolve([]);
   }),
@@ -21,8 +26,8 @@ jest.mock('../../../DataBase', () => ({
 
 const mockNavigate = jest.fn();
 const mockReplace = jest.fn();
-jest.mock('@react-navigation/native', () => ({
-  ...jest.requireActual('@react-navigation/native'),
+jest.mock("@react-navigation/native", () => ({
+  ...jest.requireActual("@react-navigation/native"),
   useNavigation: () => ({
     navigate: mockNavigate,
     replace: mockReplace,
@@ -33,134 +38,149 @@ jest.mock('@react-navigation/native', () => ({
   }),
 }));
 
-jest.mock('react-native-webview', () => {
-  const { View } = require('react-native');
+jest.mock("react-native-webview", () => {
+  const { View } = require("react-native");
   return {
     WebView: View,
   };
 });
 
-jest.mock('../../../utils/locationService', () => ({
-  getUserState: jest.fn(() => Promise.resolve('Uttar Pradesh')),
-  getGeolocatedState: jest.fn(() => Promise.resolve('Uttar Pradesh')),
+jest.mock("../../../utils/locationService", () => ({
+  getUserState: jest.fn(() => Promise.resolve("Uttar Pradesh")),
+  getGeolocatedState: jest.fn(() => Promise.resolve("Uttar Pradesh")),
 }));
 
-describe('AddCase', () => {
+describe("AddCase", () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it('should render the form with all fields', () => {
+  it("should render the form with all fields", () => {
     const { getByText } = render(<AddCase route={{ params: {} }} />);
-    expect(getByText('Case Title*')).toBeTruthy();
-    expect(getByText('Client Name')).toBeTruthy();
-    expect(getByText('Case Number')).toBeTruthy();
-    expect(getByText('CNR Number')).toBeTruthy();
-    expect(getByText('Case Type')).toBeTruthy();
-    expect(getByText('Court')).toBeTruthy();
-    expect(getByText('Date Filed')).toBeTruthy();
-    expect(getByText('Presiding Judge')).toBeTruthy();
-    expect(getByText('Opposing Counsel')).toBeTruthy();
-    expect(getByText('Case Status')).toBeTruthy();
-    expect(getByText('Priority Level')).toBeTruthy();
-    expect(getByText('Next Hearing Date')).toBeTruthy();
-    expect(getByText('Statute of Limitations')).toBeTruthy();
-    expect(getByText('First Party')).toBeTruthy();
-    expect(getByText('Opposite Party')).toBeTruthy();
-    expect(getByText('Client Contact No.')).toBeTruthy();
-    expect(getByText('Accused')).toBeTruthy();
-    expect(getByText('Under Section(s)')).toBeTruthy();
-    expect(getByText('District')).toBeTruthy();
-    expect(getByText('Case Description')).toBeTruthy();
-    expect(getByText('Internal Notes')).toBeTruthy();
+    expect(getByText("Case Title*")).toBeTruthy();
+    expect(getByText("Client Name")).toBeTruthy();
+    expect(getByText("Case Number")).toBeTruthy();
+    expect(getByText("CNR Number")).toBeTruthy();
+    expect(getByText("Case Type")).toBeTruthy();
+    expect(getByText("Court")).toBeTruthy();
+    expect(getByText("Date Filed")).toBeTruthy();
+    expect(getByText("Presiding Judge")).toBeTruthy();
+    expect(getByText("Opposing Counsel")).toBeTruthy();
+    expect(getByText("Case Status")).toBeTruthy();
+    expect(getByText("Priority Level")).toBeTruthy();
+    expect(getByText("Next Hearing Date")).toBeTruthy();
+    expect(getByText("Statute of Limitations")).toBeTruthy();
+    expect(getByText("First Party")).toBeTruthy();
+    expect(getByText("Opposite Party")).toBeTruthy();
+    expect(getByText("Client Contact No.")).toBeTruthy();
+    expect(getByText("Accused")).toBeTruthy();
+    expect(getByText("Under Section(s)")).toBeTruthy();
+    expect(getByText("District")).toBeTruthy();
+    expect(getByText("Case Description")).toBeTruthy();
+    expect(getByText("Internal Notes")).toBeTruthy();
   });
 
-  it('should show an error message if the case title is not provided', async () => {
+  it("should show an error message if the case title is not provided", async () => {
     const { getByText } = render(<AddCase route={{ params: {} }} />);
-    const saveButton = getByText('Save Case');
+    const saveButton = getByText("Save Case");
     fireEvent.press(saveButton);
     await waitFor(() => {
-      expect(getByText('Case Title is required')).toBeTruthy();
+      expect(getByText("Case Title is required")).toBeTruthy();
     });
   });
 
-  it('should save the case and navigate to the case details screen', async () => {
-    const { getByText, getByPlaceholderText } = render(<AddCase route={{ params: {} }} />);
-    const caseTitleInput = getByPlaceholderText('e.g., State vs. John Doe');
-    fireEvent.changeText(caseTitleInput, 'Test Case');
-    const saveButton = getByText('Save Case');
+  it("should save the case and navigate to the case details screen", async () => {
+    const { getByText, getByPlaceholderText } = render(
+      <AddCase route={{ params: {} }} />
+    );
+    const caseTitleInput = getByPlaceholderText("e.g., State vs. John Doe");
+    fireEvent.changeText(caseTitleInput, "Test Case");
+    const saveButton = getByText("Save Case");
     fireEvent.press(saveButton);
     await waitFor(() => {
       expect(db.addCase).toHaveBeenCalled();
-      expect(mockReplace).toHaveBeenCalledWith('CaseDetails', {
+      expect(mockReplace).toHaveBeenCalledWith("CaseDetails", {
         caseId: 1,
       });
     });
   });
 
   it('should show the "Other" input field when "Other" is selected in the case type dropdown', async () => {
-    const { getByTestId, findByPlaceholderText } = render(<AddCase route={{ params: {} }} />);
-    const caseTypeDropdown = getByTestId('case_type_id');
-    fireEvent(caseTypeDropdown, 'onValueChange', 'Other');
-    const otherInput = await findByPlaceholderText('Please specify');
+    const { getByTestId, findByPlaceholderText } = render(
+      <AddCase route={{ params: {} }} />
+    );
+    const caseTypeDropdown = getByTestId("case_type_id");
+    fireEvent(caseTypeDropdown, "onValueChange", "Other");
+    const otherInput = await findByPlaceholderText("Please specify");
     expect(otherInput).toBeTruthy();
   });
 
   it('should save the "Other" value when the form is submitted', async () => {
-    const { getByText, getByTestId, getByPlaceholderText, findByPlaceholderText } = render(<AddCase route={{ params: {} }} />);
-    const caseTypeDropdown = getByTestId('case_type_id');
-    fireEvent(caseTypeDropdown, 'onValueChange', 'Other');
-    const otherInput = await findByPlaceholderText('Please specify');
-    fireEvent.changeText(otherInput, 'New Case Type');
-    const saveButton = getByText('Save Case');
-    const caseTitleInput = getByPlaceholderText('e.g., State vs. John Doe');
-    fireEvent.changeText(caseTitleInput, 'Test Case');
+    const {
+      getByText,
+      getByTestId,
+      getByPlaceholderText,
+      findByPlaceholderText,
+    } = render(<AddCase route={{ params: {} }} />);
+    const caseTypeDropdown = getByTestId("case_type_id");
+    fireEvent(caseTypeDropdown, "onValueChange", "Other");
+    const otherInput = await findByPlaceholderText("Please specify");
+    fireEvent.changeText(otherInput, "New Case Type");
+    const saveButton = getByText("Save Case");
+    const caseTitleInput = getByPlaceholderText("e.g., State vs. John Doe");
+    fireEvent.changeText(caseTitleInput, "Test Case");
     fireEvent.press(saveButton);
     await waitFor(() => {
-      expect(db.addCaseType).toHaveBeenCalledWith('New Case Type', null);
+      expect(db.addCaseType).toHaveBeenCalledWith("New Case Type", null);
     });
   });
 
-  it('should show suggestions for the presiding judge field', async () => {
-    const { getByPlaceholderText, findByText } = render(<AddCase route={{ params: {} }} />);
+  it("should show suggestions for the presiding judge field", async () => {
+    const { getByPlaceholderText, findByText } = render(
+      <AddCase route={{ params: {} }} />
+    );
     const judgeNameInput = getByPlaceholderText("Enter Judge's Name");
-    fireEvent.changeText(judgeNameInput, 'Test');
-    const suggestion = await findByText('Test Judge');
+    fireEvent.changeText(judgeNameInput, "Test");
+    const suggestion = await findByText("Test Judge");
     expect(suggestion).toBeTruthy();
   });
 
-  it('should not show a duplicate placeholder in the dropdowns', async () => {
+  it("should not show a duplicate placeholder in the dropdowns", async () => {
     const { findAllByText } = render(<AddCase route={{ params: {} }} />);
     await waitFor(async () => {
-      expect((await findAllByText('Select Case Type...')).length).toBe(1);
-      expect((await findAllByText('Select Court...')).length).toBe(1);
+      expect((await findAllByText("Select Case Type...")).length).toBe(1);
+      expect((await findAllByText("Select Court...")).length).toBe(1);
     });
   });
 
-  it('should show the lock modal when case action count reaches 10', async () => {
-    const getItemSpy = jest.spyOn(AsyncStorage, 'getItem').mockImplementation((key) => {
-      if (key === '@cases_edit_add_count') return Promise.resolve('10');
-      return Promise.resolve(null);
-    });
+  it("should show the lock modal when case action count reaches 10", async () => {
+    const getItemSpy = jest
+      .spyOn(AsyncStorage, "getItem")
+      .mockImplementation((key) => {
+        if (key === "@cases_edit_add_count") return Promise.resolve("10");
+        return Promise.resolve(null);
+      });
     const { findByText } = render(<AddCase route={{ params: {} }} />);
-    const lockTitle = await findByText('Case Action Limit Reached');
+    const lockTitle = await findByText("Case Action Limit Reached");
     expect(lockTitle).toBeTruthy();
     getItemSpy.mockRestore();
   });
 
-  it('should render the Import from eCourts button and trigger the modal on click', async () => {
-    const { getByText, queryByText } = render(<AddCase route={{ params: {} }} />);
-    const importButton = getByText('Import Details from eCourts');
+  it("should render the Import from eCourts button and trigger the modal on click", async () => {
+    const { getByText, queryByText } = render(
+      <AddCase route={{ params: {} }} />
+    );
+    const importButton = getByText("Import Details from eCourts");
     expect(importButton).toBeTruthy();
 
     // Verify modal is not displayed initially
-    expect(queryByText('eCourts Case Importer')).toBeNull();
+    expect(queryByText("eCourts Case Importer")).toBeNull();
 
     // Trigger modal opening
     fireEvent.press(importButton);
 
     // Verify modal opens and instruction banner is shown
-    expect(getByText('eCourts Case Importer')).toBeTruthy();
+    expect(getByText("eCourts Case Importer")).toBeTruthy();
     expect(getByText(/Search for your case, solve the CAPTCHA/)).toBeTruthy();
   });
 });

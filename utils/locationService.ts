@@ -1,7 +1,11 @@
-import { getDb, getUserProfile } from '../DataBase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const fetchWithTimeout = async (url: string, timeoutMs: number = 3000): Promise<Response> => {
+import { getDb, getUserProfile } from "../DataBase";
+
+const fetchWithTimeout = async (
+  url: string,
+  timeoutMs: number = 3000
+): Promise<Response> => {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -40,7 +44,9 @@ export const getGeolocatedState = async (): Promise<string | null> => {
 
 const getUniqueStatesFromDb = async (db: any): Promise<string[]> => {
   try {
-    const rows = await db.getAllAsync("SELECT DISTINCT state FROM Districts WHERE state IS NOT NULL AND state != ''");
+    const rows = await db.getAllAsync(
+      "SELECT DISTINCT state FROM Districts WHERE state IS NOT NULL AND state != ''"
+    );
     return rows.map((r: any) => r.state);
   } catch (error) {
     console.error("Error fetching unique states:", error);
@@ -51,7 +57,7 @@ const getUniqueStatesFromDb = async (db: any): Promise<string[]> => {
 export const getUserState = async (): Promise<string | null> => {
   try {
     const db = await getDb();
-    const userIdVal = await AsyncStorage.getItem('@user_id');
+    const userIdVal = await AsyncStorage.getItem("@user_id");
     if (userIdVal) {
       const userId = parseInt(userIdVal, 10);
       const profile = await getUserProfile(db, userId);
@@ -76,7 +82,10 @@ export const getUserState = async (): Promise<string | null> => {
       const db = await getDb();
       const dbStates = await getUniqueStatesFromDb(db);
       for (const state of dbStates) {
-        if (geolocatedState.toLowerCase().includes(state.toLowerCase()) || state.toLowerCase().includes(geolocatedState.toLowerCase())) {
+        if (
+          geolocatedState.toLowerCase().includes(state.toLowerCase()) ||
+          state.toLowerCase().includes(geolocatedState.toLowerCase())
+        ) {
           return state;
         }
       }

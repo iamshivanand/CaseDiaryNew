@@ -1,5 +1,8 @@
 // utils/__tests__/legalAutocompleteService.test.ts
-import { LegalAutocompleteService, DEFAULT_LEGAL_PHRASES } from "../legalAutocompleteService";
+import {
+  LegalAutocompleteService,
+  DEFAULT_LEGAL_PHRASES,
+} from "../legalAutocompleteService";
 
 describe("legalAutocompleteService", () => {
   let service: LegalAutocompleteService;

@@ -8,6 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 import Autocomplete from "react-native-autocomplete-input";
+
 import { ThemeContext } from "../../Providers/ThemeProvider";
 
 interface SuggestionInputProps {
@@ -80,7 +81,11 @@ const SuggestionInput: React.FC<SuggestionInputProps> = ({
           placeholderTextColor={theme.colors.textSecondary || "#9CA3AF"}
           style={styles.textInput}
           renderResultList={(props: any) => (
-            <ScrollView {...props} style={styles.resultList} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              {...props}
+              style={styles.resultList}
+              keyboardShouldPersistTaps="handled"
+            >
               {filteredSuggestions.map((item, index) => (
                 <TouchableOpacity
                   key={index}
@@ -123,8 +128,8 @@ const getStyles = (theme: any, hasError: boolean) =>
     inputContainer: {
       borderWidth: 1,
       borderColor: hasError
-        ? (theme.colors.danger || "red")
-        : (theme.colors.border || "#E5E7EB"),
+        ? theme.colors.danger || "red"
+        : theme.colors.border || "#E5E7EB",
       borderRadius: 8,
       backgroundColor: theme.colors.inputBackground || theme.colors.background,
       padding: 0,

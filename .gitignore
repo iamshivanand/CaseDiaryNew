@@ -13,6 +13,7 @@ web-build/
 /ios/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
@@ -57,7 +58,7 @@ credentials.json
 yarn-error.log
 npm-debug.log
 
-# Test reports & outputs
-playwright-report/
+# Test outputs & Playwright fixtures
 test-results/
-utils/e2e/
+playwright-report/
+utils/e2e/fixtures/

@@ -10,7 +10,8 @@ describe("legalNerService", () => {
   });
 
   it("should extract CNR Number and Case Number correctly", () => {
-    const text = "IN THE HIGH COURT OF JUDICATURE AT BOMBAY\nCNR: MHAU010012342026\nBail Application No. 402/2026";
+    const text =
+      "IN THE HIGH COURT OF JUDICATURE AT BOMBAY\nCNR: MHAU010012342026\nBail Application No. 402/2026";
     const result = extractLegalEntities(text);
     expect(result.cnrNumber).toBe("MHAU010012342026");
     expect(result.caseNumber).toBe("Bail Application No. 402/2026");

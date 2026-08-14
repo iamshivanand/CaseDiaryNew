@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Alert, Platform } from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { RouteProp, useRoute, useFocusEffect } from "@react-navigation/native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, StyleSheet, FlatList, Alert, Platform } from "react-native";
 import {
   TextInput,
   Button,
@@ -12,11 +14,10 @@ import {
   Dialog,
   Portal,
   Provider as PaperProvider, // To use Dialog
-} from 'react-native-paper';
-import { RouteProp, useRoute, useFocusEffect } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as db from '../../DataBase';
-import { ProfileStackParamList } from '../../Types/navigationtypes';
+} from "react-native-paper";
+
+import * as db from "../../DataBase";
+import { ProfileStackParamList } from "../../Types/navigationtypes";
 
 export interface LookupItem {
   id: number;
@@ -25,11 +26,14 @@ export interface LookupItem {
   state?: string;
 }
 
-type ManageLookupCategoryScreenRouteProp = RouteProp<ProfileStackParamList, 'ManageLookupCategoryScreen'>;
+type ManageLookupCategoryScreenRouteProp = RouteProp<
+  ProfileStackParamList,
+  "ManageLookupCategoryScreen"
+>;
 
 // Helper: reads real user ID from storage (device is always single-user; ID is set during onboarding)
 const getCurrentUserId = async (): Promise<number> => {
-  const id = await AsyncStorage.getItem('@user_id');
+  const id = await AsyncStorage.getItem("@user_id");
   return id ? parseInt(id, 10) : 1;
 };
 
@@ -39,15 +43,14 @@ const ManageLookupCategoryScreen = () => {
   const { categoryName, title } = route.params;
 
   const [items, setItems] = useState<LookupItem[]>([]);
-  const [newItemName, setNewItemName] = useState('');
+  const [newItemName, setNewItemName] = useState("");
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
 
   // For editing (optional, can be expanded later)
   const [editingItem, setEditingItem] = useState<LookupItem | null>(null);
-  const [editedName, setEditedName] = useState('');
+  const [editedName, setEditedName] = useState("");
   const [dialogVisible, setDialogVisible] = useState(false);
-
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -56,25 +59,25 @@ const ManageLookupCategoryScreen = () => {
       const currentUserId = await getCurrentUserId();
 
       switch (categoryName) {
-        case 'CaseTypes':
+        case "CaseTypes":
           fetchedItems = await db.getCaseTypes(currentUserId);
           break;
-        case 'Courts':
+        case "Courts":
           fetchedItems = await db.getCourts(currentUserId);
           break;
-        case 'Districts':
+        case "Districts":
           fetchedItems = await db.getDistricts(currentUserId);
           break;
-        case 'PoliceStations':
+        case "PoliceStations":
           fetchedItems = await db.getPoliceStations(undefined, currentUserId);
           break;
         default:
-          console.warn('Unknown category:', categoryName);
+          console.warn("Unknown category:", categoryName);
       }
       setItems(fetchedItems);
     } catch (error) {
       console.error(`Error fetching ${categoryName}:`, error);
-      Alert.alert('Error', `Failed to fetch ${title}.`);
+      Alert.alert("Error", `Failed to fetch ${title}.`);
     } finally {
       setLoading(false);
     }
@@ -88,7 +91,7 @@ const ManageLookupCategoryScreen = () => {
 
   const handleAddItem = async () => {
     if (!newItemName.trim()) {
-      Alert.alert('Validation', 'Name cannot be empty.');
+      Alert.alert("Validation", "Name cannot be empty.");
       return;
     }
     setIsAdding(true);
@@ -97,35 +100,49 @@ const ManageLookupCategoryScreen = () => {
       let newId: number | null = null;
 
       switch (categoryName) {
-        case 'CaseTypes':
+        case "CaseTypes":
           newId = await db.addCaseType(newItemName.trim(), currentUserId);
           break;
-        case 'Courts':
+        case "Courts":
           newId = await db.addCourt(newItemName.trim(), currentUserId);
           break;
-        case 'Districts':
-          newId = await db.addDistrict(newItemName.trim(), undefined, currentUserId);
+        case "Districts":
+          newId = await db.addDistrict(
+            newItemName.trim(),
+            undefined,
+            currentUserId
+          );
           break;
-        case 'PoliceStations':
-          newId = await db.addPoliceStation(newItemName.trim(), undefined, currentUserId);
+        case "PoliceStations":
+          newId = await db.addPoliceStation(
+            newItemName.trim(),
+            undefined,
+            currentUserId
+          );
           break;
         default:
-          Alert.alert('Error', 'Cannot add item for unknown category.');
+          Alert.alert("Error", "Cannot add item for unknown category.");
           setIsAdding(false);
           return;
       }
       const success = newId !== null;
 
       if (success) {
-        setNewItemName('');
+        setNewItemName("");
         fetchData();
-        Alert.alert('Success', `${categoryName.slice(0, -1)} added successfully.`);
+        Alert.alert(
+          "Success",
+          `${categoryName.slice(0, -1)} added successfully.`
+        );
       } else {
-        Alert.alert('Error', `Failed to add ${categoryName.slice(0, -1)}.`);
+        Alert.alert("Error", `Failed to add ${categoryName.slice(0, -1)}.`);
       }
     } catch (error: any) {
       console.error(`Error adding ${categoryName}:`, error);
-      Alert.alert('Error', error.message || `An error occurred while adding ${title}.`);
+      Alert.alert(
+        "Error",
+        error.message || `An error occurred while adding ${title}.`
+      );
     } finally {
       setIsAdding(false);
     }
@@ -146,7 +163,10 @@ const ManageLookupCategoryScreen = () => {
     if (!editingItem || !editedName.trim()) return;
     const userId = await getCurrentUserId();
     if (editingItem.user_id !== userId) {
-      Alert.alert("Error", "Cannot edit global items or items not created by you.");
+      Alert.alert(
+        "Error",
+        "Cannot edit global items or items not created by you."
+      );
       setDialogVisible(false);
       return;
     }
@@ -155,11 +175,19 @@ const ManageLookupCategoryScreen = () => {
     try {
       let success = false;
       switch (categoryName) {
-        case 'CaseTypes':
-          success = await db.updateCaseType(editingItem.id, editedName.trim(), userId);
+        case "CaseTypes":
+          success = await db.updateCaseType(
+            editingItem.id,
+            editedName.trim(),
+            userId
+          );
           break;
-        case 'Courts':
-          success = await db.updateCourt(editingItem.id, editedName.trim(), userId);
+        case "Courts":
+          success = await db.updateCourt(
+            editingItem.id,
+            editedName.trim(),
+            userId
+          );
           break;
         default:
           Alert.alert("Error", "Editing not supported for this category yet.");
@@ -179,11 +207,13 @@ const ManageLookupCategoryScreen = () => {
     }
   };
 
-
   const confirmDeleteItem = async (item: LookupItem) => {
     const userId = await getCurrentUserId();
     if (item.user_id !== userId) {
-      Alert.alert("Permission Denied", "You can only delete items you created.");
+      Alert.alert(
+        "Permission Denied",
+        "You can only delete items you created."
+      );
       return;
     }
     Alert.alert(
@@ -191,7 +221,11 @@ const ManageLookupCategoryScreen = () => {
       `Are you sure you want to delete "${item.name}"? This might affect existing cases using this item.`,
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => handleDeleteItem(item.id, userId) }
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => handleDeleteItem(item.id, userId),
+        },
       ]
     );
   };
@@ -201,10 +235,10 @@ const ManageLookupCategoryScreen = () => {
     try {
       let success = false;
       switch (categoryName) {
-        case 'CaseTypes':
+        case "CaseTypes":
           success = await db.deleteCaseType(itemId, userId);
           break;
-        case 'Courts':
+        case "Courts":
           success = await db.deleteCourt(itemId, userId);
           break;
         default:
@@ -214,7 +248,10 @@ const ManageLookupCategoryScreen = () => {
         Alert.alert("Success", `${categoryName.slice(0, -1)} deleted.`);
         fetchData();
       } else {
-        Alert.alert("Error", `Failed to delete ${categoryName.slice(0, -1)}. It might be in use or you don't have permission.`);
+        Alert.alert(
+          "Error",
+          `Failed to delete ${categoryName.slice(0, -1)}. It might be in use or you don't have permission.`
+        );
       }
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to delete item.");
@@ -223,20 +260,19 @@ const ManageLookupCategoryScreen = () => {
     }
   };
 
-
   const renderItem = ({ item }: { item: LookupItem }) => {
     // null/undefined user_id = global/seeded item; matching userId = user's own custom item
     const isGlobal = item.user_id === null || item.user_id === undefined;
     // For display purposes: treat any non-global item as user's own in single-user app
     const isUserSpecific = !isGlobal;
 
-    let subtitle = '';
-    if (isGlobal) subtitle = 'Global';
-    else if (isUserSpecific) subtitle = 'Custom (You)';
-    else subtitle = 'Custom (Other User)'; // Should ideally not happen if DB queries are correct
+    let subtitle = "";
+    if (isGlobal) subtitle = "Global";
+    else if (isUserSpecific) subtitle = "Custom (You)";
+    else subtitle = "Custom (Other User)"; // Should ideally not happen if DB queries are correct
 
-    if (categoryName === 'Districts' && 'state' in item && item.state) {
-        subtitle += ` - ${item.state}`;
+    if (categoryName === "Districts" && "state" in item && item.state) {
+      subtitle += ` - ${item.state}`;
     }
     // Add more specific subtitles if needed, e.g., for PoliceStations showing district name
 
@@ -246,25 +282,37 @@ const ManageLookupCategoryScreen = () => {
         description={subtitle}
         titleStyle={{ color: theme.colors.onSurface }}
         descriptionStyle={{ color: theme.colors.onSurfaceVariant }}
-        right={(props) => (
-            isUserSpecific ? (
-                <View style={{ flexDirection: 'row'}}>
-                    <IconButton {...props} icon="pencil" onPress={() => openEditDialog(item)} />
-                    <IconButton {...props} icon="delete" onPress={() => confirmDeleteItem(item)} iconColor={theme.colors.error} />
-                </View>
-            ) : null
-        )}
+        right={(props) =>
+          isUserSpecific ? (
+            <View style={{ flexDirection: "row" }}>
+              <IconButton
+                {...props}
+                icon="pencil"
+                onPress={() => openEditDialog(item)}
+              />
+              <IconButton
+                {...props}
+                icon="delete"
+                onPress={() => confirmDeleteItem(item)}
+                iconColor={theme.colors.error}
+              />
+            </View>
+          ) : null
+        }
       />
     );
   };
 
-  if (loading && items.length === 0) { // Show full screen loader only on initial load
-    return <ActivityIndicator animating={true} size="large" style={styles.loader} />;
+  if (loading && items.length === 0) {
+    // Show full screen loader only on initial load
+    return <ActivityIndicator animating size="large" style={styles.loader} />;
   }
 
   return (
     <PaperProvider>
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+      >
         <View style={styles.inputContainer}>
           <TextInput
             label={`New ${categoryName.slice(0, -1)} Name`}
@@ -286,32 +334,43 @@ const ManageLookupCategoryScreen = () => {
           </Button>
         </View>
 
-        {loading && items.length > 0 && <ActivityIndicator animating={true} style={{ marginVertical: 10}}/>}
+        {loading && items.length > 0 && (
+          <ActivityIndicator animating style={{ marginVertical: 10 }} />
+        )}
 
         <FlatList
           data={items}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
           ItemSeparatorComponent={() => <Divider />}
-          ListEmptyComponent={!loading ? <Text style={styles.emptyText}>No {title} found.</Text> : null}
+          ListEmptyComponent={
+            !loading ? (
+              <Text style={styles.emptyText}>No {title} found.</Text>
+            ) : null
+          }
           contentContainerStyle={styles.listContent}
         />
-         <Portal>
-            <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
-                <Dialog.Title>Edit {editingItem?.name}</Dialog.Title>
-                <Dialog.Content>
-                    <TextInput
-                        label="New Name"
-                        value={editedName}
-                        onChangeText={setEditedName}
-                        mode="outlined"
-                    />
-                </Dialog.Content>
-                <Dialog.Actions>
-                    <Button onPress={() => setDialogVisible(false)}>Cancel</Button>
-                    <Button onPress={handleEditItem} disabled={loading}>Save</Button>
-                </Dialog.Actions>
-            </Dialog>
+        <Portal>
+          <Dialog
+            visible={dialogVisible}
+            onDismiss={() => setDialogVisible(false)}
+          >
+            <Dialog.Title>Edit {editingItem?.name}</Dialog.Title>
+            <Dialog.Content>
+              <TextInput
+                label="New Name"
+                value={editedName}
+                onChangeText={setEditedName}
+                mode="outlined"
+              />
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onPress={() => setDialogVisible(false)}>Cancel</Button>
+              <Button onPress={handleEditItem} disabled={loading}>
+                Save
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
         </Portal>
       </View>
     </PaperProvider>
@@ -324,27 +383,27 @@ const styles = StyleSheet.create({
   },
   loader: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   inputContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   input: {
     flex: 1,
     marginRight: 8,
   },
   addButton: {
-    justifyContent: 'center', // Align icon and text vertically
+    justifyContent: "center", // Align icon and text vertically
     height: 50, // Match TextInput outlined dense height approx
   },
   listContent: {
     paddingBottom: 16,
   },
   emptyText: {
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 20,
     fontSize: 16,
   },

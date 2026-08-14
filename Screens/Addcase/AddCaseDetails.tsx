@@ -26,7 +26,8 @@ interface Props {
   // navigation prop is implicitly available if this is registered as a screen component
 }
 
-const AddCaseDetailsScreen: React.FC<Props> = ({ route }) => { // Renamed component for clarity
+const AddCaseDetailsScreen: React.FC<Props> = ({ route }) => {
+  // Renamed component for clarity
   // Params for AddCaseDetails screen are 'update', 'initialValues', 'uniqueId'
   const { update, initialValues, uniqueId: routeUniqueId } = route.params ?? {};
 
@@ -47,7 +48,7 @@ const AddCaseDetailsScreen: React.FC<Props> = ({ route }) => { // Renamed compon
         name: "AddCase", // This 'name' matches the route name AddCase expects if it were a standalone screen
         params: {
           update: !!update, // Ensure boolean
-          initialValues: initialValues,
+          initialValues,
           uniqueId: uniqueIdToPass,
           // caseId could also be passed if available: initialValues?.id
         },

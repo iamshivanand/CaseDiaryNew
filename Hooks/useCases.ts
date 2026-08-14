@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+
 import * as db from "../DataBase";
 import { CaseDataScreen } from "../Types/appTypes";
 import { mapCaseDbToScreen } from "../utils/caseMapper";
@@ -51,33 +52,41 @@ export const useSearchCases = (initialLimit = 20) => {
   const [hasMore, setHasMore] = useState(true);
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const executeSearch = useCallback(async (query: string, offset: number) => {
-    if (!query.trim()) {
-      setResults([]);
-      setHasSearched(false);
-      setHasMore(false);
-      return;
-    }
-    setIsLoading(true);
-    setHasSearched(true);
-    setError(null);
-    try {
-      const dbResults = await db.searchCases(query.trim(), null, initialLimit, offset);
-      const mapped = dbResults.map(mapCaseDbToScreen);
-      if (offset === 0) {
-        setResults(mapped);
-      } else {
-        setResults((prev) => [...prev, ...mapped]);
+  const executeSearch = useCallback(
+    async (query: string, offset: number) => {
+      if (!query.trim()) {
+        setResults([]);
+        setHasSearched(false);
+        setHasMore(false);
+        return;
       }
-      setHasMore(mapped.length === initialLimit);
-    } catch (err: any) {
-      console.error("useSearchCases: search failed:", err);
-      setError(err?.message || "Search failed.");
-      if (offset === 0) setResults([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [initialLimit]);
+      setIsLoading(true);
+      setHasSearched(true);
+      setError(null);
+      try {
+        const dbResults = await db.searchCases(
+          query.trim(),
+          null,
+          initialLimit,
+          offset
+        );
+        const mapped = dbResults.map(mapCaseDbToScreen);
+        if (offset === 0) {
+          setResults(mapped);
+        } else {
+          setResults((prev) => [...prev, ...mapped]);
+        }
+        setHasMore(mapped.length === initialLimit);
+      } catch (err: any) {
+        console.error("useSearchCases: search failed:", err);
+        setError(err?.message || "Search failed.");
+        if (offset === 0) setResults([]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [initialLimit]
+  );
 
   useEffect(() => {
     if (searchTimeout.current) {

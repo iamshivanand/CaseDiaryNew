@@ -1,11 +1,13 @@
 // Types/appTypes.ts
 
-export interface CaseType { // For lookups like Case Type dropdown
+export interface CaseType {
+  // For lookups like Case Type dropdown
   id: number;
   name: string;
 }
 
-export interface Court { // For lookups like Court dropdown
+export interface Court {
+  // For lookups like Court dropdown
   id: number;
   name: string;
 }
@@ -83,7 +85,6 @@ export interface CaseData {
   timelineEvents?: TimelineEvent[];
 }
 
-
 export interface Document {
   id: number; // from CaseDocument id
   case_id: number; // from CaseDocument case_id
@@ -95,12 +96,16 @@ export interface Document {
   stored_filename?: string; // from CaseDocument stored_filename
 }
 
-export type TimelineEventType = 'hearing_proceeding' | 'date_fee_payment' | 'total_fee_payment' | 'date_fee_agreed';
+export type TimelineEventType =
+  | "hearing_proceeding"
+  | "date_fee_payment"
+  | "total_fee_payment"
+  | "date_fee_agreed";
 
 export interface TimelineEvent {
   id: number | string; // number from DB, string for temporary _clientSideId if 'new'
-  case_id?: number;    // Will be set when saving new events to DB
-  date: string;        // ISO8601 "YYYY-MM-DD" or full timestamp
+  case_id?: number; // Will be set when saving new events to DB
+  date: string; // ISO8601 "YYYY-MM-DD" or full timestamp
   description: string;
   user_id?: number | null; // From TimelineEventRow
   event_type?: TimelineEventType;
@@ -109,7 +114,7 @@ export interface TimelineEvent {
 
   // Client-side flags for managing state before saving
   _clientSideId?: string; // For 'new' items before they have a DB id (e.g., uuidv4())
-  _status?: 'new' | 'modified' | 'deleted' | 'synced';
+  _status?: "new" | "modified" | "deleted" | "synced";
   // 'synced' can be used after successful save to clear _status, or item is just re-fetched
 }
 
@@ -136,7 +141,10 @@ export const priorityOptions: DropdownOption[] = [
 
 export const caseStageOptions: DropdownOption[] = [
   { label: "Framing of Charges", value: "Framing of Charges" },
-  { label: "Plaintiff/Prosecution Evidence", value: "Plaintiff/Prosecution Evidence" },
+  {
+    label: "Plaintiff/Prosecution Evidence",
+    value: "Plaintiff/Prosecution Evidence",
+  },
   { label: "Cross Examination", value: "Cross Examination" },
   { label: "Defendant/Defence Evidence", value: "Defendant/Defence Evidence" },
   { label: "Final Arguments", value: "Final Arguments" },
@@ -145,8 +153,12 @@ export const caseStageOptions: DropdownOption[] = [
 ];
 
 // Lookup type options (examples, assuming these would be populated from the database)
-export interface CaseTypeOption extends DropdownOption { value: number; }
-export interface CourtOption extends DropdownOption { value: number; }
+export interface CaseTypeOption extends DropdownOption {
+  value: number;
+}
+export interface CourtOption extends DropdownOption {
+  value: number;
+}
 
 // Profile Screen Types
 export interface ActivityItem {
@@ -185,4 +197,8 @@ export interface CaseDataScreen {
   lastUpdate: string;
   previousHearing: string;
   priority?: string | null;
+  court_name?: string | null;
+  court?: string | null;
+  courtName?: string | null;
+  [key: string]: any;
 }
