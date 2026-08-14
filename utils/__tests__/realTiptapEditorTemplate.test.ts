@@ -57,4 +57,26 @@ describe("Real Tiptap Editor Template Scaffold (True Tiptap v3 & ProseMirror AST
     expect(html).toContain("cmd === 'setFontSize'");
     expect(html).toContain("cmd === 'setLineHeight'");
   });
+
+  it("supports ProseMirror Find & Replace commands and debounced state dispatch", () => {
+    const html = getRealTiptapEditorHtml("");
+    expect(html).toContain("findSearchMatches");
+    expect(html).toContain("findNextMatch");
+    expect(html).toContain("findPrevMatch");
+    expect(html).toContain("replaceCurrentMatch");
+    expect(html).toContain("replaceAllMatches");
+    expect(html).toContain("data.type === 'findText'");
+    expect(html).toContain("data.type === 'findNext'");
+    expect(html).toContain("data.type === 'replaceCurrent'");
+    expect(html).toContain("data.type === 'replaceAll'");
+  });
+
+  it("supports Legal Kit boilerplate templates (Memo of Parties, Court Fee Box, Prayer)", () => {
+    const html = getRealTiptapEditorHtml("");
+    expect(html).toContain("cmd === 'insertMemoOfParties'");
+    expect(html).toContain("cmd === 'insertCourtFeeBox'");
+    expect(html).toContain("cmd === 'insertUniversalCaption'");
+    expect(html).toContain("cmd === 'insertPrayerClause'");
+    expect(html).toContain("cmd === 'insertAffidavitBlock'");
+  });
 });

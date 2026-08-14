@@ -1354,7 +1354,7 @@ const GenerateDocumentScreen: React.FC = () => {
           </View>
         ) : null,
     });
-  }, [navigation, t, activeTab, documentType, theme, locale, handleEditCustomizeTiptap]);
+  }, [navigation, t, activeTab, documentType, theme, locale, handleEditCustomize]);
 
   const getTranslatedDocTypes = () => {
     return documentTypeOptions.map((opt) => {
@@ -2404,27 +2404,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
     }
   };
 
-  const handleEditCustomizeLegacy = async () => {
-    setIsGenerating(true);
-    await cacheAdvocateProfile();
-    try {
-      const htmlContent = getInterpolatedHtml();
-      // @ts-ignore
-      navigation.navigate("EditDraft", {
-        caseId: caseId ? Number(caseId) : undefined,
-        initialHtml: htmlContent,
-        templateType: documentType,
-        title: `${getTranslatedDocTypes().find((o) => o.value === documentType)?.label || "Draft"} - ${clientName || "Custom"}`,
-      });
-    } catch (error) {
-      console.error("Error creating initial customization HTML:", error);
-      Alert.alert(t("alert_error"), "Could not prepare draft text.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleEditCustomizeTiptap = async () => {
+  const handleEditCustomize = async () => {
     setIsGenerating(true);
     await cacheAdvocateProfile();
     try {
@@ -3140,16 +3120,9 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
 
             <View style={{ marginTop: 24 }}>
               <ActionButton
-                title="Edit in Tiptap Editor (New ⚡)"
-                onPress={handleEditCustomizeTiptap}
+                title="Edit & Format Draft (⚡)"
+                onPress={handleEditCustomize}
                 type="primary"
-                disabled={isGenerating || !advocateName}
-                style={{ marginBottom: 10 }}
-              />
-              <ActionButton
-                title="Edit in Legacy Editor (Classic 📝)"
-                onPress={handleEditCustomizeLegacy}
-                type="secondary"
                 disabled={isGenerating || !advocateName}
                 style={{ marginBottom: 10 }}
               />

@@ -367,6 +367,8 @@ export const addCase = async (
 export interface CaseWithDetails extends CaseRow {
   districtName?: string | null;
   policeStationName?: string | null;
+  lookupCourtName?: string | null;
+  lookupCaseTypeName?: string | null;
 }
 
 export const getCases = async (
@@ -380,10 +382,12 @@ export const getCases = async (
   }
 ): Promise<CaseWithDetails[]> => {
   const db = await getDb();
-  let sql = `SELECT c.*, ps.name as policeStationName, d.name as districtName 
+  let sql = `SELECT c.*, ps.name as policeStationName, d.name as districtName, co.name as lookupCourtName, ct.name as lookupCaseTypeName
              FROM Cases c
              LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
-             LEFT JOIN Districts d ON c.district_id = d.id`;
+             LEFT JOIN Districts d ON c.district_id = d.id
+             LEFT JOIN Courts co ON c.court_id = co.id
+             LEFT JOIN CaseTypes ct ON c.case_type_id = ct.id`;
 
   const whereClauses: string[] = [];
   const params: any[] = [];
@@ -473,9 +477,12 @@ export const getCaseById = async (
   userId?: number | null
 ): Promise<CaseWithDetails | null> => {
   const db = await getDb();
-  let sql = `SELECT c.*, ps.name as policeStationName, d.name as districtName FROM Cases c
+  let sql = `SELECT c.*, ps.name as policeStationName, d.name as districtName, co.name as lookupCourtName, ct.name as lookupCaseTypeName 
+             FROM Cases c
              LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
              LEFT JOIN Districts d ON c.district_id = d.id
+             LEFT JOIN Courts co ON c.court_id = co.id
+             LEFT JOIN CaseTypes ct ON c.case_type_id = ct.id
              WHERE c.id = ?`;
   const params: any[] = [id];
   if (userId != null) {
@@ -607,13 +614,15 @@ export const searchCases = async (
   const db = await getDb();
   const searchQuery = `%${query}%`;
   let sql = `
-        SELECT c.*, ps.name as policeStationName, d.name as districtName
+        SELECT c.*, ps.name as policeStationName, d.name as districtName, co.name as lookupCourtName, ct.name as lookupCaseTypeName
         FROM Cases c
         LEFT JOIN PoliceStations ps ON c.police_station_id = ps.id
         LEFT JOIN Districts d ON c.district_id = d.id
+        LEFT JOIN Courts co ON c.court_id = co.id
+        LEFT JOIN CaseTypes ct ON c.case_type_id = ct.id
         WHERE (
             c.uniqueId LIKE ? OR c.CaseTitle LIKE ? OR c.ClientName LIKE ? OR c.CNRNumber LIKE ? OR
-            c.case_number LIKE ? OR c.court_name LIKE ? OR c.case_type_name LIKE ? OR
+            c.case_number LIKE ? OR c.court_name LIKE ? OR co.name LIKE ? OR c.case_type_name LIKE ? OR ct.name LIKE ? OR
             c.JudgeName LIKE ? OR c.OnBehalfOf LIKE ? OR c.FirstParty LIKE ? OR
             c.OppositeParty LIKE ? OR c.OpposingCounsel LIKE ? OR c.Accussed LIKE ? OR
             c.Undersection LIKE ? OR c.CaseStatus LIKE ? OR c.Priority LIKE ? OR
@@ -621,7 +630,7 @@ export const searchCases = async (
             ps.name LIKE ? OR d.name LIKE ?
         )
     `;
-  const params: any[] = Array(21).fill(searchQuery);
+  const params: any[] = Array(23).fill(searchQuery);
   if (userId !== undefined && userId !== null) {
     sql += " AND c.user_id = ?";
     params.push(userId);

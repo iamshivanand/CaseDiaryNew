@@ -621,6 +621,95 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       editor.chain().focus().insertContent(indexHtml).run();
     }
 
+    // Find & Replace Engine
+    let searchMatches = [];
+    let currentSearchIndex = -1;
+    let lastSearchQuery = '';
+
+    function findSearchMatches(query, matchCase) {
+      searchMatches = [];
+      currentSearchIndex = -1;
+      lastSearchQuery = query || '';
+      if (!query || !editor) {
+        postMessage({ type: 'searchResult', total: 0, current: 0, query: '' });
+        return;
+      }
+
+      const doc = editor.state.doc;
+      const target = matchCase ? query : query.toLowerCase();
+
+      doc.descendants((node, pos) => {
+        if (node.isText && node.text) {
+          const text = matchCase ? node.text : node.text.toLowerCase();
+          let index = 0;
+          while ((index = text.indexOf(target, index)) !== -1) {
+            searchMatches.push({
+              from: pos + index,
+              to: pos + index + query.length
+            });
+            index += query.length || 1;
+          }
+        }
+      });
+
+      if (searchMatches.length > 0) {
+        currentSearchIndex = 0;
+        highlightCurrentMatch();
+      } else {
+        postMessage({
+          type: 'searchResult',
+          total: 0,
+          current: 0,
+          query: query
+        });
+      }
+    }
+
+    function highlightCurrentMatch() {
+      if (currentSearchIndex >= 0 && currentSearchIndex < searchMatches.length && editor) {
+        const match = searchMatches[currentSearchIndex];
+        try {
+          editor.chain().focus().setTextSelection({ from: match.from, to: match.to }).scrollIntoView().run();
+        } catch (e) {}
+        postMessage({
+          type: 'searchResult',
+          total: searchMatches.length,
+          current: currentSearchIndex + 1,
+          query: lastSearchQuery
+        });
+      }
+    }
+
+    function findNextMatch() {
+      if (searchMatches.length === 0) return;
+      currentSearchIndex = (currentSearchIndex + 1) % searchMatches.length;
+      highlightCurrentMatch();
+    }
+
+    function findPrevMatch() {
+      if (searchMatches.length === 0) return;
+      currentSearchIndex = (currentSearchIndex - 1 + searchMatches.length) % searchMatches.length;
+      highlightCurrentMatch();
+    }
+
+    function replaceCurrentMatch(query, replacement) {
+      if (!editor || currentSearchIndex < 0 || currentSearchIndex >= searchMatches.length) return;
+      const match = searchMatches[currentSearchIndex];
+      editor.chain().focus().insertContentAt({ from: match.from, to: match.to }, replacement || '').run();
+      findSearchMatches(query);
+    }
+
+    function replaceAllMatches(query, replacement) {
+      if (!editor || !query) return;
+      const currentHtml = editor.getHTML();
+      const newHtml = currentHtml.split(query).join(replacement || '');
+      editor.commands.setContent(newHtml);
+      searchMatches = [];
+      currentSearchIndex = -1;
+      postMessage({ type: 'searchResult', total: 0, current: 0, query: '' });
+      sendStateToRN(true);
+    }
+
     function safeChangeCase(mode) {
       if (!editor) return;
       const { state } = editor;
@@ -641,7 +730,22 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
         if (!editor) return;
         logTiptapEvent('BRIDGE_IN', 'Received bridge message: ' + (data.type || 'unknown'), data);
 
-        if (data.type === 'load' || data.type === 'setContent') {
+        if (data.type === 'findText') {
+          findSearchMatches(data.query, data.matchCase);
+        } else if (data.type === 'findNext') {
+          findNextMatch();
+        } else if (data.type === 'findPrev') {
+          findPrevMatch();
+        } else if (data.type === 'replaceCurrent') {
+          replaceCurrentMatch(data.query, data.replacement);
+        } else if (data.type === 'replaceAll') {
+          replaceAllMatches(data.query, data.replacement);
+        } else if (data.type === 'clearSearch') {
+          searchMatches = [];
+          currentSearchIndex = -1;
+          lastSearchQuery = '';
+          postMessage({ type: 'searchResult', total: 0, current: 0, query: '' });
+        } else if (data.type === 'load' || data.type === 'setContent') {
           const cleaned = cleanHtmlForTiptap(data.html || '');
           editor.commands.setContent(cleaned);
           setTimeout(updateDynamicPaperRatio, 50);
@@ -699,6 +803,12 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
               shapeHtml = '<div class="interactive-shape shape-stamp"><b>[ AFFIX COURT FEE STAMP HERE - ₹10/- ]</b></div><p></p>';
             }
             editor.chain().focus().insertContent(shapeHtml).run();
+          } else if (cmd === 'insertMemoOfParties') {
+            const memoHtml = '<p style="text-align: center; font-weight: bold; margin-bottom: 12px;"><strong><u>MEMO OF PARTIES</u></strong></p><table style="width: 100%; border: none; margin-bottom: 14px;"><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>1. [PETITIONER / PLAINTIFF NAME]</strong><br/>S/o, D/o, W/o: [Parent/Spouse Name]<br/>Age: [Age] Years, Occ: [Occupation]<br/>R/o: [Complete Residential Address]<br/>Phone: [Phone Number]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>PETITIONER / PLAINTIFF</strong></td></tr><tr><td colspan="2" style="border: none; text-align: center; padding: 8px 0; font-weight: bold;">VERSUS</td></tr><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>1. [RESPONDENT / DEFENDANT NAME]</strong><br/>S/o, D/o, W/o: [Parent/Spouse Name]<br/>Age: [Age] Years, Occ: [Occupation]<br/>R/o: [Complete Residential Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>RESPONDENT / DEFENDANT</strong></td></tr></table><p></p>';
+            editor.chain().focus().insertContent(memoHtml).run();
+          } else if (cmd === 'insertCourtFeeBox') {
+            const feeHtml = '<div style="border: 2px dashed #475569; padding: 12px; margin: 16px 0; text-align: center; background-color: #f8fafc; border-radius: 4px;"><p style="margin: 0; font-weight: bold; font-size: 13px; color: #1e293b;">COURT FEE STAMP / E-CHALLAN</p><p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;">[ Affix Court Fee Stamp of ₹________/- Here ]<br/>CNR / Deficit Fee Reg: __________________</p></div><p></p>';
+            editor.chain().focus().insertContent(feeHtml).run();
           } else if (cmd === 'insertUniversalCaption') {
             const captionHtml = '<p class="court-header" style="text-align: center; font-weight: bold; margin-bottom: 8px;"><strong>IN THE COURT OF [NAME OF COURT / TRIBUNAL]</strong><br/><strong>AT [CITY / JURISDICTION]</strong></p><p style="text-align: center; margin-bottom: 16px;"><strong>CASE NO.: ____________ OF 2026</strong></p><table style="width: 100%; border: none; margin-bottom: 16px;"><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>[PLAINTIFF / PETITIONER NAME]</strong><br/>Address: [Full Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>PLAINTIFF / PETITIONER</strong></td></tr><tr><td colspan="2" style="border: none; text-align: center; padding: 6px 0;"><strong>VERSUS</strong></td></tr><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>[DEFENDANT / RESPONDENT NAME]</strong><br/>Address: [Full Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>DEFENDANT / RESPONDENT</strong></td></tr></table><p></p>';
             editor.chain().focus().insertContent(captionHtml).run();

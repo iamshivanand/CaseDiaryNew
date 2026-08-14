@@ -174,15 +174,15 @@ const ProfileScreen: React.FC = () => {
         new Date().toISOString();
     }
 
-    setProfileData(updatedProfile);
-
     try {
       const dbInstance = await getDb();
       const userIdVal = await AsyncStorage.getItem("@user_id");
       const userId = userIdVal ? parseInt(userIdVal, 10) : 1;
       await updateUserProfile(dbInstance, userId, updatedProfile);
 
-      // Sync temp states immediately so the view doesn't revert to stale temp states
+      setProfileData({ ...updatedProfile });
+
+      // Sync temp states immediately with permanent persisted avatar and values
       setTempAvatarUri(updatedProfile.avatarUrl);
       setTempName(updatedProfile.name);
       setTempDesignation(updatedProfile.designation);

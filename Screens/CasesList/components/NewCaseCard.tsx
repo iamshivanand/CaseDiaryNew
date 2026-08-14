@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useContext } from "react";
 import { StyleSheet, Text, Pressable, View } from "react-native";
@@ -55,6 +56,14 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
     id,
     priority,
   } = caseDetails;
+
+  const courtName =
+    caseDetails.court_name ||
+    caseDetails.court ||
+    (caseDetails as any).courtName ||
+    (caseDetails as any).lookupCourtName ||
+    null;
+
   const navigation = useNavigation();
   const scale = useSharedValue(1);
 
@@ -368,14 +377,46 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
             </View>
           )}
 
-          <Text
-            style={[styles.clientInfo, { color: theme.colors.textSecondary }]}
-          >
-            Client:{" "}
-            <Text style={{ color: theme.colors.text, fontWeight: "600" }}>
-              {client}
-            </Text>
-          </Text>
+          {/* CLIENT & COURT INFORMATION CONTAINER */}
+          <View style={styles.metaInfoContainer}>
+            <View style={styles.metaRow}>
+              <Ionicons
+                name="person-outline"
+                size={13}
+                color={theme.colors.textSecondary}
+                style={{ marginRight: 5, marginTop: 1 }}
+              />
+              <Text
+                style={[styles.metaText, { color: theme.colors.textSecondary }]}
+                numberOfLines={1}
+              >
+                Client:{" "}
+                <Text style={{ color: theme.colors.text, fontWeight: "600" }}>
+                  {client}
+                </Text>
+              </Text>
+            </View>
+
+            {courtName ? (
+              <View style={[styles.metaRow, { marginTop: 4 }]}>
+                <Ionicons
+                  name="business-outline"
+                  size={13}
+                  color={theme.colors.primary}
+                  style={{ marginRight: 5, marginTop: 1 }}
+                />
+                <Text
+                  style={[styles.metaText, { color: theme.colors.textSecondary }]}
+                  numberOfLines={1}
+                >
+                  Court:{" "}
+                  <Text style={{ color: theme.colors.text, fontWeight: "600" }}>
+                    {courtName}
+                  </Text>
+                </Text>
+              </View>
+            ) : null}
+          </View>
 
           <View
             style={[
@@ -492,6 +533,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textTransform: "uppercase",
   },
+  metaInfoContainer: {
+    marginBottom: 10,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  metaText: {
+    fontSize: 13,
+    flex: 1,
+  },
   clientInfo: {
     fontSize: 14,
     marginBottom: 12,
@@ -542,6 +594,9 @@ export default React.memo(NewCaseCard, (prevProps, nextProps) => {
     p.id === n.id &&
     p.title === n.title &&
     p.client === n.client &&
+    p.court_name === n.court_name &&
+    p.court === n.court &&
+    p.courtName === n.courtName &&
     p.status === n.status &&
     p.nextHearing === n.nextHearing &&
     p.lastUpdate === n.lastUpdate &&

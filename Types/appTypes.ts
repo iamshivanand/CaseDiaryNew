@@ -197,4 +197,8 @@ export interface CaseDataScreen {
   lastUpdate: string;
   previousHearing: string;
   priority?: string | null;
+  court_name?: string | null;
+  court?: string | null;
+  courtName?: string | null;
+  [key: string]: any;
 }

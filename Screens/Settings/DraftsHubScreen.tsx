@@ -1130,34 +1130,14 @@ const DraftsHubScreen: React.FC = () => {
             activeOpacity={0.85}
           >
             <Ionicons
-              name="flash-outline"
+              name="create-outline"
               size={15}
               color="#3b82f6"
             />
             <Text
               style={[styles.actionBtnText, { color: "#3b82f6", fontWeight: "700" }]}
             >
-              Tiptap ⚡
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionBtn, { borderColor: theme.colors.border }]}
-            // @ts-ignore
-            onPress={() =>
-              navigation.navigate("EditDraft", { draftId: item.id })
-            }
-            activeOpacity={0.85}
-          >
-            <Ionicons
-              name="create-outline"
-              size={15}
-              color={theme.colors.primary}
-            />
-            <Text
-              style={[styles.actionBtnText, { color: theme.colors.primary }]}
-            >
-              Legacy 📝
+              Edit Draft
             </Text>
           </TouchableOpacity>
 

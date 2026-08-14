@@ -143,6 +143,13 @@ const TiptapEditDraftScreen: React.FC = () => {
   const [vocabSearchQuery, setVocabSearchQuery] = useState("");
   const [isMacrosModalVisible, setIsMacrosModalVisible] = useState(false);
 
+  // Find & Replace state
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [replaceQuery, setReplaceQuery] = useState("");
+  const [searchMatchCount, setSearchMatchCount] = useState(0);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+
   // Voice dictation & Autocomplete state
   const [isDictating, setIsDictating] = useState(false);
   const [liveSpeechPreview, setLiveSpeechPreview] = useState("");
@@ -384,6 +391,50 @@ const TiptapEditDraftScreen: React.FC = () => {
     }, 2000);
   };
 
+  const handleFindText = (text: string) => {
+    setSearchQuery(text);
+    postMessageToWebView({
+      type: "findText",
+      query: text,
+      matchCase: false,
+    });
+  };
+
+  const handleFindNext = () => {
+    postMessageToWebView({ type: "findNext" });
+  };
+
+  const handleFindPrev = () => {
+    postMessageToWebView({ type: "findPrev" });
+  };
+
+  const handleReplaceCurrent = () => {
+    postMessageToWebView({
+      type: "replaceCurrent",
+      query: searchQuery,
+      replacement: replaceQuery,
+    });
+    markAsEditingAndScheduleAutoSave();
+  };
+
+  const handleReplaceAll = () => {
+    postMessageToWebView({
+      type: "replaceAll",
+      query: searchQuery,
+      replacement: replaceQuery,
+    });
+    markAsEditingAndScheduleAutoSave();
+  };
+
+  const handleCloseSearch = () => {
+    setIsSearchVisible(false);
+    setSearchQuery("");
+    setReplaceQuery("");
+    setSearchMatchCount(0);
+    setCurrentMatchIndex(0);
+    postMessageToWebView({ type: "clearSearch" });
+  };
+
   const handleWebViewMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -399,6 +450,9 @@ const TiptapEditDraftScreen: React.FC = () => {
         }
         setIsLoading(false);
         markAsEditingAndScheduleAutoSave();
+      } else if (data.type === "searchResult") {
+        setSearchMatchCount(data.total || 0);
+        setCurrentMatchIndex(data.current || 0);
       } else if (data.type === "save") {
         if (data.html) setHtmlContent(data.html);
         if (data.stats) setDocStats(data.stats);
@@ -839,6 +893,21 @@ const TiptapEditDraftScreen: React.FC = () => {
           <Ionicons name="arrow-redo-outline" size={19} color="#cbd5e1" />
         </TouchableOpacity>
 
+        {/* Find & Replace Search Button */}
+        <TouchableOpacity
+          style={[styles.headerActionBtn, isSearchVisible && { backgroundColor: "#3b82f6" }]}
+          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+          onPress={() => {
+            if (isSearchVisible) {
+              handleCloseSearch();
+            } else {
+              setIsSearchVisible(true);
+            }
+          }}
+        >
+          <Ionicons name="search-outline" size={19} color={isSearchVisible ? "#ffffff" : "#cbd5e1"} />
+        </TouchableOpacity>
+
         {/* PDF Export Button */}
         <TouchableOpacity
           style={styles.headerActionBtn}
@@ -876,6 +945,76 @@ const TiptapEditDraftScreen: React.FC = () => {
           <Ionicons name="ellipsis-vertical" size={18} color="#cbd5e1" />
         </TouchableOpacity>
       </View>
+
+      {/* Find & Replace Floating / Collapsible Bar */}
+      {isSearchVisible && (
+        <View style={styles.searchBarContainer}>
+          <View style={styles.searchRow}>
+            <Ionicons name="search-outline" size={16} color="#60a5fa" style={{ marginRight: 6 }} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Find text in document..."
+              placeholderTextColor="#94a3b8"
+              value={searchQuery}
+              onChangeText={handleFindText}
+              autoFocus
+              returnKeyType="search"
+              onSubmitEditing={handleFindNext}
+            />
+            {searchMatchCount > 0 && (
+              <View style={styles.searchCountBadge}>
+                <Text style={styles.searchCountText}>
+                  {currentMatchIndex}/{searchMatchCount}
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={styles.searchNavBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={handleFindPrev}
+            >
+              <Ionicons name="chevron-up" size={16} color="#ffffff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.searchNavBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={handleFindNext}
+            >
+              <Ionicons name="chevron-down" size={16} color="#ffffff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.searchCloseBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={handleCloseSearch}
+            >
+              <Ionicons name="close" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.replaceRow}>
+            <Ionicons name="swap-horizontal-outline" size={16} color="#c084fc" style={{ marginRight: 6 }} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Replace with..."
+              placeholderTextColor="#94a3b8"
+              value={replaceQuery}
+              onChangeText={setReplaceQuery}
+            />
+            <TouchableOpacity
+              style={styles.replaceActionBtn}
+              onPress={handleReplaceCurrent}
+            >
+              <Text style={styles.replaceActionBtnText}>Replace</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.replaceActionBtn, { backgroundColor: "#7c3aed" }]}
+              onPress={handleReplaceAll}
+            >
+              <Text style={styles.replaceActionBtnText}>All</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Segmented Ribbon Controller (Kept in top position below header with Clear Text Labels) */}
       <View style={styles.ribbonHeader}>
@@ -981,6 +1120,7 @@ const TiptapEditDraftScreen: React.FC = () => {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.ribbonContent}
             >
               {/* Bold */}
@@ -1077,6 +1217,15 @@ const TiptapEditDraftScreen: React.FC = () => {
                 <Text style={styles.toolLabel}>New Para</Text>
               </TouchableOpacity>
 
+              {/* Find & Replace Tool */}
+              <TouchableOpacity
+                style={styles.labeledToolItem}
+                onPress={() => setIsSearchVisible((prev) => !prev)}
+              >
+                <Ionicons name="search-outline" size={15} color="#334155" />
+                <Text style={styles.toolLabel}>Find</Text>
+              </TouchableOpacity>
+
               <View style={styles.toolbarDivider} />
 
               {/* Scan Document OCR */}
@@ -1130,27 +1279,38 @@ const TiptapEditDraftScreen: React.FC = () => {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.legalRibbonContent}
             >
               {/* Universal Legal Macro Snippets Modal Launcher */}
               <TouchableOpacity
                 style={[styles.labeledLegalItem, { backgroundColor: "#1e3a8a", borderColor: "#3b82f6" }]}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                 onPress={() => setIsMacrosModalVisible(true)}
               >
                 <Ionicons name="flash" size={15} color="#60a5fa" />
                 <Text style={[styles.legalToolLabel, { color: "#ffffff", fontWeight: "bold" }]}>
-                  Legal Snippets
+                  ⚡ Legal Kit
                 </Text>
               </TouchableOpacity>
 
-              {/* Legal Symbols */}
-              {["§", "¶", "Δ", "π", "№"].map((sym) => (
+              {/* Quick Legal Symbols */}
+              {[
+                { sym: "§", label: "Section" },
+                { sym: "¶", label: "Para" },
+                { sym: "u/s", label: "u/s" },
+                { sym: "r/w", label: "r/w" },
+                { sym: "vs.", label: "vs" },
+                { sym: "P.S.", label: "P.S." },
+                { sym: "FIR No.", label: "FIR" },
+              ].map((item) => (
                 <TouchableOpacity
-                  key={sym}
+                  key={item.sym}
                   style={styles.legalSymbolBtn}
-                  onPress={() => triggerFormat("insertText", sym)}
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                  onPress={() => triggerFormat("insertText", item.sym + " ")}
                 >
-                  <Text style={styles.legalSymbolText}>{sym}</Text>
+                  <Text style={styles.legalSymbolText}>{item.sym}</Text>
                 </TouchableOpacity>
               ))}
 
@@ -1159,6 +1319,7 @@ const TiptapEditDraftScreen: React.FC = () => {
               {/* Signature Block Drawer */}
               <TouchableOpacity
                 style={styles.labeledLegalItem}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                 onPress={() => setIsSignatureListVisible(true)}
               >
                 <Ionicons name="document-attach-outline" size={14} color="#60a5fa" />
@@ -1168,6 +1329,7 @@ const TiptapEditDraftScreen: React.FC = () => {
               {/* Legal Dictionary / Vocabulary */}
               <TouchableOpacity
                 style={styles.labeledLegalItem}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                 onPress={() => setIsVocabularyVisible(true)}
               >
                 <Ionicons name="book-outline" size={14} color="#60a5fa" />
@@ -1185,6 +1347,7 @@ const TiptapEditDraftScreen: React.FC = () => {
                 <TouchableOpacity
                   key={c.value}
                   style={styles.caseConverterBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                   onPress={() => triggerFormat("changeCase", c.value)}
                 >
                   <Text style={styles.caseConverterText}>{c.label}</Text>
@@ -1196,6 +1359,7 @@ const TiptapEditDraftScreen: React.FC = () => {
               {/* Next Placeholder Navigator */}
               <TouchableOpacity
                 style={styles.nextPlaceholderBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                 onPress={() => triggerFormat("nextPlaceholder")}
               >
                 <Ionicons name="play-skip-forward-outline" size={12} color="#ffffff" />
@@ -1286,6 +1450,7 @@ const TiptapEditDraftScreen: React.FC = () => {
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
                   contentContainerStyle={styles.punctuationRow}
                 >
                   {[
@@ -1348,7 +1513,7 @@ const TiptapEditDraftScreen: React.FC = () => {
         />
       </KeyboardAvoidingView>
 
-      {/* Universal Legal Macro Snippets Modal */}
+      {/* ⚡ Legal Kit & Boilerplate Clauses Modal */}
       <Modal
         visible={isMacrosModalVisible}
         transparent
@@ -1356,15 +1521,55 @@ const TiptapEditDraftScreen: React.FC = () => {
         onRequestClose={() => setIsMacrosModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+          <View style={[styles.modalContent, { maxHeight: "85%" }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Universal Legal Snippets & Captions</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="flash" size={20} color="#60a5fa" />
+                <Text style={styles.modalTitle}>⚡ Legal Kit & Boilerplates</Text>
+              </View>
               <TouchableOpacity onPress={() => setIsMacrosModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#ffffff" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingVertical: 10 }}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingVertical: 10 }}
+            >
+              {/* Quick Symbol Chips Bar inside Modal */}
+              <Text style={styles.legalSectionHeaderTitle}>QUICK LEGAL SYMBOLS & SHORT FORMS</Text>
+              <View style={styles.legalSymbolGrid}>
+                {[
+                  { sym: "§", name: "Section" },
+                  { sym: "¶", name: "Paragraph" },
+                  { sym: "u/s", name: "Under Section" },
+                  { sym: "r/w", name: "Read With" },
+                  { sym: "vs.", name: "Versus" },
+                  { sym: "P.S.", name: "Police Station" },
+                  { sym: "FIR No.", name: "FIR Number" },
+                  { sym: "Cr.P.C.", name: "Cr.P.C." },
+                  { sym: "C.P.C.", name: "C.P.C." },
+                  { sym: "I.P.C.", name: "I.P.C." },
+                  { sym: "Hon'ble Court", name: "Hon'ble Court" },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.sym}
+                    style={styles.legalKitChip}
+                    onPress={() => {
+                      triggerFormat("insertText", item.sym + " ");
+                      setIsMacrosModalVisible(false);
+                    }}
+                  >
+                    <Text style={styles.legalKitChipSym}>{item.sym}</Text>
+                    <Text style={styles.legalKitChipName}>{item.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Standard Legal Clauses */}
+              <Text style={[styles.legalSectionHeaderTitle, { marginTop: 14 }]}>
+                READY BOILERPLATE CLAUSES & CAPTIONS
+              </Text>
               {[
                 {
                   title: "🏛️ Court / Tribunal Caption Header",
@@ -1372,9 +1577,14 @@ const TiptapEditDraftScreen: React.FC = () => {
                   cmd: "insertUniversalCaption",
                 },
                 {
-                  title: "📑 Index of Documents (Court Filing Table)",
-                  desc: "Standard legal filing index table with S.No., Document, Exhibit, Page Nos.",
-                  cmd: "insertFilingIndexTable",
+                  title: "📋 Memo of Parties Table",
+                  desc: "Complete Petitioner vs. Respondent parties table with parentage & addresses",
+                  cmd: "insertMemoOfParties",
+                },
+                {
+                  title: "🏷️ Court Fee Stamp / E-Challan Box",
+                  desc: "Standard court fee deficit / e-challan stamp box with ₹ placeholder",
+                  cmd: "insertCourtFeeBox",
                 },
                 {
                   title: "⚖️ Prayer for Relief Clause (Wherefore)",
@@ -1385,6 +1595,11 @@ const TiptapEditDraftScreen: React.FC = () => {
                   title: "📜 Sworn Affidavit / Verification Block",
                   desc: "Standard Deponent solemn affirmation box confirming facts under oath",
                   cmd: "insertAffidavitBlock",
+                },
+                {
+                  title: "📑 Index of Documents (Court Filing Table)",
+                  desc: "Standard legal filing index table with S.No., Document, Exhibit, Page Nos.",
+                  cmd: "insertFilingIndexTable",
                 },
                 {
                   title: "📬 Proof of Filing / Certificate of Service",
@@ -1534,29 +1749,6 @@ const TiptapEditDraftScreen: React.FC = () => {
                   <Text style={styles.moreMenuRowTitle}>Advocate Walkthrough Guide</Text>
                   <Text style={styles.moreMenuRowDesc}>
                     Learn key gestures, shortcuts, and drafting tools
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Switch to Legacy Editor */}
-              <TouchableOpacity
-                style={styles.moreMenuRow}
-                onPress={() => {
-                  setIsMoreMenuVisible(false);
-                  navigation.navigate("EditDraft" as never, {
-                    draftId: activeDraftId,
-                    caseId,
-                    initialHtml: htmlContent,
-                    templateType,
-                    title,
-                  } as never);
-                }}
-              >
-                <Ionicons name="swap-horizontal-outline" size={20} color="#cbd5e1" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.moreMenuRowTitle}>Switch to Legacy Editor</Text>
-                  <Text style={styles.moreMenuRowDesc}>
-                    Open this draft in the classic webview editor
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -2948,6 +3140,117 @@ const getStyles = (theme: any) =>
     },
     tourDotActive: {
       backgroundColor: "#2563eb",
+    },
+    // Find & Replace Bar Styles
+    searchBarContainer: {
+      backgroundColor: "#0f172a",
+      borderBottomWidth: 1,
+      borderBottomColor: "#334155",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 6,
+    },
+    searchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#1e293b",
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "#334155",
+      paddingHorizontal: 10,
+      height: 38,
+    },
+    replaceRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#1e293b",
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "#334155",
+      paddingHorizontal: 10,
+      height: 38,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 13,
+      color: "#ffffff",
+      paddingVertical: 4,
+    },
+    searchCountBadge: {
+      backgroundColor: "#334155",
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      marginRight: 6,
+    },
+    searchCountText: {
+      fontSize: 11,
+      color: "#93c5fd",
+      fontWeight: "bold",
+    },
+    searchNavBtn: {
+      width: 26,
+      height: 26,
+      backgroundColor: "#334155",
+      borderRadius: 6,
+      alignItems: "center",
+      justifyContent: "center",
+      marginLeft: 4,
+    },
+    searchCloseBtn: {
+      width: 26,
+      height: 26,
+      alignItems: "center",
+      justifyContent: "center",
+      marginLeft: 4,
+    },
+    replaceActionBtn: {
+      backgroundColor: "#2563eb",
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 6,
+      marginLeft: 4,
+    },
+    replaceActionBtnText: {
+      fontSize: 11,
+      fontWeight: "bold",
+      color: "#ffffff",
+    },
+    // Legal Kit Modal Styles
+    legalSectionHeaderTitle: {
+      fontSize: 11,
+      fontWeight: "bold",
+      color: "#60a5fa",
+      letterSpacing: 0.5,
+      marginBottom: 8,
+      marginTop: 4,
+    },
+    legalSymbolGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+      marginBottom: 8,
+    },
+    legalKitChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      backgroundColor: "#1e293b",
+      borderWidth: 1,
+      borderColor: "#334155",
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    legalKitChipSym: {
+      fontSize: 13,
+      fontWeight: "bold",
+      color: "#60a5fa",
+    },
+    legalKitChipName: {
+      fontSize: 11,
+      color: "#cbd5e1",
+      fontWeight: "500",
     },
   });
 

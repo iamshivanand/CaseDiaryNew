@@ -12,7 +12,7 @@
   },
   "include": [
     "utils/e2e/**/*.ts",
-    "utils/offlineEditorTemplate.ts",
+    "utils/realTiptapEditorTemplate.ts",
     "playwright.config.ts"
   ],
   "exclude": ["node_modules", "android"]

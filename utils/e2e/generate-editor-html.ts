@@ -3,7 +3,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import { getOfflineEditorHtml } from "../offlineEditorTemplate";
+import { getRealTiptapEditorHtml } from "../realTiptapEditorTemplate";
 
 const outDir = path.join(__dirname, "fixtures");
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
@@ -11,13 +11,13 @@ if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 // -- Blank editor (empty document)
 fs.writeFileSync(
   path.join(outDir, "editor-blank.html"),
-  getOfflineEditorHtml("")
+  getRealTiptapEditorHtml("")
 );
 
 // -- Preloaded: 1 manual page break
 fs.writeFileSync(
   path.join(outDir, "editor-one-break.html"),
-  getOfflineEditorHtml(
+  getRealTiptapEditorHtml(
     `<p>Page one content. This is a court document for testing.</p>` +
       `<div class="legal-page-break" style="break-before: page; page-break-before: always;"></div>` +
       `<p>Page two content. Lorem ipsum dolor sit amet.</p>`
@@ -27,7 +27,7 @@ fs.writeFileSync(
 // -- Preloaded: legal placeholder
 fs.writeFileSync(
   path.join(outDir, "editor-placeholder.html"),
-  getOfflineEditorHtml(
+  getRealTiptapEditorHtml(
     `<p>In the matter of <span class="legal-placeholder" data-original="[PARTY NAME]">[PARTY NAME]</span> vs State.</p>`
   )
 );
@@ -35,7 +35,7 @@ fs.writeFileSync(
 // -- Preloaded: table
 fs.writeFileSync(
   path.join(outDir, "editor-table.html"),
-  getOfflineEditorHtml(
+  getRealTiptapEditorHtml(
     `<p>Evidence list:</p>` +
       `<table class="editor-table"><thead><tr><th>Sr</th><th>Document</th><th>Date</th></tr></thead>` +
       `<tbody><tr><td>1</td><td>FIR Copy</td><td>01/01/2026</td></tr></tbody></table>` +
@@ -47,7 +47,7 @@ fs.writeFileSync(
 const longParagraph = `<p>${"This is a very long legal document paragraph that should overflow the first page boundary automatically. ".repeat(60)}</p>`;
 fs.writeFileSync(
   path.join(outDir, "editor-long-text.html"),
-  getOfflineEditorHtml(longParagraph)
+  getRealTiptapEditorHtml(longParagraph)
 );
 
 console.log("✅  Editor HTML fixtures written to utils/e2e/fixtures/");

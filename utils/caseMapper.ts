@@ -13,11 +13,21 @@ import { CaseDataScreen } from "../Types/appTypes";
 export const mapCaseDbToScreen = (
   dbCase: Partial<CaseWithDetails> & { id: number }
 ): CaseDataScreen => {
+  const resolvedCourtName =
+    dbCase.court_name ||
+    (dbCase as any).court ||
+    (dbCase as any).lookupCourtName ||
+    (dbCase as any).courtName ||
+    null;
+
   return {
     ...dbCase,
     id: dbCase.id,
     title: dbCase.CaseTitle || "No Title",
     client: dbCase.ClientName || "Unknown Client",
+    court_name: resolvedCourtName,
+    court: resolvedCourtName,
+    courtName: resolvedCourtName,
     status: (dbCase.CaseStatus === "Active" ||
     dbCase.CaseStatus === "Closed" ||
     dbCase.CaseStatus === "Pending"

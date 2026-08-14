@@ -203,5 +203,22 @@ describe("TiptapEditDraftScreen (Behavior-Driven Testing)", () => {
         });
       });
     });
+
+    it("processes searchResult bridge messages from TipTap WebView engine", async () => {
+      const { getByTestId } = renderScreen();
+
+      await waitFor(() => {
+        const webView = getByTestId("tiptap-webview");
+        act(() => {
+          webView.props.onMessage(
+            getMockWebViewMessage("searchResult", {
+              total: 5,
+              current: 1,
+              query: "Petitioner",
+            })
+          );
+        });
+      });
+    });
   });
 });

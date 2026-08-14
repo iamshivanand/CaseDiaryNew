@@ -87,10 +87,18 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
-  const hasImage = !!(
-    tempAvatarUri ||
-    (profileData.avatarUrl && !profileData.avatarUrl.includes("placeholder"))
-  );
+  const [imageError, setImageError] = React.useState(false);
+
+  React.useEffect(() => {
+    setImageError(false);
+  }, [tempAvatarUri, profileData.avatarUrl]);
+
+  const hasImage =
+    !imageError &&
+    !!(
+      tempAvatarUri ||
+      (profileData.avatarUrl && !profileData.avatarUrl.includes("placeholder"))
+    );
 
   return (
     <View
@@ -152,6 +160,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               <Image
                 source={{ uri: tempAvatarUri || profileData.avatarUrl || "" }}
                 style={styles.avatarImage}
+                onError={() => setImageError(true)}
               />
             ) : (
               <View
