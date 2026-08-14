@@ -57,3 +57,7 @@ credentials.json
 yarn-error.log
 npm-debug.log
 
+# Test reports & outputs
+playwright-report/
+test-results/
+utils/e2e/
