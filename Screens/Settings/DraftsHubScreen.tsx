@@ -9,7 +9,7 @@ import {
 import * as FileSystem from "expo-file-system";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import {
   View,
   Text,
@@ -27,9 +27,11 @@ import {
 import * as db from "../../DataBase";
 import { CaseWithDetails, DocumentDraft } from "../../DataBase";
 import { ThemeContext } from "../../Providers/ThemeProvider";
+import { useTranslation } from "../../Providers/LanguageProvider";
+import { compileLegalDocumentHtml } from "../../utils/documentTemplates";
 import { createNamedPdfFile, shareNamedPdf } from "../../utils/fileShareHelper";
 import ActionButton from "../CommonComponents/ActionButton";
-import { SkeletonList } from "../CommonComponents/SkeletonLoader";
+import { SkeletonList, SkeletonTemplateGrid } from "../CommonComponents/SkeletonLoader";
 
 const documentTypeColors: { [key: string]: string } = {
   vakalatnama: "#10B981", // Emerald/Green
@@ -59,6 +61,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_blank_page",
     template_type: "blank_page",
     title: "Blank Custom Document",
+    titleHi: "कोरा दस्तावेज़ (शुरुआत से)",
     category: "common",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -67,6 +70,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_vakalatnama",
     template_type: "vakalatnama",
     title: "Vakalatnama",
+    titleHi: "वकालतनामा (प्राधिकार पत्र)",
     category: "common",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -75,6 +79,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_adjournment",
     template_type: "adjournment",
     title: "Adjournment Application",
+    titleHi: "स्थगन प्रार्थना पत्र",
     category: "common",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -82,7 +87,8 @@ const BUILT_IN_TEMPLATES = [
   {
     id: "built_in_bail",
     template_type: "bail",
-    title: "Bail Application",
+    title: "Bail Application (Sec 439)",
+    titleHi: "नियमित जमानत आवेदन (धारा 439)",
     category: "criminal",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -90,7 +96,8 @@ const BUILT_IN_TEMPLATES = [
   {
     id: "built_in_affidavit",
     template_type: "affidavit",
-    title: "Affidavit",
+    title: "Supporting Affidavit",
+    titleHi: "शपथ पत्र (हलफनामा)",
     category: "common",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -99,6 +106,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_written_statement",
     template_type: "written_statement",
     title: "Written Statement",
+    titleHi: "लिखित कथन (जवाब दावा)",
     category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -106,7 +114,8 @@ const BUILT_IN_TEMPLATES = [
   {
     id: "built_in_legal_notice",
     template_type: "legal_notice",
-    title: "Legal Notice",
+    title: "Legal Demand Notice",
+    titleHi: "विधिक मांग नोटिस",
     category: "common",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -115,6 +124,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_caveat",
     template_type: "caveat",
     title: "Caveat Petition",
+    titleHi: "कैविएट याचिका (धारा 148क)",
     category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -123,6 +133,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_injunction",
     template_type: "injunction",
     title: "Temporary Injunction",
+    titleHi: "अस्थाई निषेधाज्ञा (आदेश 39)",
     category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -131,6 +142,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_plaint",
     template_type: "plaint",
     title: "Plaint (Civil Suit)",
+    titleHi: "वाद पत्र (दीवानी दावा)",
     category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -139,6 +151,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_rejoinder",
     template_type: "rejoinder",
     title: "Replication / Rejoinder",
+    titleHi: "प्रत्युत्तर (रिजॉइंडर)",
     category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -147,6 +160,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_execution",
     template_type: "execution",
     title: "Execution Petition",
+    titleHi: "निष्पादन याचिका (आदेश 21)",
     category: "civil",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -154,7 +168,8 @@ const BUILT_IN_TEMPLATES = [
   {
     id: "built_in_anticipatory_bail",
     template_type: "anticipatory_bail",
-    title: "Anticipatory Bail",
+    title: "Anticipatory Bail (Sec 438)",
+    titleHi: "अग्रिम जमानत (धारा 438)",
     category: "criminal",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -162,7 +177,8 @@ const BUILT_IN_TEMPLATES = [
   {
     id: "built_in_private_complaint",
     template_type: "private_complaint",
-    title: "Private Complaint",
+    title: "Private Complaint (Sec 200)",
+    titleHi: "निजी परिवाद (धारा 200)",
     category: "criminal",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -170,7 +186,8 @@ const BUILT_IN_TEMPLATES = [
   {
     id: "built_in_fir_quashing",
     template_type: "fir_quashing",
-    title: "FIR Quashing Petition",
+    title: "FIR Quashing (Sec 482)",
+    titleHi: "प्राथमिकी निरस्तीकरण (धारा 482)",
     category: "criminal",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -178,7 +195,8 @@ const BUILT_IN_TEMPLATES = [
   {
     id: "built_in_exemption",
     template_type: "exemption",
-    title: "Exemption Application",
+    title: "Exemption (Sec 317 CrPC)",
+    titleHi: "हाजिरी माफी आवेदन (धारा 317)",
     category: "common",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -187,6 +205,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_cheque_bounce",
     template_type: "cheque_bounce",
     title: "Cheque Bounce Notice",
+    titleHi: "चेक अनादर नोटिस (धारा 138)",
     category: "commercial",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -195,6 +214,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_arbitration_sec9",
     template_type: "arbitration_sec9",
     title: "Arbitration Sec 9",
+    titleHi: "मध्यस्थता अंतरिम राहत (धारा 9)",
     category: "commercial",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -203,6 +223,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_consumer_complaint",
     template_type: "consumer_complaint",
     title: "Consumer Complaint",
+    titleHi: "उपभोक्ता परिवाद",
     category: "commercial",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -211,6 +232,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_rent_agreement",
     template_type: "rent_agreement",
     title: "Rent Agreement",
+    titleHi: "किरायानामा (रेंट एग्रीमेंट)",
     category: "commercial",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -219,6 +241,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_power_of_attorney",
     template_type: "power_of_attorney",
     title: "Power of Attorney",
+    titleHi: "मुख्तारनामा (पावर ऑफ अटॉर्नी)",
     category: "commercial",
     is_custom_template: 0,
     isBuiltIn: true,
@@ -322,14 +345,20 @@ const DraftsHubScreen: React.FC = () => {
   const route = useRoute<any>();
   const isFocused = useIsFocused();
   const { theme } = useContext(ThemeContext);
+  const { locale } = useTranslation();
   const styles = getStyles(theme);
 
-  const [activeTab, setActiveTab] = useState<"drafts" | "templates">("drafts");
-  const [drafts, setDrafts] = useState<DocumentDraft[]>([]);
-  const [filteredDrafts, setFilteredDrafts] = useState<DocumentDraft[]>([]);
+  const initialTab = route.params?.tab || route.params?.initialTab || "drafts";
+  const [activeTab, setActiveTab] = useState<"drafts" | "templates">(initialTab);
+  const [templateLanguage, setTemplateLanguage] = useState<"en" | "hi">(
+    locale === "hi" ? "hi" : "en"
+  );
+  const [drafts, setDrafts] = useState<DocumentDraft[]>(
+    initialTab === "templates" ? (BUILT_IN_TEMPLATES as any) : []
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(initialTab !== "templates");
 
   // Pagination states
   const [page, setPage] = useState(0);
@@ -492,13 +521,31 @@ const DraftsHubScreen: React.FC = () => {
     `;
   };
 
+  const handleTabChange = (newTab: "drafts" | "templates") => {
+    if (newTab === activeTab) return;
+    setActiveTab(newTab);
+    setSearchQuery("");
+    setSelectedCategory("all");
+    setPage(0);
+    setHasMore(true);
+    if (newTab === "templates") {
+      setDrafts(BUILT_IN_TEMPLATES as any);
+      setIsLoading(false);
+    } else {
+      setDrafts([]);
+      setIsLoading(true);
+    }
+  };
+
   // Load drafts and templates from SQLite
   const loadDrafts = async (resetPage: boolean = false) => {
     const isSearching = searchQuery.trim() !== "";
     const targetPage = resetPage ? 0 : page;
 
     if (targetPage === 0) {
-      setIsLoading(true);
+      if (activeTab === "drafts" && drafts.length === 0) {
+        setIsLoading(true);
+      }
     } else if (!isSearching) {
       setIsFetchingNextPage(true);
     }
@@ -524,10 +571,8 @@ const DraftsHubScreen: React.FC = () => {
 
         if (targetPage === 0 || isSearching) {
           setDrafts(combined as any);
-          setFilteredDrafts(combined as any);
         } else {
-          setDrafts((prev) => [...prev, ...(combined as any)]);
-          setFilteredDrafts((prev) => [...prev, ...(combined as any)]);
+          setDrafts((prev) => [...prev, ...(mappedResults as any)]);
         }
 
         setHasMore(!isSearching && results.length === PAGE_SIZE);
@@ -549,10 +594,8 @@ const DraftsHubScreen: React.FC = () => {
 
         if (targetPage === 0 || isSearching) {
           setDrafts(results);
-          setFilteredDrafts(results);
         } else {
           setDrafts((prev) => [...prev, ...results]);
-          setFilteredDrafts((prev) => [...prev, ...results]);
         }
 
         setHasMore(!isSearching && results.length === PAGE_SIZE);
@@ -585,13 +628,12 @@ const DraftsHubScreen: React.FC = () => {
     if (isFocused) {
       setPage(0);
       setHasMore(true);
-      setSelectedCategory("all");
       loadDrafts(true);
     }
   }, [isFocused, activeTab, searchQuery]);
 
-  // Filter drafts based on search query and category
-  useEffect(() => {
+  // Filter drafts based on search query and category with useMemo for optimal rendering performance
+  const filteredDrafts = useMemo(() => {
     let filtered = drafts;
 
     if (activeTab === "templates" && selectedCategory !== "all") {
@@ -612,13 +654,13 @@ const DraftsHubScreen: React.FC = () => {
       );
     }
 
-    setFilteredDrafts(filtered);
-  }, [searchQuery, drafts, activeTab, selectedCategory]);
+    return filtered;
+  }, [drafts, activeTab, selectedCategory, searchQuery]);
 
   // Load cases from Database for Attach Modal
   const loadCases = async () => {
     try {
-      const allCases = await db.getCases();
+      const allCases = await db.getCases(null, -1, 0, { status: "Active" });
       setCases(allCases);
       setFilteredCases(allCases);
     } catch (error) {
@@ -1237,6 +1279,8 @@ const DraftsHubScreen: React.FC = () => {
   const renderTemplateGridItem = ({ item }: { item: any }) => {
     const color =
       documentTypeColors[item.template_type] || theme.colors.primary;
+    const displayTitle =
+      templateLanguage === "hi" ? (item.titleHi || item.title) : item.title;
     return (
       <TouchableOpacity
         style={{
@@ -1256,11 +1300,44 @@ const DraftsHubScreen: React.FC = () => {
           maxWidth: (Dimensions.get("window").width - 32) / 2 - 12,
         }}
         activeOpacity={0.85}
-        onPress={() => {
+        onPress={async () => {
+          let compiledHtml = "";
+          if (item.isBuiltIn) {
+            try {
+              const advocateName =
+                (await AsyncStorage.getItem("@advocate_name")) || "";
+              const advocateEnrollment =
+                (await AsyncStorage.getItem("@advocate_enrollment")) || "";
+              const advocateAddress =
+                (await AsyncStorage.getItem("@advocate_address")) || "";
+              compiledHtml = compileLegalDocumentHtml(
+                item.template_type,
+                {
+                  advocateName,
+                  advocateEnrollment,
+                  advocateAddress,
+                },
+                templateLanguage === "hi"
+              );
+            } catch (e) {
+              console.error("Failed to compile template:", e);
+            }
+          } else {
+            try {
+              const draft = await db.getDocumentDraftById(item.id);
+              if (draft) compiledHtml = draft.html_content;
+            } catch (err) {
+              console.error("Failed to load template draft:", err);
+            }
+          }
+
           // @ts-ignore
-          navigation.navigate("GenerateDocument", {
+          navigation.navigate("TiptapEditDraft", {
             templateType: item.template_type,
             draftId: item.isBuiltIn ? undefined : item.id,
+            initialHtml: compiledHtml,
+            language: templateLanguage,
+            title: `${displayTitle} - Draft`,
           });
         }}
       >
@@ -1346,7 +1423,7 @@ const DraftsHubScreen: React.FC = () => {
           }}
           numberOfLines={2}
         >
-          {item.title}
+          {displayTitle}
         </Text>
 
         <View
@@ -1368,7 +1445,13 @@ const DraftsHubScreen: React.FC = () => {
                 : theme.colors.success,
             }}
           >
-            {item.isBuiltIn ? "Built-in" : "Custom"}
+            {item.isBuiltIn
+              ? templateLanguage === "hi"
+                ? "मानक"
+                : "Built-in"
+              : templateLanguage === "hi"
+              ? "कस्टम"
+              : "Custom"}
           </Text>
         </View>
       </TouchableOpacity>
@@ -1409,7 +1492,7 @@ const DraftsHubScreen: React.FC = () => {
             styles.tabButton,
             activeTab === "drafts" && styles.activeTabButton,
           ]}
-          onPress={() => setActiveTab("drafts")}
+          onPress={() => handleTabChange("drafts")}
         >
           <Text
             style={[
@@ -1425,7 +1508,7 @@ const DraftsHubScreen: React.FC = () => {
             styles.tabButton,
             activeTab === "templates" && styles.activeTabButton,
           ]}
-          onPress={() => setActiveTab("templates")}
+          onPress={() => handleTabChange("templates")}
         >
           <Text
             style={[
@@ -1522,7 +1605,11 @@ const DraftsHubScreen: React.FC = () => {
       )}
 
       {isLoading ? (
-        <SkeletonList count={4} />
+        activeTab === "templates" ? (
+          <SkeletonTemplateGrid count={6} />
+        ) : (
+          <SkeletonList count={4} />
+        )
       ) : filteredDrafts.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconCircle}>
@@ -1562,6 +1649,11 @@ const DraftsHubScreen: React.FC = () => {
           numColumns={2}
           contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
+          getItemLayout={(_data, index) => ({
+            length: 180,
+            offset: 180 * Math.floor(index / 2),
+            index,
+          })}
           initialNumToRender={6}
           maxToRenderPerBatch={6}
           windowSize={3}

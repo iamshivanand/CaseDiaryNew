@@ -14,6 +14,7 @@ import { promptClientNotification } from '../../utils/whatsappNotifier';
 import { DeviceEventEmitter } from 'react-native';
 import { CASE_UPDATED_EVENT } from '../../utils/caseEvents';
 import { mapCaseDbToScreen } from '../../utils/caseMapper';
+import { SkeletonList } from '../CommonComponents/SkeletonLoader';
 
 const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }: any) => {
   return (
@@ -162,9 +163,9 @@ const YesterdaysCasesScreen = () => {
 
   if (loading) {
     return (
-      <View style={[styles.centered, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+        <SkeletonList count={3} />
+      </SafeAreaView>
     );
   }
 
@@ -202,7 +203,6 @@ const YesterdaysCasesScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? 25 : 0,
   },
   container: {
     padding: 16,

@@ -154,8 +154,17 @@ function AppContent() {
   useEffect(() => {
     const initialize = async () => {
       try {
-        await getDb();
-        console.log("Database initialized successfully from App.tsx");
+        const [, , isPremiumVal, onboardingStatus] = await Promise.all([
+          getDb(),
+          mobileAds()
+            .initialize()
+            .catch((err) =>
+              console.warn("Mobile Ads SDK init non-fatal error:", err)
+            ),
+          AsyncStorage.getItem("@user_is_premium"),
+          AsyncStorage.getItem("@onboarding_complete"),
+        ]);
+        console.log("Database and core services initialized concurrently.");
         scheduleDailyMultiIntervalNotifications();
 
         // Check for updates asynchronously (does not block startup)
@@ -215,15 +224,7 @@ function AppContent() {
         };
         runUpdateCheck();
 
-        // Initialize Ads SDK (ads will be loaded lazily on demand)
-        await mobileAds().initialize();
-
-        const isPremiumVal = await AsyncStorage.getItem("@user_is_premium");
         const isPremium = isPremiumVal === "true";
-
-        const onboardingStatus = await AsyncStorage.getItem(
-          "@onboarding_complete"
-        );
         const isOnboarded = onboardingStatus === "true";
 
         if (isOnboarded) {

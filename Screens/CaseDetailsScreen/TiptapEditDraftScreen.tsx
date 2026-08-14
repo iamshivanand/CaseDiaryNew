@@ -30,13 +30,14 @@ import { LegalAutocompleteBar } from "./components/LegalAutocompleteBar";
 import { TableConfigModal } from "./components/TableConfigModal";
 import { ElementContextModal } from "./components/ElementContextModal";
 import OcrReviewModal from "./components/OcrReviewModal";
-import { saveDocumentDraft, getDocumentDraftById } from "../../DataBase";
+import { saveDocumentDraft, getDocumentDraftById, getCaseById } from "../../DataBase";
 import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { LEGAL_VOCABULARY } from "../../utils/legalVocabulary";
 import { extractTextFromImages } from "../../utils/ocrService";
 import { getRealTiptapEditorHtml } from "../../utils/realTiptapEditorTemplate";
+import { compileLegalDocumentHtml } from "../../utils/documentTemplates";
 import { speechRecognitionService } from "../../utils/speechRecognitionService";
 import { createNamedPdfFile, shareNamedPdf } from "../../utils/fileShareHelper";
 import ActionButton from "../CommonComponents/ActionButton";
@@ -68,6 +69,7 @@ const TiptapEditDraftScreen: React.FC = () => {
     initialHtml = "",
     templateType = "draft",
     title: initialTitle,
+    language: initialLanguage,
   } = route.params || {};
 
   const [docTemplateType, setDocTemplateType] = useState<string>(templateType || "draft");
@@ -112,12 +114,13 @@ const TiptapEditDraftScreen: React.FC = () => {
   const [unitMode, setUnitMode] = useState<"in" | "mm" | "px">("in");
   const [isPageSetupVisible, setIsPageSetupVisible] = useState(false);
   const [pageSize, setPageSize] = useState<"a4" | "legal">("legal");
-  const [docDraftLanguage, setDocDraftLanguage] = useState<"en" | "hi">("en");
+  const [docDraftLanguage, setDocDraftLanguage] = useState<"en" | "hi">(
+    (initialLanguage as "en" | "hi") || (locale === "hi" ? "hi" : "en")
+  );
 
   // Ribbon state (Kept in intuitive top position with clear text labels)
   const [toolbarMode, setToolbarMode] = useState<"format" | "legal">("format");
   const [isRibbonCollapsed, setIsRibbonCollapsed] = useState(false);
-  const [isTransitionFinished, setIsTransitionFinished] = useState(false);
 
   // Modals state
   const [placeholderModalVisible, setPlaceholderModalVisible] = useState(false);
@@ -234,7 +237,6 @@ const TiptapEditDraftScreen: React.FC = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setIsTransitionFinished(true);
       setIsLoading(false);
     }, 250);
     return () => clearTimeout(timer);
@@ -821,6 +823,78 @@ const TiptapEditDraftScreen: React.FC = () => {
     }
   };
 
+  const handleToggleTemplateLanguage = React.useCallback(async () => {
+    const nextLang = docDraftLanguage === "en" ? "hi" : "en";
+
+    if (
+      docTemplateType &&
+      docTemplateType !== "draft" &&
+      docTemplateType !== "blank_page"
+    ) {
+      Alert.alert(
+        nextLang === "hi"
+          ? "हिन्दी प्रारूप लोड करें?"
+          : "Switch to English Template?",
+        nextLang === "hi"
+          ? "क्या आप इस विधिक प्रारूप को हिन्दी में बदलना चाहते हैं? केस विवरण स्वतः हिन्दी में भर दिए जाएंगे।"
+          : "Do you want to switch this template to English? Case details will be re-populated in English.",
+        [
+          { text: t("alert_cancel") || "Cancel", style: "cancel" },
+          {
+            text: nextLang === "hi" ? "हाँ, हिन्दी करें" : "Yes, Switch",
+            onPress: async () => {
+              try {
+                setIsLoading(true);
+                let caseData: any = {};
+                if (caseId) {
+                  caseData = (await getCaseById(caseId)) || {};
+                }
+                const advocateName =
+                  (await AsyncStorage.getItem("@advocate_name")) || "";
+                const advocateEnrollment =
+                  (await AsyncStorage.getItem("@advocate_enrollment")) || "";
+                const advocateAddress =
+                  (await AsyncStorage.getItem("@advocate_address")) || "";
+                const combinedData = {
+                  ...caseData,
+                  advocateName,
+                  advocateEnrollment,
+                  advocateAddress,
+                };
+                const newHtml = compileLegalDocumentHtml(
+                  docTemplateType,
+                  combinedData,
+                  nextLang === "hi"
+                );
+                setDocDraftLanguage(nextLang);
+                setHtmlContent(newHtml);
+                postMessageToWebView({ type: "load", html: newHtml });
+                postMessageToWebView({
+                  type: "setEditorLanguage",
+                  lang: nextLang,
+                });
+                speechRecognitionService?.setLanguage?.(
+                  nextLang === "hi" ? "hi-IN" : "en-IN"
+                );
+                setSaveStatus("saved");
+              } catch (err) {
+                console.error("Failed to switch template language:", err);
+              } finally {
+                setIsLoading(false);
+              }
+            },
+          },
+        ]
+      );
+    } else {
+      setDocDraftLanguage(nextLang);
+      postMessageToWebView({ type: "setEditorLanguage", lang: nextLang });
+      speechRecognitionService?.setLanguage?.(
+        nextLang === "hi" ? "hi-IN" : "en-IN"
+      );
+    }
+  }, [docDraftLanguage, docTemplateType, caseId, t]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
@@ -832,7 +906,7 @@ const TiptapEditDraftScreen: React.FC = () => {
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          <Ionicons name="arrow-back" size={22} color="#ffffff" />
         </TouchableOpacity>
 
         <View style={styles.headerTitleColumn}>
@@ -845,104 +919,74 @@ const TiptapEditDraftScreen: React.FC = () => {
             }}
             placeholder="Draft Title..."
             placeholderTextColor="#94a3b8"
+            numberOfLines={1}
           />
-          {/* Prominent Live Save / Edit Status Subtitle Pill */}
-          <TouchableOpacity
-            style={styles.headerStatusRow}
-            onPress={performSilentAutoSave}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
-            <View
-              style={[
-                styles.statusDot,
-                {
-                  backgroundColor:
-                    saveStatus === "saved"
-                      ? "#10b981"
-                      : saveStatus === "saving"
-                      ? "#3b82f6"
-                      : "#f59e0b",
-                },
-              ]}
-            />
-            <Text style={styles.headerStatusText}>
-              {saveStatus === "saved"
-                ? `Saved • ${pageSize === "legal" ? "Legal" : "A4"} • ${docStats.wordCount} words`
-                : saveStatus === "saving"
-                ? "Auto-saving..."
-                : "Editing... (Auto-saving)"}
-            </Text>
-          </TouchableOpacity>
         </View>
+
+        {/* English / Hindi Toggle Button */}
+        <TouchableOpacity
+          style={[
+            styles.headerLangToggleBtn,
+            docDraftLanguage === "hi" && styles.headerLangToggleBtnHi,
+          ]}
+          hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+          onPress={handleToggleTemplateLanguage}
+        >
+          <Ionicons
+            name="language"
+            size={13}
+            color={docDraftLanguage === "hi" ? "#fbbf24" : "#93c5fd"}
+            style={{ marginRight: 3 }}
+          />
+          <Text
+            style={[
+              styles.headerLangToggleText,
+              docDraftLanguage === "hi" && styles.headerLangToggleTextHi,
+            ]}
+          >
+            {docDraftLanguage === "hi" ? "हिन्दी" : "EN"}
+          </Text>
+        </TouchableOpacity>
 
         {/* Undo Button */}
         <TouchableOpacity
           style={styles.headerActionBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+          hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
           onPress={() => triggerFormat("undo")}
         >
-          <Ionicons name="arrow-undo-outline" size={19} color="#cbd5e1" />
+          <Ionicons name="arrow-undo-outline" size={17} color="#cbd5e1" />
         </TouchableOpacity>
 
         {/* Redo Button */}
         <TouchableOpacity
           style={styles.headerActionBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+          hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
           onPress={() => triggerFormat("redo")}
         >
-          <Ionicons name="arrow-redo-outline" size={19} color="#cbd5e1" />
-        </TouchableOpacity>
-
-        {/* Find & Replace Search Button */}
-        <TouchableOpacity
-          style={[styles.headerActionBtn, isSearchVisible && { backgroundColor: "#3b82f6" }]}
-          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-          onPress={() => {
-            if (isSearchVisible) {
-              handleCloseSearch();
-            } else {
-              setIsSearchVisible(true);
-            }
-          }}
-        >
-          <Ionicons name="search-outline" size={19} color={isSearchVisible ? "#ffffff" : "#cbd5e1"} />
-        </TouchableOpacity>
-
-        {/* PDF Export Button */}
-        <TouchableOpacity
-          style={styles.headerActionBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-          onPress={handleExportPdf}
-          disabled={isExporting}
-        >
-          {isExporting ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <Ionicons name="download-outline" size={20} color="#60a5fa" />
-          )}
+          <Ionicons name="arrow-redo-outline" size={17} color="#cbd5e1" />
         </TouchableOpacity>
 
         {/* Save Draft Button (Opens confirmation dialog) */}
         <TouchableOpacity
-          style={[styles.headerActionBtn, { backgroundColor: "#2563eb" }]}
-          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+          style={[styles.headerActionBtn, { backgroundColor: "#2563eb", borderColor: "#3b82f6" }]}
+          hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
           onPress={handleOpenSaveDialog}
           disabled={isSaving}
         >
           {isSaving ? (
             <ActivityIndicator size="small" color="#ffffff" />
           ) : (
-            <Ionicons name="checkmark" size={22} color="#ffffff" />
+            <Ionicons name="checkmark" size={19} color="#ffffff" />
           )}
         </TouchableOpacity>
 
         {/* More Options (...) Button */}
         <TouchableOpacity
           style={styles.headerActionBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+          hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
           onPress={() => setIsMoreMenuVisible(true)}
         >
-          <Ionicons name="ellipsis-vertical" size={18} color="#cbd5e1" />
+          <Ionicons name="ellipsis-vertical" size={16} color="#cbd5e1" />
         </TouchableOpacity>
       </View>
 
@@ -1103,6 +1147,34 @@ const TiptapEditDraftScreen: React.FC = () => {
             />
           </TouchableOpacity>
         </View>
+
+        {/* Live Auto-Save Status Pill */}
+        <TouchableOpacity
+          style={styles.headerStatusRow}
+          onPress={performSilentAutoSave}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <View
+            style={[
+              styles.statusDot,
+              {
+                backgroundColor:
+                  saveStatus === "saved"
+                    ? "#10b981"
+                    : saveStatus === "saving"
+                    ? "#3b82f6"
+                    : "#f59e0b",
+              },
+            ]}
+          />
+          <Text style={styles.headerStatusText}>
+            {saveStatus === "saved"
+              ? `Saved • ${pageSize === "legal" ? "Legal" : "A4"} • ${docStats.wordCount} words`
+              : saveStatus === "saving"
+              ? "Auto-saving..."
+              : "Editing... (Auto-saving)"}
+          </Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.hudChip}
@@ -1375,7 +1447,7 @@ const TiptapEditDraftScreen: React.FC = () => {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.editorWrapper}>
-          {!isTransitionFinished || isLoading ? (
+          {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#2563eb" />
               <Text style={styles.loadingText}>Initializing Tiptap AST Engine...</Text>
@@ -2444,41 +2516,48 @@ const getStyles = (theme: any) =>
     safeArea: {
       flex: 1,
       backgroundColor: "#0f172a",
+      paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0,
     },
     headerContainer: {
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: "#0f172a",
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      gap: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      height: 48,
       borderBottomWidth: 1,
       borderBottomColor: "#1e293b",
     },
     headerBackBtn: {
-      padding: 4,
+      padding: 6,
     },
     headerTitleColumn: {
       flex: 1,
+      marginHorizontal: 6,
       justifyContent: "center",
-      paddingHorizontal: 4,
     },
     headerTitleInput: {
       fontSize: 15,
       fontWeight: "bold",
       color: "#ffffff",
-      paddingVertical: 2,
+      paddingVertical: 0,
       paddingHorizontal: 0,
+      height: 28,
     },
     headerStatusRow: {
       flexDirection: "row",
       alignItems: "center",
-      marginTop: 1,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 12,
+      backgroundColor: "#0f172a",
+      borderWidth: 1,
+      borderColor: "#334155",
     },
     statusDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 3.5,
+      width: 6,
+      height: 6,
+      borderRadius: 3,
       marginRight: 5,
     },
     headerStatusText: {
@@ -2487,22 +2566,47 @@ const getStyles = (theme: any) =>
       fontWeight: "500",
     },
     headerActionBtn: {
-      width: 34,
-      height: 34,
+      width: 32,
+      height: 32,
       backgroundColor: "#1e293b",
-      borderRadius: 8,
+      borderRadius: 7,
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 1,
       borderColor: "#334155",
+      marginLeft: 4,
+    },
+    headerLangToggleBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      height: 30,
+      paddingHorizontal: 6,
+      backgroundColor: "#1e293b",
+      borderRadius: 7,
+      borderWidth: 1,
+      borderColor: "#3b82f666",
+      marginLeft: 4,
+    },
+    headerLangToggleBtnHi: {
+      backgroundColor: "#451a03",
+      borderColor: "#f59e0b88",
+    },
+    headerLangToggleText: {
+      fontSize: 11,
+      fontWeight: "bold",
+      color: "#93c5fd",
+    },
+    headerLangToggleTextHi: {
+      color: "#fbbf24",
     },
     ribbonHeader: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
       backgroundColor: "#1e293b",
-      paddingHorizontal: 12,
-      paddingVertical: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      height: 38,
       borderBottomWidth: 1,
       borderBottomColor: "#334155",
     },

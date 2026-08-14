@@ -49,39 +49,29 @@ const CalendarScreen: React.FC<Props> = () => {
   const navigation = useNavigation();
 
   const getResultFromDate = async (date: string) => {
-    const allCases = await db.getCases();
-    const filteredCases = allCases.filter((c) => {
-      const caseDate = normalizeDateToYYYYMMDD(c.NextDate);
-      return caseDate === date;
-    });
-
-    const mappedCases: CaseDataScreen[] = filteredCases.map(mapCaseDbToScreen);
-    setResultToShow(mappedCases);
+    try {
+      const dbCases = await db.getCases(null, -1, 0, {
+        dateFilter: "specific",
+        specificDate: date,
+      });
+      setResultToShow(dbCases.map(mapCaseDbToScreen));
+    } catch (e) {
+      console.error("Error fetching calendar date cases:", e);
+    }
   };
 
   const fetchAllDates = async () => {
-    const allCases = await db.getCases();
-    const datesArray = allCases
-      .map((item) => normalizeDateToYYYYMMDD(item.NextDate))
-      .filter(Boolean);
-
-    const formattedDates = datesArray.reduce((acc: any, date) => {
-      const dateString = date;
-      if (acc[dateString]) {
-        acc[dateString].eventsCount += 1;
-      } else {
-        acc[dateString] = { marked: true, eventsCount: 1 };
-      }
-      return acc;
-    }, {});
-
-    setMarkedDates(formattedDates);
+    try {
+      const marked = await db.getCalendarMarkedDates();
+      setMarkedDates(marked);
+    } catch (e) {
+      console.error("Error fetching calendar marked dates:", e);
+    }
   };
 
   useFocusEffect(
     useCallback(() => {
-      fetchAllDates();
-      getResultFromDate(selected);
+      Promise.all([fetchAllDates(), getResultFromDate(selected)]);
     }, [selected])
   );
 
@@ -89,8 +79,7 @@ const CalendarScreen: React.FC<Props> = () => {
     let isMounted = true;
     const sub = DeviceEventEmitter.addListener(CASE_UPDATED_EVENT, () => {
       if (isMounted) {
-        fetchAllDates();
-        getResultFromDate(selected);
+        Promise.all([fetchAllDates(), getResultFromDate(selected)]);
       }
     });
     return () => {

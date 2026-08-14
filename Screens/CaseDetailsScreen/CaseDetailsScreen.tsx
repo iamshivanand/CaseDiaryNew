@@ -1,7 +1,7 @@
 // Screens/CaseDetailsScreen/CaseDetailsScreen.tsx
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system";
 import * as IntentLauncher from "expo-intent-launcher";
 import * as Sharing from "expo-sharing";
@@ -358,7 +358,10 @@ const CaseDetailsScreen: React.FC = () => {
       if (!currentCaseId) return;
       setIsLoadingDocuments(true);
       try {
-        const fetchedDocs = await db.getCaseDocuments(currentCaseId);
+        const [fetchedDocs, fetchedTimelineEvents] = await Promise.all([
+          db.getCaseDocuments(currentCaseId),
+          getCaseTimelineEventsByCaseId(currentCaseId),
+        ]);
         const uiDocs: Document[] = fetchedDocs.map((dbDoc) => ({
           id: dbDoc.id,
           case_id: dbDoc.case_id,
@@ -370,8 +373,6 @@ const CaseDetailsScreen: React.FC = () => {
         }));
         setDocuments(uiDocs);
 
-        const fetchedTimelineEvents =
-          await getCaseTimelineEventsByCaseId(currentCaseId);
         setTimelineEvents(
           fetchedTimelineEvents.map((tle) => ({
             id: tle.id.toString(),
@@ -392,40 +393,43 @@ const CaseDetailsScreen: React.FC = () => {
     []
   );
 
-  useEffect(() => {
-    if (!caseId) return;
-    const caseIdToLoad = parseInt(caseId.toString(), 10);
-
-    const fetchAllData = async () => {
+  useFocusEffect(
+    useCallback(() => {
+      if (!caseId) return;
+      const caseIdToLoad = parseInt(caseId.toString(), 10);
       if (!caseIdToLoad || isNaN(caseIdToLoad)) {
         Alert.alert(t("alert_error"), t("casedetails_err_no_id"));
         setIsLoading(false);
         if (navigation.canGoBack()) navigation.goBack();
         return;
       }
-      setIsLoading(true);
-      try {
-        await loadCaseDetails(caseIdToLoad);
-        await loadDocumentsAndTimeline(caseIdToLoad);
-      } catch (error) {
-        console.error("Error fetching case details:", error);
-        Alert.alert(t("alert_error"), t("casedetails_err_load"));
-        if (navigation.canGoBack()) navigation.goBack();
-      } finally {
-        setIsLoading(false);
-      }
-    };
 
-    // Load data initially on mount
-    fetchAllData();
+      let isActive = true;
+      const fetchAllData = async () => {
+        setIsLoading(true);
+        try {
+          await Promise.all([
+            loadCaseDetails(caseIdToLoad),
+            loadDocumentsAndTimeline(caseIdToLoad),
+          ]);
+        } catch (error) {
+          console.error("Error fetching case details:", error);
+          Alert.alert(t("alert_error"), t("casedetails_err_load"));
+          if (navigation.canGoBack()) navigation.goBack();
+        } finally {
+          if (isActive) {
+            setIsLoading(false);
+          }
+        }
+      };
 
-    // Reload data when the screen is focused (e.g., when returning from Edit Case)
-    const unsubscribe = navigation.addListener("focus", () => {
       fetchAllData();
-    });
 
-    return unsubscribe;
-  }, [caseId, navigation, loadDocumentsAndTimeline, loadCaseDetails]);
+      return () => {
+        isActive = false;
+      };
+    }, [caseId, navigation, loadDocumentsAndTimeline, loadCaseDetails, t])
+  );
 
   const handleEditCase = () => {
     // Navigate to an EditCase screen, passing the case details

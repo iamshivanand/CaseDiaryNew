@@ -29,6 +29,7 @@ export type HomeStackParamList = {
     caseId?: number;
     templateType?: string;
     draftId?: string;
+    language?: "en" | "hi";
   };
   DraftsHub: undefined;
   EditDraft: {
@@ -37,6 +38,7 @@ export type HomeStackParamList = {
     initialHtml?: string;
     templateType?: string;
     title?: string;
+    language?: "en" | "hi";
   };
   TiptapEditDraft: {
     draftId?: string;
@@ -44,6 +46,7 @@ export type HomeStackParamList = {
     initialHtml?: string;
     templateType?: string;
     title?: string;
+    language?: "en" | "hi";
   };
   ImportMigration: { isFromOnboarding?: boolean };
   DuplicateReview: undefined;

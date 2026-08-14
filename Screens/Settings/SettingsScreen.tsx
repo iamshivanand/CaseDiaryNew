@@ -23,7 +23,13 @@ import { useAdTrigger } from "../CommonComponents/AdManager";
 
 type SettingsScreenNavigationProp = any;
 
-const SettingsScreen = () => {
+interface SettingsScreenProps {
+  nestedInScrollView?: boolean;
+}
+
+const SettingsScreen: React.FC<SettingsScreenProps> = ({
+  nestedInScrollView = false,
+}) => {
   const { theme, themeMode, setThemeMode } = useContext(ThemeContext);
   const { t, locale, setLocale } = useTranslation();
   const navigation = useNavigation<any>();
@@ -340,11 +346,16 @@ const SettingsScreen = () => {
         ? "weather-sunny"
         : "theme-light-dark";
 
+  const ContainerComponent = nestedInScrollView ? View : ScrollView;
+  const containerProps = nestedInScrollView
+    ? { style: { flex: 1, backgroundColor: theme.colors.background } }
+    : {
+        style: [styles.container, { backgroundColor: theme.colors.background }],
+        contentContainerStyle: { padding: 16, paddingBottom: 40 },
+      };
+
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-    >
+    <ContainerComponent {...(containerProps as any)}>
       {/* SECTION 1: PREFERENCES */}
       <View style={{ marginBottom: 20 }}>
         <Text
@@ -954,7 +965,7 @@ const SettingsScreen = () => {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </ContainerComponent>
   );
 };
 

@@ -749,3 +749,268 @@ export const getPowerOfAttorneyHtml = (
 <p class="body-text" style="text-align: justify; text-indent: 36px; line-height: 1.8; margin-bottom: 24px;">Powers granted: <b>${data.powersGranted || "to manage property, file court cases and sign documents."}</b></p>
 <table style="width: 100%; border: none; border-collapse: collapse; margin-top: 36px; margin-bottom: 12px;"><tr><td style="width: 50%; border: none; padding: 0; text-align: left; vertical-align: bottom;"><b>Witness: ____________</b></td><td style="width: 50%; border: none; padding: 0; text-align: right; vertical-align: bottom;"><b>EXECUTANT / PRINCIPAL:</b><br/><b>${data.principalName}</b></td></tr></table>`;
 };
+
+/**
+ * Master helper function to compile any legal document template into full HTML
+ * in either English or Hindi with provided case/advocate metadata.
+ */
+export const compileLegalDocumentHtml = (
+  templateType: string,
+  data: any = {},
+  isHindi: boolean = false
+): string => {
+  const courtName = data.courtName || data.court || (isHindi ? "जिला न्यायालय" : "District Court");
+  const caseNumber = data.caseNumber || data.case_number || "__________";
+  const caseYear = data.caseYear || data.case_year || "2026";
+  const clientName = data.clientName || data.ClientName || (isHindi ? "मुवक्किल / प्रार्थी" : "Client");
+  const advocateName = data.advocateName || (isHindi ? "अधिवक्ता" : "Advocate");
+  const advocateEnrollment = data.advocateEnrollment || "";
+  const advocateAddress = data.advocateAddress || "";
+  const parties = data.parties || data.CaseTitle || (isHindi ? "राज्य बनाम अभियुक्त" : "State vs. Accused");
+  const oppositePartyName = data.oppositePartyName || data.OppositeParty || (isHindi ? "विपक्षी दल" : "Opposite Party");
+  const receiverAddress = data.receiverAddress || (isHindi ? "न्यायालय परिसर" : "District Court Complex");
+  const deponentAddress = data.deponentAddress || advocateAddress || (isHindi ? "अधिवक्ता चेंबर" : "Advocate Chamber");
+  const deponentAge = data.deponentAge || "35";
+  const policeStation = data.policeStation || data.policeStationName || (isHindi ? "थाना" : "Police Station");
+  const firNumber = data.firNumber || data.crime_number || "__________";
+  const firYear = data.firYear || data.crime_year || caseYear;
+  const underSection = data.underSection || data.Undersection || "";
+  const accusedName = data.accusedName || data.Accussed || clientName;
+  const valuation = data.valuation || data.total_fee ? String(data.valuation || data.total_fee) : "50,000";
+  const reason = data.reason || data.adjournmentReason || (isHindi ? "अधिवक्ता अन्य न्यायालय में व्यस्त हैं" : "Counsel is engaged in another urgent matter");
+
+  switch (templateType) {
+    case "vakalatnama":
+      return getVakalatnamaHtml({
+        courtName,
+        suitNumber: caseNumber,
+        caseYear,
+        parties,
+        clientName,
+        advocateName,
+        advocateEnrollment,
+        advocateAddress,
+      }, isHindi);
+    case "adjournment":
+      return getAdjournmentHtml({
+        courtName,
+        caseNumber,
+        parties,
+        nextHearingDate: data.nextHearingDate || "",
+        reason,
+        advocateName,
+      }, isHindi);
+    case "bail":
+      return getBailHtml({
+        courtName: data.courtName || (isHindi ? "सत्र न्यायालय" : "Sessions Court"),
+        policeStation,
+        firNumber,
+        firYear,
+        underSection,
+        accusedName,
+        groundOfBail: data.groundOfBail || (isHindi ? "जांच पूरी हो चुकी है और आवेदक कानून का पालन करने वाला नागरिक है।" : "The investigation is complete and the applicant is a law-abiding citizen."),
+        advocateName,
+      }, isHindi);
+    case "affidavit":
+      return getAffidavitHtml({
+        courtName,
+        caseNumber,
+        parties,
+        deponentName: clientName,
+        deponentAge,
+        deponentAddress,
+        facts: data.facts || (isHindi ? "यह कि साथ में प्रस्तुत आवेदन की सभी बातें मेरे निजी ज्ञान से सत्य हैं।" : "That the contents of the accompanying application are true and correct to my personal knowledge."),
+      }, isHindi);
+    case "written_statement":
+      return getWrittenStatementHtml({
+        courtName,
+        caseNumber,
+        parties,
+        respondentName: clientName,
+        preliminaryObjections: data.preliminaryObjections || (isHindi ? "यह कि वादी का वाद कानूनन चलने योग्य नहीं है।" : "That the suit is not maintainable under law."),
+        replyOnMerits: data.replyOnMerits || (isHindi ? "यह कि वाद पत्र के समस्त तथ्य अस्वीकार किए जाते हैं।" : "That the contents of the plaint are denied."),
+        advocateName,
+      }, isHindi);
+    case "legal_notice":
+      return getLegalNoticeHtml({
+        senderName: clientName,
+        senderAddress: deponentAddress,
+        receiverName: oppositePartyName,
+        receiverAddress,
+        noticeSubject: data.noticeSubject || parties,
+        noticeFacts: data.noticeFacts || (isHindi ? "अपने मवक्किल के निर्देशानुसार मैं यह कानूनी नोटिस प्रेषित कर रहा हूँ।" : "Under instructions from my client, I hereby serve you with this notice."),
+        demandText: data.demandText || (isHindi ? "हमारे मवक्किल की शर्तों का तुरंत पालन करें" : "comply with the terms immediately"),
+        advocateName,
+        advocateEnrollment,
+        advocateAddress,
+      }, isHindi);
+    case "caveat":
+      return getCaveatHtml({
+        courtName,
+        caveatorName: clientName,
+        caveatorAddress: deponentAddress,
+        expectedOppositePartyName: oppositePartyName,
+        expectedOppositePartyAddress: receiverAddress,
+        subjectMatter: data.subjectMatter || parties,
+        advocateName,
+        advocateEnrollment,
+        advocateAddress,
+      }, isHindi);
+    case "injunction":
+      return getInjunctionHtml({
+        courtName,
+        caseNumber,
+        parties,
+        applicantName: clientName,
+        injunctionFacts: data.injunctionFacts || (isHindi ? "यह कि वादी के पक्ष में एक मजबूत मामला बनता है और सुविधा का संतुलन है।" : "That the applicant has a strong prima facie case and balance of convenience."),
+        restraintPrayer: data.restraintPrayer || (isHindi ? "संपत्ति में कोई तीसरा पक्ष हित पैदा करने या स्वरूप बदलने से" : "creating third party rights or altering the nature of property"),
+        advocateName,
+      }, isHindi);
+    case "plaint":
+      return getPlaintHtml({
+        courtName,
+        caseNumber,
+        caseYear,
+        parties,
+        plaintiffName: clientName,
+        defendantName: oppositePartyName,
+        valuation,
+        suitFacts: data.suitFacts || (isHindi ? "यह कि वादी मुकदमे का वास्तविक स्वामी है और अनुतोष पाने का अधिकारी है।" : "That the plaintiff is the rightful owner and entitled to the reliefs claimed."),
+        prayerText: data.prayerText || (isHindi ? "वादी के पक्ष में डिक्री पारित करने की कृपा करें" : "pass a decree in favor of the plaintiff"),
+        advocateName,
+      }, isHindi);
+    case "rejoinder":
+      return getRejoinderHtml({
+        courtName,
+        caseNumber,
+        caseYear,
+        parties,
+        replyPoints: data.replyPoints || (isHindi ? "यह कि लिखित कथन के सभी प्रतिकूल तथ्यों का खंडन किया जाता है।" : "That all adverse assertions in the written statement are denied."),
+        advocateName,
+      }, isHindi);
+    case "execution":
+      return getExecutionHtml({
+        courtName,
+        caseNumber,
+        caseYear,
+        decreeHolder: clientName,
+        judgmentDebtor: oppositePartyName,
+        decreeDate: data.decreeDate || "__________",
+        decreetalAmount: valuation,
+        satisfactionDetails: data.satisfactionDetails || (isHindi ? "कोई नहीं" : "None"),
+        reliefSought: data.reliefSought || (isHindi ? "ऋणी की संपत्ति की कुर्की एवं नीलामी" : "attachment and sale of property"),
+        advocateName,
+      }, isHindi);
+    case "anticipatory_bail":
+      return getAnticipatoryBailHtml({
+        courtName: data.courtName || (isHindi ? "सत्र न्यायालय" : "Sessions Court"),
+        policeStation,
+        firNumber,
+        firYear,
+        underSection,
+        applicantName: accusedName,
+        apprehensionReason: data.apprehensionReason || (isHindi ? "रंजिशवश झूठा फंसाए जाने की आशंका" : "false implication due to hostility"),
+        grounds: data.grounds || (isHindi ? "आवेदक जांच में पूर्ण सहयोग करने को तैयार है" : "applicant is willing to join investigation"),
+        advocateName,
+      }, isHindi);
+    case "private_complaint":
+      return getPrivateComplaintHtml({
+        courtName: data.courtName || (isHindi ? "मुख्य न्यायिक मजिस्ट्रेट न्यायालय" : "Chief Judicial Magistrate Court"),
+        complainantName: clientName,
+        complainantAddress: deponentAddress,
+        accusedName: oppositePartyName,
+        accusedAddress: receiverAddress,
+        incidentDate: data.incidentDate || "__________",
+        incidentFacts: data.incidentFacts || (isHindi ? "यह कि अभियुक्त ने धोखाधड़ी व मारपीट का अपराध किया है।" : "That the accused committed offences of cheating and assault."),
+        offences: underSection || (isHindi ? "धोखाधड़ी, अमानत में खयानत, मारपीट" : "Cheating, fraud, criminal breach of trust"),
+        advocateName,
+      }, isHindi);
+    case "fir_quashing":
+      return getFirQuashingHtml({
+        courtName: data.courtName || (isHindi ? "उच्च न्यायालय" : "High Court"),
+        policeStation,
+        firNumber,
+        firYear,
+        applicantName: clientName,
+        groundsOfQuashing: data.groundsOfQuashing || (isHindi ? "पक्षकारों के बीच बिना किसी दबाव के सौहार्दपूर्ण समझौता हो गया है।" : "Matter has been amicably resolved between parties without coercion."),
+        advocateName,
+      }, isHindi);
+    case "exemption":
+      return getExemptionHtml({
+        courtName,
+        caseNumber,
+        caseYear,
+        parties,
+        accusedName,
+        excuseReason: reason,
+        advocateName,
+      }, isHindi);
+    case "cheque_bounce":
+      return getChequeBounceHtml({
+        senderName: clientName,
+        senderAddress: deponentAddress,
+        receiverName: oppositePartyName,
+        receiverAddress,
+        chequeNumber: data.chequeNumber || "__________",
+        chequeDate: data.chequeDate || "__________",
+        bankName: data.bankName || (isHindi ? "राष्ट्रीयकृत बैंक" : "National Bank"),
+        chequeAmount: valuation,
+        dishonorDate: data.dishonorDate || "__________",
+        dishonorReason: data.dishonorReason || (isHindi ? "खाते में अपर्याप्त राशि" : "Funds Insufficient"),
+        noticeDate: new Date().toLocaleDateString(isHindi ? "hi-IN" : "en-IN"),
+        demandPeriod: isHindi ? "15 दिन" : "15 days",
+        advocateName,
+        advocateEnrollment,
+        advocateAddress,
+      }, isHindi);
+    case "arbitration_sec9":
+      return getArbitrationSec9Html({
+        courtName: data.courtName || (isHindi ? "वाणिज्यिक न्यायालय" : "Commercial Court"),
+        parties,
+        agreementDate: data.agreementDate || "__________",
+        disputeDetails: data.disputeDetails || (isHindi ? "वाणिज्यिक अनुबंध का उल्लंघन" : "Commercial contract breach"),
+        interimRelief: data.interimRelief || (isHindi ? "मध्यस्थता लंबित रहने तक संपत्तियों की सुरक्षा व रिसीवर नियुक्ति" : "Protection of assets and appointment of receiver pending arbitration"),
+        advocateName,
+      }, isHindi);
+    case "consumer_complaint":
+      return getConsumerComplaintHtml({
+        forumName: data.courtName || (isHindi ? "जिला उपभोक्ता विवाद निवारण आयोग" : "District Consumer Commission"),
+        complainantName: clientName,
+        oppositePartyName,
+        productDetails: data.productDetails || (isHindi ? "दोषपूर्ण उत्पाद / सेवा में विफलता" : "Defective goods/service provided"),
+        costAmount: valuation,
+        deficiencyDetails: data.deficiencyDetails || (isHindi ? "सेवा में घोर कमी" : "Gross deficiency in service"),
+        compensationSought: data.compensationSought || (isHindi ? "पूर्ण राशि वापसी ब्याज सहित व मानसिक संताप हेतु क्षतिपूर्ति" : "Full refund with 18% interest and compensation for harassment"),
+        advocateName,
+      }, isHindi);
+    case "rent_agreement":
+      return getRentAgreementHtml({
+        landlordName: clientName,
+        landlordAddress: deponentAddress,
+        tenantName: oppositePartyName,
+        tenantAddress: receiverAddress,
+        propertyAddress: data.propertyAddress || (isHindi ? "आवासीय परिसर" : "Residential Premises"),
+        rentAmount: data.rentAmount || "15,000",
+        securityDeposit: data.securityDeposit || "50,000",
+        termMonths: data.termMonths || "11",
+        agreementDate: new Date().toLocaleDateString(isHindi ? "hi-IN" : "en-IN"),
+        witness1: "__________",
+        witness2: "__________",
+      }, isHindi);
+    case "power_of_attorney":
+      return getPowerOfAttorneyHtml({
+        principalName: clientName,
+        principalAddress: deponentAddress,
+        attorneyName: oppositePartyName,
+        attorneyAddress: receiverAddress,
+        powersGranted: data.powersGranted || (isHindi ? "संपत्ति प्रबंधन, न्यायालय में पैरवी, दस्तावेजों व विलेखों पर हस्ताक्षर करने का सामान्य अधिकार।" : "General management of properties, appearance before courts, signing documents and deeds."),
+        executionDate: new Date().toLocaleDateString(isHindi ? "hi-IN" : "en-IN"),
+        witness1: "__________",
+        witness2: "__________",
+      }, isHindi);
+    case "blank_page":
+    default:
+      return getBlankDocumentHtml(isHindi);
+  }
+};
+

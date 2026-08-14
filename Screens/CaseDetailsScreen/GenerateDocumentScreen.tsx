@@ -48,6 +48,7 @@ import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 import { formatDate } from "../../utils/commonFunctions";
 import { createNamedPdfFile, shareNamedPdf } from "../../utils/fileShareHelper";
 import {
+  compileLegalDocumentHtml,
   getVakalatnamaHtml,
   getAdjournmentHtml,
   getBailHtml,
@@ -103,7 +104,8 @@ const BUILT_IN_TEMPLATES = [
   {
     id: "built_in_blank_page",
     template_type: "blank_page",
-    title: "Blank Canvas (Start from Scratch)",
+    title: "Blank Canvas (From Scratch)",
+    titleHi: "कोरा दस्तावेज़ (शुरुआत से)",
     category: "reusable",
     isBuiltIn: true,
   },
@@ -111,6 +113,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_vakalatnama",
     template_type: "vakalatnama",
     title: "Vakalatnama",
+    titleHi: "वकालतनामा (प्राधिकार पत्र)",
     category: "common",
     isBuiltIn: true,
   },
@@ -118,20 +121,23 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_adjournment",
     template_type: "adjournment",
     title: "Adjournment Application",
+    titleHi: "स्थगन प्रार्थना पत्र",
     category: "common",
     isBuiltIn: true,
   },
   {
     id: "built_in_bail",
     template_type: "bail",
-    title: "Bail Application",
+    title: "Bail Application (Sec 439)",
+    titleHi: "नियमित जमानत आवेदन (धारा 439)",
     category: "criminal",
     isBuiltIn: true,
   },
   {
     id: "built_in_affidavit",
     template_type: "affidavit",
-    title: "Affidavit",
+    title: "Supporting Affidavit",
+    titleHi: "शपथ पत्र (हलफनामा)",
     category: "common",
     isBuiltIn: true,
   },
@@ -139,13 +145,15 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_written_statement",
     template_type: "written_statement",
     title: "Written Statement",
+    titleHi: "लिखित कथन (जवाब दावा)",
     category: "civil",
     isBuiltIn: true,
   },
   {
     id: "built_in_legal_notice",
     template_type: "legal_notice",
-    title: "Legal Notice",
+    title: "Legal Demand Notice",
+    titleHi: "विधिक मांग नोटिस",
     category: "common",
     isBuiltIn: true,
   },
@@ -153,6 +161,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_caveat",
     template_type: "caveat",
     title: "Caveat Petition",
+    titleHi: "कैविएट याचिका (धारा 148क)",
     category: "civil",
     isBuiltIn: true,
   },
@@ -160,6 +169,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_injunction",
     template_type: "injunction",
     title: "Temporary Injunction",
+    titleHi: "अस्थाई निषेधाज्ञा (आदेश 39)",
     category: "civil",
     isBuiltIn: true,
   },
@@ -167,6 +177,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_plaint",
     template_type: "plaint",
     title: "Plaint (Civil Suit)",
+    titleHi: "वाद पत्र (दीवानी दावा)",
     category: "civil",
     isBuiltIn: true,
   },
@@ -174,6 +185,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_rejoinder",
     template_type: "rejoinder",
     title: "Replication / Rejoinder",
+    titleHi: "प्रत्युत्तर (रिजॉइंडर)",
     category: "civil",
     isBuiltIn: true,
   },
@@ -181,34 +193,39 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_execution",
     template_type: "execution",
     title: "Execution Petition",
+    titleHi: "निष्पादन याचिका (आदेश 21)",
     category: "civil",
     isBuiltIn: true,
   },
   {
     id: "built_in_anticipatory_bail",
     template_type: "anticipatory_bail",
-    title: "Anticipatory Bail",
+    title: "Anticipatory Bail (Sec 438)",
+    titleHi: "अग्रिम जमानत (धारा 438)",
     category: "criminal",
     isBuiltIn: true,
   },
   {
     id: "built_in_private_complaint",
     template_type: "private_complaint",
-    title: "Private Complaint",
+    title: "Private Complaint (Sec 200)",
+    titleHi: "निजी परिवाद (धारा 200)",
     category: "criminal",
     isBuiltIn: true,
   },
   {
     id: "built_in_fir_quashing",
     template_type: "fir_quashing",
-    title: "FIR Quashing Petition",
+    title: "FIR Quashing (Sec 482)",
+    titleHi: "प्राथमिकी निरस्तीकरण (धारा 482)",
     category: "criminal",
     isBuiltIn: true,
   },
   {
     id: "built_in_exemption",
     template_type: "exemption",
-    title: "Exemption Application",
+    title: "Exemption (Sec 317 CrPC)",
+    titleHi: "हाजिरी माफी आवेदन (धारा 317)",
     category: "common",
     isBuiltIn: true,
   },
@@ -216,6 +233,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_cheque_bounce",
     template_type: "cheque_bounce",
     title: "Cheque Bounce Notice",
+    titleHi: "चेक अनादर नोटिस (धारा 138)",
     category: "commercial",
     isBuiltIn: true,
   },
@@ -223,6 +241,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_arbitration_sec9",
     template_type: "arbitration_sec9",
     title: "Arbitration Sec 9",
+    titleHi: "मध्यस्थता अंतरिम राहत (धारा 9)",
     category: "commercial",
     isBuiltIn: true,
   },
@@ -230,6 +249,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_consumer_complaint",
     template_type: "consumer_complaint",
     title: "Consumer Complaint",
+    titleHi: "उपभोक्ता परिवाद",
     category: "commercial",
     isBuiltIn: true,
   },
@@ -237,6 +257,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_rent_agreement",
     template_type: "rent_agreement",
     title: "Rent Agreement",
+    titleHi: "किरायानामा (रेंट एग्रीमेंट)",
     category: "commercial",
     isBuiltIn: true,
   },
@@ -244,6 +265,7 @@ const BUILT_IN_TEMPLATES = [
     id: "built_in_power_of_attorney",
     template_type: "power_of_attorney",
     title: "Power of Attorney",
+    titleHi: "मुख्तारनामा (पावर ऑफ अटॉर्नी)",
     category: "commercial",
     isBuiltIn: true,
   },
@@ -382,6 +404,161 @@ const getTemplateLabel = (type: string): string => {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 };
+
+interface TemplateCardItemProps {
+  item: any;
+  color: string;
+  theme: any;
+  language?: "en" | "hi";
+  onPress: (item: any) => void;
+}
+
+const TemplateCardItem: React.FC<TemplateCardItemProps> = React.memo(
+  ({ item, color, theme, language = "en", onPress }) => {
+    const displayTitle = language === "hi" ? (item.titleHi || item.title) : item.title;
+    return (
+      <TouchableOpacity
+        style={{
+          flex: 1,
+          margin: 6,
+          backgroundColor: theme.colors.cardBackground,
+          borderRadius: 12,
+          padding: 12,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+          alignItems: "center",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 3,
+          elevation: 2,
+          maxWidth: (Dimensions.get("window").width - 32) / 2 - 12,
+        }}
+        activeOpacity={0.85}
+        onPress={() => onPress(item)}
+      >
+        <View
+          style={{
+            width: 72,
+            height: 114,
+            backgroundColor: "#fcf9f2",
+            borderRadius: 6,
+            borderWidth: 1.5,
+            borderColor: "#e2d2b2",
+            position: "relative",
+            overflow: "hidden",
+            marginBottom: 10,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 2,
+            elevation: 3,
+          }}
+        >
+          <View
+            style={{
+              position: "absolute",
+              left: 14,
+              top: 0,
+              bottom: 0,
+              width: 1,
+              backgroundColor: "#ef4444",
+              opacity: 0.6,
+            }}
+          />
+          <View
+            style={{
+              marginTop: 14,
+              paddingLeft: 18,
+              paddingRight: 6,
+              gap: 5,
+            }}
+          >
+            <View
+              style={{ height: 3, backgroundColor: "#d1d5db", width: "80%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#d1d5db", width: "90%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#d1d5db", width: "65%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#e5e7eb", width: "85%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#e5e7eb", width: "70%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#e5e7eb", width: "90%" }}
+            />
+            <View
+              style={{ height: 3, backgroundColor: "#e5e7eb", width: "50%" }}
+            />
+          </View>
+          <View
+            style={{
+              position: "absolute",
+              bottom: 4,
+              right: 4,
+              backgroundColor: color,
+              borderRadius: 3,
+              paddingHorizontal: 4,
+              paddingVertical: 2,
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 8, fontWeight: "bold" }}>
+              PDF
+            </Text>
+          </View>
+        </View>
+
+        <Text
+          style={{
+            fontSize: 13,
+            fontWeight: "bold",
+            color: theme.colors.text,
+            textAlign: "center",
+            marginBottom: 6,
+            height: 36,
+          }}
+          numberOfLines={2}
+        >
+          {displayTitle}
+        </Text>
+
+        <View
+          style={{
+            backgroundColor: item.isBuiltIn
+              ? `${theme.colors.primary}12`
+              : `${theme.colors.success}12`,
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: 4,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: "600",
+              color: item.isBuiltIn
+                ? theme.colors.primary
+                : theme.colors.success,
+            }}
+          >
+            {item.isBuiltIn
+              ? language === "hi"
+                ? "मानक"
+                : "Built-in"
+              : language === "hi"
+              ? "कस्टम"
+              : "Custom"}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+);
 
 const GenerateDocumentScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -677,163 +854,87 @@ const GenerateDocumentScreen: React.FC = () => {
     return filtered;
   }, [customTemplates, templateSearchQuery, selectedTemplateCategory]);
 
+  const handleSelectTemplateCard = React.useCallback(
+    async (item: any) => {
+      setDocumentType(item.template_type);
+      let compiledHtml = "";
+      if (item.isBuiltIn) {
+        let advocateName = "";
+        let advocateEnrollment = "";
+        let advocateAddress = "";
+        try {
+          advocateName = (await AsyncStorage.getItem("@advocate_name")) || "";
+          advocateEnrollment = (await AsyncStorage.getItem("@advocate_enrollment")) || "";
+          advocateAddress = (await AsyncStorage.getItem("@advocate_address")) || "";
+        } catch (e) {}
+
+        const combinedData = {
+          ...caseDetails,
+          courtName: caseDetails?.court,
+          caseNumber: caseDetails?.case_number,
+          caseYear: caseDetails?.case_year,
+          clientName: caseDetails?.ClientName,
+          parties: caseDetails?.CaseTitle || `${caseDetails?.FirstParty || caseDetails?.ClientName || "Petitioner"} vs ${caseDetails?.OppositeParty || "Respondent"}`,
+          advocateName,
+          advocateEnrollment,
+          advocateAddress,
+          policeStation: caseDetails?.policeStationName,
+          firNumber: caseDetails?.crime_number,
+          underSection: caseDetails?.Undersection,
+          accusedName: caseDetails?.Accussed || caseDetails?.ClientName,
+        };
+        compiledHtml = compileLegalDocumentHtml(
+          item.template_type,
+          combinedData,
+          outputLanguage === "hi"
+        );
+      } else {
+        try {
+          const draft = await db.getDocumentDraftById(item.id);
+          if (draft) {
+            compiledHtml = draft.html_content;
+          }
+        } catch (err) {
+          console.error("Failed to load template draft HTML:", err);
+        }
+      }
+
+      setHtmlContent(compiledHtml);
+      setIsTemplateSelected(true);
+
+      // Navigate directly into TiptapEditDraft
+      // @ts-ignore
+      navigation.navigate("TiptapEditDraft", {
+        caseId: caseId ? Number(caseId) : undefined,
+        initialHtml: compiledHtml,
+        templateType: item.template_type,
+        language: outputLanguage,
+        title: `${outputLanguage === "hi" ? (item.titleHi || item.title) : item.title} - ${caseDetails?.ClientName || "Draft"}`,
+      });
+    },
+    [
+      caseDetails,
+      outputLanguage,
+      caseId,
+      navigation,
+    ]
+  );
+
   const renderTemplateCardItem = React.useCallback(
     ({ item }: { item: any }) => {
       const color =
         documentTypeColors[item.template_type] || theme.colors.primary;
       return (
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            margin: 6,
-            backgroundColor: theme.colors.cardBackground,
-            borderRadius: 12,
-            padding: 12,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            alignItems: "center",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 3,
-            elevation: 2,
-            maxWidth: (Dimensions.get("window").width - 32) / 2 - 12,
-          }}
-          activeOpacity={0.85}
-          onPress={async () => {
-            setDocumentType(item.template_type);
-            if (!item.isBuiltIn) {
-              try {
-                const draft = await db.getDocumentDraftById(item.id);
-                if (draft) {
-                  setHtmlContent(draft.html_content);
-                }
-              } catch (err) {
-                console.error("Failed to load template draft HTML:", err);
-              }
-            } else {
-              setHtmlContent("");
-            }
-            setIsTemplateSelected(true);
-            setActiveTab("preview");
-          }}
-        >
-          <View
-            style={{
-              width: 72,
-              height: 114,
-              backgroundColor: "#fcf9f2",
-              borderRadius: 6,
-              borderWidth: 1.5,
-              borderColor: "#e2d2b2",
-              position: "relative",
-              overflow: "hidden",
-              marginBottom: 10,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 2,
-              elevation: 3,
-            }}
-          >
-            <View
-              style={{
-                position: "absolute",
-                left: 14,
-                top: 0,
-                bottom: 0,
-                width: 1,
-                backgroundColor: "#ef4444",
-                opacity: 0.6,
-              }}
-            />
-            <View
-              style={{
-                marginTop: 14,
-                paddingLeft: 18,
-                paddingRight: 6,
-                gap: 5,
-              }}
-            >
-              <View
-                style={{ height: 3, backgroundColor: "#d1d5db", width: "80%" }}
-              />
-              <View
-                style={{ height: 3, backgroundColor: "#d1d5db", width: "90%" }}
-              />
-              <View
-                style={{ height: 3, backgroundColor: "#d1d5db", width: "65%" }}
-              />
-              <View
-                style={{ height: 3, backgroundColor: "#e5e7eb", width: "85%" }}
-              />
-              <View
-                style={{ height: 3, backgroundColor: "#e5e7eb", width: "70%" }}
-              />
-              <View
-                style={{ height: 3, backgroundColor: "#e5e7eb", width: "90%" }}
-              />
-              <View
-                style={{ height: 3, backgroundColor: "#e5e7eb", width: "50%" }}
-              />
-            </View>
-            <View
-              style={{
-                position: "absolute",
-                bottom: 4,
-                right: 4,
-                backgroundColor: color,
-                borderRadius: 3,
-                paddingHorizontal: 4,
-                paddingVertical: 2,
-              }}
-            >
-              <Text style={{ color: "#fff", fontSize: 8, fontWeight: "bold" }}>
-                PDF
-              </Text>
-            </View>
-          </View>
-
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: "bold",
-              color: theme.colors.text,
-              textAlign: "center",
-              marginBottom: 6,
-              height: 36,
-            }}
-            numberOfLines={2}
-          >
-            {item.title}
-          </Text>
-
-          <View
-            style={{
-              backgroundColor: item.isBuiltIn
-                ? `${theme.colors.primary}12`
-                : `${theme.colors.success}12`,
-              paddingHorizontal: 8,
-              paddingVertical: 2,
-              borderRadius: 4,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 10,
-                fontWeight: "600",
-                color: item.isBuiltIn
-                  ? theme.colors.primary
-                  : theme.colors.success,
-              }}
-            >
-              {item.isBuiltIn ? "Built-in" : "Custom"}
-            </Text>
-          </View>
-        </TouchableOpacity>
+        <TemplateCardItem
+          item={item}
+          color={color}
+          theme={theme}
+          language={outputLanguage}
+          onPress={handleSelectTemplateCard}
+        />
       );
     },
-    [theme]
+    [theme, outputLanguage, handleSelectTemplateCard]
   );
 
   const webViewRef = React.useRef<WebView>(null);
@@ -1272,6 +1373,26 @@ const GenerateDocumentScreen: React.FC = () => {
     }
   };
 
+  const handleEditCustomize = React.useCallback(async () => {
+    setIsGenerating(true);
+    try {
+      const htmlContent = getInterpolatedHtml();
+      // @ts-ignore
+      navigation.navigate("TiptapEditDraft", {
+        caseId: caseId ? Number(caseId) : undefined,
+        initialHtml: htmlContent,
+        templateType: documentType,
+        language: outputLanguage,
+        title: `${getTranslatedDocTypes().find((o) => o.value === documentType)?.label || "Draft"} - ${clientName || "Custom"}`,
+      });
+    } catch (error) {
+      console.error("Error creating initial customization HTML:", error);
+      Alert.alert(t("alert_error"), "Could not prepare draft text.");
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [navigation, caseId, documentType, outputLanguage, clientName, getInterpolatedHtml, getTranslatedDocTypes, t]);
+
   useLayoutEffect(() => {
     navigation.setOptions({
       title:
@@ -1295,7 +1416,7 @@ const GenerateDocumentScreen: React.FC = () => {
                 borderRadius: 16,
                 marginRight: 6,
               }}
-              onPress={handleEditCustomizeTiptap}
+              onPress={handleEditCustomize}
             >
               <Ionicons
                 name="flash-outline"
@@ -1567,9 +1688,6 @@ const GenerateDocumentScreen: React.FC = () => {
             }
 
             if (matchedCategory) {
-              setSelectedTemplateCategory(matchedCategory);
-
-              // Reorder categoriesList to prioritize lawyer's matching category
               const baseCategories = [
                 {
                   label: locale === "hi" ? "सभी श्रेणियां" : "All Categories",
@@ -1600,9 +1718,9 @@ const GenerateDocumentScreen: React.FC = () => {
               );
               if (matchedItem) {
                 const rest = baseCategories.filter(
-                  (c) => c.value !== matchedCategory
+                  (c) => c.value !== matchedCategory && c.value !== "all"
                 );
-                setCategoriesList([matchedItem, ...rest]);
+                setCategoriesList([baseCategories[0], matchedItem, ...rest]);
               }
             }
           }
@@ -2404,38 +2522,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
     }
   };
 
-  const handleEditCustomize = async () => {
-    setIsGenerating(true);
-    await cacheAdvocateProfile();
-    try {
-      const htmlContent = getInterpolatedHtml();
-      // @ts-ignore
-      navigation.navigate("TiptapEditDraft", {
-        caseId: caseId ? Number(caseId) : undefined,
-        initialHtml: htmlContent,
-        templateType: documentType,
-        title: `${getTranslatedDocTypes().find((o) => o.value === documentType)?.label || "Draft"} - ${clientName || "Custom"}`,
-      });
-    } catch (error) {
-      console.error("Error creating initial customization HTML:", error);
-      Alert.alert(t("alert_error"), "Could not prepare draft text.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
-  if (isLoading || !isTransitionFinished) {
-    return (
-      <View
-        style={[styles.centered, { backgroundColor: theme.colors.background }]}
-      >
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={{ marginTop: 12, color: theme.colors.textSecondary }}>
-          {t("docgen_preparing")}
-        </Text>
-      </View>
-    );
-  }
 
   if (!isTemplateSelected) {
     return (
@@ -2447,28 +2534,82 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
           style={{
             flexDirection: "row",
             alignItems: "center",
+            justifyContent: "space-between",
             paddingHorizontal: 16,
-            paddingVertical: 14,
+            paddingVertical: 12,
             borderBottomWidth: 1,
             borderBottomColor: theme.colors.border,
             backgroundColor: theme.colors.cardBackground,
           }}
         >
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={{ marginRight: 12 }}
-          >
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={{ marginRight: 12 }}
+            >
+              <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+            <Text
+              style={{
+                fontSize: 17,
+                fontWeight: "bold",
+                color: theme.colors.text,
+              }}
+            >
+              {outputLanguage === "hi" ? "दस्तावेज़ प्रारूप चुनें" : "Select Document Template"}
+            </Text>
+          </View>
+
+          {/* English / Hindi Language Switcher */}
+          <View
             style={{
-              fontSize: 18,
-              fontWeight: "bold",
-              color: theme.colors.text,
+              flexDirection: "row",
+              backgroundColor: theme.colors.background,
+              borderRadius: 20,
+              padding: 2,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
             }}
           >
-            Select Document Template
-          </Text>
+            <TouchableOpacity
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 16,
+                backgroundColor: outputLanguage === "en" ? theme.colors.primary : "transparent",
+              }}
+              onPress={() => setOutputLanguage("en")}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "bold",
+                  color: outputLanguage === "en" ? "#ffffff" : theme.colors.textSecondary,
+                }}
+              >
+                EN
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 16,
+                backgroundColor: outputLanguage === "hi" ? "#ea580c" : "transparent",
+              }}
+              onPress={() => setOutputLanguage("hi")}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "bold",
+                  color: outputLanguage === "hi" ? "#ffffff" : theme.colors.textSecondary,
+                }}
+              >
+                हिन्दी
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Search Bar */}
@@ -2575,9 +2716,15 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
           numColumns={2}
           contentContainerStyle={{ padding: 10, paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={6}
+          getItemLayout={(_data, index) => ({
+            length: 220,
+            offset: 220 * Math.floor(index / 2),
+            index,
+          })}
+          initialNumToRender={8}
           maxToRenderPerBatch={6}
           windowSize={3}
+          updateCellsBatchingPeriod={50}
           removeClippedSubviews
           ListEmptyComponent={
             <View
@@ -2603,6 +2750,19 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
           }
         />
       </SafeAreaView>
+    );
+  }
+
+  if (isLoading || !isTransitionFinished) {
+    return (
+      <View
+        style={[styles.centered, { backgroundColor: theme.colors.background }]}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={{ marginTop: 12, color: theme.colors.textSecondary }}>
+          {t("docgen_preparing")}
+        </Text>
+      </View>
     );
   }
 

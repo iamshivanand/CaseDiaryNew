@@ -377,17 +377,15 @@ CREATE TABLE IF NOT EXISTS document_draft_revisions (
 export const initializeSchema = async (
   db: SQLite.SQLiteDatabase
 ): Promise<void> => {
-  // Enable foreign keys - this is important for SQLite to enforce constraints
-  // It's often good practice to do this at the start of a connection.
-  // With expo-sqlite/next, this might be on by default or managed differently,
-  // but explicit is often better.
   try {
     await db.execAsync("PRAGMA foreign_keys = ON;");
-    console.log("Foreign keys enabled.");
+    await db.execAsync("PRAGMA journal_mode = WAL;");
+    await db.execAsync("PRAGMA synchronous = NORMAL;");
+    await db.execAsync("PRAGMA cache_size = -64000;");
+    await db.execAsync("PRAGMA temp_store = MEMORY;");
+    console.log("SQLite PRAGMAs (WAL, cache_size, foreign_keys) initialized.");
   } catch (e) {
-    console.error("Error enabling foreign keys, or already enabled:", e);
-    // If this fails, subsequent FK constraints might not be enforced.
-    // Depending on the exact expo-sqlite version, errors here might be ignorable if FKs are on by default.
+    console.error("Error setting SQLite PRAGMAs:", e);
   }
 
   await db.execAsync(CREATE_USERS_TABLE);
@@ -395,11 +393,9 @@ export const initializeSchema = async (
   await db.execAsync(CREATE_COURTS_TABLE);
   await db.execAsync(CREATE_DISTRICTS_TABLE);
   await db.execAsync(CREATE_POLICE_STATIONS_TABLE);
-  // Cases table must be created before CaseDocuments and CaseHistoryLog if they have FKs to it
   await db.execAsync(CREATE_CASES_TABLE);
-  await db.execAsync(CREATE_CASES_UPDATED_AT_TRIGGER); // Trigger for Cases
+  await db.execAsync(CREATE_CASES_UPDATED_AT_TRIGGER);
 
-  // Schema migration: Add column session_trial_number if it does not exist
   try {
     const tableInfo = await db.getAllAsync<{ name: string }>(
       "PRAGMA table_info(Cases);"
@@ -482,19 +478,17 @@ export const initializeSchema = async (
     console.error("Error migrating Cases table:", migrationError);
   }
 
-  // Create indexes on Cases table for O(log N) query lookup speed
-  await db.execAsync(
-    `CREATE INDEX IF NOT EXISTS idx_cases_user_id ON Cases(user_id);`
-  );
-  await db.execAsync(
-    `CREATE INDEX IF NOT EXISTS idx_cases_next_date ON Cases(NextDate);`
-  );
-  await db.execAsync(
-    `CREATE INDEX IF NOT EXISTS idx_cases_case_status ON Cases(CaseStatus);`
-  );
-  await db.execAsync(
-    `CREATE INDEX IF NOT EXISTS idx_cases_updated_at ON Cases(updated_at);`
-  );
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_user_id ON Cases(user_id);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_next_date ON Cases(NextDate);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_case_status ON Cases(CaseStatus);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_status_nextdate ON Cases(CaseStatus, NextDate);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_court_id ON Cases(court_id);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_case_type_id ON Cases(case_type_id);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_police_station_id ON Cases(police_station_id);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_district_id ON Cases(district_id);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_cases_updated_at ON Cases(updated_at);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_districts_state ON Districts(state);`);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_ps_district ON PoliceStations(district_id);`);
 
   await db.execAsync(CREATE_CASE_DOCUMENTS_TABLE);
   await db.execAsync(CREATE_CASE_DOCUMENTS_CASE_ID_INDEX);
@@ -502,49 +496,37 @@ export const initializeSchema = async (
   await db.execAsync(CREATE_CASE_TIMELINE_CASE_ID_INDEX);
   await db.execAsync(CREATE_CASE_TIMELINE_UPDATED_AT_TRIGGER);
 
-  // Migration check for CaseTimeline columns
   try {
     const timelineInfo = await db.getAllAsync<{ name: string }>(
       "PRAGMA table_info(CaseTimeline);"
     );
     const hasEventType = timelineInfo.some((col) => col.name === "event_type");
     if (!hasEventType) {
-      await db.execAsync(
-        "ALTER TABLE CaseTimeline ADD COLUMN event_type TEXT DEFAULT 'hearing_proceeding';"
-      );
+      await db.execAsync("ALTER TABLE CaseTimeline ADD COLUMN event_type TEXT DEFAULT 'hearing_proceeding';");
     }
     const hasAmount = timelineInfo.some((col) => col.name === "amount");
     if (!hasAmount) {
-      await db.execAsync(
-        "ALTER TABLE CaseTimeline ADD COLUMN amount REAL DEFAULT 0;"
-      );
+      await db.execAsync("ALTER TABLE CaseTimeline ADD COLUMN amount REAL DEFAULT 0;");
     }
-    const hasPaymentMode = timelineInfo.some(
-      (col) => col.name === "payment_mode"
-    );
+    const hasPaymentMode = timelineInfo.some((col) => col.name === "payment_mode");
     if (!hasPaymentMode) {
-      await db.execAsync(
-        "ALTER TABLE CaseTimeline ADD COLUMN payment_mode TEXT;"
-      );
+      await db.execAsync("ALTER TABLE CaseTimeline ADD COLUMN payment_mode TEXT;");
     }
   } catch (tError) {
     console.error("Error migrating CaseTimeline table:", tError);
   }
+
   await db.execAsync(CREATE_DOCUMENT_DRAFTS_TABLE);
+  await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_drafts_lookup ON document_drafts(is_custom_template, case_id, updated_at);`);
   await db.execAsync(CREATE_DOCUMENT_DRAFTS_UPDATED_AT_TRIGGER);
   await db.execAsync(CREATE_DOCUMENT_DRAFT_REVISIONS_TABLE);
   await initializeUserProfileDB(db);
   await initializeUserInformationDB(db);
 
-  // Sanitize existing duplicates in lookup tables asynchronously in background
   sanitizeLookupTable(db, "CaseTypes", "case_type_id", ["user_id"]);
   sanitizeLookupTable(db, "Courts", "court_id", ["user_id"]);
-  sanitizeLookupTable(db, "PoliceStations", "police_station_id", [
-    "district_id",
-    "user_id",
-  ]);
+  sanitizeLookupTable(db, "PoliceStations", "police_station_id", ["district_id", "user_id"]);
 
-  // Migrate existing date strings stored in DD-MM-YYYY format to YYYY-MM-DD
   try {
     const casesToMigrate = await db.getAllAsync<{
       id: number;
@@ -559,7 +541,6 @@ export const initializeSchema = async (
     for (const c of casesToMigrate) {
       const updates: string[] = [];
       const params: any[] = [];
-
       const convert = (dateStr: string | null) => {
         if (dateStr && /^\d{2}-\d{2}-\d{4}$/.test(dateStr.trim())) {
           const [day, month, year] = dateStr.trim().split("-");
@@ -567,31 +548,14 @@ export const initializeSchema = async (
         }
         return null;
       };
-
       const newNext = convert(c.NextDate);
-      if (newNext) {
-        updates.push("NextDate = ?");
-        params.push(newNext);
-      }
-
+      if (newNext) { updates.push("NextDate = ?"); params.push(newNext); }
       const newPrev = convert(c.PreviousDate);
-      if (newPrev) {
-        updates.push("PreviousDate = ?");
-        params.push(newPrev);
-      }
-
+      if (newPrev) { updates.push("PreviousDate = ?"); params.push(newPrev); }
       const newFiled = convert(c.dateFiled);
-      if (newFiled) {
-        updates.push("dateFiled = ?");
-        params.push(newFiled);
-      }
-
+      if (newFiled) { updates.push("dateFiled = ?"); params.push(newFiled); }
       const newSol = convert(c.StatuteOfLimitations);
-      if (newSol) {
-        updates.push("StatuteOfLimitations = ?");
-        params.push(newSol);
-      }
-
+      if (newSol) { updates.push("StatuteOfLimitations = ?"); params.push(newSol); }
       if (updates.length > 0) {
         params.push(c.id);
         await db.runAsync(
@@ -689,103 +653,100 @@ export const tableExists = async (
 export const seedInitialData = async (
   db: SQLite.SQLiteDatabase
 ): Promise<void> => {
-  console.log("Seeding initial data...");
+  console.log("Checking initial seed status...");
 
-  // Seed Districts
+  // Seed Districts if not already present
   try {
-    for (const stateObj of statesAndDistrictsData.states) {
-      for (const distName of stateObj.districts) {
-        const trimmedDist = distName.trim();
-        const trimmedState = stateObj.state.trim();
-        const existing = await db.getFirstAsync<{ id: number }>(
-          "SELECT id FROM Districts WHERE LOWER(name) = LOWER(?) AND LOWER(state) = LOWER(?) AND user_id IS NULL",
-          [trimmedDist, trimmedState]
-        );
-        if (!existing) {
+    const existingDistricts = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM Districts WHERE user_id IS NULL"
+    );
+    if (!existingDistricts || existingDistricts.count === 0) {
+      console.log("Seeding predefined districts for the first time...");
+      for (const stateObj of statesAndDistrictsData.states) {
+        for (const distName of stateObj.districts) {
+          const trimmedDist = distName.trim();
+          const trimmedState = stateObj.state.trim();
           await db.runAsync(
             "INSERT INTO Districts (name, state, user_id) VALUES (?, ?, NULL)",
             [trimmedDist, trimmedState]
           );
         }
       }
+      console.log("Predefined districts seeded successfully.");
     }
-    console.log("Predefined districts seeded or already exist.");
   } catch (error) {
     console.error("Error seeding predefined districts:", error);
   }
 
-  // Seed Police Stations for Delhi, Maharashtra, and Uttar Pradesh
+  // Seed Police Stations if not already present
   try {
-    const targetStates = ["Delhi (NCT)", "Maharashtra", "Uttar Pradesh"];
-    const districts = await db.getAllAsync<{
-      id: number;
-      name: string;
-      state: string;
-    }>(
-      "SELECT id, name, state FROM Districts WHERE state IN (?, ?, ?)",
-      targetStates
+    const existingPs = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM PoliceStations WHERE user_id IS NULL"
     );
+    if (!existingPs || existingPs.count === 0) {
+      console.log("Seeding predefined police stations for the first time...");
+      const targetStates = ["Delhi (NCT)", "Maharashtra", "Uttar Pradesh"];
+      const districts = await db.getAllAsync<{
+        id: number;
+        name: string;
+        state: string;
+      }>(
+        "SELECT id, name, state FROM Districts WHERE state IN (?, ?, ?)",
+        targetStates
+      );
 
-    const mappings = (policeStationsData.mappings || {}) as Record<
-      string,
-      string[]
-    >;
+      const mappings = (policeStationsData.mappings || {}) as Record<
+        string,
+        string[]
+      >;
 
-    for (const dist of districts) {
-      let stations: string[] = [];
-      if (mappings[dist.name]) {
-        stations = mappings[dist.name];
-      } else {
-        const isMaharashtra = dist.state === "Maharashtra";
-        const cityOrKotwali = isMaharashtra ? "City" : "Kotwali";
-        stations = [
-          `${dist.name} Sadar Police Station`,
-          `${dist.name} ${cityOrKotwali} Police Station`,
-          `${dist.name} Mahila Police Station`,
-        ];
-      }
+      for (const dist of districts) {
+        let stations: string[] = [];
+        if (mappings[dist.name]) {
+          stations = mappings[dist.name];
+        } else {
+          const isMaharashtra = dist.state === "Maharashtra";
+          const cityOrKotwali = isMaharashtra ? "City" : "Kotwali";
+          stations = [
+            `${dist.name} Sadar Police Station`,
+            `${dist.name} ${cityOrKotwali} Police Station`,
+            `${dist.name} Mahila Police Station`,
+          ];
+        }
 
-      for (const psName of stations) {
-        const trimmedPs = psName.trim();
-        const existing = await db.getFirstAsync<{ id: number }>(
-          "SELECT id FROM PoliceStations WHERE LOWER(name) = LOWER(?) AND (district_id = ? OR (district_id IS NULL AND ? IS NULL)) AND user_id IS NULL",
-          [trimmedPs, dist.id, dist.id]
-        );
-        if (!existing) {
+        for (const psName of stations) {
+          const trimmedPs = psName.trim();
           await db.runAsync(
             "INSERT INTO PoliceStations (name, district_id, user_id) VALUES (?, ?, NULL)",
             [trimmedPs, dist.id]
           );
         }
       }
+      console.log("Predefined police stations seeded successfully.");
     }
-    console.log("Predefined police stations seeded or already exist.");
   } catch (error) {
     console.error("Error seeding predefined police stations:", error);
   }
 
-  // Seed Case Types
+  // Seed Case Types if not already present
   try {
-    for (const caseType of PREDEFINED_CASE_TYPES) {
-      const trimmed = caseType.name.trim();
-      const existing = await db.getFirstAsync<{ id: number }>(
-        "SELECT id FROM CaseTypes WHERE LOWER(name) = LOWER(?) AND user_id IS NULL",
-        [trimmed]
-      );
-      if (!existing) {
+    const existingTypes = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM CaseTypes WHERE user_id IS NULL"
+    );
+    if (!existingTypes || existingTypes.count === 0) {
+      console.log("Seeding predefined case types for the first time...");
+      for (const caseType of PREDEFINED_CASE_TYPES) {
+        const trimmed = caseType.name.trim();
         await db.runAsync(
           "INSERT INTO CaseTypes (name, user_id) VALUES (?, NULL)",
           [trimmed]
         );
       }
+      console.log("Predefined case types seeded successfully.");
     }
-    console.log("Predefined case types seeded or already exist.");
   } catch (error) {
     console.error("Error seeding predefined case types:", error);
   }
-
-  // Mock case seeding removed for production release.
-  // District, police station, and case type seeds above are retained as useful reference data.
 
   console.log("Initial data seeding process complete.");
 };

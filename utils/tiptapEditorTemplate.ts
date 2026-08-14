@@ -871,22 +871,24 @@ export const getTiptapEditorHtml = (initialHtml: string): string => {
         guide.style.height = Math.max(10, singleSheetHeight - (dynamicTopMargin + dynamicBottomMargin)) + 'px';
         guideOverlay.appendChild(guide);
 
-        const headerText = window.userHeaderText || "IN THE HIGH COURT OF JUDICATURE";
-        const runningHeader = document.createElement('div');
-        runningHeader.className = 'court-running-header';
-        runningHeader.style.top = (sheetTop + Math.max(4, dynamicTopMargin / 3)) + 'px';
-        runningHeader.style.fontSize = Math.max(8, Math.round(10 * scaleRatio)) + 'px';
-        runningHeader.textContent = headerText;
-        guideOverlay.appendChild(runningHeader);
+        if (window.userHeaderText) {
+          const runningHeader = document.createElement('div');
+          runningHeader.className = 'court-running-header';
+          runningHeader.style.top = (sheetTop + Math.max(4, dynamicTopMargin / 3)) + 'px';
+          runningHeader.style.fontSize = Math.max(8, Math.round(10 * scaleRatio)) + 'px';
+          runningHeader.textContent = window.userHeaderText;
+          guideOverlay.appendChild(runningHeader);
+        }
 
-        const rawFooterText = window.userFooterText || "Page {page} of {total} | Advocate Draft";
-        const footerText = rawFooterText.replace('{page}', i + 1).replace('{total}', totalPages);
-        const runningFooter = document.createElement('div');
-        runningFooter.className = 'court-running-footer';
-        runningFooter.style.top = (sheetTop + singleSheetHeight - Math.max(14, dynamicBottomMargin * 0.8)) + 'px';
-        runningFooter.style.fontSize = Math.max(8, Math.round(10 * scaleRatio)) + 'px';
-        runningFooter.textContent = footerText;
-        guideOverlay.appendChild(runningFooter);
+        if (window.userFooterText) {
+          const footerText = window.userFooterText.replace('{page}', i + 1).replace('{total}', totalPages);
+          const runningFooter = document.createElement('div');
+          runningFooter.className = 'court-running-footer';
+          runningFooter.style.top = (sheetTop + singleSheetHeight - Math.max(14, dynamicBottomMargin * 0.8)) + 'px';
+          runningFooter.style.fontSize = Math.max(8, Math.round(10 * scaleRatio)) + 'px';
+          runningFooter.textContent = footerText;
+          guideOverlay.appendChild(runningFooter);
+        }
 
         if (window.userWatermarkText) {
           const watermark = document.createElement('div');

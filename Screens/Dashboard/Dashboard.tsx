@@ -43,6 +43,7 @@ import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPop
 import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 import { CauseListCustomizerModal } from "../CommonComponents/CauseListCustomizerModal";
+import { SkeletonCard } from "../CommonComponents/SkeletonLoader";
 import SectionHeader from "../CommonComponents/SectionHeader";
 import VoiceSearchBar from "../CommonComponents/VoiceSearchBar";
 
@@ -471,18 +472,8 @@ const TodaysCasesSection = () => {
 
   const fetchTodaysCases = async () => {
     try {
-      const allCases = await db.getCases();
-      const today = getLocalDateString(new Date());
-
-      const filteredCases = allCases.filter((c) => {
-        if (!c.NextDate) return false;
-        const caseDate = normalizeDateToYYYYMMDD(c.NextDate);
-        return caseDate === today;
-      });
-
-      const mappedCases: CaseDataScreen[] =
-        filteredCases.map(mapCaseDbToScreen);
-
+      const dbCases = await db.getCases(null, -1, 0, { dateFilter: "today" });
+      const mappedCases: CaseDataScreen[] = dbCases.map(mapCaseDbToScreen);
       setTodaysCases(mappedCases);
     } catch (error) {
       console.error("Error fetching today's cases:", error);
@@ -634,12 +625,8 @@ const TodaysCasesSection = () => {
         if (success) {
           try {
             const todayStr = format(new Date(), "eeee, MMMM d, yyyy");
-            const allDbCases = await db.getCases();
-            const today = getLocalDateString(new Date());
-            const filteredDbCases = allDbCases.filter((c) => {
-              if (!c.NextDate) return false;
-              const caseDate = c.NextDate.split("T")[0];
-              return caseDate === today;
+            const filteredDbCases = await db.getCases(null, -1, 0, {
+              dateFilter: "today",
             });
             await exportDailyCauseListToPdf(
               filteredDbCases,
@@ -712,7 +699,10 @@ const TodaysCasesSection = () => {
         )}
       </View>
       {loading ? (
-        <ActivityIndicator color={theme.colors.primary} />
+        <View style={{ marginTop: 4 }}>
+          <SkeletonCard />
+          <SkeletonCard />
+        </View>
       ) : todaysCases.length > 0 ? (
         todaysCases.map((caseData, index) => (
           <AnimatedNewCaseCard

@@ -146,7 +146,7 @@ const PdfScannerScreen: React.FC = () => {
 
   const loadActiveCases = async () => {
     try {
-      const r = await db.getCases();
+      const r = await db.getCases(null, -1, 0, { status: "Active" });
       setCases(r);
       setFilteredCases(r);
     } catch (e) {

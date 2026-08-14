@@ -98,16 +98,26 @@ class SpeechRecognitionService {
   private isListening: boolean = false;
   private listeners: any[] = [];
   private lastProcessedTranscript: string = "";
+  private currentLocale: string = "en-IN";
 
   constructor() {}
+
+  public setLanguage(locale: string): void {
+    this.currentLocale = locale;
+  }
+
+  public getLanguage(): string {
+    return this.currentLocale;
+  }
 
   /**
    * Start native speech dictation session using ExpoSpeechRecognitionModule
    */
   public async startListening(
-    locale: string = "en-IN",
-    callbacks: SpeechRecognitionCallbacks
+    locale?: string,
+    callbacks: SpeechRecognitionCallbacks = {}
   ): Promise<boolean> {
+    const targetLocale = locale || this.currentLocale;
     if (this.isListening) {
       await this.stopListening();
     }
@@ -184,7 +194,7 @@ class SpeechRecognitionService {
       this.listeners.push(resultSub, errorSub, endSub);
 
       ExpoSpeechRecognitionModule.start({
-        lang: locale,
+        lang: targetLocale,
         interimResults: true,
         maxAlternatives: 1,
         addsPunctuation: true,

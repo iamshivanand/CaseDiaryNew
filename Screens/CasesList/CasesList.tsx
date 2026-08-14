@@ -5,7 +5,7 @@ import {
   useRoute,
   RouteProp,
 } from "@react-navigation/native";
-import React, { useCallback, useContext, useState, useEffect } from "react";
+import React, { useCallback, useContext, useState, useEffect, useLayoutEffect } from "react";
 import {
   FlatList,
   SafeAreaView,
@@ -321,37 +321,47 @@ const CasesList = () => {
     []
   );
 
+  useLayoutEffect(() => {
+    if (typeof navigation?.setOptions === "function") {
+      try {
+        navigation.setOptions({
+          headerRight: () => (
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TouchableOpacity
+                onPress={() => setImportModalVisible(true)}
+                style={{ padding: 6, marginRight: 4 }}
+                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+              >
+                <Ionicons
+                  name="cloud-download-outline"
+                  size={24}
+                  color={theme.colors.primary || "#007AFF"}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={navigateToAddCase}
+                style={{ padding: 6 }}
+                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+              >
+                <Ionicons
+                  name="add-circle-outline"
+                  size={26}
+                  color={theme.colors.primary || "#007AFF"}
+                />
+              </TouchableOpacity>
+            </View>
+          ),
+        });
+      } catch {
+        // Ignored if rendered outside a React Navigation stack (e.g. isolated unit test)
+      }
+    }
+  }, [navigation, theme, navigateToAddCase]);
+
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
     >
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-          {t("cases_header_title")}
-        </Text>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <TouchableOpacity
-            onPress={() => setImportModalVisible(true)}
-            style={[styles.addButton, { marginRight: 8 }]}
-          >
-            <Ionicons
-              name="cloud-download-outline"
-              size={28}
-              color={theme.colors.primary || "#007AFF"}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={navigateToAddCase}
-            style={styles.addButton}
-          >
-            <Ionicons
-              name="add-circle-outline"
-              size={32}
-              color={theme.colors.primary || "#007AFF"}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
 
       <View style={styles.searchContainer}>
         <View

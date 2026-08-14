@@ -110,24 +110,75 @@ export const SkeletonForm: React.FC<{ rows?: number }> = ({ rows = 5 }) => {
   );
 };
 
-export const SkeletonProfile: React.FC = () => {
+export const SkeletonTemplateCard: React.FC = () => {
   const { theme } = useContext(ThemeContext);
   return (
-    <View style={{ padding: 20, alignItems: "center" }}>
+    <View
+      style={{
+        flex: 1,
+        margin: 6,
+        backgroundColor: theme.colors.cardBackground,
+        borderRadius: 12,
+        padding: 14,
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+      }}
+    >
+      {/* Miniature Document Preview Skeleton */}
       <SkeletonItem
-        style={{ width: 90, height: 90, borderRadius: 45, marginBottom: 16 }}
+        style={{
+          width: 58,
+          height: 84,
+          borderRadius: 4,
+          marginBottom: 10,
+        }}
+      />
+      {/* Title Placeholder */}
+      <SkeletonItem
+        style={{
+          width: "80%",
+          height: 14,
+          borderRadius: 4,
+          marginBottom: 6,
+        }}
       />
       <SkeletonItem
-        style={{ width: "50%", height: 20, marginBottom: 8, borderRadius: 6 }}
+        style={{
+          width: "55%",
+          height: 12,
+          borderRadius: 4,
+          marginBottom: 8,
+        }}
       />
+      {/* Pill Badge Placeholder */}
       <SkeletonItem
-        style={{ width: "30%", height: 14, marginBottom: 24, borderRadius: 4 }}
+        style={{
+          width: 64,
+          height: 18,
+          borderRadius: 9,
+        }}
       />
-      <View style={{ width: "100%", gap: 16 }}>
-        <SkeletonItem style={{ width: "100%", height: 54, borderRadius: 12 }} />
-        <SkeletonItem style={{ width: "100%", height: 54, borderRadius: 12 }} />
-        <SkeletonItem style={{ width: "100%", height: 54, borderRadius: 12 }} />
-      </View>
     </View>
   );
 };
+
+export const SkeletonTemplateGrid: React.FC<{ count?: number }> = ({
+  count = 6,
+}) => {
+  const pairs = Array.from({ length: Math.ceil(count / 2) });
+  return (
+    <View style={{ paddingHorizontal: 10, paddingVertical: 12 }}>
+      {pairs.map((_, rowIdx) => (
+        <View
+          key={rowIdx}
+          style={{ flexDirection: "row", justifyContent: "space-between" }}
+        >
+          <SkeletonTemplateCard />
+          <SkeletonTemplateCard />
+        </View>
+      ))}
+    </View>
+  );
+};
+

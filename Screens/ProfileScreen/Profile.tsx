@@ -12,6 +12,7 @@ import {
   Alert,
   Platform,
   ActivityIndicator,
+  StatusBar,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
@@ -347,7 +348,7 @@ const ProfileScreen: React.FC = () => {
         </>
       );
     } else if (selectedTab === "Settings") {
-      return <SettingsScreen />;
+      return <SettingsScreen nestedInScrollView={true} />;
     }
     return null;
   };
@@ -618,6 +619,7 @@ const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight || 25 : 0,
   },
   // actionButtonsContainer: { // Kept for reference if needed later
   //   flexDirection: "row",

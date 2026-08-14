@@ -377,7 +377,14 @@ export const getCases = async (
   offset: number = 0,
   options?: {
     status?: "Active" | "Closed" | "All";
-    dateFilter?: "today" | "tomorrow" | "yesterday" | "undated" | null;
+    dateFilter?:
+      | "today"
+      | "tomorrow"
+      | "yesterday"
+      | "undated"
+      | "specific"
+      | null;
+    specificDate?: string | null;
     searchQuery?: string;
   }
 ): Promise<CaseWithDetails[]> => {
@@ -398,7 +405,7 @@ export const getCases = async (
   }
 
   if (options) {
-    const { status, dateFilter, searchQuery } = options;
+    const { status, dateFilter, specificDate, searchQuery } = options;
 
     if (status && status !== "All") {
       if (status === "Active") {
@@ -425,6 +432,9 @@ export const getCases = async (
         const yesterdayStr = getLocalDateString(yesterday);
         whereClauses.push("c.NextDate = ?");
         params.push(yesterdayStr);
+      } else if (dateFilter === "specific" && specificDate) {
+        whereClauses.push("c.NextDate = ?");
+        params.push(normalizeDateToYYYYMMDD(specificDate));
       } else if (dateFilter === "undated") {
         whereClauses.push(
           "(c.NextDate IS NULL OR c.NextDate = '' OR c.NextDate = 'N/A')"
@@ -703,6 +713,42 @@ export const getUpcomingHearings = async (
   }
   const result = await db.getFirstAsync<{ count: number }>(sql, params);
   return result?.count ?? 0;
+};
+
+export const getCalendarMarkedDates = async (
+  userId?: number | null
+): Promise<{
+  [dateString: string]: { marked: boolean; eventsCount: number };
+}> => {
+  const db = await getDb();
+  let sql = `SELECT NextDate, COUNT(*) as count 
+             FROM Cases 
+             WHERE NextDate IS NOT NULL AND NextDate != '' AND NextDate != 'N/A'`;
+  const params: any[] = [];
+  if (userId !== undefined && userId !== null) {
+    sql += " AND user_id = ?";
+    params.push(userId);
+  }
+  sql += " GROUP BY NextDate";
+
+  const rows = await db.getAllAsync<{ NextDate: string; count: number }>(
+    sql,
+    params
+  );
+  const result: {
+    [dateString: string]: { marked: boolean; eventsCount: number };
+  } = {};
+  for (const row of rows) {
+    const formatted = normalizeDateToYYYYMMDD(row.NextDate);
+    if (formatted) {
+      if (result[formatted]) {
+        result[formatted].eventsCount += row.count;
+      } else {
+        result[formatted] = { marked: true, eventsCount: row.count };
+      }
+    }
+  }
+  return result;
 };
 
 export const addUser = async (
