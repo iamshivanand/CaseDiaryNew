@@ -27,6 +27,7 @@ import {
 import * as db from "../../DataBase";
 import { CaseWithDetails, DocumentDraft } from "../../DataBase";
 import { ThemeContext } from "../../Providers/ThemeProvider";
+import { createNamedPdfFile, shareNamedPdf } from "../../utils/fileShareHelper";
 import ActionButton from "../CommonComponents/ActionButton";
 import { SkeletonList } from "../CommonComponents/SkeletonLoader";
 
@@ -694,6 +695,8 @@ const DraftsHubScreen: React.FC = () => {
         height: isLegal ? 1008 : 842,
       });
 
+      const namedUri = await createNamedPdfFile(uri, draft.title);
+
       setIsLoading(false);
       Alert.alert(draft.title, "Choose an action for this document:", [
         {
@@ -701,7 +704,7 @@ const DraftsHubScreen: React.FC = () => {
           onPress: () => {
             // @ts-ignore
             navigation.navigate("PdfViewer", {
-              pdfUri: uri,
+              pdfUri: namedUri,
               title: draft.title,
             });
           },
@@ -709,13 +712,7 @@ const DraftsHubScreen: React.FC = () => {
         {
           text: "Share PDF",
           onPress: async () => {
-            if (await Sharing.isAvailableAsync()) {
-              await Sharing.shareAsync(uri, {
-                mimeType: "application/pdf",
-                dialogTitle: draft.title,
-                UTI: "com.adobe.pdf",
-              });
-            }
+            await shareNamedPdf(namedUri, draft.title, draft.title);
           },
         },
         {
@@ -1125,6 +1122,26 @@ const DraftsHubScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={[styles.actionBtn, { borderColor: "#3b82f644", backgroundColor: "#1e3a8a11" }]}
+            // @ts-ignore
+            onPress={() =>
+              navigation.navigate("TiptapEditDraft", { draftId: item.id })
+            }
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="flash-outline"
+              size={15}
+              color="#3b82f6"
+            />
+            <Text
+              style={[styles.actionBtnText, { color: "#3b82f6", fontWeight: "700" }]}
+            >
+              Tiptap ⚡
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.actionBtn, { borderColor: theme.colors.border }]}
             // @ts-ignore
             onPress={() =>
@@ -1134,13 +1151,13 @@ const DraftsHubScreen: React.FC = () => {
           >
             <Ionicons
               name="create-outline"
-              size={16}
+              size={15}
               color={theme.colors.primary}
             />
             <Text
               style={[styles.actionBtnText, { color: theme.colors.primary }]}
             >
-              Edit
+              Legacy 📝
             </Text>
           </TouchableOpacity>
 

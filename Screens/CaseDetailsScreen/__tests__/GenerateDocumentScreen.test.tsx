@@ -117,7 +117,7 @@ describe("GenerateDocumentScreen", () => {
 
   it("should render client details and document type selection options", async () => {
     mockRouteParams = { caseId: undefined, templateType: "bail" };
-    const { findAllByText, queryByText } = renderWithProviders();
+    const { findAllByText, findByText, queryByText } = renderWithProviders();
 
     // Wait for the loading indicator to disappear
     await waitFor(

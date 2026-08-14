@@ -362,6 +362,17 @@ FOR EACH ROW
 BEGIN
   UPDATE document_drafts SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE id = OLD.id;
 END;`;
+
+export const CREATE_DOCUMENT_DRAFT_REVISIONS_TABLE = `
+CREATE TABLE IF NOT EXISTS document_draft_revisions (
+  id TEXT PRIMARY KEY,
+  draft_id TEXT NOT NULL,
+  revision_number INTEGER NOT NULL,
+  html_content TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+  FOREIGN KEY (draft_id) REFERENCES document_drafts(id) ON DELETE CASCADE
+);`;
+
 // Function to execute all DDL statements
 export const initializeSchema = async (
   db: SQLite.SQLiteDatabase
@@ -521,6 +532,7 @@ export const initializeSchema = async (
   }
   await db.execAsync(CREATE_DOCUMENT_DRAFTS_TABLE);
   await db.execAsync(CREATE_DOCUMENT_DRAFTS_UPDATED_AT_TRIGGER);
+  await db.execAsync(CREATE_DOCUMENT_DRAFT_REVISIONS_TABLE);
   await initializeUserProfileDB(db);
   await initializeUserInformationDB(db);
 

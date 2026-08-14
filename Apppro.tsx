@@ -20,6 +20,7 @@ import AddDocumentScreen from "./Screens/Addcase/AddDocument";
 import CalendarScreen from "./Screens/Calendar/Calendar";
 import CaseDetailsScreen from "./Screens/CaseDetailsScreen/CaseDetailsScreen"; // This is now the new, refactored screen
 import EditDraftScreen from "./Screens/CaseDetailsScreen/EditDraftScreen";
+import TiptapEditDraftScreen from "./Screens/CaseDetailsScreen/TiptapEditDraftScreen";
 import GenerateDocumentScreen from "./Screens/CaseDetailsScreen/GenerateDocumentScreen";
 import CasesList from "./Screens/CasesList/CasesList";
 import DashboardScreen from "./Screens/Dashboard/Dashboard";
@@ -137,6 +138,11 @@ const HomeStack = () => {
       <HomeStackNav.Screen
         name="EditDraft"
         component={EditDraftScreen}
+        options={{ headerShown: false }}
+      />
+      <HomeStackNav.Screen
+        name="TiptapEditDraft"
+        component={TiptapEditDraftScreen}
         options={{ headerShown: false }}
       />
       <HomeStackNav.Screen
@@ -372,6 +378,8 @@ const Appro: React.FC = () => {
             "ManageLookupCategoryScreen",
             "GenerateDocument",
             "DraftsHub",
+            "EditDraft",
+            "TiptapEditDraft",
             "DatabaseImportScreen",
             "PdfScanner",
             "PdfViewer",

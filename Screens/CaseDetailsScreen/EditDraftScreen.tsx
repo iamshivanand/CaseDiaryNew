@@ -40,6 +40,7 @@ import { LEGAL_VOCABULARY } from "../../utils/legalVocabulary";
 import { extractTextFromImages } from "../../utils/ocrService";
 import { getOfflineEditorHtml } from "../../utils/offlineEditorTemplate";
 import { speechRecognitionService } from "../../utils/speechRecognitionService";
+import { createNamedPdfFile, shareNamedPdf } from "../../utils/fileShareHelper";
 import ActionButton from "../CommonComponents/ActionButton";
 
 type EditDraftScreenRouteProp = RouteProp<HomeStackParamList, "EditDraft">;
@@ -861,28 +862,25 @@ const EditDraftScreen: React.FC = () => {
         height: isLegal ? 1008 : 842,
       });
 
+      const docTitle = title || "Draft Document";
+      const namedUri = await createNamedPdfFile(uri, docTitle);
+
       setIsExporting(false);
-      Alert.alert(title || "Draft Document", "Choose an action for this PDF:", [
+      Alert.alert(docTitle, "Choose an action for this PDF:", [
         {
           text: "Open in App",
           onPress: () => {
             // @ts-ignore
             navigation.navigate("PdfViewer", {
-              pdfUri: uri,
-              title: title || "Draft",
+              pdfUri: namedUri,
+              title: docTitle,
             });
           },
         },
         {
           text: "Share PDF",
           onPress: async () => {
-            if (await Sharing.isAvailableAsync()) {
-              await Sharing.shareAsync(uri, {
-                mimeType: "application/pdf",
-                dialogTitle: title,
-                UTI: "com.adobe.pdf",
-              });
-            }
+            await shareNamedPdf(namedUri, docTitle, docTitle);
           },
         },
         {
@@ -1243,6 +1241,35 @@ const EditDraftScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Tiptap Engine Switcher Button */}
+          <TouchableOpacity
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: "#1e3a8a22",
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: "#3b82f644",
+              marginRight: 6,
+            }}
+            onPress={() => {
+              (navigation as any).navigate("TiptapEditDraft", {
+                draftId,
+                caseId,
+                initialHtml: htmlContent,
+                templateType,
+                title,
+              });
+            }}
+          >
+            <Ionicons name="flash-outline" size={12} color="#f59e0b" style={{ marginRight: 3 }} />
+            <Text style={{ fontSize: 11, fontWeight: "700", color: "#3b82f6" }}>
+              Try Tiptap Engine 🚀
+            </Text>
+          </TouchableOpacity>
 
           {/* Auto-saved Status Badge */}
           <View

@@ -103,8 +103,14 @@ describe("UndatedCasesScreen", () => {
 
     fireEvent.press(shareButton);
 
+    const generatePdfButton = await findByText("Generate PDF");
+    expect(generatePdfButton).toBeTruthy();
+
+    fireEvent.press(generatePdfButton);
+
     await waitFor(() => {
       expect(mockShowAd).toHaveBeenCalledWith("rewarded", expect.any(Function));
+      expect(exportUndatedCasesToPdf).toHaveBeenCalled();
     });
   });
 });

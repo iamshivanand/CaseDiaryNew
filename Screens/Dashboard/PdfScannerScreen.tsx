@@ -31,6 +31,7 @@ import * as db from "../../DataBase";
 import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 import { HomeStackParamList } from "../../Types/navigationtypes";
+import { shareNamedPdf } from "../../utils/fileShareHelper";
 import AdBanner from "../CommonComponents/AdBanner";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 
@@ -382,7 +383,11 @@ const PdfScannerScreen: React.FC = () => {
     const fp = db.getFullDocumentPath(item.stored_filename);
     if (fp) {
       try {
-        await Sharing.shareAsync(fp, { mimeType: "application/pdf" });
+        await shareNamedPdf(
+          fp,
+          item.original_display_name || "Scanned_Document",
+          item.original_display_name || "Scanned Document"
+        );
       } catch (e) {
         console.error("Sharing error", e);
       }

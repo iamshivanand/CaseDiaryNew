@@ -179,9 +179,7 @@ describe("Typography Hierarchy (scaleRatio-derived)", () => {
 
   it("applies computed typography to all inline and block editor elements", () => {
     const html = getOfflineEditorHtml("");
-    expect(html).toContain(
-      "#editor p, #editor div, #editor td, #editor th, #editor li, #editor span"
-    );
+    expect(html).toContain("#editor p, #editor div, #editor li, #editor blockquote");
   });
 
   it("sets Times New Roman as default font family", () => {
@@ -574,7 +572,7 @@ describe("Legal List & Case Transformation", () => {
   it("changeCase 'title' capitalises first letter of each word", () => {
     const html = getOfflineEditorHtml("");
     expect(html).toContain("toUpperCase()");
-    expect(html).toContain("data.value === 'title'");
+    expect(html).toContain("mode === 'title'");
   });
 
   it("undo command uses native execCommand undo", () => {

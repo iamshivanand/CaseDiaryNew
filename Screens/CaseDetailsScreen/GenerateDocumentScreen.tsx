@@ -6,7 +6,7 @@ import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import React, { useContext, useEffect, useLayoutEffect, useState } from "react";
+import React, { useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -38,13 +38,15 @@ import {
   getDocumentDrafts,
   DocumentDraft,
   saveDocumentDraft,
+  saveDraftRevision,
+  getDraftRevisions,
   getUserProfile,
   getDb,
 } from "../../DataBase";
 import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
-import { HomeStackParamList } from "../../Types/navigationtypes";
 import { formatDate } from "../../utils/commonFunctions";
+import { createNamedPdfFile, shareNamedPdf } from "../../utils/fileShareHelper";
 import {
   getVakalatnamaHtml,
   getAdjournmentHtml,
@@ -74,7 +76,7 @@ import {
 } from "../../utils/legalNerService";
 import { LEGAL_VOCABULARY } from "../../utils/legalVocabulary";
 import { extractTextFromImages } from "../../utils/ocrService";
-import { getOfflineEditorHtml } from "../../utils/offlineEditorTemplate";
+import { getTiptapEditorHtml } from "../../utils/tiptapEditorTemplate";
 import { speechRecognitionService } from "../../utils/speechRecognitionService";
 import ActionButton from "../CommonComponents/ActionButton";
 import { useAdTrigger } from "../CommonComponents/AdManager";
@@ -394,7 +396,7 @@ const GenerateDocumentScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"fields" | "preview">("fields");
+  const [activeTab, setActiveTab] = useState<"fields" | "preview">("preview");
   const [documentType, setDocumentType] = useState<string>(
     route.params?.templateType || ""
   );
@@ -454,8 +456,10 @@ const GenerateDocumentScreen: React.FC = () => {
     if (route.params?.templateType) {
       setDocumentType(route.params.templateType);
       setIsTemplateSelected(true);
-      if (route.params.templateType === "blank_page") {
+      if (route.params.templateType === "blank_page" || route.params.draftId) {
         setActiveTab("preview");
+      } else {
+        setActiveTab("fields");
       }
       if (route.params.draftId) {
         const fetchDraftHtml = async () => {
@@ -587,6 +591,13 @@ const GenerateDocumentScreen: React.FC = () => {
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [customTemplateTitle, setCustomTemplateTitle] = useState("");
   const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
+  const [watermarkText, setWatermarkText] = useState<string>("");
+  const [watermarkOpacity, setWatermarkOpacity] = useState<number>(0.2);
+  const [isRevisionHistoryVisible, setIsRevisionHistoryVisible] = useState(false);
+  const [draftRevisions, setDraftRevisions] = useState<any[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+
+  const [tiptapJsonState, setTiptapJsonState] = useState<any>(null);
 
   const [docStats, setDocStats] = useState({
     wordCount: 0,
@@ -704,11 +715,7 @@ const GenerateDocumentScreen: React.FC = () => {
               setHtmlContent("");
             }
             setIsTemplateSelected(true);
-            if (item.template_type === "blank_page") {
-              setActiveTab("preview");
-            } else {
-              setActiveTab("fields");
-            }
+            setActiveTab("preview");
           }}
         >
           <View
@@ -831,6 +838,13 @@ const GenerateDocumentScreen: React.FC = () => {
 
   const webViewRef = React.useRef<WebView>(null);
   const saveCallbackRef = React.useRef<((html: string) => void) | null>(null);
+  const initialEditorHtml = useMemo(() => getTiptapEditorHtml(""), []);
+
+  useEffect(() => {
+    if (htmlContent !== undefined && htmlContent !== null) {
+      postMessageToWebView({ type: "load", html: htmlContent });
+    }
+  }, [htmlContent]);
 
   const postMessageToWebView = (message: object) => {
     const jsonStr = JSON.stringify(message);
@@ -908,7 +922,9 @@ const GenerateDocumentScreen: React.FC = () => {
     bMargin: number = bottomMargin,
     lMargin: number = leftMargin,
     rMargin: number = rightMargin,
-    lhSpace: number = letterheadSpace
+    lhSpace: number = letterheadSpace,
+    wmText: string = watermarkText,
+    wmOpacity: number = watermarkOpacity
   ) => {
     postMessageToWebView({
       type: "layout",
@@ -920,7 +936,75 @@ const GenerateDocumentScreen: React.FC = () => {
       leftMargin: lMargin,
       rightMargin: rMargin,
       letterheadSpace: lhSpace,
+      watermarkText: wmText,
+      watermarkOpacity: wmOpacity,
     });
+  };
+
+  const applyCourtPreset = (
+    preset: "supreme_court" | "high_court" | "district_court"
+  ) => {
+    if (preset === "supreme_court") {
+      setPageSize("legal");
+      setTopMargin(48);
+      setBottomMargin(48);
+      setLeftMargin(72);
+      setRightMargin(48);
+      setLineHeight("2.0");
+      setFont("'Times New Roman', Georgia, serif");
+      applyLayoutSettings(
+        "'Times New Roman', Georgia, serif",
+        "2.0",
+        "legal",
+        48,
+        48,
+        72,
+        48,
+        letterheadSpace,
+        watermarkText,
+        watermarkOpacity
+      );
+    } else if (preset === "high_court") {
+      setPageSize("legal");
+      setTopMargin(36);
+      setBottomMargin(36);
+      setLeftMargin(64);
+      setRightMargin(36);
+      setLineHeight("1.5");
+      setFont("'Times New Roman', Georgia, serif");
+      applyLayoutSettings(
+        "'Times New Roman', Georgia, serif",
+        "1.5",
+        "legal",
+        36,
+        36,
+        64,
+        36,
+        letterheadSpace,
+        watermarkText,
+        watermarkOpacity
+      );
+    } else if (preset === "district_court") {
+      setPageSize("a4");
+      setTopMargin(24);
+      setBottomMargin(24);
+      setLeftMargin(36);
+      setRightMargin(24);
+      setLineHeight("1.15");
+      setFont("Arial, Helvetica, sans-serif");
+      applyLayoutSettings(
+        "Arial, Helvetica, sans-serif",
+        "1.15",
+        "a4",
+        24,
+        24,
+        36,
+        24,
+        letterheadSpace,
+        watermarkText,
+        watermarkOpacity
+      );
+    }
   };
 
   const handleEditorMessage = async (event: any) => {
@@ -961,6 +1045,9 @@ const GenerateDocumentScreen: React.FC = () => {
               }
             }, 600);
           }
+        }
+        if (data.tiptapJson) {
+          setTiptapJsonState(data.tiptapJson);
         }
       } else if (data.type === "change") {
         setIsRichTextModified(true);
@@ -1195,47 +1282,79 @@ const GenerateDocumentScreen: React.FC = () => {
           : t("docgen_header_title"),
       headerRight: () =>
         documentType !== "blank_page" ? (
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: `${theme.colors.primary}18`,
-              borderWidth: 1,
-              borderColor: `${theme.colors.primary}40`,
-              paddingHorizontal: 10,
-              paddingVertical: 5,
-              borderRadius: 16,
-              marginRight: 8,
-            }}
-            onPress={() =>
-              handleTabChange(activeTab === "fields" ? "preview" : "fields")
-            }
-          >
-            <Ionicons
-              name={activeTab === "fields" ? "create-outline" : "list-outline"}
-              size={14}
-              color={theme.colors.primary}
-              style={{ marginRight: 4 }}
-            />
-            <Text
+          <View style={{ flexDirection: "row", alignItems: "center", marginRight: 8 }}>
+            <TouchableOpacity
               style={{
-                fontSize: 12,
-                fontWeight: "bold",
-                color: theme.colors.primary,
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#1e3a8a22",
+                borderWidth: 1,
+                borderColor: "#3b82f666",
+                paddingHorizontal: 9,
+                paddingVertical: 5,
+                borderRadius: 16,
+                marginRight: 6,
               }}
+              onPress={handleEditCustomizeTiptap}
             >
-              {activeTab === "fields"
-                ? locale === "hi"
-                  ? "लाइव एडिटर"
-                  : "Live Editor"
-                : locale === "hi"
-                  ? "फ़ॉर्म इनपुट"
-                  : "Form Input"}
-            </Text>
-          </TouchableOpacity>
+              <Ionicons
+                name="flash-outline"
+                size={13}
+                color="#3b82f6"
+                style={{ marginRight: 3 }}
+              />
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: "bold",
+                  color: "#3b82f6",
+                }}
+              >
+                Tiptap Editor ⚡
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: `${theme.colors.primary}18`,
+                borderWidth: 1,
+                borderColor: `${theme.colors.primary}40`,
+                paddingHorizontal: 9,
+                paddingVertical: 5,
+                borderRadius: 16,
+              }}
+              onPress={() =>
+                handleTabChange(activeTab === "fields" ? "preview" : "fields")
+              }
+            >
+              <Ionicons
+                name={activeTab === "fields" ? "create-outline" : "list-outline"}
+                size={13}
+                color={theme.colors.primary}
+                style={{ marginRight: 3 }}
+              />
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: "bold",
+                  color: theme.colors.primary,
+                }}
+              >
+                {activeTab === "fields"
+                  ? locale === "hi"
+                    ? "लाइव एडिटर"
+                    : "Live Editor"
+                  : locale === "hi"
+                    ? "फ़ॉर्म इनपुट"
+                    : "Form Input"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         ) : null,
     });
-  }, [navigation, t, activeTab, documentType, theme, locale]);
+  }, [navigation, t, activeTab, documentType, theme, locale, handleEditCustomizeTiptap]);
 
   const getTranslatedDocTypes = () => {
     return documentTypeOptions.map((opt) => {
@@ -2098,7 +2217,13 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
 
           if (caseId) {
             // Case-associated document sharing / opening options
-            const docTitle = `Export_${documentType.toUpperCase()}`;
+            const docTypeLabel =
+              getFullDocTypesList().find((o) => o.value === documentType)?.label ||
+              documentType.toUpperCase();
+            const docFileName = `${docTypeLabel}_${caseTitle || clientName || "Document"}_${formatDate(new Date())}`;
+            const namedUri = await createNamedPdfFile(uri, docFileName);
+            const docTitle = `${docTypeLabel} - ${caseTitle || clientName || "Case"}`;
+
             Alert.alert(
               t("docgen_alert_saved_title") || "Document Generated",
               "Choose an action for this PDF:",
@@ -2108,7 +2233,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                   onPress: () => {
                     // @ts-ignore
                     navigation.navigate("PdfViewer", {
-                      pdfUri: uri,
+                      pdfUri: namedUri,
                       title: docTitle,
                     });
                   },
@@ -2116,13 +2241,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                 {
                   text: "Share PDF",
                   onPress: async () => {
-                    if (await Sharing.isAvailableAsync()) {
-                      await Sharing.shareAsync(uri, {
-                        mimeType: "application/pdf",
-                        dialogTitle: docTitle,
-                        UTI: "com.adobe.pdf",
-                      });
-                    }
+                    await shareNamedPdf(namedUri, docFileName, docTitle);
                   },
                 },
                 {
@@ -2187,6 +2306,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
               updated_at: new Date().toISOString(),
             });
 
+            const namedUri = await createNamedPdfFile(destinationUri, newDraft.title);
+
             Alert.alert(
               t("docgen_alert_saved_title"),
               t("docgen_alert_saved_desc"),
@@ -2196,7 +2317,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                   onPress: () => {
                     // @ts-ignore
                     navigation.navigate("PdfViewer", {
-                      pdfUri: destinationUri,
+                      pdfUri: namedUri,
                       title: newDraft.title,
                     });
                   },
@@ -2204,13 +2325,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                 {
                   text: "Share PDF",
                   onPress: async () => {
-                    if (await Sharing.isAvailableAsync()) {
-                      await Sharing.shareAsync(destinationUri, {
-                        mimeType: "application/pdf",
-                        dialogTitle: newDraft.title,
-                        UTI: "com.adobe.pdf",
-                      });
-                    }
+                    await shareNamedPdf(namedUri, newDraft.title, newDraft.title);
                   },
                 },
                 {
@@ -2289,13 +2404,33 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
     }
   };
 
-  const handleEditCustomize = async () => {
+  const handleEditCustomizeLegacy = async () => {
     setIsGenerating(true);
     await cacheAdvocateProfile();
     try {
       const htmlContent = getInterpolatedHtml();
       // @ts-ignore
       navigation.navigate("EditDraft", {
+        caseId: caseId ? Number(caseId) : undefined,
+        initialHtml: htmlContent,
+        templateType: documentType,
+        title: `${getTranslatedDocTypes().find((o) => o.value === documentType)?.label || "Draft"} - ${clientName || "Custom"}`,
+      });
+    } catch (error) {
+      console.error("Error creating initial customization HTML:", error);
+      Alert.alert(t("alert_error"), "Could not prepare draft text.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleEditCustomizeTiptap = async () => {
+    setIsGenerating(true);
+    await cacheAdvocateProfile();
+    try {
+      const htmlContent = getInterpolatedHtml();
+      // @ts-ignore
+      navigation.navigate("TiptapEditDraft", {
         caseId: caseId ? Number(caseId) : undefined,
         initialHtml: htmlContent,
         templateType: documentType,
@@ -3005,11 +3140,18 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
 
             <View style={{ marginTop: 24 }}>
               <ActionButton
-                title="Edit & Customize Draft"
-                onPress={handleEditCustomize}
+                title="Edit in Tiptap Editor (New ⚡)"
+                onPress={handleEditCustomizeTiptap}
                 type="primary"
                 disabled={isGenerating || !advocateName}
-                style={{ marginBottom: 12 }}
+                style={{ marginBottom: 10 }}
+              />
+              <ActionButton
+                title="Edit in Legacy Editor (Classic 📝)"
+                onPress={handleEditCustomizeLegacy}
+                type="secondary"
+                disabled={isGenerating || !advocateName}
+                style={{ marginBottom: 10 }}
               />
               <ActionButton
                 title={
@@ -3850,6 +3992,37 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                   </Text>
                 </TouchableOpacity>
 
+                {/* Filing Index Table Button */}
+                <TouchableOpacity
+                  style={{
+                    padding: 7,
+                    paddingHorizontal: 8,
+                    borderRadius: 6,
+                    backgroundColor: `${theme.colors.primary}15`,
+                    borderWidth: 1,
+                    borderColor: `${theme.colors.primary}40`,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                  onPress={() => triggerFormat("insertFilingIndexTable")}
+                >
+                  <Ionicons
+                    name="list-outline"
+                    size={14}
+                    color={theme.colors.primary}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={{
+                      color: theme.colors.primary,
+                      fontSize: 11,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Index Docket
+                  </Text>
+                </TouchableOpacity>
+
                 <View
                   style={{
                     width: 1,
@@ -3893,7 +4066,7 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
           {/* Full Height Editor Canvas */}
           <WebView
             ref={webViewRef}
-            source={{ html: getOfflineEditorHtml(htmlContent) }}
+            source={{ html: initialEditorHtml }}
             onMessage={handleEditorMessage}
             style={{ flex: 1 }}
             originWhitelist={["*"]}
@@ -3970,6 +4143,8 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                         created_at: new Date().toISOString(),
                         updated_at: new Date().toISOString(),
                       });
+                      await saveDraftRevision(idToSave, html);
+                      setActiveDraftId(idToSave);
 
                       Alert.alert(
                         locale === "hi" ? "सफलता" : "Success",
@@ -4068,6 +4243,45 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
 
             <TouchableOpacity
               style={{
+                paddingHorizontal: 8,
+                backgroundColor: `${theme.colors.primary}12`,
+                borderColor: `${theme.colors.primary}35`,
+                borderWidth: 1,
+                borderRadius: 8,
+                height: 36,
+                justifyContent: "center",
+                alignItems: "center",
+                flexDirection: "row",
+              }}
+              onPress={async () => {
+                if (activeDraftId) {
+                  const revs = await getDraftRevisions(activeDraftId);
+                  setDraftRevisions(revs);
+                } else {
+                  setDraftRevisions([]);
+                }
+                setIsRevisionHistoryVisible(true);
+              }}
+            >
+              <Ionicons
+                name="time-outline"
+                size={14}
+                color={theme.colors.primary}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={{
+                  color: theme.colors.primary,
+                  fontWeight: "600",
+                  fontSize: 12,
+                }}
+              >
+                Revisions
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
                 flex: 1,
                 backgroundColor: "#10B981",
                 borderRadius: 8,
@@ -4146,6 +4360,50 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
               contentContainerStyle={{ paddingBottom: 16 }}
             >
               <View style={{ paddingVertical: 16 }}>
+                {/* Court Filing Presets (1-Tap Setup) */}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "bold",
+                    color: theme.colors.primary,
+                    marginBottom: 8,
+                  }}
+                >
+                  🏛️ Court Filing Presets (1-Tap)
+                </Text>
+                <View style={{ flexDirection: "row", marginBottom: 16, gap: 6 }}>
+                  {[
+                    { label: "Supreme Court", value: "supreme_court" },
+                    { label: "High Court", value: "high_court" },
+                    { label: "District Court", value: "district_court" },
+                  ].map((p) => (
+                    <TouchableOpacity
+                      key={p.value}
+                      style={{
+                        flex: 1,
+                        padding: 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: theme.colors.primary,
+                        backgroundColor: `${theme.colors.primary}15`,
+                        alignItems: "center",
+                      }}
+                      onPress={() => applyCourtPreset(p.value as any)}
+                    >
+                      <Text
+                        style={{
+                          color: theme.colors.primary,
+                          fontSize: 11,
+                          fontWeight: "700",
+                          textAlign: "center",
+                        }}
+                      >
+                        {p.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
                 {/* Font selection */}
                 <Text
                   style={{
@@ -4906,6 +5164,64 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
                     </TouchableOpacity>
                   </View>
                 </View>
+                {/* Advocate Digital Watermark */}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "bold",
+                    color: theme.colors.textSecondary,
+                    marginBottom: 8,
+                    marginTop: 14,
+                  }}
+                >
+                  🛡️ Advocate Digital Watermark
+                </Text>
+                <View style={{ flexDirection: "row", gap: 6, marginBottom: 8 }}>
+                  {["CONFIDENTIAL DRAFT", "FOR COURT RECORD ONLY", "ADVOCATE COPY"].map((wm) => {
+                    const isSel = watermarkText === wm;
+                    return (
+                      <TouchableOpacity
+                        key={wm}
+                        style={{
+                          flex: 1,
+                          padding: 8,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: isSel ? theme.colors.primary : theme.colors.border,
+                          backgroundColor: isSel ? `${theme.colors.primary}20` : "transparent",
+                          alignItems: "center",
+                        }}
+                        onPress={() => {
+                          const nextWm = isSel ? "" : wm;
+                          setWatermarkText(nextWm);
+                          applyLayoutSettings(
+                            font,
+                            lineHeight,
+                            pageSize,
+                            topMargin,
+                            bottomMargin,
+                            leftMargin,
+                            rightMargin,
+                            letterheadSpace,
+                            nextWm,
+                            watermarkOpacity
+                          );
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: "700",
+                            color: isSel ? theme.colors.primary : theme.colors.text,
+                            textAlign: "center",
+                          }}
+                        >
+                          {wm}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
             </ScrollView>
           </View>
@@ -5584,6 +5900,89 @@ body { font-family: 'Outfit', sans-serif; padding: 20px; line-height: 1.6; }
         onClose={() => setOcrModalVisible(false)}
         onImport={handleImportOcrText}
       />
+
+      {/* Revision History Modal */}
+      <Modal
+        visible={isRevisionHistoryVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsRevisionHistoryVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: theme.colors.cardBackground, maxHeight: "80%" },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                📜 Draft Revision History
+              </Text>
+              <TouchableOpacity onPress={() => setIsRevisionHistoryVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {draftRevisions.length === 0 ? (
+              <View style={{ padding: 24, alignItems: "center" }}>
+                <Ionicons
+                  name="time-outline"
+                  size={48}
+                  color={theme.colors.textSecondary}
+                  style={{ opacity: 0.5, marginBottom: 12 }}
+                />
+                <Text style={{ color: theme.colors.textSecondary, textAlign: "center" }}>
+                  No saved revisions found for this draft yet. Save draft to record snapshot versions.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView style={{ paddingVertical: 12 }}>
+                {draftRevisions.map((rev) => (
+                  <View
+                    key={rev.id}
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: 12,
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.colors.border,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: "bold", color: theme.colors.text, fontSize: 13 }}>
+                        Revision #{rev.revision_number}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>
+                        {formatDate(rev.created_at)}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: theme.colors.primary,
+                        borderRadius: 6,
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                      }}
+                      onPress={() => {
+                        postMessageToWebView({ type: "setContent", html: rev.html_content });
+                        setIsRevisionHistoryVisible(false);
+                        Alert.alert("Revision Restored", `Restored snapshot #${rev.revision_number} successfully.`);
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+                        Restore
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };

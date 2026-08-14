@@ -802,20 +802,39 @@ export const saveDocumentDraft = async (
 ): Promise<void> => {
   const db = await getDb();
   let content = draft.html_content;
-  if (content === undefined || content === null) {
+  let templateType = draft.template_type;
+  let isCustom = draft.is_custom_template ?? 0;
+  let title = draft.title || "Draft Document";
+
+  if (
+    content === undefined ||
+    content === null ||
+    templateType === undefined ||
+    templateType === null ||
+    templateType === ""
+  ) {
     const existing = await getDocumentDraftById(draft.id);
-    content = existing?.html_content || "<div><p>Document Content</p></div>";
+    if (content === undefined || content === null) {
+      content = existing?.html_content || "<div><p>Document Content</p></div>";
+    }
+    if (!templateType) {
+      templateType = existing?.template_type || "draft";
+    }
+    if (draft.is_custom_template === undefined && existing?.is_custom_template !== undefined) {
+      isCustom = existing.is_custom_template;
+    }
   }
+
   await db.runAsync(
     `INSERT OR REPLACE INTO document_drafts (id, case_id, title, template_type, html_content, is_custom_template, created_at, updated_at) 
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       draft.id,
       draft.case_id ?? null,
-      draft.title,
-      draft.template_type,
+      title,
+      templateType || "draft",
       content,
-      draft.is_custom_template,
+      isCustom,
       draft.created_at || new Date().toISOString(),
       new Date().toISOString(),
     ]
@@ -964,3 +983,39 @@ export const getUndatedCasesCount = async (
   const cases = await getUndatedCases(userId);
   return cases.length;
 };
+
+export interface DocumentDraftRevision {
+  id: string;
+  draft_id: string;
+  revision_number: number;
+  html_content: string;
+  created_at: string;
+}
+
+export const saveDraftRevision = async (
+  draftId: string,
+  htmlContent: string
+): Promise<void> => {
+  const db = await getDb();
+  const revs = await db.getAllAsync<{ revision_number: number }>(
+    "SELECT revision_number FROM document_draft_revisions WHERE draft_id = ? ORDER BY revision_number DESC LIMIT 1",
+    [draftId]
+  );
+  const nextRev = revs && revs.length > 0 ? revs[0].revision_number + 1 : 1;
+  const id = `${draftId}_rev_${nextRev}_${Date.now()}`;
+  await db.runAsync(
+    "INSERT INTO document_draft_revisions (id, draft_id, revision_number, html_content, created_at) VALUES (?, ?, ?, ?, ?)",
+    [id, draftId, nextRev, htmlContent, new Date().toISOString()]
+  );
+};
+
+export const getDraftRevisions = async (
+  draftId: string
+): Promise<DocumentDraftRevision[]> => {
+  const db = await getDb();
+  return db.getAllAsync<DocumentDraftRevision>(
+    "SELECT * FROM document_draft_revisions WHERE draft_id = ? ORDER BY revision_number DESC",
+    [draftId]
+  );
+};
+

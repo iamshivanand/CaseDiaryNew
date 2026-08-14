@@ -11,10 +11,12 @@ export const getAddCaseStyles = (theme: Theme) =>
     },
     scrollContentContainerStyle: {
       flexGrow: 1,
+      paddingBottom: 60,
     },
     formScreenContainer: {
       paddingHorizontal: 16,
       paddingTop: 16,
+      paddingBottom: 20,
     },
     screenTitle: {
       fontSize: 26,
@@ -25,8 +27,10 @@ export const getAddCaseStyles = (theme: Theme) =>
     },
     actionButtonContainer: {
       marginTop: 20,
+      marginBottom: 32,
       flexDirection: "row",
-      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 12,
     },
     groupCard: {
       borderRadius: 16,

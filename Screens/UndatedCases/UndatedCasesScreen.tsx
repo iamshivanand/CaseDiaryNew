@@ -1,37 +1,35 @@
-import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPopup';
-import { getCurrentUserId } from '../../utils/commonFunctions';
-import { ThemeContext } from '../../Providers/ThemeProvider';
-import { promptClientNotification } from '../../utils/whatsappNotifier';
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState, useCallback, useContext } from "react";
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
-  ActivityIndicator,
   TouchableOpacity,
   Alert,
+  SafeAreaView,
+  Platform,
+  DeviceEventEmitter,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 
-
-import { SafeAreaView, Platform } from "react-native";
-import { DeviceEventEmitter } from "react-native";
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as db from "../../DataBase";
-import { CaseData, CaseDataScreen } from '../../Types/appTypes';
+import { ThemeContext } from "../../Providers/ThemeProvider";
+import { CaseDataScreen } from "../../Types/appTypes";
 import { CASE_UPDATED_EVENT } from "../../utils/caseEvents";
 import { mapCaseDbToScreen } from "../../utils/caseMapper";
 import {
-  formatDate,
+  getCurrentUserId,
   getLocalDateString,
-  normalizeDateToYYYYMMDD,
 } from "../../utils/commonFunctions";
 import dbCacheManager from "../../utils/dbCacheManager";
 import { exportUndatedCasesToPdf } from "../../utils/pdfExporter";
+import { promptClientNotification } from "../../utils/whatsappNotifier";
+import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { useAdTrigger } from "../CommonComponents/AdManager";
+import { CauseListCustomizerModal } from "../CommonComponents/CauseListCustomizerModal";
 import { SkeletonList } from "../CommonComponents/SkeletonLoader";
 
 const AnimatedNewCaseCard = ({
@@ -59,10 +57,11 @@ const UndatedCasesScreen = () => {
   const [undatedCases, setUndatedCases] = useState<CaseDataScreen[]>([]);
   const [rawCases, setRawCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { showAdWithPreload } = useAdTrigger();
   const [isPopupVisible, setPopupVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
+  const [isCauseListModalVisible, setIsCauseListModalVisible] = useState(false);
 
   const fetchUndatedCases = async () => {
     try {
@@ -217,16 +216,30 @@ const UndatedCasesScreen = () => {
     []
   );
 
-  const handleShareUndatedCases = async () => {
+  const handleShareUndatedCases = () => {
     if (rawCases.length === 0) {
       Alert.alert("Empty List", "There are no undated cases to export.");
       return;
     }
+    setIsCauseListModalVisible(true);
+  };
+
+  const handleGenerateUndatedPdf = async (
+    selectedFields: string[],
+    sortField?: string,
+    sortDirection?: "asc" | "desc"
+  ) => {
     try {
       await showAdWithPreload("rewarded", async (success) => {
         if (success) {
           try {
-            await exportUndatedCasesToPdf(rawCases, navigation);
+            await exportUndatedCasesToPdf(
+              rawCases,
+              navigation,
+              selectedFields,
+              sortField,
+              sortDirection
+            );
           } catch (error) {
             Alert.alert(
               "Export Failed",
@@ -320,6 +333,12 @@ const UndatedCasesScreen = () => {
           }
         />
       )}
+      <CauseListCustomizerModal
+        visible={isCauseListModalVisible}
+        onClose={() => setIsCauseListModalVisible(false)}
+        onGenerate={handleGenerateUndatedPdf}
+        title="Customize Undated Cases List"
+      />
     </SafeAreaView>
   );
 };

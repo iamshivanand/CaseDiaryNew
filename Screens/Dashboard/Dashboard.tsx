@@ -42,6 +42,7 @@ import { promptClientNotification } from "../../utils/whatsappNotifier";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { useAdTrigger } from "../CommonComponents/AdManager";
+import { CauseListCustomizerModal } from "../CommonComponents/CauseListCustomizerModal";
 import SectionHeader from "../CommonComponents/SectionHeader";
 import VoiceSearchBar from "../CommonComponents/VoiceSearchBar";
 
@@ -466,6 +467,7 @@ const TodaysCasesSection = () => {
   const { showAdWithPreload } = useAdTrigger();
   const [isPopupVisible, setPopupVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
+  const [isCauseListModalVisible, setIsCauseListModalVisible] = useState(false);
 
   const fetchTodaysCases = async () => {
     try {
@@ -611,7 +613,7 @@ const TodaysCasesSection = () => {
     }
   };
 
-  const handleShareCauseList = async () => {
+  const handleShareCauseList = () => {
     if (todaysCases.length === 0) {
       Alert.alert(
         "Empty Cause List",
@@ -619,6 +621,14 @@ const TodaysCasesSection = () => {
       );
       return;
     }
+    setIsCauseListModalVisible(true);
+  };
+
+  const handleGenerateCauseList = async (
+    selectedFields: string[],
+    sortField?: string,
+    sortDirection?: "asc" | "desc"
+  ) => {
     try {
       await showAdWithPreload("rewarded", async (success) => {
         if (success) {
@@ -631,7 +641,14 @@ const TodaysCasesSection = () => {
               const caseDate = c.NextDate.split("T")[0];
               return caseDate === today;
             });
-            await exportDailyCauseListToPdf(filteredDbCases, todayStr);
+            await exportDailyCauseListToPdf(
+              filteredDbCases,
+              todayStr,
+              navigation,
+              selectedFields,
+              sortField,
+              sortDirection
+            );
           } catch (error) {
             Alert.alert(
               "Export Failed",
@@ -759,6 +776,12 @@ const TodaysCasesSection = () => {
           }
         />
       )}
+      <CauseListCustomizerModal
+        visible={isCauseListModalVisible}
+        onClose={() => setIsCauseListModalVisible(false)}
+        onGenerate={handleGenerateCauseList}
+        title="Customize Today's Cause List"
+      />
     </View>
   );
 };

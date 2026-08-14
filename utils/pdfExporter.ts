@@ -2,7 +2,14 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { Alert } from "react-native";
 
+import {
+  AVAILABLE_CAUSE_LIST_FIELDS,
+  getCauseListSelectedFields,
+  getCauseListSortConfig,
+  sortCasesForCauseList,
+} from "./causeListConfig";
 import { formatDate } from "./commonFunctions";
+import { createNamedPdfFile, shareNamedPdf } from "./fileShareHelper";
 import { CaseWithDetails, getCaseTimelineEventsByCaseId } from "../DataBase";
 
 const appPromoFooterHtml = `
@@ -201,18 +208,21 @@ export const exportCaseToPdf = async (
       height: 1008,
     });
 
+    const docFileName = `Case_Summary_${caseDetails.CaseTitle || "Case"}${caseDetails.case_number ? `_${caseDetails.case_number}` : ""}`;
+    const namedUri = await createNamedPdfFile(uri, docFileName);
+    const docTitle = caseDetails.CaseTitle || "Case Summary";
+
     // 2. Open sharing/viewing options
-    const docTitle = `Export_${caseDetails.CaseTitle || "Case"}`;
     if (navigation) {
       Alert.alert(
-        caseDetails.CaseTitle || "Case Summary",
+        docTitle,
         "Choose an action for this PDF:",
         [
           {
             text: "Open in App",
             onPress: () => {
               navigation.navigate("PdfViewer", {
-                pdfUri: uri,
+                pdfUri: namedUri,
                 title: docTitle,
               });
             },
@@ -220,13 +230,7 @@ export const exportCaseToPdf = async (
           {
             text: "Share PDF",
             onPress: async () => {
-              if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, {
-                  mimeType: "application/pdf",
-                  dialogTitle: docTitle,
-                  UTI: "com.adobe.pdf",
-                });
-              }
+              await shareNamedPdf(namedUri, docFileName, docTitle);
             },
           },
           {
@@ -236,20 +240,213 @@ export const exportCaseToPdf = async (
         ]
       );
     } else {
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: "application/pdf",
-          dialogTitle: docTitle,
-          UTI: "com.adobe.pdf",
-        });
-      } else {
-        console.warn("PDF sharing is not available on this platform.");
-      }
+      await shareNamedPdf(namedUri, docFileName, docTitle);
     }
   } catch (error) {
     console.error("Failed to export case to PDF:", error);
     throw error;
   }
+};
+
+/**
+ * Helper to build a high-density, single-line-per-case cause list HTML table.
+ */
+const generateCauseListHtml = async (
+  cases: any[],
+  title: string,
+  subtitle: string,
+  selectedFieldIds?: string[],
+  sortField?: string,
+  sortDirection?: "asc" | "desc"
+): Promise<string> => {
+  const activeFieldIds =
+    selectedFieldIds && selectedFieldIds.length > 0
+      ? selectedFieldIds
+      : await getCauseListSelectedFields();
+
+  let activeSortField = sortField;
+  let activeSortDirection = sortDirection || "asc";
+
+  if (!activeSortField) {
+    const savedSort = await getCauseListSortConfig();
+    activeSortField = savedSort.field;
+    activeSortDirection = savedSort.direction;
+  }
+
+  const sortedCases = sortCasesForCauseList(
+    cases,
+    activeSortField,
+    activeSortDirection
+  );
+
+  const selectedFields = AVAILABLE_CAUSE_LIST_FIELDS.filter((f) =>
+    activeFieldIds.includes(f.id)
+  );
+
+  // Width distribution:
+  // S.No: 4% (Mandatory)
+  // Blank Notes: 16% (Mandatory)
+  // Selected columns share remaining 80% proportionally
+  const S_NO_WIDTH = 4;
+  const BLANK_NOTES_WIDTH = 16;
+  const REMAINING_WIDTH = 100 - S_NO_WIDTH - BLANK_NOTES_WIDTH;
+
+  const totalBaseWeight =
+    selectedFields.reduce((sum, f) => sum + f.baseWidthPercent, 0) || 1;
+  const columnsWithWidth = selectedFields.map((f) => ({
+    ...f,
+    widthPercent: (f.baseWidthPercent / totalBaseWeight) * REMAINING_WIDTH,
+  }));
+
+  // Build <thead>
+  let theadHtml = `
+    <tr>
+      <th style="width: ${S_NO_WIDTH}%; text-align: center;">S.No</th>
+  `;
+  columnsWithWidth.forEach((col) => {
+    theadHtml += `<th style="width: ${col.widthPercent.toFixed(1)}%; text-align: left;">${col.label}</th>`;
+  });
+  theadHtml += `
+      <th style="width: ${BLANK_NOTES_WIDTH}%; text-align: left;">Note / Next Date</th>
+    </tr>
+  `;
+
+  // Build <tbody>
+  let tbodyHtml = "";
+  const totalCols = 2 + columnsWithWidth.length;
+
+  if (sortedCases.length > 0) {
+    sortedCases.forEach((c, index) => {
+      tbodyHtml += `<tr>`;
+      // 1. S.No (Mandatory, 1 to N after sorting)
+      tbodyHtml += `<td style="text-align: center; font-weight: bold;">${index + 1}</td>`;
+
+      // 2. Selected dynamic columns (strictly single-line)
+      columnsWithWidth.forEach((col) => {
+        const rawVal = col.getValue(c);
+        const escapedVal = String(rawVal)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        tbodyHtml += `<td title="${escapedVal}">${escapedVal}</td>`;
+      });
+
+      // 3. Last Blank Column for Handwriting (Mandatory)
+      tbodyHtml += `<td class="blank-column"></td>`;
+      tbodyHtml += `</tr>`;
+    });
+  } else {
+    tbodyHtml = `
+      <tr>
+        <td colspan="${totalCols}" style="padding: 16px; text-align: center; color: #666; font-style: italic;">
+          No cases found to display.
+        </td>
+      </tr>
+    `;
+  }
+
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+          @page {
+            size: landscape;
+            margin: 6mm 8mm;
+          }
+          * {
+            box-sizing: border-box;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #1E293B;
+            margin: 0;
+            padding: 4px;
+            font-size: 9px;
+            background-color: #FFFFFF;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 1.5px solid #0F172A;
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 800;
+            color: #0F172A;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .header h2 {
+            margin: 2px 0 0 0;
+            font-size: 11px;
+            font-weight: 500;
+            color: #475569;
+          }
+          table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            border: 1px solid #64748B;
+          }
+          th {
+            background-color: #E2E8F0;
+            color: #0F172A;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 3px 4px;
+            border: 1px solid #94A3B8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-transform: uppercase;
+            height: 20px;
+          }
+          td {
+            padding: 2px 4px;
+            font-size: 8.5px;
+            line-height: 1.15;
+            height: 19px;
+            max-height: 19px;
+            border: 1px solid #CBD5E1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            vertical-align: middle;
+            color: #0F172A;
+          }
+          tr:nth-child(even) td {
+            background-color: #F8FAFC;
+          }
+          td.blank-column {
+            background-color: #FFFFFF;
+          }
+          @media print {
+            body { -webkit-print-color-adjust: exact; }
+            tr { page-break-inside: avoid; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>${title}</h1>
+          <h2>${subtitle}</h2>
+        </div>
+        <table>
+          <thead>
+            ${theadHtml}
+          </thead>
+          <tbody>
+            ${tbodyHtml}
+          </tbody>
+        </table>
+        ${appPromoFooterHtml}
+      </body>
+    </html>
+  `;
 };
 
 /**
@@ -259,119 +456,215 @@ export const exportCaseToPdf = async (
 export const exportDailyCauseListToPdf = async (
   cases: any[],
   titleDate: string,
-  navigation?: any
+  navigation?: any,
+  selectedFieldIds?: string[],
+  sortField?: string,
+  sortDirection?: "asc" | "desc"
 ): Promise<void> => {
   try {
-    let rowsHtml = "";
-    if (cases.length > 0) {
-      cases.forEach((c, index) => {
-        rowsHtml += `
-          <tr>
-            <td style="padding: 4px 5px; border: 1px solid #777; text-align: center; font-size: 10px; font-weight: bold;">
-              ${index + 1}
-            </td>
-            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10.5px;">
-              <strong style="color: #000;">${c.CaseTitle || "No Title"}</strong> ${c.case_number ? `(${c.case_number})` : ""}<br/>
-              <span style="font-size: 9.5px; color: #444;">Client: ${c.ClientName || "N/A"} | CNR: ${c.CNRNumber || "N/A"}</span>
-            </td>
-            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px;">
-              ${c.court_name || "N/A"} ${c.JudgeName ? `[${c.JudgeName}]` : ""}
-            </td>
-            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px;">
-              ${c.CaseStatus || "N/A"} ${c.Undersection ? `(${c.Undersection})` : ""}
-            </td>
-            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px; text-align: center;">
-              ${c.PreviousDate ? formatDate(c.PreviousDate) : "N/A"}
-            </td>
-            <td style="padding: 4px 5px; border: 1px solid #777; width: 140px; height: 26px; background-color: #fafafa;">
-              <!-- Blank column for hand-written notes / next date -->
-            </td>
-          </tr>
-        `;
-      });
-    } else {
-      rowsHtml = `
-        <tr>
-          <td colspan="6" style="padding: 20px; text-align: center; color: #666; font-style: italic;">
-            No cases listed for today.
-          </td>
-        </tr>
-      `;
-    }
+    const htmlContent = await generateCauseListHtml(
+      cases,
+      "Daily Cause List",
+      `Date: ${titleDate} • Prepared for Junior Advocates`,
+      selectedFieldIds,
+      sortField,
+      sortDirection
+    );
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <style>
-            @page {
-              size: landscape;
-              margin: 10mm;
-            }
-            body {
-              font-family: Arial, sans-serif;
-              color: #222;
-              line-height: 1.4;
-              padding: 10px;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 2px double #333;
-              padding-bottom: 8px;
-              margin-bottom: 15px;
-            }
-            .header h1 {
-              margin: 0;
-              font-size: 22px;
-              text-transform: uppercase;
-            }
-            .header h2 {
-              margin: 5px 0 0 0;
-              font-size: 15px;
-              color: #444;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 10px;
-            }
-            th {
-              background-color: #eaeaea;
-              color: #111;
-              font-size: 12px;
-              text-align: left;
-              padding: 8px;
-              font-weight: bold;
-              border: 1px solid #aaa;
-              text-transform: uppercase;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Daily Cause List</h1>
-            <h2>Date: ${titleDate} &bull; Prepared for Junior Advocates</h2>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 5%; text-align: center;">S.No</th>
-                <th style="width: 30%;">Case Details</th>
-                <th style="width: 25%;">Court & Judge</th>
-                <th style="width: 15%;">Status / Sec</th>
-                <th style="width: 10%; text-align: center;">Prev. Date</th>
-                <th style="width: 15%;">Note / Next Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-          ${appPromoFooterHtml}
-        </body>
-      </html>
+    activeSortDirection
+  );
+
+  const selectedFields = AVAILABLE_CAUSE_LIST_FIELDS.filter((f) =>
+    activeFieldIds.includes(f.id)
+  );
+
+  // Width distribution:
+  // S.No: 4% (Mandatory)
+  // Blank Notes: 16% (Mandatory)
+  // Selected columns share remaining 80% proportionally
+  const S_NO_WIDTH = 4;
+  const BLANK_NOTES_WIDTH = 16;
+  const REMAINING_WIDTH = 100 - S_NO_WIDTH - BLANK_NOTES_WIDTH;
+
+  const totalBaseWeight =
+    selectedFields.reduce((sum, f) => sum + f.baseWidthPercent, 0) || 1;
+  const columnsWithWidth = selectedFields.map((f) => ({
+    ...f,
+    widthPercent: (f.baseWidthPercent / totalBaseWeight) * REMAINING_WIDTH,
+  }));
+
+  // Build <thead>
+  let theadHtml = `
+    <tr>
+      <th style="width: ${S_NO_WIDTH}%; text-align: center;">S.No</th>
+  `;
+  columnsWithWidth.forEach((col) => {
+    theadHtml += `<th style="width: ${col.widthPercent.toFixed(1)}%; text-align: left;">${col.label}</th>`;
+  });
+  theadHtml += `
+      <th style="width: ${BLANK_NOTES_WIDTH}%; text-align: left;">Note / Next Date</th>
+    </tr>
+  `;
+
+  // Build <tbody>
+  let tbodyHtml = "";
+  const totalCols = 2 + columnsWithWidth.length;
+
+  if (sortedCases.length > 0) {
+    sortedCases.forEach((c, index) => {
+      tbodyHtml += `<tr>`;
+      // 1. S.No (Mandatory, 1 to N after sorting)
+      tbodyHtml += `<td style="text-align: center; font-weight: bold;">${index + 1}</td>`;
+
+      // 2. Selected dynamic columns (strictly single-line)
+      columnsWithWidth.forEach((col) => {
+        const rawVal = col.getValue(c);
+        const escapedVal = String(rawVal)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        tbodyHtml += `<td title="${escapedVal}">${escapedVal}</td>`;
+      });
+
+      // 3. Last Blank Column for Handwriting (Mandatory)
+      tbodyHtml += `<td class="blank-column"></td>`;
+      tbodyHtml += `</tr>`;
+    });
+  } else {
+    tbodyHtml = `
+      <tr>
+        <td colspan="${totalCols}" style="padding: 16px; text-align: center; color: #666; font-style: italic;">
+          No cases found to display.
+        </td>
+      </tr>
     `;
+  }
+
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+          @page {
+            size: landscape;
+            margin: 6mm 8mm;
+          }
+          * {
+            box-sizing: border-box;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #1E293B;
+            margin: 0;
+            padding: 4px;
+            font-size: 9px;
+            background-color: #FFFFFF;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 1.5px solid #0F172A;
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 800;
+            color: #0F172A;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .header h2 {
+            margin: 2px 0 0 0;
+            font-size: 11px;
+            font-weight: 500;
+            color: #475569;
+          }
+          table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            border: 1px solid #64748B;
+          }
+          th {
+            background-color: #E2E8F0;
+            color: #0F172A;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 3px 4px;
+            border: 1px solid #94A3B8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-transform: uppercase;
+            height: 20px;
+          }
+          td {
+            padding: 2px 4px;
+            font-size: 8.5px;
+            line-height: 1.15;
+            height: 19px;
+            max-height: 19px;
+            border: 1px solid #CBD5E1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            vertical-align: middle;
+            color: #0F172A;
+          }
+          tr:nth-child(even) td {
+            background-color: #F8FAFC;
+          }
+          td.blank-column {
+            background-color: #FFFFFF;
+          }
+          @media print {
+            body { -webkit-print-color-adjust: exact; }
+            tr { page-break-inside: avoid; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>${title}</h1>
+          <h2>${subtitle}</h2>
+        </div>
+        <table>
+          <thead>
+            ${theadHtml}
+          </thead>
+          <tbody>
+            ${tbodyHtml}
+          </tbody>
+        </table>
+        ${appPromoFooterHtml}
+      </body>
+    </html>
+  `;
+};
+
+/**
+ * Exports today's cause list of cases to a structured PDF for junior advocates.
+ * Includes a blank 'Notes' column on the right for manual handwriting.
+ */
+export const exportDailyCauseListToPdf = async (
+  cases: any[],
+  titleDate: string,
+  navigation?: any,
+  selectedFieldIds?: string[],
+  sortField?: string,
+  sortDirection?: "asc" | "desc"
+): Promise<void> => {
+  try {
+    const htmlContent = await generateCauseListHtml(
+      cases,
+      "Daily Cause List",
+      `Date: ${titleDate} • Prepared for Junior Advocates`,
+      selectedFieldIds,
+      sortField,
+      sortDirection
+    );
 
     const { uri } = await Print.printToFileAsync({
       html: htmlContent,
@@ -379,49 +672,40 @@ export const exportDailyCauseListToPdf = async (
       height: 595,
     });
 
-    const docTitle = `Daily_Cause_List_${titleDate.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const docFileName = `Daily_Cause_List_${titleDate}`;
+    const namedUri = await createNamedPdfFile(uri, docFileName);
+    const docTitle = `Daily Cause List - ${titleDate}`;
+
     if (navigation) {
-      Alert.alert(
-        `Cause List - ${titleDate}`,
-        "Choose an action for this PDF:",
-        [
-          {
-            text: "Open in App",
-            onPress: () => {
-              navigation.navigate("PdfViewer", {
-                pdfUri: uri,
-                title: `Cause List - ${titleDate}`,
-              });
-            },
-          },
-          {
-            text: "Share PDF",
-            onPress: async () => {
-              if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, {
-                  mimeType: "application/pdf",
-                  dialogTitle: docTitle,
-                  UTI: "com.adobe.pdf",
+      setTimeout(() => {
+        Alert.alert(
+          docTitle,
+          "Choose an action for this PDF:",
+          [
+            {
+              text: "Open in App",
+              onPress: () => {
+                navigation.navigate("PdfViewer", {
+                  pdfUri: namedUri,
+                  title: docTitle,
                 });
-              }
+              },
             },
-          },
-          {
-            text: "Cancel",
-            style: "cancel",
-          },
-        ]
-      );
+            {
+              text: "Share PDF",
+              onPress: async () => {
+                await shareNamedPdf(namedUri, docFileName, docTitle);
+              },
+            },
+            {
+              text: "Cancel",
+              style: "cancel",
+            },
+          ]
+        );
+      }, 350);
     } else {
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: "application/pdf",
-          dialogTitle: docTitle,
-          UTI: "com.adobe.pdf",
-        });
-      } else {
-        console.warn("PDF sharing is not available on this platform.");
-      }
+      await shareNamedPdf(namedUri, docFileName, docTitle);
     }
   } catch (error) {
     console.error("Failed to export cause list to PDF:", error);
@@ -514,11 +798,11 @@ export const exportCaseHistoryToPdf = async (
               display: grid;
               grid-template-columns: 1fr 1fr;
               gap: 10px;
-              font-size: 14px;
+              font-size: 13px;
             }
             .meta-item span {
               font-weight: bold;
-              color: #555;
+              color: #1E3A8A;
             }
             table {
               width: 100%;
@@ -583,49 +867,40 @@ export const exportCaseHistoryToPdf = async (
       height: 595,
     });
 
-    const docTitle = `History_${caseDetails.CaseTitle || "Case"}`;
+    const docFileName = `Hearing_History_${caseDetails.CaseTitle || "Case"}${caseDetails.case_number ? `_${caseDetails.case_number}` : ""}`;
+    const namedUri = await createNamedPdfFile(uri, docFileName);
+    const docTitle = `History - ${caseDetails.CaseTitle || "Case"}`;
+
     if (navigation) {
-      Alert.alert(
-        `History - ${caseDetails.CaseTitle || "Case"}`,
-        "Choose an action for this PDF:",
-        [
-          {
-            text: "Open in App",
-            onPress: () => {
-              navigation.navigate("PdfViewer", {
-                pdfUri: uri,
-                title: `History - ${caseDetails.CaseTitle || "Case"}`,
-              });
-            },
-          },
-          {
-            text: "Share PDF",
-            onPress: async () => {
-              if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, {
-                  mimeType: "application/pdf",
-                  dialogTitle: docTitle,
-                  UTI: "com.adobe.pdf",
+      setTimeout(() => {
+        Alert.alert(
+          docTitle,
+          "Choose an action for this PDF:",
+          [
+            {
+              text: "Open in App",
+              onPress: () => {
+                navigation.navigate("PdfViewer", {
+                  pdfUri: namedUri,
+                  title: docTitle,
                 });
-              }
+              },
             },
-          },
-          {
-            text: "Cancel",
-            style: "cancel",
-          },
-        ]
-      );
+            {
+              text: "Share PDF",
+              onPress: async () => {
+                await shareNamedPdf(namedUri, docFileName, docTitle);
+              },
+            },
+            {
+              text: "Cancel",
+              style: "cancel",
+            },
+          ]
+        );
+      }, 350);
     } else {
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: "application/pdf",
-          dialogTitle: docTitle,
-          UTI: "com.adobe.pdf",
-        });
-      } else {
-        console.warn("PDF sharing is not available on this platform.");
-      }
+      await shareNamedPdf(namedUri, docFileName, docTitle);
     }
   } catch (error) {
     console.error("Failed to export case history to PDF:", error);
@@ -639,119 +914,20 @@ export const exportCaseHistoryToPdf = async (
  */
 export const exportUndatedCasesToPdf = async (
   cases: any[],
-  navigation?: any
+  navigation?: any,
+  selectedFieldIds?: string[],
+  sortField?: string,
+  sortDirection?: "asc" | "desc"
 ): Promise<void> => {
   try {
-    let rowsHtml = "";
-    if (cases.length > 0) {
-      cases.forEach((c, index) => {
-        rowsHtml += `
-          <tr>
-            <td style="padding: 4px 5px; border: 1px solid #777; text-align: center; font-size: 10px; font-weight: bold;">
-              ${index + 1}
-            </td>
-            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10.5px;">
-              <strong style="color: #000;">${c.CaseTitle || "No Title"}</strong> ${c.case_number ? `(${c.case_number})` : ""}<br/>
-              <span style="font-size: 9.5px; color: #444;">Client: ${c.ClientName || "N/A"} | CNR: ${c.CNRNumber || "N/A"}</span>
-            </td>
-            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px;">
-              ${c.court_name || "N/A"} ${c.JudgeName ? `[${c.JudgeName}]` : ""}
-            </td>
-            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px;">
-              ${c.CaseStatus || "N/A"} ${c.Undersection ? `(${c.Undersection})` : ""}
-            </td>
-            <td style="padding: 4px 5px; border: 1px solid #777; font-size: 10px; text-align: center;">
-              ${c.PreviousDate ? formatDate(c.PreviousDate) : "N/A"}
-            </td>
-            <td style="padding: 4px 5px; border: 1px solid #777; width: 140px; height: 26px; background-color: #fafafa;">
-              <!-- Blank column for hand-written notes / next date -->
-            </td>
-          </tr>
-        `;
-      });
-    } else {
-      rowsHtml = `
-        <tr>
-          <td colspan="6" style="padding: 20px; text-align: center; color: #666; font-style: italic;">
-            No undated cases found.
-          </td>
-        </tr>
-      `;
-    }
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <style>
-            @page {
-              size: landscape;
-              margin: 10mm;
-            }
-            body {
-              font-family: Arial, sans-serif;
-              color: #222;
-              line-height: 1.4;
-              padding: 10px;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 2px double #333;
-              padding-bottom: 8px;
-              margin-bottom: 15px;
-            }
-            .header h1 {
-              margin: 0;
-              font-size: 22px;
-              text-transform: uppercase;
-            }
-            .header h2 {
-              margin: 5px 0 0 0;
-              font-size: 15px;
-              color: #444;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 10px;
-            }
-            th {
-              background-color: #eaeaea;
-              color: #111;
-              font-size: 12px;
-              text-align: left;
-              padding: 8px;
-              font-weight: bold;
-              border: 1px solid #aaa;
-              text-transform: uppercase;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Undated Cases List</h1>
-            <h2>Prepared for Junior Advocates</h2>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 5%; text-align: center;">S.No</th>
-                <th style="width: 30%;">Case Details</th>
-                <th style="width: 25%;">Court & Judge</th>
-                <th style="width: 15%;">Status / Sec</th>
-                <th style="width: 10%; text-align: center;">Prev. Date</th>
-                <th style="width: 15%;">Note / Next Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-          ${appPromoFooterHtml}
-        </body>
-      </html>
-    `;
+    const htmlContent = await generateCauseListHtml(
+      cases,
+      "Undated Cases List",
+      "Prepared for Junior Advocates",
+      selectedFieldIds,
+      sortField,
+      sortDirection
+    );
 
     const { uri } = await Print.printToFileAsync({
       html: htmlContent,
@@ -759,45 +935,37 @@ export const exportUndatedCasesToPdf = async (
       height: 595,
     });
 
-    const docTitle = "Undated_Cases_List";
+    const dateStr = formatDate(new Date());
+    const docFileName = `Undated_Cases_List_${dateStr}`;
+    const namedUri = await createNamedPdfFile(uri, docFileName);
+    const docTitle = "Undated Cases List";
+
     if (navigation) {
-      Alert.alert("Undated Cases List", "Choose an action for this PDF:", [
-        {
-          text: "Open in App",
-          onPress: () => {
-            navigation.navigate("PdfViewer", {
-              pdfUri: uri,
-              title: "Undated Cases List",
-            });
-          },
-        },
-        {
-          text: "Share PDF",
-          onPress: async () => {
-            if (await Sharing.isAvailableAsync()) {
-              await Sharing.shareAsync(uri, {
-                mimeType: "application/pdf",
-                dialogTitle: docTitle,
-                UTI: "com.adobe.pdf",
+      setTimeout(() => {
+        Alert.alert(docTitle, "Choose an action for this PDF:", [
+          {
+            text: "Open in App",
+            onPress: () => {
+              navigation.navigate("PdfViewer", {
+                pdfUri: namedUri,
+                title: docTitle,
               });
-            }
+            },
           },
-        },
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-      ]);
+          {
+            text: "Share PDF",
+            onPress: async () => {
+              await shareNamedPdf(namedUri, docFileName, docTitle);
+            },
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+        ]);
+      }, 350);
     } else {
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: "application/pdf",
-          dialogTitle: docTitle,
-          UTI: "com.adobe.pdf",
-        });
-      } else {
-        console.warn("PDF sharing is not available on this platform.");
-      }
+      await shareNamedPdf(namedUri, docFileName, docTitle);
     }
   } catch (error) {
     console.error("Failed to export undated cases list to PDF:", error);

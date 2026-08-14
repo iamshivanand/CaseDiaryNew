@@ -1478,15 +1478,17 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 20}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollViewStyle}
           contentContainerStyle={styles.scrollContentContainerStyle}
           keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled={true}
+          showsVerticalScrollIndicator={true}
         >
           <View style={styles.formScreenContainer}>
             <Formik
@@ -1760,18 +1762,24 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
                     </Animatable.View>
                   ))}
                   <View style={styles.actionButtonContainer}>
-                    <ActionButton
-                      title={
-                        update ? t("btn_save_changes") : t("btn_save_case")
-                      }
-                      onPress={() => formikProps.handleSubmit()}
-                      type="primary"
-                    />
-                    <ActionButton
-                      title={t("alert_cancel")}
-                      onPress={() => navigation.goBack()}
-                      type="secondary"
-                    />
+                    <View style={{ flex: 1 }}>
+                      <ActionButton
+                        title={
+                          update ? t("btn_save_changes") : t("btn_save_case")
+                        }
+                        onPress={() => formikProps.handleSubmit()}
+                        type="primary"
+                        style={{ width: "100%", marginVertical: 0 }}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <ActionButton
+                        title={t("alert_cancel")}
+                        onPress={() => navigation.goBack()}
+                        type="secondary"
+                        style={{ width: "100%", marginVertical: 0 }}
+                      />
+                    </View>
                   </View>
                   <ECourtsImportModal
                     visible={isECourtsModalVisible}

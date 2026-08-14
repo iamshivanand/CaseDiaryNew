@@ -100,11 +100,16 @@ describe("DashboardScreen", () => {
     expect(todayCasesTitle).toBeTruthy();
   }, 15000);
 
-  it("should trigger ad preloading and daily cause list compilation on Share List click", async () => {
+  it("should open customizer modal and compile daily cause list on confirmation", async () => {
     const { findByText } = renderWithProviders();
     const shareButton = await findByText("Share List");
 
     fireEvent.press(shareButton);
+
+    const generatePdfButton = await findByText("Generate PDF");
+    expect(generatePdfButton).toBeTruthy();
+
+    fireEvent.press(generatePdfButton);
 
     await waitFor(() => {
       expect(mockShowAd).toHaveBeenCalledWith("rewarded", expect.any(Function));

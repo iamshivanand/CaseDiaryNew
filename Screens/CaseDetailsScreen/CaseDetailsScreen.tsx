@@ -54,6 +54,7 @@ import {
   exportCaseToPdf,
   exportCaseHistoryToPdf,
 } from "../../utils/pdfExporter";
+import { shareNamedPdf } from "../../utils/fileShareHelper";
 import { sendFeeReminderWhatsApp } from "../../utils/whatsappNotifier";
 import DocumentUpload from "../Addcase/DocumentUpload";
 import ActionButton from "../CommonComponents/ActionButton";
@@ -1345,8 +1346,12 @@ const CaseDetailsScreen: React.FC = () => {
   const handleShareDocument = async (doc: Document) => {
     if (!doc.stored_filename) return;
     const localPath = db.getFullDocumentPath(doc.stored_filename);
-    if (localPath && (await Sharing.isAvailableAsync())) {
-      await Sharing.shareAsync(localPath);
+    if (localPath) {
+      await shareNamedPdf(
+        localPath,
+        doc.fileName || doc.title || "Document",
+        doc.fileName || doc.title || "Document"
+      );
     } else {
       Alert.alert(t("alert_warning"), "Sharing unavailable for this document.");
     }

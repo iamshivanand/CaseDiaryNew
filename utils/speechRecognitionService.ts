@@ -42,27 +42,56 @@ const LEGAL_PHONETIC_CORRECTIONS: Record<string, string> = {
 };
 
 /**
- * Applies legal domain vocabulary correction to raw speech recognition output
+ * Spoken commands mapped to punctuation marks and line formatting
+ */
+const SPOKEN_PUNCTUATION_MAP: Record<string, string> = {
+  "full stop": ". ",
+  period: ". ",
+  "पूर्ण विराम": ". ",
+  comma: ", ",
+  अल्पविराम: ", ",
+  "new line": "\n",
+  "नया लाइन": "\n",
+  "paragraph break": "\n\n",
+  पैराग्राफ: "\n\n",
+  colon: ": ",
+  semicolon: "; ",
+  "question mark": "? ",
+  प्रश्नवाचक: "? ",
+  "exclamation mark": "! ",
+  "open bracket": " (",
+  "close bracket": ") ",
+};
+
+/**
+ * Applies legal domain vocabulary correction and spoken punctuation parsing to raw speech recognition output
  */
 export const applyLegalVocabularyCorrection = (rawText: string): string => {
   if (!rawText) return "";
 
   let cleaned = rawText.trim();
 
-  // 1. Replace phonetic misspellings from dictionary
+  // 1. Replace spoken punctuation commands
+  Object.keys(SPOKEN_PUNCTUATION_MAP).forEach((cmd) => {
+    const regex = new RegExp(`\\b${cmd}\\b`, "gi");
+    cleaned = cleaned.replace(regex, SPOKEN_PUNCTUATION_MAP[cmd]);
+  });
+
+  // 2. Replace phonetic misspellings from dictionary
   Object.keys(LEGAL_PHONETIC_CORRECTIONS).forEach((key) => {
     const regex = new RegExp(`\\b${key}\\b`, "gi");
     cleaned = cleaned.replace(regex, LEGAL_PHONETIC_CORRECTIONS[key]);
   });
 
-  // 2. Cross-reference with LEGAL_VOCABULARY entries for exact case matching
+  // 3. Cross-reference with LEGAL_VOCABULARY entries for exact case matching
   LEGAL_VOCABULARY.forEach((entry) => {
     const term = entry.english;
     const regex = new RegExp(`\\b${term}\\b`, "gi");
     cleaned = cleaned.replace(regex, term);
   });
 
-  return cleaned;
+  // Clean up double spaces created by punctuation replacements
+  return cleaned.replace(/\s+/g, " ").replace(/\s+([.,:;!?])/g, "$1");
 };
 
 class SpeechRecognitionService {

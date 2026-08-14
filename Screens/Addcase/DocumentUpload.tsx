@@ -24,6 +24,7 @@ import * as db from "../../DataBase"; // Corrected import
 import { CaseDocument } from "../../DataBase/schema";
 import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
+import { shareNamedPdf } from "../../utils/fileShareHelper";
 
 export type DocumentUploadRouteParams = {
   caseId?: number; // For existing cases
@@ -217,10 +218,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             {
               text: "Share PDF",
               onPress: async () => {
-                await Sharing.shareAsync(localUri, {
-                  mimeType: doc.file_type || "application/pdf",
-                  dialogTitle: t("doc_dialog_title"),
-                });
+                await shareNamedPdf(
+                  localUri,
+                  doc.original_display_name,
+                  t("doc_dialog_title")
+                );
               },
             },
             {
@@ -230,10 +232,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           ]
         );
       } else {
-        await Sharing.shareAsync(localUri, {
-          mimeType: doc.file_type || "*/*",
-          dialogTitle: t("doc_dialog_title"),
-        });
+        await shareNamedPdf(
+          localUri,
+          doc.original_display_name,
+          t("doc_dialog_title")
+        );
       }
     } catch (error) {
       console.error("Error downloading document:", error);

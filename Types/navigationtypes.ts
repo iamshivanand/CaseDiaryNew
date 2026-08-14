@@ -38,6 +38,13 @@ export type HomeStackParamList = {
     templateType?: string;
     title?: string;
   };
+  TiptapEditDraft: {
+    draftId?: string;
+    caseId?: number;
+    initialHtml?: string;
+    templateType?: string;
+    title?: string;
+  };
   ImportMigration: { isFromOnboarding?: boolean };
   DuplicateReview: undefined;
   PdfViewer: { pdfUri: string; title: string };
