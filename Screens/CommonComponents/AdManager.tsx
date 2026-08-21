@@ -54,7 +54,7 @@ let interstitialAd: InterstitialAd;
 export const createRewardedAd = () => {
   try {
     rewardedAd = RewardedAd.createForAdRequest(rewardedAdUnitId, {
-      requestNonPersonalizedAdsOnly: true,
+      requestNonPersonalizedAdsOnly: false,
     });
 
     let unsubL: (() => void) | null = null;
@@ -84,7 +84,7 @@ export const createRewardedAd = () => {
 export const createInterstitialAd = () => {
   try {
     interstitialAd = InterstitialAd.createForAdRequest(interstitialAdUnitId, {
-      requestNonPersonalizedAdsOnly: true,
+      requestNonPersonalizedAdsOnly: false,
     });
 
     let unsubL: (() => void) | null = null;
@@ -512,7 +512,14 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({
 export const useAdTrigger = () => {
   const context = useContext(AdContext);
   if (!context) {
-    throw new Error("useAdTrigger must be used within an AdProvider");
+    return {
+      showAdWithPreload: async (
+        _adType: "rewarded" | "interstitial",
+        onComplete: (success: boolean) => void
+      ) => {
+        onComplete(true);
+      },
+    };
   }
   return context;
 };

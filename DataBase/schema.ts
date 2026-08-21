@@ -159,6 +159,28 @@ export interface DocumentDraft {
   updated_at: string;
 }
 
+export interface AppNotificationRow {
+  id: number;
+  title: string;
+  body: string;
+  category: "hearing" | "case_update" | "fee" | "system" | string;
+  case_id?: number | null;
+  action_type?: string | null;
+  data_json?: string | null;
+  is_read: number; // 0: unread, 1: read
+  created_at: string;
+}
+
+export interface NewAppNotification {
+  title: string;
+  body: string;
+  category: "hearing" | "case_update" | "fee" | "system" | string;
+  case_id?: number | null;
+  action_type?: string | null;
+  data_json?: string | null;
+  is_read?: number;
+}
+
 // ---------------
 // DDL STATEMENTS
 // ---------------
@@ -373,6 +395,26 @@ CREATE TABLE IF NOT EXISTS document_draft_revisions (
   FOREIGN KEY (draft_id) REFERENCES document_drafts(id) ON DELETE CASCADE
 );`;
 
+export const CREATE_APP_NOTIFICATIONS_TABLE = `
+CREATE TABLE IF NOT EXISTS AppNotifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  category TEXT NOT NULL,
+  case_id INTEGER,
+  action_type TEXT,
+  data_json TEXT,
+  is_read INTEGER DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+  FOREIGN KEY (case_id) REFERENCES Cases(id) ON DELETE CASCADE
+);`;
+
+export const CREATE_APP_NOTIFICATIONS_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_notifications_category ON AppNotifications(category);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON AppNotifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON AppNotifications(created_at);
+`;
+
 // Function to execute all DDL statements
 export const initializeSchema = async (
   db: SQLite.SQLiteDatabase
@@ -520,6 +562,8 @@ export const initializeSchema = async (
   await db.execAsync(`CREATE INDEX IF NOT EXISTS idx_drafts_lookup ON document_drafts(is_custom_template, case_id, updated_at);`);
   await db.execAsync(CREATE_DOCUMENT_DRAFTS_UPDATED_AT_TRIGGER);
   await db.execAsync(CREATE_DOCUMENT_DRAFT_REVISIONS_TABLE);
+  await db.execAsync(CREATE_APP_NOTIFICATIONS_TABLE);
+  await db.execAsync(CREATE_APP_NOTIFICATIONS_INDEXES);
   await initializeUserProfileDB(db);
   await initializeUserInformationDB(db);
 

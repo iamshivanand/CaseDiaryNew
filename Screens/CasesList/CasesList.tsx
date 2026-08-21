@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
   Platform,
   DeviceEventEmitter,
+  ScrollView,
 } from "react-native";
 
 import { ECourtsTextImportModal } from "./components/ECourtsTextImportModal";
@@ -41,10 +42,22 @@ import {
 import dbCacheManager from "../../utils/dbCacheManager";
 import { promptClientNotification } from "../../utils/whatsappNotifier";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
+import { VoiceCaseNoteModal } from "../CommonComponents/VoiceCaseNoteModal";
 import AdBanner from "../CommonComponents/AdBanner";
 import { SkeletonList } from "../CommonComponents/SkeletonLoader";
 
-type FilterStatus = "Active" | "Closed";
+export type SmartFilterKey =
+  | "All"
+  | "Active"
+  | "overdue"
+  | "feePending"
+  | "highPriority"
+  | "In Progress"
+  | "On Hold"
+  | "Appealed"
+  | "Closed"
+  | "dormant"
+  | "thisWeek";
 
 type CasesListRouteProp = RouteProp<{ params: { Filter?: string } }, "params">;
 
@@ -60,10 +73,12 @@ const CasesList = () => {
   const [cases, setCases] = useState<CaseDataScreen[]>([]);
   const [searchText, setSearchText] = useState("");
   const [debouncedSearchText, setDebouncedSearchText] = useState("");
-  const [activeFilter, setActiveFilter] = useState<FilterStatus>("Active");
+  const [activeFilterKey, setActiveFilterKey] = useState<SmartFilterKey>("All");
   const [isPopupVisible, setPopupVisible] = useState(false);
+  const [isNoteModalVisible, setNoteModalVisible] = useState(false);
   const [isImportModalVisible, setImportModalVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
+  const [noteCase, setNoteCase] = useState<CaseDataScreen | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -77,37 +92,85 @@ const CasesList = () => {
     return () => clearTimeout(handler);
   }, [searchText]);
 
+  // Sync incoming route filter param (e.g. from deep link)
+  useEffect(() => {
+    if (
+      filterParam === "overdue" ||
+      filterParam === "feePending" ||
+      filterParam === "highPriority" ||
+      filterParam === "dormant" ||
+      filterParam === "thisWeek"
+    ) {
+      setActiveFilterKey(filterParam as SmartFilterKey);
+    }
+  }, [filterParam]);
+
   // Fetch paginated cases from the database
   const fetchCasesList = useCallback(
     async (
       offset: number,
       queryText: string,
-      currentFilter: string,
-      currentActiveFilter: FilterStatus
+      currentParamFilter: string,
+      currentSmartFilter: SmartFilterKey
     ) => {
       setIsLoading(true);
       try {
-        let dateFilter: "today" | "tomorrow" | "yesterday" | "undated" | null =
-          null;
-        let status: "Active" | "Closed" | "All" = currentActiveFilter;
+        let dateFilter:
+          | "today"
+          | "tomorrow"
+          | "yesterday"
+          | "undated"
+          | "thisWeek"
+          | null = null;
+        let status: string = "All";
+        let smartFilter:
+          | "overdue"
+          | "feePending"
+          | "highPriority"
+          | "dormant"
+          | "thisWeek"
+          | null = null;
 
-        if (currentFilter === "todaysCases") {
+        if (currentParamFilter === "todaysCases") {
           dateFilter = "today";
-          status = "All";
-        } else if (currentFilter === "tomorrowCases") {
+        } else if (currentParamFilter === "tomorrowCases") {
           dateFilter = "tomorrow";
-          status = "All";
-        } else if (currentFilter === "yesterdayCases") {
+        } else if (currentParamFilter === "yesterdayCases") {
           dateFilter = "yesterday";
-          status = "All";
+        } else if (currentParamFilter === "undatedCases") {
+          dateFilter = "undated";
+        } else {
+          // Smart status and workflow filters
+          if (currentSmartFilter === "All") {
+            status = "All";
+          } else if (currentSmartFilter === "Active") {
+            status = "Active";
+          } else if (currentSmartFilter === "Closed") {
+            status = "Closed";
+          } else if (
+            currentSmartFilter === "In Progress" ||
+            currentSmartFilter === "On Hold" ||
+            currentSmartFilter === "Appealed"
+          ) {
+            status = currentSmartFilter;
+          } else if (
+            currentSmartFilter === "overdue" ||
+            currentSmartFilter === "feePending" ||
+            currentSmartFilter === "highPriority" ||
+            currentSmartFilter === "dormant" ||
+            currentSmartFilter === "thisWeek"
+          ) {
+            smartFilter = currentSmartFilter;
+          }
         }
 
         const results = await getCases(
-          null, // Global case retrieval or pass specific user if needed
+          null,
           LIMIT,
           offset,
           {
             status,
+            smartFilter,
             dateFilter,
             searchQuery: queryText,
           }
@@ -131,16 +194,21 @@ const CasesList = () => {
     []
   );
 
-  // Fetch initial page on tab focus, filter change, or query change
+  // Instant reactive fetch when search text, route filter, or filter chip changes
+  useEffect(() => {
+    fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilterKey);
+  }, [debouncedSearchText, filterParam, activeFilterKey, fetchCasesList]);
+
+  // Re-fetch when screen gains focus if cache is stale
   useFocusEffect(
     useCallback(() => {
       if (dbCacheManager.shouldRefreshCases(!isLoading)) {
-        fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
+        fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilterKey);
       }
     }, [
       debouncedSearchText,
       filterParam,
-      activeFilter,
+      activeFilterKey,
       fetchCasesList,
       isLoading,
     ])
@@ -150,19 +218,19 @@ const CasesList = () => {
     let isMounted = true;
     const sub = DeviceEventEmitter.addListener(CASE_UPDATED_EVENT, () => {
       if (isMounted) {
-        fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
+        fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilterKey);
       }
     });
     return () => {
       isMounted = false;
       if (sub && typeof sub.remove === "function") sub.remove();
     };
-  }, [debouncedSearchText, filterParam, activeFilter, fetchCasesList]);
+  }, [debouncedSearchText, filterParam, activeFilterKey, fetchCasesList]);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
-    fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
-  }, [debouncedSearchText, filterParam, activeFilter, fetchCasesList]);
+    fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilterKey);
+  }, [debouncedSearchText, filterParam, activeFilterKey, fetchCasesList]);
 
   const loadMore = useCallback(() => {
     if (!isLoading && hasMore) {
@@ -170,7 +238,7 @@ const CasesList = () => {
         cases.length,
         debouncedSearchText,
         filterParam || "",
-        activeFilter
+        activeFilterKey
       );
     }
   }, [
@@ -179,7 +247,7 @@ const CasesList = () => {
     cases.length,
     debouncedSearchText,
     filterParam,
-    activeFilter,
+    activeFilterKey,
     fetchCasesList,
   ]);
 
@@ -278,7 +346,7 @@ const CasesList = () => {
           userId
         );
 
-        fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilter);
+        fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilterKey);
 
         setTimeout(() => {
           promptClientNotification(
@@ -295,7 +363,7 @@ const CasesList = () => {
       selectedCase,
       debouncedSearchText,
       filterParam,
-      activeFilter,
+      activeFilterKey,
       fetchCasesList,
     ]
   );
@@ -310,6 +378,10 @@ const CasesList = () => {
       <NewCaseCard
         caseDetails={item}
         onUpdateHearingPress={() => handleUpdateHearing(item)}
+        onLongPress={() => {
+          setNoteCase(item);
+          setNoteModalVisible(true);
+        }}
       />
     ),
     [handleUpdateHearing]
@@ -358,11 +430,29 @@ const CasesList = () => {
     }
   }, [navigation, theme, navigateToAddCase]);
 
+  const FILTER_CHIPS: {
+    key: SmartFilterKey;
+    label: string;
+    icon?: any;
+    color?: string;
+  }[] = [
+    { key: "All", label: "All Cases" },
+    { key: "Active", label: "Active" },
+    { key: "overdue", label: "Overdue", icon: "alert-circle", color: "#EF4444" },
+    { key: "feePending", label: "Fee Pending", icon: "cash-outline", color: "#10B981" },
+    { key: "highPriority", label: "High Priority", icon: "flag", color: "#EF4444" },
+    { key: "In Progress", label: "In Progress" },
+    { key: "On Hold", label: "On Hold" },
+    { key: "Appealed", label: "Appealed" },
+    { key: "Closed", label: "Closed" },
+    { key: "dormant", label: "Dormant (60d)", icon: "time-outline", color: "#F59E0B" },
+    { key: "thisWeek", label: "This Week", icon: "calendar-outline", color: "#6366F1" },
+  ];
+
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
     >
-
       <View style={styles.searchContainer}>
         <View
           style={[
@@ -389,51 +479,55 @@ const CasesList = () => {
       </View>
 
       {!filterParam && (
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              activeFilter === "Active"
-                ? styles.activeButton
-                : styles.inactiveButton,
-              activeFilter === "Active"
-                ? { backgroundColor: theme.colors.primary || "#007AFF" }
-                : { backgroundColor: theme.colors.border || "#E0E0E0" },
-            ]}
-            onPress={() => setActiveFilter("Active")}
+        <View style={{ marginBottom: 8 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScrollView}
           >
-            <Text
-              style={
-                activeFilter === "Active"
-                  ? styles.activeButtonText
-                  : [styles.inactiveButtonText, { color: theme.colors.text }]
-              }
-            >
-              {t("cases_filter_active")}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              activeFilter === "Closed"
-                ? styles.activeButton
-                : styles.inactiveButton,
-              activeFilter === "Closed"
-                ? { backgroundColor: theme.colors.primary || "#007AFF" }
-                : { backgroundColor: theme.colors.border || "#E0E0E0" },
-            ]}
-            onPress={() => setActiveFilter("Closed")}
-          >
-            <Text
-              style={
-                activeFilter === "Closed"
-                  ? styles.activeButtonText
-                  : [styles.inactiveButtonText, { color: theme.colors.text }]
-              }
-            >
-              {t("cases_filter_closed")}
-            </Text>
-          </TouchableOpacity>
+            {FILTER_CHIPS.map((chip) => {
+              const isSelected = activeFilterKey === chip.key;
+              return (
+                <TouchableOpacity
+                  key={chip.key}
+                  style={[
+                    styles.filterChip,
+                    isSelected
+                      ? {
+                          backgroundColor: theme.colors.primary || "#6366F1",
+                          borderColor: theme.colors.primary || "#6366F1",
+                        }
+                      : {
+                          backgroundColor: theme.colors.cardBackground,
+                          borderColor: theme.colors.border,
+                        },
+                  ]}
+                  onPress={() => setActiveFilterKey(chip.key)}
+                  activeOpacity={0.8}
+                >
+                  {chip.icon && (
+                    <Ionicons
+                      name={chip.icon}
+                      size={14}
+                      color={isSelected ? "#FFFFFF" : chip.color || theme.colors.textSecondary}
+                      style={{ marginRight: 5 }}
+                    />
+                  )}
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      {
+                        color: isSelected ? "#FFFFFF" : theme.colors.text,
+                        fontWeight: isSelected ? "700" : "500",
+                      },
+                    ]}
+                  >
+                    {chip.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
       )}
 
@@ -568,10 +662,50 @@ const CasesList = () => {
             0,
             debouncedSearchText,
             filterParam || "",
-            activeFilter
+            activeFilterKey
           );
         }}
       />
+      {noteCase && (
+        <VoiceCaseNoteModal
+          visible={isNoteModalVisible}
+          caseId={parseInt(noteCase.id.toString(), 10)}
+          caseTitle={noteCase.title || "Legal Matter"}
+          existingNextHearingDate={noteCase.nextHearing}
+          onClose={() => {
+            setNoteModalVisible(false);
+            setNoteCase(null);
+          }}
+          onSave={async (data) => {
+            const caseId = parseInt(noteCase.id.toString(), 10);
+            if (isNaN(caseId)) return;
+            const nowIso = new Date().toISOString();
+            if (data.notes && data.notes.trim()) {
+              await addCaseTimelineEvent({
+                case_id: caseId,
+                hearing_date: nowIso,
+                notes: data.notes.trim(),
+                event_type: "hearing_note",
+              });
+            }
+            if (data.updateNextDate && data.nextHearingDate) {
+              await updateCase(
+                caseId,
+                { NextDate: data.nextHearingDate },
+                await getCurrentUserId()
+              );
+            }
+            setNoteModalVisible(false);
+            setNoteCase(null);
+            fetchCasesList(
+              0,
+              debouncedSearchText,
+              filterParam || "",
+              activeFilterKey
+            );
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -588,15 +722,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    // borderBottomWidth: 1, // Optional: if you want a separator
-    // borderBottomColor: '#E0E0E0', // Optional
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
   },
   addButton: {
-    padding: 6, // Make it easier to tap
+    padding: 6,
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -605,50 +737,35 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    // backgroundColor: '#F0F0F0', // Light grey background for search bar
-    borderWidth: 1, // Optional: if you prefer a border
-    borderColor: "#D1D1D6", // Optional
+    borderWidth: 1,
+    borderColor: "#D1D1D6",
   },
   searchIcon: {
     marginRight: 8,
   },
   input: {
     flex: 1,
-    height: 44, // Standard iOS height
-    fontSize: 16,
+    height: 44,
+    fontSize: 15,
   },
-  toggleContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around", // Or 'center' with margin on buttons
+  filterScrollView: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  toggleButton: {
-    flex: 1, // Make buttons take equal width
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 6,
+    paddingVertical: 4,
+    gap: 8,
     alignItems: "center",
-    marginHorizontal: 5, // Add some space between buttons
   },
-  activeButton: {
-    // backgroundColor: "#007AFF", // Blue for active
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  inactiveButton: {
-    // backgroundColor: "#E0E0E0", // Grey for inactive
-  },
-  activeButtonText: {
-    color: "#FFFFFF", // White text for active
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  inactiveButtonText: {
-    // color: "#000000", // Black text for inactive
-    fontSize: 15,
-    fontWeight: "600",
+  filterChipText: {
+    fontSize: 13,
   },
   listContentContainer: {
     paddingBottom: 24,
@@ -657,10 +774,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 50, // Adjust as needed
+    marginTop: 50,
   },
   emptyListText: {
     fontSize: 16,
-    // color: "#8E8E93", // Grey color for empty message
   },
 });

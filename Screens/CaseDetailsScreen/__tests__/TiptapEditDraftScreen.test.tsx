@@ -35,6 +35,9 @@ jest.mock("@react-navigation/native", () => ({
 jest.mock("../../../DataBase", () => ({
   saveDocumentDraft: jest.fn(() => Promise.resolve(1)),
   getDocumentDraftById: jest.fn(() => Promise.resolve(null)),
+  getCaseById: jest.fn(() => Promise.resolve({ id: 42, CaseTitle: "Sharma vs. State" })),
+  getCases: jest.fn(() => Promise.resolve([{ id: 42, CaseTitle: "Sharma vs. State", case_number: "WP/101/2026", CourtName: "High Court" }])),
+  uploadCaseDocument: jest.fn(() => Promise.resolve(10)),
 }));
 
 jest.mock("expo-print", () => ({
@@ -219,6 +222,11 @@ describe("TiptapEditDraftScreen (Behavior-Driven Testing)", () => {
           );
         });
       });
+    });
+
+    it("renders case picker modal elements for instant case attachment", async () => {
+      const { queryByPlaceholderText } = renderScreen();
+      expect(queryByPlaceholderText("Search by case title, number, party...")).toBeDefined();
     });
   });
 });

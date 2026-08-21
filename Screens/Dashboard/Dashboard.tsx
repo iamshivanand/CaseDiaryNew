@@ -40,12 +40,14 @@ import dbCacheManager from "../../utils/dbCacheManager";
 import { exportDailyCauseListToPdf } from "../../utils/pdfExporter";
 import { promptClientNotification } from "../../utils/whatsappNotifier";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
+import { VoiceCaseNoteModal } from "../CommonComponents/VoiceCaseNoteModal";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 import { CauseListCustomizerModal } from "../CommonComponents/CauseListCustomizerModal";
 import { SkeletonCard } from "../CommonComponents/SkeletonLoader";
 import SectionHeader from "../CommonComponents/SectionHeader";
 import VoiceSearchBar from "../CommonComponents/VoiceSearchBar";
+import NotificationBellButton from "../CommonComponents/NotificationBellButton";
 
 const WelcomeCard = () => {
   const { theme } = useContext(ThemeContext);
@@ -69,7 +71,7 @@ const WelcomeCard = () => {
           }
         }
       } catch (error) {
-        console.error("Error fetching user name:", error);
+        console.error("Failed to fetch user name for WelcomeCard:", error);
       }
     };
     fetchUserName();
@@ -106,14 +108,36 @@ const WelcomeCard = () => {
         },
       ]}
     >
-      <Text style={[styles.welcomeTitle, { color: "#FFFFFF" }]}>
-        {greeting.emoji} {greeting.text}, {userName}!
-      </Text>
-      <Text
-        style={[styles.welcomeSubtitle, { color: "rgba(255, 255, 255, 0.85)" }]}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+        }}
       >
-        {formattedDate}
-      </Text>
+        <View style={{ flex: 1, paddingRight: 10 }}>
+          <Text style={[styles.welcomeTitle, { color: "#FFFFFF" }]}>
+            {greeting.emoji} {greeting.text}, {userName}!
+          </Text>
+          <Text
+            style={[
+              styles.welcomeSubtitle,
+              { color: "rgba(255, 255, 255, 0.85)" },
+            ]}
+          >
+            {formattedDate}
+          </Text>
+        </View>
+        <View
+          style={{
+            backgroundColor: "rgba(255, 255, 255, 0.2)",
+            borderRadius: 20,
+            padding: 2,
+          }}
+        >
+          <NotificationBellButton color="#FFFFFF" size={22} />
+        </View>
+      </View>
     </LinearGradient>
   );
 };
@@ -334,6 +358,191 @@ const BackupReminderBanner = () => {
   );
 };
 
+const LimitationWarningBanner = () => {
+  const navigation = useNavigation<any>();
+  const [limitationCases, setLimitationCases] = useState<any[]>([]);
+
+  const fetchLimitations = async () => {
+    try {
+      const cases = await db.getExpiringLimitationCases(30);
+      setLimitationCases(cases);
+    } catch (e) {
+      console.warn("Failed to fetch expiring limitation cases:", e);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchLimitations();
+    }, [])
+  );
+
+  if (limitationCases.length === 0) return null;
+
+  const topCase = limitationCases[0];
+  const [lYear, lMonth, lDay] = topCase.StatuteOfLimitations.split("-").map(Number);
+  const limDate = new Date(lYear, lMonth - 1, lDay);
+  const diffDays = Math.max(
+    0,
+    Math.ceil((limDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  );
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={() => navigation.navigate("CaseDetails", { caseId: topCase.id })}
+      style={{
+        backgroundColor: "#FEF2F2",
+        borderColor: "#EF4444",
+        borderWidth: 1.5,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 14,
+        flexDirection: "row",
+        alignItems: "center",
+      }}
+    >
+      <Ionicons
+        name="alert-circle"
+        size={24}
+        color="#DC2626"
+        style={{ marginRight: 10 }}
+      />
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={{ fontWeight: "800", fontSize: 13, color: "#991B1B" }}>
+            🚨 Limitation Period Expiring
+          </Text>
+          <View
+            style={{
+              backgroundColor: "#DC2626",
+              paddingHorizontal: 6,
+              paddingVertical: 1,
+              borderRadius: 6,
+            }}
+          >
+            <Text style={{ color: "#FFF", fontSize: 10, fontWeight: "800" }}>
+              {diffDays === 0 ? "TODAY" : `${diffDays}d left`}
+            </Text>
+          </View>
+        </View>
+        <Text style={{ fontSize: 12, color: "#7F1D1D", marginTop: 2 }} numberOfLines={1}>
+          {topCase.CaseTitle || "Case"} • Client: {topCase.ClientName || "Client"}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="#DC2626" />
+    </TouchableOpacity>
+  );
+};
+
+const UpcomingFeeRecoveryNudge = () => {
+  const navigation = useNavigation<any>();
+  const [feeCases, setFeeCases] = useState<any[]>([]);
+
+  const fetchFeeCases = async () => {
+    try {
+      const cases = await db.getUpcomingHearingsWithPendingFee(7);
+      setFeeCases(cases);
+    } catch (e) {
+      console.warn("Failed to fetch pending fee cases:", e);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchFeeCases();
+    }, [])
+  );
+
+  if (feeCases.length === 0) return null;
+
+  const topFeeCase = feeCases[0];
+  const pendingAmount =
+    Number(topFeeCase.total_fee || 0) - Number(topFeeCase.fee_paid || 0);
+
+  return (
+    <View
+      style={{
+        backgroundColor: "#ECFDF5",
+        borderColor: "#10B981",
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 14,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 6,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Text style={{ fontSize: 16, marginRight: 6 }}>💰</Text>
+          <Text style={{ fontWeight: "700", fontSize: 13, color: "#065F46" }}>
+            Upcoming Fee Recovery Nudge
+          </Text>
+        </View>
+        <Text style={{ fontSize: 11, fontWeight: "600", color: "#047857" }}>
+          Hearing: {topFeeCase.NextDate}
+        </Text>
+      </View>
+      <Text style={{ fontSize: 13, fontWeight: "700", color: "#047857" }}>
+        ₹{pendingAmount.toLocaleString("en-IN")} Pending from {topFeeCase.ClientName || "Client"}
+      </Text>
+      <Text style={{ fontSize: 11, color: "#065F46", opacity: 0.8, marginTop: 1 }} numberOfLines={1}>
+        Case: {topFeeCase.CaseTitle || "Legal Matter"}
+      </Text>
+      <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+        <TouchableOpacity
+          onPress={() =>
+            promptClientNotification(
+              topFeeCase.id,
+              topFeeCase.NextDate,
+              `Friendly reminder regarding the hearing listed on ${topFeeCase.NextDate}. Pending retainer fee balance: ₹${pendingAmount.toLocaleString("en-IN")}.`
+            )
+          }
+          style={{
+            flex: 1,
+            backgroundColor: "#10B981",
+            paddingVertical: 7,
+            borderRadius: 8,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name="logo-whatsapp" size={14} color="#FFF" style={{ marginRight: 4 }} />
+          <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "700" }}>
+            WhatsApp Client
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate("CaseDetails", { caseId: topFeeCase.id })
+          }
+          style={{
+            flex: 1,
+            backgroundColor: "#FFF",
+            borderColor: "#10B981",
+            borderWidth: 1,
+            paddingVertical: 7,
+            borderRadius: 8,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={{ color: "#047857", fontSize: 12, fontWeight: "700" }}>
+            View Case
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 const QuickActionsGrid = () => {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
@@ -418,6 +627,8 @@ const QuickActionsGrid = () => {
 
   return (
     <View style={{ marginBottom: 12 }}>
+      <LimitationWarningBanner />
+      <UpcomingFeeRecoveryNudge />
       <BackupReminderBanner />
       <SectionHeader title={t("dash_quick_actions")} />
       <View
@@ -443,7 +654,12 @@ const QuickActionsGrid = () => {
   );
 };
 
-const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
+const AnimatedNewCaseCard = ({
+  caseDetails,
+  onUpdateHearingPress,
+  onLongPress,
+  index,
+}: any) => {
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 30)
@@ -454,6 +670,7 @@ const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
       <NewCaseCard
         caseDetails={caseDetails}
         onUpdateHearingPress={onUpdateHearingPress}
+        onLongPress={onLongPress}
       />
     </Animated.View>
   );
@@ -467,7 +684,9 @@ const TodaysCasesSection = () => {
   const navigation = useNavigation<any>();
   const { showAdWithPreload } = useAdTrigger();
   const [isPopupVisible, setPopupVisible] = useState(false);
+  const [isNoteModalVisible, setNoteModalVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
+  const [noteCase, setNoteCase] = useState<CaseDataScreen | null>(null);
   const [isCauseListModalVisible, setIsCauseListModalVisible] = useState(false);
 
   const fetchTodaysCases = async () => {
@@ -709,6 +928,10 @@ const TodaysCasesSection = () => {
             key={`${caseData.id}-${(caseData as any).updated_at || ""}-${(caseData as any).fee_paid || 0}-${(caseData as any).date_fee_collected || 0}-${(caseData as any).date_fee_paid || 0}-${(caseData as any).date_fee || 0}-${caseData.nextHearing || ""}`}
             caseDetails={caseData}
             onUpdateHearingPress={() => handleUpdateHearing(caseData)}
+            onLongPress={() => {
+              setNoteCase(caseData);
+              setNoteModalVisible(true);
+            }}
             index={index}
           />
         ))
@@ -764,6 +987,41 @@ const TodaysCasesSection = () => {
               paymentNotes
             )
           }
+        />
+      )}
+      {noteCase && (
+        <VoiceCaseNoteModal
+          visible={isNoteModalVisible}
+          caseId={parseInt(noteCase.id.toString(), 10)}
+          caseTitle={noteCase.title || "Legal Matter"}
+          existingNextHearingDate={noteCase.nextHearing}
+          onClose={() => {
+            setNoteModalVisible(false);
+            setNoteCase(null);
+          }}
+          onSave={async (data) => {
+            const caseId = parseInt(noteCase.id.toString(), 10);
+            if (isNaN(caseId)) return;
+            const nowIso = new Date().toISOString();
+            if (data.notes && data.notes.trim()) {
+              await db.addCaseTimelineEvent({
+                case_id: caseId,
+                hearing_date: nowIso,
+                notes: data.notes.trim(),
+                event_type: "hearing_note",
+              });
+            }
+            if (data.updateNextDate && data.nextHearingDate) {
+              await db.updateCase(
+                caseId,
+                { NextDate: data.nextHearingDate },
+                await getCurrentUserId()
+              );
+            }
+            setNoteModalVisible(false);
+            setNoteCase(null);
+            fetchTodaysCases();
+          }}
         />
       )}
       <CauseListCustomizerModal

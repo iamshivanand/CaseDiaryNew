@@ -15,6 +15,7 @@ import { formatDate, parseLocalDate } from "../../../utils/commonFunctions";
 interface NewCaseCardProps {
   caseDetails: CaseDataScreen;
   onUpdateHearingPress?: (caseDetails: CaseDataScreen) => void;
+  onLongPress?: (caseDetails: CaseDataScreen) => void;
 }
 
 const statusColors = {
@@ -44,6 +45,7 @@ const priorityBgColors = {
 const NewCaseCard: React.FC<NewCaseCardProps> = ({
   caseDetails,
   onUpdateHearingPress,
+  onLongPress,
 }) => {
   const { theme } = useContext(ThemeContext);
   const {
@@ -64,7 +66,7 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
     (caseDetails as any).lookupCourtName ||
     null;
 
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -155,6 +157,12 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
         scale.value = withSpring(1, { damping: 25, stiffness: 400, mass: 0.4 });
       }}
       onPress={() => navigation.navigate("CaseDetails", { caseId: id })}
+      onLongPress={() => {
+        if (onLongPress) {
+          onLongPress(caseDetails);
+        }
+      }}
+      delayLongPress={350}
       style={{ width: "100%" }}
     >
       <Animated.View

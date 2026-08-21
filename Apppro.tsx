@@ -35,6 +35,7 @@ import DatabaseImportScreen from "./Screens/Settings/DatabaseImportScreen";
 import DraftsHubScreen from "./Screens/Settings/DraftsHubScreen";
 import ECourtsAppImportScreen from "./Screens/Settings/ECourtsAppImportScreen";
 import ManageLookupCategoryScreen from "./Screens/Settings/ManageLookupCategoryScreen";
+import NotificationInboxScreen from "./Screens/Notifications/NotificationInboxScreen";
 import SettingsScreen from "./Screens/Settings/SettingsScreen";
 import UndatedCasesScreen from "./Screens/UndatedCases/UndatedCasesScreen";
 import YesterdaysCasesScreen from "./Screens/YesterdaysCases/YesterdaysCasesScreen";
@@ -173,6 +174,11 @@ const HomeStack = () => {
         name="Settings"
         component={SettingsScreen}
         options={{ headerShown: true, title: "Settings" }}
+      />
+      <HomeStackNav.Screen
+        name="NotificationInbox"
+        component={NotificationInboxScreen}
+        options={{ headerShown: false }}
       />
     </HomeStackNav.Navigator>
   );

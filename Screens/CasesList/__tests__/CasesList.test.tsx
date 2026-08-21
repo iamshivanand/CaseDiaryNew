@@ -77,4 +77,39 @@ describe("CasesList", () => {
     const popupTitle = await findByText("Update Hearing & Fee Details");
     expect(popupTitle).toBeTruthy();
   });
+
+  it("triggers getCases with proper smartFilter when a filter chip is tapped", async () => {
+    const { getCases } = require("../../../DataBase");
+    const { findByText } = render(
+      <NavigationContainer>
+        <ThemeContext.Provider value={{ theme }}>
+          <CasesList />
+        </ThemeContext.Provider>
+      </NavigationContainer>
+    );
+
+    const overdueChip = await findByText("Overdue");
+    fireEvent.press(overdueChip);
+
+    expect(getCases).toHaveBeenCalledWith(
+      null,
+      20,
+      0,
+      expect.objectContaining({
+        smartFilter: "overdue",
+      })
+    );
+
+    const feePendingChip = await findByText("Fee Pending");
+    fireEvent.press(feePendingChip);
+
+    expect(getCases).toHaveBeenCalledWith(
+      null,
+      20,
+      0,
+      expect.objectContaining({
+        smartFilter: "feePending",
+      })
+    );
+  });
 });

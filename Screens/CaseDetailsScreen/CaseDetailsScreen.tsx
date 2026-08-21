@@ -10,6 +10,7 @@ import React, {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useState,
 } from "react";
 import {
@@ -49,7 +50,6 @@ import {
 } from "../../Types/appTypes";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { formatDate, getCurrentUserId } from "../../utils/commonFunctions";
-import { scheduleOverdueHearingNotification } from "../../utils/notificationScheduler";
 import {
   exportCaseToPdf,
   exportCaseHistoryToPdf,
@@ -266,6 +266,14 @@ const CaseDetailsScreen: React.FC = () => {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
 
+  // Timeline Filter States
+  const [timelineCategory, setTimelineCategory] = useState<
+    "all" | "case_updates" | "payments"
+  >("all");
+  const [timelineSubFilter, setTimelineSubFilter] = useState<
+    "all_updates" | "hearings" | "status" | "judge_court" | "stage"
+  >("all_updates");
+
   // Date Fee Specific States
   const [showDateFeeModal, setShowDateFeeModal] = useState(false);
   const [editingDateFeeAmount, setEditingDateFeeAmount] = useState("");
@@ -327,27 +335,6 @@ const CaseDetailsScreen: React.FC = () => {
     if (details) {
       console.log("Case details found:", details);
       setCaseDetails(details);
-
-      if (details.NextDate) {
-        try {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const parts = details.NextDate.split("-");
-          if (parts.length === 3) {
-            const hDate = new Date(
-              parseInt(parts[0], 10),
-              parseInt(parts[1], 10) - 1,
-              parseInt(parts[2], 10)
-            );
-            hDate.setHours(0, 0, 0, 0);
-            if (hDate.getTime() < today.getTime()) {
-              scheduleOverdueHearingNotification(details);
-            }
-          }
-        } catch (e) {
-          // ignore date parse errors
-        }
-      }
     } else {
       console.log("Case details not found for caseId:", caseId);
     }
@@ -378,6 +365,10 @@ const CaseDetailsScreen: React.FC = () => {
             id: tle.id.toString(),
             date: tle.hearing_date,
             description: tle.notes,
+            event_type: (tle.event_type || "hearing_proceeding") as TimelineEventType,
+            amount: tle.amount,
+            payment_mode: tle.payment_mode,
+            created_at: tle.created_at,
           }))
         );
       } catch (error) {
@@ -698,7 +689,10 @@ const CaseDetailsScreen: React.FC = () => {
 
           allEvents.forEach((ev) => {
             const evId = parseInt(ev.id.toString(), 10);
-            const evText = evId === eventId ? finalNotes : ev.description || "";
+            const evText =
+              evId === eventId
+                ? finalNotes
+                : (ev as any).notes || ev.description || "";
             const evType = ev.event_type;
 
             if (
@@ -815,7 +809,7 @@ const CaseDetailsScreen: React.FC = () => {
                 allEvents.forEach((ev) => {
                   const evId = parseInt(ev.id.toString(), 10);
                   if (evId === eventId) return;
-                  const evText = ev.description || "";
+                  const evText = (ev as any).notes || ev.description || "";
                   const evType = ev.event_type;
                   if (
                     evType === "date_fee_payment" ||
@@ -1361,6 +1355,93 @@ const CaseDetailsScreen: React.FC = () => {
     }
   };
 
+  // Helper to categorize events
+  const isPaymentEvent = (ev: TimelineEvent) => {
+    const evT = ev.event_type || "";
+    const d = ev.description || "";
+    return (
+      evT === "date_fee_payment" ||
+      evT === "total_fee_payment" ||
+      evT === "date_fee_agreed" ||
+      evT === "total_fee_agreed" ||
+      d.includes("(Date Fee)") ||
+      d.includes("(Total Retainer)") ||
+      d.includes("Fee Payment Received") ||
+      d.includes("Recorded Payment") ||
+      d.includes("Fee Received") ||
+      d.includes("Fee Agreed") ||
+      d.includes("retainer fee")
+    );
+  };
+
+  const isHearingEvent = (ev: TimelineEvent) => {
+    const evT = ev.event_type || "";
+    const d = ev.description || "";
+    return (
+      evT === "hearing_scheduled" ||
+      evT === "hearing_adjourned" ||
+      evT === "hearing_proceeding" ||
+      d.includes("Hearing") ||
+      d.includes("hearing") ||
+      d.includes("adjourned") ||
+      d.includes("scheduled")
+    );
+  };
+
+  const isStatusEvent = (ev: TimelineEvent) => {
+    const evT = ev.event_type || "";
+    const d = ev.description || "";
+    return evT === "status_change" || d.includes("Case status changed");
+  };
+
+  const isJudgeOrCourtEvent = (ev: TimelineEvent) => {
+    const evT = ev.event_type || "";
+    const d = ev.description || "";
+    return (
+      evT === "judge_change" ||
+      evT === "court_change" ||
+      d.includes("Judge") ||
+      d.includes("Court")
+    );
+  };
+
+  const isStageEvent = (ev: TimelineEvent) => {
+    const evT = ev.event_type || "";
+    const d = ev.description || "";
+    return evT === "stage_change" || d.includes("Case stage");
+  };
+
+  // Counts for category badges
+  const totalEventsCount = timelineEvents.length;
+  const paymentEventsCount = useMemo(
+    () => timelineEvents.filter(isPaymentEvent).length,
+    [timelineEvents]
+  );
+  const caseUpdatesCount = totalEventsCount - paymentEventsCount;
+
+  // Filtered timeline events list
+  const filteredTimelineEvents = useMemo(() => {
+    return timelineEvents.filter((ev) => {
+      if (timelineCategory === "payments") {
+        return isPaymentEvent(ev);
+      }
+      if (timelineCategory === "case_updates") {
+        if (isPaymentEvent(ev)) return false;
+        if (timelineSubFilter === "hearings") return isHearingEvent(ev);
+        if (timelineSubFilter === "status") return isStatusEvent(ev);
+        if (timelineSubFilter === "judge_court") return isJudgeOrCourtEvent(ev);
+        if (timelineSubFilter === "stage") return isStageEvent(ev);
+        return true;
+      }
+      // "all" category
+      if (timelineSubFilter === "hearings") return isHearingEvent(ev);
+      if (timelineSubFilter === "status") return isStatusEvent(ev);
+      if (timelineSubFilter === "judge_court") return isJudgeOrCourtEvent(ev);
+      if (timelineSubFilter === "stage") return isStageEvent(ev);
+      return true;
+    });
+  }, [timelineEvents, timelineCategory, timelineSubFilter]);
+
   const listData: ListItemType[] = [];
   listData.push({ type: "summary", data: caseDetails });
 
@@ -1368,16 +1449,16 @@ const CaseDetailsScreen: React.FC = () => {
   if (isLoadingDocuments) {
     listData.push({ type: "loadingDocuments" });
   } else {
-    // We will render the DocumentUpload component directly, so we don't need to push documents here.
+    // Rendered directly
   }
 
   listData.push({ type: "timelineHeader" });
-  if (timelineEvents.length > 0) {
-    timelineEvents.forEach((event, index) =>
+  if (filteredTimelineEvents.length > 0) {
+    filteredTimelineEvents.forEach((event, index) =>
       listData.push({
         type: "timelineEvent",
         data: event,
-        isLast: index === timelineEvents.length - 1,
+        isLast: index === filteredTimelineEvents.length - 1,
         id: `tl-${event.id}`,
       })
     );
@@ -4298,12 +4379,205 @@ const CaseDetailsScreen: React.FC = () => {
         );
       case "documentsHeader":
         return null;
-      case "timelineHeader":
+      case "timelineHeader": {
         return (
-          <View style={styles.timelineSection}>
-            <SectionHeader title={t("casedetails_sec_timeline")} />
+          <View style={[styles.timelineSection, { marginBottom: 12 }]}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <SectionHeader title={t("casedetails_sec_timeline")} />
+                <View
+                  style={{
+                    backgroundColor: theme.isDark ? "#1E1B4B" : "#EEF2FF",
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: theme.isDark ? "#4338CA" : "#C7D2FE",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: "700",
+                      color: theme.isDark ? "#A5B4FC" : "#4F46E5",
+                    }}
+                  >
+                    {totalEventsCount} Total
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Main Category Tabs */}
+            <View
+              style={{
+                flexDirection: "row",
+                backgroundColor: theme.isDark ? "#1E293B" : "#F1F5F9",
+                borderRadius: 12,
+                padding: 4,
+                marginBottom: 10,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setTimelineCategory("all")}
+                activeOpacity={0.7}
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  backgroundColor:
+                    timelineCategory === "all"
+                      ? theme.colors.primary
+                      : "transparent",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "700",
+                    color:
+                      timelineCategory === "all"
+                        ? "#ffffff"
+                        : theme.colors.textSecondary,
+                  }}
+                >
+                  All ({totalEventsCount})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setTimelineCategory("case_updates")}
+                activeOpacity={0.7}
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  backgroundColor:
+                    timelineCategory === "case_updates"
+                      ? theme.colors.primary
+                      : "transparent",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "700",
+                    color:
+                      timelineCategory === "case_updates"
+                        ? "#ffffff"
+                        : theme.colors.textSecondary,
+                  }}
+                >
+                  Updates ({caseUpdatesCount})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setTimelineCategory("payments")}
+                activeOpacity={0.7}
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  backgroundColor:
+                    timelineCategory === "payments"
+                      ? theme.colors.primary
+                      : "transparent",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "700",
+                    color:
+                      timelineCategory === "payments"
+                        ? "#ffffff"
+                        : theme.colors.textSecondary,
+                  }}
+                >
+                  Payments ({paymentEventsCount})
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Sub-Filters Chips (Available on All & Case Updates) */}
+            {timelineCategory !== "payments" && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 6, paddingVertical: 2 }}
+                style={{ marginBottom: 8 }}
+              >
+                {[
+                  { key: "all_updates", label: "All Events" },
+                  { key: "hearings", label: "📅 Hearings" },
+                  { key: "status", label: "🔄 Status" },
+                  { key: "judge_court", label: "⚖️ Judge & Court" },
+                  { key: "stage", label: "🎯 Stage" },
+                ].map((chip) => {
+                  const isSelected = timelineSubFilter === chip.key;
+                  return (
+                    <TouchableOpacity
+                      key={chip.key}
+                      onPress={() => setTimelineSubFilter(chip.key as any)}
+                      activeOpacity={0.7}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 16,
+                        backgroundColor: isSelected
+                          ? theme.isDark
+                            ? "#312E81"
+                            : "#EEF2FF"
+                          : theme.isDark
+                          ? "#1E293B"
+                          : "#F8FAFC",
+                        borderWidth: 1,
+                        borderColor: isSelected
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: isSelected ? "700" : "500",
+                          color: isSelected
+                            ? theme.colors.primary
+                            : theme.colors.textSecondary,
+                        }}
+                      >
+                        {chip.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
         );
+      }
       case "timelineEvent":
         return (
           <TimelineEventItem
@@ -4315,9 +4589,48 @@ const CaseDetailsScreen: React.FC = () => {
         );
       case "noTimelineEvents":
         return (
-          <View style={styles.timelineSection}>
-            <Text style={styles.noItemsText}>
-              {t("casedetails_no_timeline")}
+          <View
+            style={[
+              styles.timelineSection,
+              {
+                paddingVertical: 24,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor:
+                  theme.colors.cardBackground ||
+                  (theme.isDark ? "#1E293B" : "#F8FAFC"),
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                marginTop: 4,
+                marginBottom: 16,
+              },
+            ]}
+          >
+            <Ionicons
+              name={
+                timelineCategory === "payments"
+                  ? "wallet-outline"
+                  : "calendar-outline"
+              }
+              size={32}
+              color={theme.colors.textSecondary}
+              style={{ opacity: 0.6, marginBottom: 8 }}
+            />
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "600",
+                color: theme.colors.textSecondary,
+                textAlign: "center",
+                paddingHorizontal: 20,
+              }}
+            >
+              {timelineCategory === "payments"
+                ? "No payment or fee events recorded yet."
+                : timelineSubFilter !== "all_updates"
+                ? `No events matching "${timelineSubFilter.replace("_", " ")}" filter.`
+                : t("casedetails_no_timeline")}
             </Text>
           </View>
         );

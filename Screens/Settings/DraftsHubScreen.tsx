@@ -22,6 +22,8 @@ import {
   TextInput,
   Dimensions,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 
 import * as db from "../../DataBase";
@@ -358,6 +360,10 @@ const DraftsHubScreen: React.FC = () => {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [draftFilterChip, setDraftFilterChip] = useState<"all" | "linked" | "standalone" | "recent">("all");
+  const [actionMenuDraft, setActionMenuDraft] = useState<DocumentDraft | null>(null);
+  const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(initialTab !== "templates");
 
   // Pagination states
@@ -645,17 +651,34 @@ const DraftsHubScreen: React.FC = () => {
       });
     }
 
+    if (activeTab === "drafts" && draftFilterChip !== "all") {
+      const now = Date.now();
+      const oneDay = 24 * 60 * 60 * 1000;
+      if (draftFilterChip === "linked") {
+        filtered = filtered.filter((d) => !!d.case_id);
+      } else if (draftFilterChip === "standalone") {
+        filtered = filtered.filter((d) => !d.case_id);
+      } else if (draftFilterChip === "recent") {
+        filtered = filtered.filter((d) => {
+          const t = new Date(d.updated_at || d.created_at).getTime();
+          return !isNaN(t) && now - t < oneDay;
+        });
+      }
+    }
+
     if (searchQuery.trim() !== "") {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (draft) =>
           draft.title.toLowerCase().includes(query) ||
-          getTemplateLabel(draft.template_type).toLowerCase().includes(query)
+          getTemplateLabel(draft.template_type).toLowerCase().includes(query) ||
+          (draft.case_title && draft.case_title.toLowerCase().includes(query)) ||
+          (draft.client_name && draft.client_name.toLowerCase().includes(query))
       );
     }
 
     return filtered;
-  }, [drafts, activeTab, selectedCategory, searchQuery]);
+  }, [drafts, activeTab, selectedCategory, draftFilterChip, searchQuery]);
 
   // Load cases from Database for Attach Modal
   const loadCases = async () => {
@@ -788,9 +811,6 @@ const DraftsHubScreen: React.FC = () => {
               setIsLoading(true);
               // Optimistically update local state immediately so item vanishes right away
               setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
-              setFilteredDrafts((prev) =>
-                prev.filter((d) => d.id !== draft.id)
-              );
               await db.deleteDocumentDraft(draft.id);
               await loadDrafts(true);
             } catch (error) {
@@ -882,19 +902,6 @@ const DraftsHubScreen: React.FC = () => {
               : d
           )
         );
-        setFilteredDrafts((prev) =>
-          prev.map((d) =>
-            d.id === selectedDraft.id
-              ? {
-                  ...d,
-                  case_id: updatedCaseId,
-                  case_title: updatedCaseTitle,
-                  client_name: updatedClientName,
-                  case_number: updatedCaseNumber,
-                }
-              : d
-          )
-        );
 
         setIsAttachModalVisible(false);
         Alert.alert(
@@ -951,19 +958,6 @@ const DraftsHubScreen: React.FC = () => {
                     : d
                 )
               );
-              setFilteredDrafts((prev) =>
-                prev.map((d) =>
-                  d.id === draft.id
-                    ? {
-                        ...d,
-                        case_id: null,
-                        case_title: undefined,
-                        client_name: undefined,
-                        case_number: undefined,
-                      }
-                    : d
-                )
-              );
               Alert.alert("Success", "Draft unlinked from case successfully.");
             } catch (err) {
               console.error("Error unlinking draft from case:", err);
@@ -977,302 +971,307 @@ const DraftsHubScreen: React.FC = () => {
     );
   };
 
+  const handleOpenEditor = async (draft: DocumentDraft) => {
+    try {
+      let fullHtml = draft.html_content;
+      let fullCaseId = draft.case_id;
+      let fullTitle = draft.title;
+      let fullType = draft.template_type;
+
+      const fullDraft = await db.getDocumentDraftById(draft.id);
+      if (fullDraft) {
+        fullHtml = fullDraft.html_content || fullHtml;
+        fullCaseId = fullDraft.case_id !== undefined ? fullDraft.case_id : fullCaseId;
+        fullTitle = fullDraft.title || fullTitle;
+        fullType = fullDraft.template_type || fullType;
+      }
+
+      // @ts-ignore
+      navigation.navigate("TiptapEditDraft", {
+        draftId: draft.id,
+        caseId: fullCaseId,
+        initialHtml: fullHtml || "",
+        templateType: fullType || "draft",
+        title: fullTitle,
+      });
+    } catch (err) {
+      console.error("Error opening draft for edit:", err);
+      // @ts-ignore
+      navigation.navigate("TiptapEditDraft", {
+        draftId: draft.id,
+        caseId: draft.case_id,
+        initialHtml: draft.html_content || "",
+        templateType: draft.template_type || "draft",
+        title: draft.title,
+      });
+    }
+  };
+
+  const isRecentDraft = (dateStr?: string) => {
+    if (!dateStr) return false;
+    const t = new Date(dateStr).getTime();
+    return !isNaN(t) && Date.now() - t < 24 * 60 * 60 * 1000;
+  };
+
   const renderDraftItem = ({ item }: { item: DocumentDraft }) => {
     const color =
       documentTypeColors[item.template_type] || theme.colors.primary;
-    const dateStr = new Date(
-      item.created_at || item.updated_at
-    ).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    const rawDate = item.updated_at || item.created_at;
+    let dateStr = "";
+    if (rawDate) {
+      try {
+        const d = new Date(rawDate);
+        if (!isNaN(d.getTime())) {
+          const datePart = d.toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          });
+          const timePart = d.toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          });
+          dateStr = `${datePart} • ${timePart}`;
+        }
+      } catch (e) {
+        dateStr = String(rawDate);
+      }
+    }
+    const isRecent = isRecentDraft(rawDate);
 
     return (
-      <View style={styles.draftCard}>
-        <View style={styles.draftHeader}>
-          <View style={{ marginRight: 12 }}>
-            <View
-              style={{
-                width: 48,
-                height: 76,
-                backgroundColor: "#fcf9f2",
-                borderRadius: 4,
-                borderWidth: 1,
-                borderColor: "#e2d2b2",
-                position: "relative",
-                overflow: "hidden",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.1,
-                shadowRadius: 1,
-                elevation: 1,
-              }}
-            >
-              <View
-                style={{
-                  position: "absolute",
-                  left: 9,
-                  top: 0,
-                  bottom: 0,
-                  width: 0.8,
-                  backgroundColor: "#ef4444",
-                  opacity: 0.6,
-                }}
-              />
-              <View
-                style={{
-                  marginTop: 10,
-                  paddingLeft: 12,
-                  paddingRight: 4,
-                  gap: 4,
-                }}
-              >
-                <View
-                  style={{
-                    height: 2,
-                    backgroundColor: "#d1d5db",
-                    width: "80%",
-                  }}
-                />
-                <View
-                  style={{
-                    height: 2,
-                    backgroundColor: "#d1d5db",
-                    width: "90%",
-                  }}
-                />
-                <View
-                  style={{
-                    height: 2,
-                    backgroundColor: "#d1d5db",
-                    width: "65%",
-                  }}
-                />
-                <View
-                  style={{
-                    height: 2,
-                    backgroundColor: "#e5e7eb",
-                    width: "85%",
-                  }}
-                />
-                <View
-                  style={{
-                    height: 2,
-                    backgroundColor: "#e5e7eb",
-                    width: "70%",
-                  }}
-                />
-                <View
-                  style={{
-                    height: 2,
-                    backgroundColor: "#e5e7eb",
-                    width: "90%",
-                  }}
-                />
-                <View
-                  style={{
-                    height: 2,
-                    backgroundColor: "#e5e7eb",
-                    width: "50%",
-                  }}
-                />
-              </View>
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: 2,
-                  right: 2,
-                  backgroundColor: color,
-                  borderRadius: 2,
-                  paddingHorizontal: 3,
-                  paddingVertical: 1.5,
-                }}
-              >
-                <Text
-                  style={{ color: "#fff", fontSize: 6, fontWeight: "bold" }}
-                >
-                  PDF
-                </Text>
-              </View>
+      <TouchableOpacity
+        style={[styles.draftCard, { borderLeftColor: color, borderLeftWidth: 4 }]}
+        activeOpacity={0.9}
+        onPress={() => handleOpenEditor(item)}
+      >
+        {/* Top Header Strip: Badges & Three-Dots Menu */}
+        <View style={styles.cardTopRow}>
+          <View style={styles.badgeCluster}>
+            <View style={[styles.typeBadge, { backgroundColor: `${color}20` }]}>
+              <Text style={[styles.typeBadgeText, { color }]}>
+                {getTemplateLabel(item.template_type)}
+              </Text>
             </View>
-          </View>
-          <View style={styles.draftTitleContainer}>
-            <Text style={styles.draftTitle} numberOfLines={2}>
-              {item.title}
-            </Text>
 
             {item.case_title || item.client_name ? (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginTop: 4,
-                  marginBottom: 4,
-                }}
-              >
+              <View style={[styles.caseBadge, { backgroundColor: `${theme.colors.primary}15` }]}>
                 <Ionicons
                   name="briefcase-outline"
-                  size={13}
+                  size={12}
                   color={theme.colors.primary}
                   style={{ marginRight: 4 }}
                 />
                 <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: "600",
-                    color: theme.colors.primary,
-                    flex: 1,
-                  }}
+                  style={[styles.caseBadgeText, { color: theme.colors.primary }]}
                   numberOfLines={1}
                 >
-                  Case: {item.case_title || item.client_name}{" "}
-                  {item.case_number ? `(${item.case_number})` : ""}
+                  {item.case_title || item.client_name}
                 </Text>
               </View>
-            ) : null}
+            ) : (
+              <View style={[styles.caseBadge, { backgroundColor: `${theme.colors.border}30` }]}>
+                <Text style={[styles.caseBadgeText, { color: theme.colors.textSecondary }]}>
+                  Standalone
+                </Text>
+              </View>
+            )}
 
-            <View style={styles.badgeRow}>
-              <View
-                style={[styles.typeBadge, { backgroundColor: `${color}20` }]}
-              >
-                <Text style={[styles.typeBadgeText, { color }]}>
-                  {getTemplateLabel(item.template_type)}
-                </Text>
+            {isRecent && (
+              <View style={styles.recentDotBadge}>
+                <View style={styles.recentDot} />
+                <Text style={styles.recentDotText}>Active</Text>
               </View>
+            )}
+          </View>
+
+          {/* Three-Dots Menu Button */}
+          <TouchableOpacity
+            style={styles.moreMenuButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={() => {
+              setActionMenuDraft(item);
+              setIsActionMenuVisible(true);
+            }}
+          >
+            <Ionicons name="ellipsis-vertical" size={18} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Center Section: Miniature Page Graphic & Title/Date */}
+        <View style={styles.cardCenterRow}>
+          {/* Miniature Page Graphic */}
+          <View style={styles.parchmentThumbnail}>
+            <View style={styles.parchmentMarginLine} />
+            <View style={styles.parchmentLines}>
+              <View style={[styles.dummyLine, { width: "80%" }]} />
+              <View style={[styles.dummyLine, { width: "90%" }]} />
+              <View style={[styles.dummyLine, { width: "65%" }]} />
+              <View style={[styles.dummyLine, { width: "85%" }]} />
+              <View style={[styles.dummyLine, { width: "70%" }]} />
+            </View>
+            <View style={[styles.parchmentPdfTag, { backgroundColor: color }]}>
+              <Text style={styles.parchmentPdfTagText}>PDF</Text>
+            </View>
+          </View>
+
+          {/* Title & Metadata */}
+          <View style={styles.cardTitleColumn}>
+            <Text style={styles.draftTitle} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <View style={styles.dateRow}>
+              <Ionicons name="time-outline" size={12} color={theme.colors.textSecondary} style={{ marginRight: 4 }} />
               <Text style={styles.draftDate}>{dateStr}</Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.actionRow}>
+        {/* Bottom Clean Action Dock */}
+        <View style={styles.actionDock}>
           <TouchableOpacity
-            style={[styles.actionBtn, { borderColor: theme.colors.border }]}
-            onPress={() => handleOpenPdf(item)}
+            style={[styles.equalActionBtn, { backgroundColor: "#2563eb", borderColor: "#2563eb" }]}
+            onPress={() => handleOpenEditor(item)}
             activeOpacity={0.85}
           >
-            <Ionicons
-              name="eye-outline"
-              size={16}
-              color={theme.colors.primary}
-            />
-            <Text
-              style={[styles.actionBtnText, { color: theme.colors.primary }]}
-            >
-              Open PDF
+            <Ionicons name="create-outline" size={13} color="#ffffff" style={{ marginRight: 3 }} />
+            <Text style={[styles.equalActionBtnText, { color: "#ffffff" }]} numberOfLines={1} ellipsizeMode="tail">
+              Edit
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionBtn, { borderColor: "#3b82f644", backgroundColor: "#1e3a8a11" }]}
-            // @ts-ignore
-            onPress={() =>
-              navigation.navigate("TiptapEditDraft", { draftId: item.id })
-            }
-            activeOpacity={0.85}
-          >
-            <Ionicons
-              name="create-outline"
-              size={15}
-              color="#3b82f6"
-            />
-            <Text
-              style={[styles.actionBtnText, { color: "#3b82f6", fontWeight: "700" }]}
+          {/* Show Link button on main card only for standalone drafts */}
+          {!item.case_id && (
+            <TouchableOpacity
+              style={[
+                styles.equalActionBtn,
+                {
+                  borderColor: `${theme.colors.success}80`,
+                  backgroundColor: `${theme.colors.success}12`,
+                },
+              ]}
+              onPress={() => openAttachModal(item)}
+              activeOpacity={0.85}
             >
-              Edit Draft
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionBtn, { borderColor: theme.colors.border }]}
-            onPress={() => handleShareDraft(item)}
-            activeOpacity={0.85}
-          >
-            <Ionicons
-              name="share-outline"
-              size={16}
-              color={theme.colors.primary}
-            />
-            <Text
-              style={[styles.actionBtnText, { color: theme.colors.primary }]}
-            >
-              Share PDF
-            </Text>
-          </TouchableOpacity>
-
-          {activeTab === "drafts" && (
-            <>
-              <TouchableOpacity
-                style={[styles.actionBtn, { borderColor: theme.colors.border }]}
-                onPress={() => openAttachModal(item)}
-                activeOpacity={0.85}
+              <Ionicons
+                name="link-outline"
+                size={13}
+                color={theme.colors.success}
+                style={{ marginRight: 3 }}
+              />
+              <Text
+                style={[
+                  styles.equalActionBtnText,
+                  {
+                    color: theme.colors.success,
+                  },
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
               >
-                <Ionicons
-                  name={item.case_id ? "options-outline" : "link-outline"}
-                  size={16}
-                  color={
-                    item.case_id ? theme.colors.primary : theme.colors.success
-                  }
-                />
-                <Text
-                  style={[
-                    styles.actionBtnText,
-                    {
-                      color: item.case_id
-                        ? theme.colors.primary
-                        : theme.colors.success,
-                    },
-                  ]}
-                >
-                  {item.case_id ? "Change Case" : "Link Case"}
-                </Text>
-              </TouchableOpacity>
-
-              {item.case_id ? (
-                <TouchableOpacity
-                  style={[
-                    styles.actionBtn,
-                    { borderColor: theme.colors.border },
-                  ]}
-                  onPress={() => handleUnlinkCase(item)}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons
-                    name="unlink-outline"
-                    size={16}
-                    color={theme.colors.danger}
-                  />
-                  <Text
-                    style={[
-                      styles.actionBtnText,
-                      { color: theme.colors.danger },
-                    ]}
-                  >
-                    Unlink
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
-            </>
+                Link
+              </Text>
+            </TouchableOpacity>
           )}
 
           <TouchableOpacity
-            style={[styles.actionBtn, { borderColor: theme.colors.border }]}
-            onPress={() => handleDeleteDraft(item)}
+            style={[styles.equalActionBtn, { borderColor: theme.colors.border, backgroundColor: theme.colors.cardBackground }]}
+            onPress={() => handleOpenPdf(item)}
             activeOpacity={0.85}
           >
-            <Ionicons
-              name="trash-outline"
-              size={16}
-              color={theme.colors.danger}
-            />
-            <Text
-              style={[styles.actionBtnText, { color: theme.colors.danger }]}
-            >
-              Delete
+            <Ionicons name="eye-outline" size={13} color={theme.colors.primary} style={{ marginRight: 3 }} />
+            <Text style={[styles.equalActionBtnText, { color: theme.colors.primary }]} numberOfLines={1} ellipsizeMode="tail">
+              PDF
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.equalActionBtn, { borderColor: theme.colors.border, backgroundColor: theme.colors.cardBackground }]}
+            onPress={() => handleShareDraft(item)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="share-outline" size={13} color={theme.colors.primary} style={{ marginRight: 3 }} />
+            <Text style={[styles.equalActionBtnText, { color: theme.colors.primary }]} numberOfLines={1} ellipsizeMode="tail">
+              Share
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderDraftListItem = ({ item }: { item: DocumentDraft }) => {
+    const color =
+      documentTypeColors[item.template_type] || theme.colors.primary;
+    const rawDate = item.updated_at || item.created_at;
+    let dateStr = "";
+    if (rawDate) {
+      try {
+        const d = new Date(rawDate);
+        if (!isNaN(d.getTime())) {
+          dateStr = d.toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          });
+        }
+      } catch (e) {
+        dateStr = String(rawDate);
+      }
+    }
+
+    return (
+      <TouchableOpacity
+        style={[styles.draftListRow, { borderLeftColor: color, borderLeftWidth: 3.5 }]}
+        activeOpacity={0.85}
+        onPress={() => handleOpenEditor(item)}
+      >
+        <View style={[styles.listRowIconBg, { backgroundColor: `${color}15` }]}>
+          <Ionicons name="document-text-outline" size={20} color={color} />
+        </View>
+
+        <View style={styles.listRowContent}>
+          <Text style={styles.listRowTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={styles.listRowSubtitle} numberOfLines={1}>
+            {item.case_title || item.client_name ? `Case: ${item.case_title || item.client_name} • ` : ""}{dateStr}
+          </Text>
+        </View>
+
+        <View style={styles.listRowActions}>
+          {!item.case_id && (
+            <TouchableOpacity
+              style={[styles.listActionBtn, { backgroundColor: `${theme.colors.success}18` }]}
+              onPress={() => openAttachModal(item)}
+            >
+              <Ionicons
+                name="link-outline"
+                size={15}
+                color={theme.colors.success}
+              />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.listActionBtn, { backgroundColor: "#2563eb12" }]}
+            onPress={() => handleOpenEditor(item)}
+          >
+            <Ionicons name="create-outline" size={15} color="#2563eb" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.listActionBtn}
+            onPress={() => {
+              setActionMenuDraft(item);
+              setIsActionMenuVisible(true);
+            }}
+          >
+            <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -1550,7 +1549,61 @@ const DraftsHubScreen: React.FC = () => {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* View Mode Toggle (Grid vs List) */}
+        {activeTab === "drafts" && (
+          <TouchableOpacity
+            style={styles.viewModeToggleBtn}
+            onPress={() => setViewMode((prev) => (prev === "grid" ? "list" : "grid"))}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={viewMode === "grid" ? "list-outline" : "grid-outline"}
+              size={20}
+              color={theme.colors.primary}
+            />
+          </TouchableOpacity>
+        )}
       </View>
+
+      {/* Quick Filter Chips for Case Drafts */}
+      {activeTab === "drafts" && (
+        <View style={styles.filterChipsBar}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterChipsContent}
+          >
+            {[
+              { label: "All Drafts", value: "all" },
+              { label: "Linked to Cases", value: "linked" },
+              { label: "Standalone", value: "standalone" },
+              { label: "Recent (< 24h)", value: "recent" },
+            ].map((chip) => {
+              const isSelected = draftFilterChip === chip.value;
+              return (
+                <TouchableOpacity
+                  key={chip.value}
+                  style={[
+                    styles.filterChip,
+                    isSelected && styles.filterChipSelected,
+                  ]}
+                  onPress={() => setDraftFilterChip(chip.value as any)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      isSelected && styles.filterChipTextSelected,
+                    ]}
+                  >
+                    {chip.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
 
       {activeTab === "templates" && (
         <View
@@ -1672,15 +1725,10 @@ const DraftsHubScreen: React.FC = () => {
         />
       ) : (
         <FlatList
-          key="drafts_list"
+          key={viewMode === "grid" ? "drafts_cards" : "drafts_rows"}
           data={filteredDrafts}
-          renderItem={renderDraftItem}
+          renderItem={viewMode === "grid" ? renderDraftItem : renderDraftListItem}
           keyExtractor={(item) => item.id}
-          getItemLayout={(data, index) => ({
-            length: 110,
-            offset: 110 * index,
-            index,
-          })}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           initialNumToRender={6}
@@ -1701,6 +1749,155 @@ const DraftsHubScreen: React.FC = () => {
         />
       )}
 
+      {/* 3-Dots Quick Actions Menu Modal */}
+      <Modal
+        visible={isActionMenuVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsActionMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuModalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsActionMenuVisible(false)}
+        >
+          <View style={styles.menuModalContent}>
+            <View style={styles.menuModalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuModalTitle} numberOfLines={1}>
+                  {actionMenuDraft?.title || "Document Actions"}
+                </Text>
+                <Text style={styles.menuModalSubtitle}>
+                  {actionMenuDraft ? getTemplateLabel(actionMenuDraft.template_type) : ""}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.menuModalCloseBtn}
+                onPress={() => setIsActionMenuVisible(false)}
+              >
+                <Ionicons name="close" size={20} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.menuModalDivider} />
+
+            {actionMenuDraft && (
+              <View style={styles.menuModalOptions}>
+                <TouchableOpacity
+                  style={styles.menuOptionRow}
+                  onPress={() => {
+                    const draft = actionMenuDraft;
+                    setIsActionMenuVisible(false);
+                    handleOpenEditor(draft);
+                  }}
+                >
+                  <View style={[styles.menuOptionIconBg, { backgroundColor: "#eff6ff" }]}>
+                    <Ionicons name="create-outline" size={18} color="#2563eb" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.menuOptionText}>Edit Document</Text>
+                    <Text style={styles.menuOptionSub}>Open in rich text legal editor</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuOptionRow}
+                  onPress={() => {
+                    const draft = actionMenuDraft;
+                    setIsActionMenuVisible(false);
+                    handleOpenPdf(draft);
+                  }}
+                >
+                  <View style={[styles.menuOptionIconBg, { backgroundColor: "#f0fdf4" }]}>
+                    <Ionicons name="eye-outline" size={18} color="#16a34a" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.menuOptionText}>Open PDF</Text>
+                    <Text style={styles.menuOptionSub}>Preview printable court layout</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuOptionRow}
+                  onPress={() => {
+                    const draft = actionMenuDraft;
+                    setIsActionMenuVisible(false);
+                    handleShareDraft(draft);
+                  }}
+                >
+                  <View style={[styles.menuOptionIconBg, { backgroundColor: "#faf5ff" }]}>
+                    <Ionicons name="share-outline" size={18} color="#9333ea" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.menuOptionText}>Share PDF Document</Text>
+                    <Text style={styles.menuOptionSub}>Share via WhatsApp, Email or Print</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuOptionRow}
+                  onPress={() => {
+                    const draft = actionMenuDraft;
+                    setIsActionMenuVisible(false);
+                    openAttachModal(draft);
+                  }}
+                >
+                  <View style={[styles.menuOptionIconBg, { backgroundColor: "#eff6ff" }]}>
+                    <Ionicons name="briefcase-outline" size={18} color="#0284c7" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.menuOptionText}>
+                      {actionMenuDraft.case_id ? "Change Linked Case" : "Link to a Case"}
+                    </Text>
+                    <Text style={styles.menuOptionSub}>
+                      {actionMenuDraft.case_id
+                        ? `Currently linked to ${actionMenuDraft.case_title || actionMenuDraft.client_name || "Case"}`
+                        : "Associate draft with an active diary case"}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {actionMenuDraft.case_id ? (
+                  <TouchableOpacity
+                    style={styles.menuOptionRow}
+                    onPress={() => {
+                      const draft = actionMenuDraft;
+                      setIsActionMenuVisible(false);
+                      handleUnlinkCase(draft);
+                    }}
+                  >
+                    <View style={[styles.menuOptionIconBg, { backgroundColor: "#fff1f2" }]}>
+                      <Ionicons name="unlink-outline" size={18} color="#e11d48" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.menuOptionText, { color: "#e11d48" }]}>Unlink from Case</Text>
+                      <Text style={styles.menuOptionSub}>Convert to standalone draft</Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : null}
+
+                <TouchableOpacity
+                  style={styles.menuOptionRow}
+                  onPress={() => {
+                    const draft = actionMenuDraft;
+                    setIsActionMenuVisible(false);
+                    handleDeleteDraft(draft);
+                  }}
+                >
+                  <View style={[styles.menuOptionIconBg, { backgroundColor: "#fef2f2" }]}>
+                    <Ionicons name="trash-outline" size={18} color="#dc2626" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.menuOptionText, { color: "#dc2626" }]}>Delete Draft</Text>
+                    <Text style={styles.menuOptionSub}>Permanently remove from device</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Attach to Case Modal */}
       <Modal
         visible={isAttachModalVisible}
@@ -1708,7 +1905,10 @@ const DraftsHubScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => setIsAttachModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Attach Draft to Case</Text>
@@ -1754,11 +1954,13 @@ const DraftsHubScreen: React.FC = () => {
                 renderItem={renderCaseItem}
                 keyExtractor={(item) => item.id.toString()}
                 style={styles.modalList}
-                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40, flexGrow: 1 }}
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled"
               />
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -1799,12 +2001,15 @@ const getStyles = (theme: any) =>
       fontWeight: "bold",
     },
     searchBarContainer: {
+      flexDirection: "row",
+      alignItems: "center",
       padding: 12,
       backgroundColor: theme.colors.cardBackground,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
     },
     searchBar: {
+      flex: 1,
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: theme.colors.inputBackground,
@@ -1812,11 +2017,48 @@ const getStyles = (theme: any) =>
       paddingHorizontal: 12,
       height: 40,
     },
-    searchInput: {
-      flex: 1,
-      fontSize: 14,
+    viewModeToggleBtn: {
+      marginLeft: 10,
+      width: 40,
+      height: 40,
+      borderRadius: 8,
+      backgroundColor: theme.colors.inputBackground,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    filterChipsBar: {
+      height: 44,
+      backgroundColor: theme.colors.cardBackground,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    filterChipsContent: {
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      gap: 8,
+    },
+    filterChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 20,
+      backgroundColor: `${theme.colors.border}40`,
+      height: 28,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    filterChipSelected: {
+      backgroundColor: theme.colors.primary,
+    },
+    filterChipText: {
+      fontSize: 12,
+      fontWeight: "600",
       color: theme.colors.text,
-      paddingVertical: 0,
+    },
+    filterChipTextSelected: {
+      color: "#ffffff",
+      fontWeight: "bold",
     },
     listContent: {
       padding: 12,
@@ -1825,78 +2067,269 @@ const getStyles = (theme: any) =>
     draftCard: {
       backgroundColor: theme.colors.cardBackground,
       borderRadius: 12,
-      padding: 16,
+      padding: 14,
       marginBottom: 12,
       borderWidth: 1,
       borderColor: theme.colors.border,
       elevation: 2,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
+      shadowOpacity: 0.08,
       shadowRadius: 3,
     },
-    draftHeader: {
+    cardTopRow: {
       flexDirection: "row",
-      alignItems: "flex-start",
-      marginBottom: 16,
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 10,
     },
-    iconContainer: {
+    badgeCluster: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 6,
+      flex: 1,
+    },
+    caseBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 4,
+      maxWidth: 180,
+    },
+    caseBadgeText: {
+      fontSize: 11,
+      fontWeight: "600",
+    },
+    recentDotBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#ecfdf5",
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 10,
+    },
+    recentDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: "#10b981",
+      marginRight: 4,
+    },
+    recentDotText: {
+      fontSize: 10,
+      fontWeight: "bold",
+      color: "#059669",
+    },
+    moreMenuButton: {
+      padding: 4,
+      marginLeft: 6,
+    },
+    cardCenterRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    parchmentThumbnail: {
       width: 44,
-      height: 44,
+      height: 68,
+      backgroundColor: "#fcf9f2",
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: "#e2d2b2",
+      position: "relative",
+      overflow: "hidden",
+      marginRight: 12,
+      elevation: 1,
+    },
+    parchmentMarginLine: {
+      position: "absolute",
+      left: 8,
+      top: 0,
+      bottom: 0,
+      width: 0.8,
+      backgroundColor: "#ef4444",
+      opacity: 0.6,
+    },
+    parchmentLines: {
+      marginTop: 8,
+      paddingLeft: 11,
+      paddingRight: 4,
+      gap: 4,
+    },
+    dummyLine: {
+      height: 2,
+      backgroundColor: "#d1d5db",
+    },
+    parchmentPdfTag: {
+      position: "absolute",
+      bottom: 2,
+      right: 2,
+      borderRadius: 2,
+      paddingHorizontal: 2.5,
+      paddingVertical: 1,
+    },
+    parchmentPdfTagText: {
+      color: "#fff",
+      fontSize: 6,
+      fontWeight: "bold",
+    },
+    cardTitleColumn: {
+      flex: 1,
+    },
+    draftTitle: {
+      fontSize: 15,
+      fontWeight: "bold",
+      color: theme.colors.text,
+      marginBottom: 4,
+      lineHeight: 20,
+    },
+    dateRow: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    typeBadge: {
+      paddingHorizontal: 7,
+      paddingVertical: 2.5,
+      borderRadius: 4,
+    },
+    typeBadgeText: {
+      fontSize: 10,
+      fontWeight: "700",
+    },
+    draftDate: {
+      fontSize: 11,
+      color: theme.colors.textSecondary,
+    },
+    actionDock: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderTopWidth: 1,
+      borderTopColor: `${theme.colors.border}60`,
+      paddingTop: 10,
+      gap: 6,
+    },
+    equalActionBtn: {
+      flex: 1,
+      height: 34,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 6,
+      borderWidth: 1,
+      paddingHorizontal: 4,
+    },
+    equalActionBtnText: {
+      fontSize: 11.5,
+      fontWeight: "700",
+      textAlign: "center",
+    },
+    draftListRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.colors.cardBackground,
+      borderRadius: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      elevation: 1,
+    },
+    listRowIconBg: {
+      width: 36,
+      height: 36,
+      borderRadius: 6,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 10,
+    },
+    listRowContent: {
+      flex: 1,
+    },
+    listRowTitle: {
+      fontSize: 14,
+      fontWeight: "bold",
+      color: theme.colors.text,
+      marginBottom: 2,
+    },
+    listRowSubtitle: {
+      fontSize: 11,
+      color: theme.colors.textSecondary,
+    },
+    listRowActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    listActionBtn: {
+      padding: 6,
+      borderRadius: 6,
+    },
+    menuModalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      justifyContent: "flex-end",
+    },
+    menuModalContent: {
+      backgroundColor: theme.colors.cardBackground,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 16,
+      paddingBottom: Platform.OS === "ios" ? 36 : 20,
+      elevation: 10,
+    },
+    menuModalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    menuModalTitle: {
+      fontSize: 16,
+      fontWeight: "bold",
+      color: theme.colors.text,
+    },
+    menuModalSubtitle: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      marginTop: 2,
+    },
+    menuModalCloseBtn: {
+      padding: 6,
+    },
+    menuModalDivider: {
+      height: 1,
+      backgroundColor: theme.colors.border,
+      marginVertical: 12,
+    },
+    menuModalOptions: {
+      gap: 4,
+    },
+    menuOptionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 10,
+      paddingHorizontal: 8,
+      borderRadius: 8,
+    },
+    menuOptionIconBg: {
+      width: 36,
+      height: 36,
       borderRadius: 8,
       justifyContent: "center",
       alignItems: "center",
       marginRight: 12,
     },
-    draftTitleContainer: {
-      flex: 1,
-    },
-    draftTitle: {
-      fontSize: 16,
-      fontWeight: "bold",
-      color: theme.colors.text,
-      marginBottom: 6,
-    },
-    badgeRow: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    typeBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 4,
-      marginRight: 8,
-    },
-    typeBadgeText: {
-      fontSize: 11,
+    menuOptionText: {
+      fontSize: 14,
       fontWeight: "600",
+      color: theme.colors.text,
     },
-    draftDate: {
-      fontSize: 12,
-      color: theme.colors.textSecondary,
-    },
-    actionRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
-      paddingTop: 12,
-    },
-    actionBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 1,
-      borderRadius: 6,
-      paddingVertical: 6,
-      paddingHorizontal: 8,
-      flex: 1,
-      marginHorizontal: 3,
-    },
-    actionBtnText: {
+    menuOptionSub: {
       fontSize: 11,
-      fontWeight: "bold",
-      marginLeft: 4,
+      color: theme.colors.textSecondary,
+      marginTop: 1,
     },
     centered: {
       flex: 1,
@@ -1946,8 +2379,10 @@ const getStyles = (theme: any) =>
       backgroundColor: theme.colors.cardBackground,
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
-      height: Dimensions.get("window").height * 0.65,
+      maxHeight: Dimensions.get("window").height * 0.82,
+      height: Dimensions.get("window").height * 0.70,
       padding: 16,
+      paddingBottom: Platform.OS === "ios" ? 36 : 24,
     },
     modalHeader: {
       flexDirection: "row",

@@ -13,10 +13,10 @@ export interface VakalatnamaData {
 
 export const getBlankDocumentHtml = (isHindi: boolean = false): string => {
   return `
-    <div style="font-family: 'Times New Roman', Times, serif; font-size: 13pt; line-height: 1.6; color: #000000; min-height: 500px;">
-      <p style="text-align: center; font-weight: bold; font-size: 15pt; margin-bottom: 18pt;">
+    <div style="min-height: 500px;">
+      <h1 class="court-header">
         ${isHindi ? "प्रारूप / दस्तावेज़ (Custom Draft)" : "DRAFT DOCUMENT"}
-      </p>
+      </h1>
       <p style="text-align: left; margin-bottom: 12px;">
         ${isHindi ? "यहाँ अपना विधिक दस्तावेज़ लिखना प्रारंभ करें..." : "Start typing your legal document content here..."}
       </p>

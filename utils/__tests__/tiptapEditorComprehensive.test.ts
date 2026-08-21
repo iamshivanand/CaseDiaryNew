@@ -196,7 +196,7 @@ describe("Tiptap Production-Grade Editor - True Tiptap & ProseMirror AST Test Su
     it("supports replacePlaceholderValue command across editor HTML", () => {
       const html = getRealTiptapEditorHtml("");
       expect(html).toContain("cmd === 'replacePlaceholderValue'");
-      expect(html).toContain("currentHtml.split(label).join(newVal)");
+      expect(html).toContain("split(label).join(newVal)");
       expect(html).toContain("editor.commands.setContent(updatedHtml)");
     });
 

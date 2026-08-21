@@ -46,10 +46,19 @@ const mockCases = [
 
 jest.mock("../../../DataBase", () => ({
   ...jest.requireActual("../../../DataBase"),
-  getDb: jest.fn(() => Promise.resolve({})),
+  getDb: jest.fn(() =>
+    Promise.resolve({
+      getAllAsync: jest.fn(() => Promise.resolve([])),
+      getFirstAsync: jest.fn(() => Promise.resolve(null)),
+      runAsync: jest.fn(() => Promise.resolve({ changes: 0 })),
+    })
+  ),
   getCases: jest.fn(() => Promise.resolve(mockCases)),
   getYesterdaysCasesCount: jest.fn(() => Promise.resolve(0)),
   getUndatedCasesCount: jest.fn(() => Promise.resolve(0)),
+  getExpiringLimitationCases: jest.fn(() => Promise.resolve([])),
+  getUpcomingHearingsWithPendingFee: jest.fn(() => Promise.resolve([])),
+  getOverdueCasesCount: jest.fn(() => Promise.resolve(0)),
   getUserProfile: jest.fn(() =>
     Promise.resolve({ id: 1, name: "Test Advocate" })
   ),

@@ -55,6 +55,7 @@ export const translations = {
     onboarding_welcome_desc:
       "Let's get you set up for a seamless case management experience.",
     onboarding_start_btn: "Let's Get Started",
+    onboarding_import_link: "Already have a backup? Import Data",
     onboarding_step_1_of_4: "Step 1 of 4",
     onboarding_full_name: "Full Name",
     onboarding_enter_full_name: "Enter your full name",
@@ -564,6 +565,7 @@ export const translations = {
     onboarding_welcome_desc:
       "आइए आपको एक सहज केस प्रबंधन अनुभव के लिए तैयार करें।",
     onboarding_start_btn: "आइए शुरू करें",
+    onboarding_import_link: "क्या आपके पास बैकअप है? डेटा आयात करें",
     onboarding_step_1_of_4: "चरण १/४",
     onboarding_full_name: "पूरा नाम",
     onboarding_enter_full_name: "अपना पूरा नाम दर्ज करें",

@@ -722,6 +722,65 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   const uniqueIdToUse =
     routeUniqueId || initialValues?.uniqueId || generatedUniqueId;
 
+  const formikRef = useRef<FormikProps<Partial<CaseData>>>(null);
+  const formikBagRef = useRef<FormikProps<Partial<CaseData>> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  React.useLayoutEffect(() => {
+    if (!navigation?.setOptions) return;
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => {
+            if (formikBagRef.current) {
+              formikBagRef.current.handleSubmit();
+            } else if (formikRef.current) {
+              formikRef.current.handleSubmit();
+            }
+          }}
+          disabled={isSaving}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: theme.colors.primary,
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 8,
+            marginRight: 8,
+            opacity: isSaving ? 0.6 : 1,
+          }}
+          activeOpacity={0.7}
+        >
+          {isSaving ? (
+            <ActivityIndicator
+              size="small"
+              color="#ffffff"
+              style={{ marginRight: 4 }}
+            />
+          ) : (
+            <Ionicons
+              name="checkmark-outline"
+              size={18}
+              color="#ffffff"
+              style={{ marginRight: 4 }}
+            />
+          )}
+          <Text
+            style={{
+              color: "#ffffff",
+              fontSize: 14,
+              fontWeight: "600",
+            }}
+          >
+            {update
+              ? t("btn_save_changes") || "Save"
+              : t("btn_save_case") || "Save"}
+          </Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, theme, update, t, isSaving]);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const cardLayouts = useRef<{ [key: number]: number }>({});
   const fieldLayouts = useRef<{ [key: string]: number }>({});
@@ -1186,292 +1245,283 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   };
 
   const handleSubmitForm = async (formValues: Partial<CaseData>) => {
-    console.log("Submitting form values:", formValues);
+    setIsSaving(true);
+    try {
+      console.log("Submitting form values:", formValues);
 
-    const userIdVal = await AsyncStorage.getItem("@user_id");
-    const userId = userIdVal ? parseInt(userIdVal, 10) : null;
-
-    const crimeNo =
-      formValues.crime_number && formValues.crime_number.trim()
-        ? formValues.crime_number.trim()
-        : null;
-    const crimeYr =
-      formValues.crime_year && formValues.crime_year.toString().trim()
-        ? parseInt(formValues.crime_year.toString().trim(), 10)
-        : null;
-
-    let courtNameString = null;
-    if (formValues.court_id === "Other") {
-      courtNameString = otherValues["court_id"];
-      if (courtNameString) {
-        const newCourtId = await addCourt(courtNameString, userId);
-        formValues.court_id = newCourtId;
-      }
-    } else {
-      const selectedCourtOption = courtOptions.find(
-        (opt) => opt.value === formValues.court_id
-      );
-      courtNameString =
-        selectedCourtOption && selectedCourtOption.value !== ""
-          ? selectedCourtOption.label
-          : null;
-    }
-
-    let caseTypeNameString = null;
-    if (formValues.case_type_id === "Other") {
-      caseTypeNameString = otherValues["case_type_id"];
-      if (caseTypeNameString) {
-        const newCaseTypeId = await addCaseType(caseTypeNameString, userId);
-        formValues.case_type_id = newCaseTypeId;
-      }
-    } else {
-      const selectedCaseTypeOption = caseTypeOptions.find(
-        (opt) => opt.value === formValues.case_type_id
-      );
-      caseTypeNameString =
-        selectedCaseTypeOption && selectedCaseTypeOption.value !== ""
-          ? selectedCaseTypeOption.label
-          : null;
-    }
-
-    let districtId = formValues.district_id || null;
-    if (districtId === "Other") {
-      const districtName = otherValues["district_id"];
-      if (districtName) {
-        const newDistrictId = await addDistrict(districtName, null, userId);
-        districtId = newDistrictId;
-      } else {
-        districtId = null;
-      }
-    } else {
-      districtId = districtId ? Number(districtId) : null;
-    }
-
-    let policeStationId = formValues.police_station_id || null;
-    if (policeStationId === "Other") {
-      const psName = otherValues["police_station_id"];
-      if (psName) {
-        const newPsId = await addPoliceStation(psName, districtId, userId);
-        policeStationId = newPsId;
-      } else {
-        policeStationId = null;
-      }
-    } else {
-      policeStationId = policeStationId ? Number(policeStationId) : null;
-    }
-
-    if (update && initialValues?.id) {
-      const caseIdToUpdate = initialValues.id;
-
-      const initialFormStateForCompare = prepareFormInitialValues();
-      const changedFields = getChangedValues(
-        initialFormStateForCompare,
-        formValues
-      );
-
-      if (Object.keys(changedFields).length === 0) {
-        console.log("No changes detected to update.");
-        navigation.goBack();
-        return;
-      }
-
-      const updatePayload: CaseUpdateData = {
-        ...(changedFields.CaseTitle && { CaseTitle: changedFields.CaseTitle }),
-        ...(changedFields.ClientName && {
-          ClientName: changedFields.ClientName,
-        }),
-        ...(changedFields.CNRNumber && { CNRNumber: changedFields.CNRNumber }),
-        court_id: formValues.court_id || null,
-        court_name: courtNameString,
-        dateFiled: changedFields.FiledDate,
-        case_type_id: formValues.case_type_id || null,
-        case_type_name: caseTypeNameString,
-        ...(changedFields.case_number && {
-          case_number: changedFields.case_number,
-        }),
-        ...(changedFields.case_year && {
-          case_year: changedFields.case_year
-            ? parseInt(changedFields.case_year as string, 10)
-            : null,
-        }),
-        ...(changedFields.session_trial_number && {
-          session_trial_number: changedFields.session_trial_number,
-        }),
-        crime_number: crimeNo,
-        crime_year: crimeYr,
-        ...(changedFields.JudgeName && { JudgeName: changedFields.JudgeName }),
-        ...(changedFields.OnBehalfOf && {
-          OnBehalfOf: changedFields.OnBehalfOf,
-        }),
-        ...(changedFields.FirstParty && {
-          FirstParty: changedFields.FirstParty,
-        }),
-        ...(changedFields.OppositeParty && {
-          OppositeParty: changedFields.OppositeParty,
-        }),
-        ...(changedFields.ClientContactNumber && {
-          ClientContactNumber: changedFields.ClientContactNumber,
-        }),
-        ...(changedFields.Accussed && { Accussed: changedFields.Accussed }),
-        ...(changedFields.Undersection && {
-          Undersection: changedFields.Undersection,
-        }),
-        police_station_id: policeStationId,
-        ...(changedFields.StatuteOfLimitations && {
-          StatuteOfLimitations: changedFields.StatuteOfLimitations,
-        }),
-        ...(changedFields.OpposingCounsel && {
-          OpposingCounsel: changedFields.OpposingCounsel,
-        }),
-        ...(changedFields.OppositeAdvocate && {
-          OppositeAdvocate: changedFields.OppositeAdvocate,
-        }),
-        ...(changedFields.OppAdvocateContactNumber && {
-          OppAdvocateContactNumber: changedFields.OppAdvocateContactNumber,
-        }),
-        ...(changedFields.Status && { CaseStatus: changedFields.Status }),
-        ...(changedFields.Priority && { Priority: changedFields.Priority }),
-        ...(changedFields.PreviousDate && {
-          PreviousDate: changedFields.PreviousDate,
-        }),
-        ...(changedFields.HearingDate && {
-          NextDate: changedFields.HearingDate,
-        }),
-        ...(changedFields.CaseDescription && {
-          CaseDescription: changedFields.CaseDescription,
-        }),
-        ...(changedFields.CaseNotes && { CaseNotes: changedFields.CaseNotes }),
-        ...(changedFields.case_stage && {
-          case_stage: changedFields.case_stage,
-        }),
-        ...(changedFields.total_fee !== undefined && {
-          total_fee:
-            typeof changedFields.total_fee === "string"
-              ? parseFloat(changedFields.total_fee)
-              : changedFields.total_fee,
-        }),
-        ...(changedFields.fee_paid !== undefined && {
-          fee_paid:
-            typeof changedFields.fee_paid === "string"
-              ? parseFloat(changedFields.fee_paid)
-              : changedFields.fee_paid,
-        }),
-      };
-      Object.keys(updatePayload).forEach((key) => {
-        const K = key as keyof CaseUpdateData;
-        if (updatePayload[K] === undefined) {
-          delete updatePayload[K];
-        }
-      });
-
-      console.log(
-        "Attempting to update with payload:",
-        JSON.stringify(updatePayload, null, 2)
-      );
-      try {
-        const success = await updateCase(caseIdToUpdate, updatePayload);
-        if (success) {
-          Alert.alert(t("alert_success"), t("editcase_success_updated"));
-          await incrementCaseActionCount();
-          navigation.navigate("CaseDetails", {
-            caseId: caseIdToUpdate,
-          });
-          if (updatePayload.NextDate) {
-            setTimeout(() => {
-              promptClientNotification(
-                caseIdToUpdate,
-                updatePayload.NextDate,
-                "Hearing updated."
-              );
-            }, 600);
-          }
-        } else {
-          Alert.alert(t("alert_error"), t("editcase_err_save_details"));
-        }
-      } catch (e) {
-        console.error("Error updating case:", e);
-        Alert.alert(t("alert_error"), t("editcase_err_general"));
-      }
-    } else {
       const userIdVal = await AsyncStorage.getItem("@user_id");
       const userId = userIdVal ? parseInt(userIdVal, 10) : null;
-      const insertPayload: CaseInsertData = {
-        uniqueId: formValues.uniqueId || uniqueIdToUse,
-        user_id: userId,
-        CaseTitle:
-          formValues.CaseTitle ||
-          (formValues.FirstParty && formValues.OppositeParty
-            ? `${formValues.FirstParty} vs. ${formValues.OppositeParty}`
-            : null),
-        ClientName: formValues.ClientName || null,
-        CNRNumber: formValues.CNRNumber || null,
-        court_id: formValues.court_id || null,
-        court_name: courtNameString,
-        dateFiled: formValues.FiledDate || null,
-        case_type_id: formValues.case_type_id || null,
-        case_type_name: caseTypeNameString,
-        case_number: formValues.case_number || null,
-        case_year: formValues.case_year
-          ? parseInt(formValues.case_year as string, 10)
-          : null,
-        session_trial_number: formValues.session_trial_number || null,
-        crime_number: crimeNo,
-        crime_year: crimeYr,
-        JudgeName: formValues.JudgeName || null,
-        OnBehalfOf: formValues.OnBehalfOf || null,
-        FirstParty: formValues.FirstParty || null,
-        OppositeParty: formValues.OppositeParty || null,
-        ClientContactNumber: formValues.ClientContactNumber || null,
-        Accussed: formValues.Accussed || null,
-        Undersection: formValues.Undersection || null,
-        police_station_id: policeStationId,
-        StatuteOfLimitations: formValues.StatuteOfLimitations || null,
-        OpposingCounsel: formValues.OpposingCounsel || null,
-        OppositeAdvocate: formValues.OppositeAdvocate || null,
-        OppAdvocateContactNumber: formValues.OppAdvocateContactNumber || null,
-        CaseStatus: formValues.Status || null,
-        Priority: formValues.Priority || null,
-        PreviousDate: formValues.PreviousDate || null,
-        NextDate: formValues.HearingDate || null,
-        CaseDescription: formValues.CaseDescription || null,
-        CaseNotes: formValues.CaseNotes || null,
-        case_stage: formValues.case_stage || null,
-        total_fee: formValues.total_fee
-          ? parseFloat(formValues.total_fee as any)
-          : 0,
-        fee_paid: formValues.fee_paid
-          ? parseFloat(formValues.fee_paid as any)
-          : 0,
-      };
 
-      console.log(
-        "Attempting to insert with payload:",
-        JSON.stringify(insertPayload, null, 2)
-      );
-      try {
-        const newCaseId = await addCase(insertPayload);
-        if (newCaseId) {
-          Alert.alert(t("alert_success"), t("editcase_success_saved"));
-          await incrementCaseActionCount();
-          (navigation as any).replace("CaseDetails", {
-            caseId: newCaseId,
-          });
-          if (insertPayload.NextDate) {
-            setTimeout(() => {
-              promptClientNotification(
-                newCaseId,
-                insertPayload.NextDate,
-                "New case registered."
-              );
-            }, 600);
-          }
-        } else {
-          Alert.alert(t("alert_error"), t("editcase_err_save_details"));
+      const crimeNo =
+        formValues.crime_number && formValues.crime_number.trim()
+          ? formValues.crime_number.trim()
+          : null;
+      const crimeYr =
+        formValues.crime_year && formValues.crime_year.toString().trim()
+          ? parseInt(formValues.crime_year.toString().trim(), 10)
+          : null;
+
+      let courtNameString = null;
+      if (formValues.court_id === "Other") {
+        courtNameString = otherValues["court_id"];
+        if (courtNameString) {
+          const newCourtId = await addCourt(courtNameString, userId);
+          formValues.court_id = newCourtId;
         }
-      } catch (e) {
-        console.error("Error adding case:", e);
-        Alert.alert(t("alert_error"), t("editcase_err_general"));
+      } else {
+        const selectedCourtOption = courtOptions.find(
+          (opt) => opt.value === formValues.court_id
+        );
+        courtNameString =
+          selectedCourtOption && selectedCourtOption.value !== ""
+            ? selectedCourtOption.label
+            : null;
       }
+
+      let caseTypeNameString = null;
+      if (formValues.case_type_id === "Other") {
+        caseTypeNameString = otherValues["case_type_id"];
+        if (caseTypeNameString) {
+          const newCaseTypeId = await addCaseType(caseTypeNameString, userId);
+          formValues.case_type_id = newCaseTypeId;
+        }
+      } else {
+        const selectedCaseTypeOption = caseTypeOptions.find(
+          (opt) => opt.value === formValues.case_type_id
+        );
+        caseTypeNameString =
+          selectedCaseTypeOption && selectedCaseTypeOption.value !== ""
+            ? selectedCaseTypeOption.label
+            : null;
+      }
+
+      let districtId = formValues.district_id || null;
+      if (districtId === "Other") {
+        const districtName = otherValues["district_id"];
+        if (districtName) {
+          const newDistrictId = await addDistrict(districtName, null, userId);
+          districtId = newDistrictId;
+        } else {
+          districtId = null;
+        }
+      } else {
+        districtId = districtId ? Number(districtId) : null;
+      }
+
+      let policeStationId = formValues.police_station_id || null;
+      if (policeStationId === "Other") {
+        const psName = otherValues["police_station_id"];
+        if (psName) {
+          const newPsId = await addPoliceStation(psName, districtId, userId);
+          policeStationId = newPsId;
+        } else {
+          policeStationId = null;
+        }
+      } else {
+        policeStationId = policeStationId ? Number(policeStationId) : null;
+      }
+
+      if (update && initialValues?.id) {
+        const caseIdToUpdate = initialValues.id;
+
+        const initialFormStateForCompare = prepareFormInitialValues();
+        const changedFields = getChangedValues(
+          initialFormStateForCompare,
+          formValues
+        );
+
+        if (Object.keys(changedFields).length === 0) {
+          console.log("No changes detected to update.");
+          navigation.goBack();
+          return;
+        }
+
+        const updatePayload: CaseUpdateData = {
+          ...(changedFields.CaseTitle && { CaseTitle: changedFields.CaseTitle }),
+          ...(changedFields.ClientName && {
+            ClientName: changedFields.ClientName,
+          }),
+          ...(changedFields.CNRNumber && { CNRNumber: changedFields.CNRNumber }),
+          court_id: formValues.court_id || null,
+          court_name: courtNameString,
+          dateFiled: changedFields.FiledDate,
+          case_type_id: formValues.case_type_id || null,
+          case_type_name: caseTypeNameString,
+          ...(changedFields.case_number && {
+            case_number: changedFields.case_number,
+          }),
+          ...(changedFields.case_year && {
+            case_year: changedFields.case_year
+              ? parseInt(changedFields.case_year as string, 10)
+              : null,
+          }),
+          ...(changedFields.session_trial_number && {
+            session_trial_number: changedFields.session_trial_number,
+          }),
+          crime_number: crimeNo,
+          crime_year: crimeYr,
+          JudgeName: changedFields.JudgeName,
+          OnBehalfOf: changedFields.OnBehalfOf,
+          FirstParty: changedFields.FirstParty,
+          OppositeParty: changedFields.OppositeParty,
+          ClientContactNumber: changedFields.ClientContactNumber,
+          Accussed: changedFields.Accussed,
+          Undersection: changedFields.Undersection,
+          police_station_id: policeStationId,
+          StatuteOfLimitations: changedFields.StatuteOfLimitations,
+          OpposingCounsel: changedFields.OpposingCounsel,
+          ...(changedFields.OppositeAdvocate && {
+            OppositeAdvocate: changedFields.OppositeAdvocate,
+          }),
+          ...(changedFields.OppAdvocateContactNumber && {
+            OppAdvocateContactNumber: changedFields.OppAdvocateContactNumber,
+          }),
+          ...(changedFields.Status && { CaseStatus: changedFields.Status }),
+          ...(changedFields.Priority && { Priority: changedFields.Priority }),
+          ...(changedFields.PreviousDate && {
+            PreviousDate: changedFields.PreviousDate,
+          }),
+          ...(changedFields.HearingDate && {
+            NextDate: changedFields.HearingDate,
+          }),
+          ...(changedFields.CaseDescription && {
+            CaseDescription: changedFields.CaseDescription,
+          }),
+          ...(changedFields.CaseNotes && { CaseNotes: changedFields.CaseNotes }),
+          ...(changedFields.case_stage && {
+            case_stage: changedFields.case_stage,
+          }),
+          ...(changedFields.total_fee !== undefined && {
+            total_fee:
+              typeof changedFields.total_fee === "string"
+                ? parseFloat(changedFields.total_fee)
+                : changedFields.total_fee,
+          }),
+          ...(changedFields.fee_paid !== undefined && {
+            fee_paid:
+              typeof changedFields.fee_paid === "string"
+                ? parseFloat(changedFields.fee_paid)
+                : changedFields.fee_paid,
+          }),
+        };
+        Object.keys(updatePayload).forEach((key) => {
+          const K = key as keyof CaseUpdateData;
+          if (updatePayload[K] === undefined) {
+            delete updatePayload[K];
+          }
+        });
+
+        console.log(
+          "Attempting to update with payload:",
+          JSON.stringify(updatePayload, null, 2)
+        );
+        try {
+          const success = await updateCase(caseIdToUpdate, updatePayload);
+          if (success) {
+            Alert.alert(t("alert_success"), t("editcase_success_updated"));
+            await incrementCaseActionCount();
+            navigation.navigate("CaseDetails", {
+              caseId: caseIdToUpdate,
+            });
+            if (updatePayload.NextDate) {
+              setTimeout(() => {
+                promptClientNotification(
+                  caseIdToUpdate,
+                  updatePayload.NextDate,
+                  "Hearing updated."
+                );
+              }, 600);
+            }
+          } else {
+            Alert.alert(t("alert_error"), t("editcase_err_save_details"));
+          }
+        } catch (e) {
+          console.error("Error updating case:", e);
+          Alert.alert(t("alert_error"), t("editcase_err_general"));
+        }
+      } else {
+        const userIdVal = await AsyncStorage.getItem("@user_id");
+        const userId = userIdVal ? parseInt(userIdVal, 10) : null;
+        const insertPayload: CaseInsertData = {
+          uniqueId: formValues.uniqueId || uniqueIdToUse,
+          user_id: userId,
+          CaseTitle:
+            formValues.CaseTitle ||
+            (formValues.FirstParty && formValues.OppositeParty
+              ? `${formValues.FirstParty} vs. ${formValues.OppositeParty}`
+              : null),
+          ClientName: formValues.ClientName || null,
+          CNRNumber: formValues.CNRNumber || null,
+          court_id: formValues.court_id || null,
+          court_name: courtNameString,
+          dateFiled: formValues.FiledDate || null,
+          case_type_id: formValues.case_type_id || null,
+          case_type_name: caseTypeNameString,
+          case_number: formValues.case_number || null,
+          case_year: formValues.case_year
+            ? parseInt(formValues.case_year as string, 10)
+            : null,
+          session_trial_number: formValues.session_trial_number || null,
+          crime_number: crimeNo,
+          crime_year: crimeYr,
+          JudgeName: formValues.JudgeName || null,
+          OnBehalfOf: formValues.OnBehalfOf || null,
+          FirstParty: formValues.FirstParty || null,
+          OppositeParty: formValues.OppositeParty || null,
+          ClientContactNumber: formValues.ClientContactNumber || null,
+          Accussed: formValues.Accussed || null,
+          Undersection: formValues.Undersection || null,
+          police_station_id: policeStationId,
+          StatuteOfLimitations: formValues.StatuteOfLimitations || null,
+          OpposingCounsel: formValues.OpposingCounsel || null,
+          OppositeAdvocate: formValues.OppositeAdvocate || null,
+          OppAdvocateContactNumber: formValues.OppAdvocateContactNumber || null,
+          CaseStatus: formValues.Status || null,
+          Priority: formValues.Priority || null,
+          PreviousDate: formValues.PreviousDate || null,
+          NextDate: formValues.HearingDate || null,
+          CaseDescription: formValues.CaseDescription || null,
+          CaseNotes: formValues.CaseNotes || null,
+          case_stage: formValues.case_stage || null,
+          total_fee: formValues.total_fee
+            ? parseFloat(formValues.total_fee as any)
+            : 0,
+          fee_paid: formValues.fee_paid
+            ? parseFloat(formValues.fee_paid as any)
+            : 0,
+        };
+
+        console.log(
+          "Attempting to insert with payload:",
+          JSON.stringify(insertPayload, null, 2)
+        );
+        try {
+          const newCaseId = await addCase(insertPayload);
+          if (newCaseId) {
+            Alert.alert(t("alert_success"), t("editcase_success_saved"));
+            await incrementCaseActionCount();
+            (navigation as any).replace("CaseDetails", {
+              caseId: newCaseId,
+            });
+            if (insertPayload.NextDate) {
+              setTimeout(() => {
+                promptClientNotification(
+                  newCaseId,
+                  insertPayload.NextDate,
+                  "New case registered."
+                );
+              }, 600);
+            }
+          } else {
+            Alert.alert(t("alert_error"), t("editcase_err_save_details"));
+          }
+        } catch (e) {
+          console.error("Error adding case:", e);
+          Alert.alert(t("alert_error"), t("editcase_err_general"));
+        }
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1492,13 +1542,16 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
         >
           <View style={styles.formScreenContainer}>
             <Formik
+              innerRef={formikRef}
               initialValues={prepareFormInitialValues()}
               validationSchema={validationSchema}
               onSubmit={handleSubmitForm}
               enableReinitialize
             >
-              {(formikProps) => (
-                <View>
+              {(formikProps) => {
+                formikBagRef.current = formikProps;
+                return (
+                  <View>
                   <FormikErrorScroller
                     errors={formikProps.errors}
                     submitCount={formikProps.submitCount}
@@ -1788,8 +1841,9 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
                       handleImportSuccess(data, formikProps.setFieldValue)
                     }
                   />
-                </View>
-              )}
+                  </View>
+                );
+              }}
             </Formik>
           </View>
         </ScrollView>

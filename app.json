@@ -2,7 +2,8 @@
   "expo": {
     "name": "Advocase",
     "slug": "CaseDiary",
-    "version": "1.2.2",
+    "scheme": "advocase",
+    "version": "1.2.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -10,7 +11,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0F172A"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -26,10 +27,10 @@
       "targetSdkVersion": 36,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0F172A"
       },
       "package": "com.iamshiv.CaseDiary",
-      "versionCode": 12,
+      "versionCode": 13,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -43,6 +44,12 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0F172A"
+        }
+      ],
       [
         "expo-document-picker",
         {

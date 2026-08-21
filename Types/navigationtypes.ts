@@ -54,6 +54,7 @@ export type HomeStackParamList = {
   PdfScanner: { caseId?: number };
   SettingsScreen: undefined;
   Settings: undefined;
+  NotificationInbox: { initialCategory?: string } | undefined;
 };
 
 // Stack for the "Search" Tab

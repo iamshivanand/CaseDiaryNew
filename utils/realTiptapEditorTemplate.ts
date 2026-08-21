@@ -44,23 +44,24 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       box-sizing: border-box;
       -webkit-tap-highlight-color: transparent;
     }
-    html, body {
-      margin: 0;
-      padding: 0;
+    html {
       width: 100%;
       min-height: 100%;
       background-color: #e5e7eb;
       font-family: 'Times New Roman', Georgia, serif;
+      scroll-padding-top: 80px;
     }
     body {
-      padding: 8px 4px 40px 4px;
+      margin: 0;
+      padding: 55px 4px 60px 4px;
       display: flex;
       justify-content: center;
       box-sizing: border-box;
+      scroll-padding-top: 80px;
     }
     .page-container {
       position: relative;
-      margin: 0 auto;
+      margin: 10px auto 0 auto;
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
       border-radius: 6px;
       overflow: hidden;
@@ -69,6 +70,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       box-sizing: border-box;
       width: 100%;
       max-width: 816px;
+      scroll-margin-top: 80px;
     }
     .page-margin-guide {
       position: absolute;
@@ -220,7 +222,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
     .tiptap td, .tiptap th, .editor-table td, .editor-table th {
       border: 1px solid #94a3b8;
       padding: 8px;
-      font-size: 15px;
+      font-size: inherit;
       vertical-align: top;
       box-sizing: border-box;
       position: relative;
@@ -348,6 +350,52 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       } catch (e) {}
     }
 
+    // Selection preservation on blur (for native ribbon buttons)
+    let savedSelection = { from: 0, to: 0 };
+
+    // Native ProseMirror Mark for Font Sizing (preserves bold, italic, paragraphs, links)
+    const FontSizeMark = Tiptap.Mark.create({
+      name: 'fontSize',
+      addAttributes() {
+        return {
+          size: {
+            default: null,
+            parseHTML: element => element.style.fontSize || element.getAttribute('data-size'),
+            renderHTML: attributes => {
+              if (!attributes.size) return {};
+              return {
+                style: 'font-size: ' + attributes.size,
+              };
+            },
+          },
+        };
+      },
+      parseHTML() {
+        return [
+          {
+            tag: 'span[style*="font-size"]',
+            getAttrs: element => {
+              const fs = element.style.fontSize;
+              return fs ? { size: fs } : false;
+            },
+          },
+        ];
+      },
+      renderHTML({ HTMLAttributes }) {
+        return ['span', HTMLAttributes, 0];
+      },
+      addCommands() {
+        return {
+          setFontSize: size => ({ chain }) => {
+            return chain().setMark(this.name, { size: size }).run();
+          },
+          unsetFontSize: () => ({ chain }) => {
+            return chain().unsetMark(this.name).run();
+          },
+        };
+      },
+    });
+
     // Initialize True Tiptap Engine with ProseMirror AST
     let editor = null;
     try {
@@ -358,6 +406,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             heading: { levels: [1, 2, 3, 4, 5, 6] },
           }),
           Tiptap.Underline,
+          FontSizeMark,
           Tiptap.Table.configure({
             resizable: true,
             HTMLAttributes: {
@@ -378,6 +427,22 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           sendStateToRN(false);
         },
         onSelectionUpdate() {
+          if (editor) {
+            const { from, to } = editor.state.selection;
+            if (from !== to) {
+              savedSelection = { from, to };
+              try {
+                const domSelection = window.getSelection();
+                if (domSelection && domSelection.rangeCount > 0) {
+                  const range = domSelection.getRangeAt(0);
+                  const rect = range.getBoundingClientRect();
+                  if (rect.top < 95) {
+                    window.scrollBy({ top: rect.top - 110, behavior: 'smooth' });
+                  }
+                }
+              } catch (e) {}
+            }
+          }
           sendStateToRN(false);
         },
       });
@@ -703,9 +768,16 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
 
     function replaceAllMatches(query, replacement) {
       if (!editor || !query) return;
-      const currentHtml = editor.getHTML();
-      const newHtml = currentHtml.split(query).join(replacement || '');
-      editor.commands.setContent(newHtml);
+      findSearchMatches(query, false);
+      if (searchMatches.length === 0) return;
+
+      const matchesToReplace = [...searchMatches].sort((a, b) => b.from - a.from);
+      matchesToReplace.forEach(match => {
+        try {
+          editor.chain().insertContentAt({ from: match.from, to: match.to }, replacement || '').run();
+        } catch (e) {}
+      });
+
       searchMatches = [];
       currentSearchIndex = -1;
       postMessage({ type: 'searchResult', total: 0, current: 0, query: '' });
@@ -852,16 +924,40 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             const newVal = data.value;
             if (label && newVal) {
               const currentHtml = editor.getHTML();
-              const updatedHtml = currentHtml.split(label).join(newVal);
+              let updatedHtml = currentHtml.split('<span class="legal-placeholder">' + label + '</span>').join(newVal);
+              updatedHtml = updatedHtml.split(label).join(newVal);
               editor.commands.setContent(updatedHtml);
               sendStateToRN(true);
             }
+          } else if (cmd === 'toggleHeading') {
+            const level = parseInt(data.value, 10) || 1;
+            editor.chain().focus().toggleHeading({ level: level }).run();
+          } else if (cmd === 'setParagraph') {
+            editor.chain().focus().setParagraph().run();
           } else if (cmd === 'setFontSize') {
             const sizeVal = data.value || '14';
             const numSize = parseInt(sizeVal, 10) || 14;
-            window.userFontSize = numSize;
-            updateDynamicPaperRatio();
-            sendStateToRN();
+            const sizeStr = numSize + 'pt';
+
+            const { state } = editor;
+            let from = state.selection.from;
+            let to = state.selection.to;
+
+            // If native blur collapsed selection, check if we have a saved active selection
+            if (from === to && savedSelection.from !== savedSelection.to) {
+              from = savedSelection.from;
+              to = savedSelection.to;
+            }
+
+            if (from !== to) {
+              // Apply native ProseMirror Mark to exact selection range
+              editor.chain().setTextSelection({ from, to }).setFontSize(sizeStr).run();
+            } else {
+              // No selection -> Change base document font size
+              window.userFontSize = numSize;
+              updateDynamicPaperRatio();
+            }
+            sendStateToRN(true);
           } else if (cmd === 'setLineHeight') {
             const lhVal = parseFloat(data.value) || 1.8;
             window.userLineHeightRatio = lhVal;
@@ -873,8 +969,13 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             editor.chain().focus().redo().run();
           }
         } else if (data.type === 'layout') {
-          if (data.font) editorEl.style.fontFamily = data.font;
-          if (data.lineHeight) editorEl.style.lineHeight = data.lineHeight;
+          if (data.font && editorEl) editorEl.style.fontFamily = data.font;
+          if (data.lineHeight) {
+            window.userLineHeightRatio = parseFloat(data.lineHeight) || 1.8;
+          }
+          if (data.fontSize) {
+            window.userFontSize = parseInt(data.fontSize, 10) || 14;
+          }
           if (data.headerText !== undefined) window.userHeaderText = data.headerText;
           if (data.footerText !== undefined) window.userFooterText = data.footerText;
           if (data.watermarkText !== undefined) window.userWatermarkText = data.watermarkText;
@@ -942,10 +1043,31 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       
       const doSend = function() {
         if (!editor) return;
+        let activeFontSize = String(window.userFontSize || 14);
+        try {
+          const markAttrs = editor.getAttributes('fontSize');
+          if (markAttrs && markAttrs.size) {
+            activeFontSize = String(parseInt(markAttrs.size, 10) || markAttrs.size).replace(/[^0-9]/g, '') || activeFontSize;
+          } else if (editor.isActive('heading', { level: 1 })) {
+            activeFontSize = String(Math.round((window.userFontSize || 14) * 1.35));
+          } else if (editor.isActive('heading', { level: 2 })) {
+            activeFontSize = String(Math.round((window.userFontSize || 14) * 1.22));
+          } else if (editor.isActive('heading', { level: 3 })) {
+            activeFontSize = String(Math.round((window.userFontSize || 14) * 1.12));
+          }
+        } catch (e) {}
+
+        const isSelected = editor.state.selection.from !== editor.state.selection.to;
         const state = {
           bold: editor.isActive('bold'),
           italic: editor.isActive('italic'),
           underline: editor.isActive('underline'),
+          fontSize: activeFontSize,
+          hasSelection: isSelected,
+          h1: editor.isActive('heading', { level: 1 }),
+          h2: editor.isActive('heading', { level: 2 }),
+          h3: editor.isActive('heading', { level: 3 }),
+          paragraph: !editor.isActive('heading'),
           alignLeft: !editor.isActive('heading', { level: 2 }) && !editor.isActive('heading', { level: 3 }),
           alignCenter: editor.isActive('heading', { level: 2 }) || editor.isActive('heading', { level: 1 }),
           alignRight: editor.isActive('heading', { level: 3 }),
@@ -954,7 +1076,8 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           unorderedList: editor.isActive('bulletList'),
         };
         const stats = calculateStats();
-        const payloadJson = JSON.stringify({ state, stats });
+        const html = editor.getHTML();
+        const payloadJson = JSON.stringify({ state, stats, html });
         if (payloadJson === lastSentStateJson && !immediate) {
           return;
         }
@@ -965,6 +1088,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           engine: 'tiptap-v3-prosemirror-ast',
           state: state,
           stats: stats,
+          html: html,
         });
       };
 
