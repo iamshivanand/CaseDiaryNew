@@ -231,6 +231,43 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       background-color: #f1f5f9;
       font-weight: bold;
     }
+    /* Borderless Multi-Column Grid Tables (Method 1) */
+    .tiptap table.borderless-table, .editor-table.borderless-table,
+    .tiptap table.borderless-columns, .editor-table.borderless-columns,
+    table.borderless-table, table.borderless-columns {
+      border: none !important;
+      margin: 8px 0;
+      width: 100%;
+    }
+    .tiptap table.borderless-table td, .editor-table.borderless-table td,
+    .tiptap table.borderless-columns td, .editor-table.borderless-columns td,
+    table.borderless-table td, table.borderless-columns td {
+      border: 1px dashed #cbd5e1 !important; /* Subtle guide in editor mode */
+      padding: 6px 8px;
+    }
+    .tiptap table.borderless-table th, .editor-table.borderless-table th,
+    .tiptap table.borderless-columns th, .editor-table.borderless-columns th,
+    table.borderless-table th, table.borderless-columns th {
+      border: 1px dashed #cbd5e1 !important;
+      background-color: transparent !important;
+    }
+    @media print {
+      .tiptap table.borderless-table, .editor-table.borderless-table,
+      .tiptap table.borderless-columns, .editor-table.borderless-columns,
+      table.borderless-table, table.borderless-columns {
+        border: none !important;
+      }
+      .tiptap table.borderless-table td, .editor-table.borderless-table td,
+      .tiptap table.borderless-columns td, .editor-table.borderless-columns td,
+      .tiptap table.borderless-table th, .editor-table.borderless-table th,
+      .tiptap table.borderless-columns th, .editor-table.borderless-columns th,
+      table.borderless-table td, table.borderless-columns td,
+      table.borderless-table th, table.borderless-columns th {
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+      }
+    }
     .signature-stamp {
       max-height: 90px;
       max-width: 220px;
@@ -396,6 +433,44 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       },
     });
 
+    // Native ProseMirror Extension for Block Text Alignment (Left, Center, Right, Justify)
+    const TextAlignExtension = Tiptap.Extension.create({
+      name: 'textAlign',
+      addGlobalAttributes() {
+        return [
+          {
+            types: ['heading', 'paragraph', 'blockquote'],
+            attributes: {
+              textAlign: {
+                default: null,
+                parseHTML: element => element.style.textAlign || null,
+                renderHTML: attributes => {
+                  if (!attributes.textAlign) return {};
+                  return {
+                    style: 'text-align: ' + attributes.textAlign + ';',
+                  };
+                },
+              },
+            },
+          },
+        ];
+      },
+      addCommands() {
+        return {
+          setTextAlign: (alignment) => ({ commands }) => {
+            return ['paragraph', 'heading', 'blockquote'].some(type =>
+              commands.updateAttributes(type, { textAlign: alignment })
+            );
+          },
+          unsetTextAlign: () => ({ commands }) => {
+            return ['paragraph', 'heading', 'blockquote'].some(type =>
+              commands.resetAttributes(type, 'textAlign')
+            );
+          },
+        };
+      },
+    });
+
     // Initialize True Tiptap Engine with ProseMirror AST
     let editor = null;
     try {
@@ -407,6 +482,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           }),
           Tiptap.Underline,
           FontSizeMark,
+          TextAlignExtension,
           Tiptap.Table.configure({
             resizable: true,
             HTMLAttributes: {
@@ -544,10 +620,10 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       container.style.height = canvasHeight + 'px';
       
       // Proportional font, line-height, spacing & padding derived strictly from scaleRatio
-      const baseFontSize = window.userFontSize || 14;
-      const renderFontPx = Math.max(11, Math.round(baseFontSize * scaleRatio));
+      const baseFontSize = window.userFontSize || 12;
+      const renderFontPx = Math.max(10, Math.round(baseFontSize * scaleRatio));
 
-      const baseLineRatio = window.userLineHeightRatio || (metrics.isLegal ? 1.8 : 1.5);
+      const baseLineRatio = window.userLineHeightRatio || (metrics.isLegal ? 1.25 : 1.2);
       const renderLineHeightPx = (renderFontPx * baseLineRatio).toFixed(1);
 
       const baseLetterSpace = window.userLetterSpacing || 0;
@@ -556,11 +632,11 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       const baseWordSpace = window.userWordSpacing || 0;
       const renderWordSpacePx = (baseWordSpace * scaleRatio).toFixed(2);
 
-      const titlePx = Math.round(renderFontPx * 1.35);
-      const headerPx = Math.round(renderFontPx * 1.22);
-      const sectionPx = Math.round(renderFontPx * 1.12);
-      const paragraphMb = Math.max(4, Math.round(10 * scaleRatio));
-      const padBottomPx = Math.round(30 * scaleRatio);
+      const titlePx = Math.round(renderFontPx * 1.3);
+      const headerPx = Math.round(renderFontPx * 1.2);
+      const sectionPx = Math.round(renderFontPx * 1.1);
+      const paragraphMb = Math.max(3, Math.round(5 * scaleRatio));
+      const padBottomPx = Math.round(20 * scaleRatio);
 
       let dynamicStyle = document.getElementById('dynamic-paper-scale-style');
       if (!dynamicStyle) {
@@ -834,13 +910,13 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           } else if (cmd === 'underline') {
             editor.chain().focus().toggleUnderline().run();
           } else if (cmd === 'justifyLeft') {
-            editor.chain().focus().setParagraph().run();
+            editor.chain().focus().setTextAlign('left').run();
           } else if (cmd === 'justifyCenter') {
-            editor.chain().focus().setHeading({ level: 2 }).run();
+            editor.chain().focus().setTextAlign('center').run();
           } else if (cmd === 'justifyRight') {
-            editor.chain().focus().setHeading({ level: 3 }).run();
-          } else if (cmd === 'justifyFull') {
-            editor.chain().focus().setParagraph().run();
+            editor.chain().focus().setTextAlign('right').run();
+          } else if (cmd === 'justifyFull' || cmd === 'justify') {
+            editor.chain().focus().setTextAlign('justify').run();
           } else if (cmd === 'insertOrderedList' || cmd === 'toggleLegalList') {
             editor.chain().focus().toggleOrderedList().run();
           } else if (cmd === 'insertUnorderedList') {
@@ -913,6 +989,19 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             editor.chain().focus().deleteRow().run();
           } else if (cmd === 'tableDeleteCol') {
             editor.chain().focus().deleteColumn().run();
+          } else if (cmd === 'toggleTableBorders') {
+            const activeTable = document.querySelector('.active-selected-element') || (editorEl ? editorEl.querySelector('table') : null);
+            if (activeTable && (activeTable.tagName === 'TABLE' || activeTable.classList.contains('editor-table'))) {
+              activeTable.classList.toggle('borderless-table');
+              activeTable.classList.toggle('borderless-columns');
+              sendStateToRN(true);
+            }
+          } else if (cmd === 'insertBorderlessColumns' || cmd === 'insert2Columns') {
+            const col2Html = '<table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin: 8px 0;"><tbody><tr><td style="width: 50%; border: none; vertical-align: top; padding: 4px 8px 4px 0;"><p><strong>[Left Column / Party 1]</strong></p><p>Type left column details, address, or grounds here...</p></td><td style="width: 50%; border: none; vertical-align: top; padding: 4px 0 4px 8px;"><p><strong>[Right Column / Party 2]</strong></p><p>Type right column details, status, or reply here...</p></td></tr></tbody></table><p></p>';
+            editor.chain().focus().insertContent(col2Html).run();
+          } else if (cmd === 'insert3Columns') {
+            const col3Html = '<table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin: 8px 0;"><tbody><tr><td style="width: 33.33%; border: none; vertical-align: top; padding: 4px 6px;"><p><strong>[Column 1]</strong></p><p>Details...</p></td><td style="width: 33.33%; border: none; vertical-align: top; padding: 4px 6px;"><p><strong>[Column 2]</strong></p><p>Details...</p></td><td style="width: 33.33%; border: none; vertical-align: top; padding: 4px 6px;"><p><strong>[Column 3]</strong></p><p>Details...</p></td></tr></tbody></table><p></p>';
+            editor.chain().focus().insertContent(col3Html).run();
           } else if (cmd === 'deleteSelectedElement') {
             if (editor.isActive('table')) {
               editor.chain().focus().deleteTable().run();
@@ -1058,6 +1147,12 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
         } catch (e) {}
 
         const isSelected = editor.state.selection.from !== editor.state.selection.to;
+        
+        let activeAlign = 'left';
+        if (editor.isActive({ textAlign: 'center' })) activeAlign = 'center';
+        else if (editor.isActive({ textAlign: 'right' })) activeAlign = 'right';
+        else if (editor.isActive({ textAlign: 'justify' })) activeAlign = 'justify';
+
         const state = {
           bold: editor.isActive('bold'),
           italic: editor.isActive('italic'),
@@ -1068,10 +1163,10 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           h2: editor.isActive('heading', { level: 2 }),
           h3: editor.isActive('heading', { level: 3 }),
           paragraph: !editor.isActive('heading'),
-          alignLeft: !editor.isActive('heading', { level: 2 }) && !editor.isActive('heading', { level: 3 }),
-          alignCenter: editor.isActive('heading', { level: 2 }) || editor.isActive('heading', { level: 1 }),
-          alignRight: editor.isActive('heading', { level: 3 }),
-          alignJustify: false,
+          alignLeft: activeAlign === 'left',
+          alignCenter: activeAlign === 'center',
+          alignRight: activeAlign === 'right',
+          alignJustify: activeAlign === 'justify',
           orderedList: editor.isActive('orderedList'),
           unorderedList: editor.isActive('bulletList'),
         };

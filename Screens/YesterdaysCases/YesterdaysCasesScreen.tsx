@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useContext } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Platform, SafeAreaView } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatDate, getLocalDateString } from '../../utils/commonFunctions';
 import * as db from '../../DataBase';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -10,11 +11,13 @@ import UpdateHearingPopup from '../CaseDetailsScreen/components/UpdateHearingPop
 import { getCurrentUserId } from '../../utils/commonFunctions';
 import { ThemeContext } from '../../Providers/ThemeProvider';
 import { promptClientNotification } from '../../utils/whatsappNotifier';
+import { useToast } from '../../Providers/ToastContext';
 
 import { DeviceEventEmitter } from 'react-native';
 import { CASE_UPDATED_EVENT } from '../../utils/caseEvents';
 import { mapCaseDbToScreen } from '../../utils/caseMapper';
 import { SkeletonList } from '../CommonComponents/SkeletonLoader';
+import { useAdTrigger } from '../CommonComponents/AdManager';
 
 const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }: any) => {
   return (
@@ -22,13 +25,17 @@ const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }: any) 
       <NewCaseCard
         caseDetails={caseDetails}
         onUpdateHearingPress={onUpdateHearingPress}
+        marginHorizontal={0}
       />
     </Animated.View>
   );
 };
 
 const YesterdaysCasesScreen = () => {
+  const insets = useSafeAreaInsets();
   const { theme } = useContext(ThemeContext);
+  const { showToast } = useToast();
+  const { recordCaseUpdateMilestone } = useAdTrigger();
   const [yesterdaysCases, setYesterdaysCases] = useState<CaseDataScreen[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
@@ -136,6 +143,14 @@ const YesterdaysCasesScreen = () => {
       }, userId);
 
       fetchYesterdaysCases();
+      recordCaseUpdateMilestone();
+
+      const formattedNextDate = formatDate(getLocalDateString(nextHearingDate));
+      showToast({
+        title: "Hearing Updated",
+        message: `Next hearing set to ${formattedNextDate}`,
+        type: "success",
+      });
 
       setTimeout(() => {
         promptClientNotification(caseId, getLocalDateString(nextHearingDate), notes);
@@ -149,7 +164,7 @@ const YesterdaysCasesScreen = () => {
     ({ item, index }: { item: CaseDataScreen; index: number }) => (
       <AnimatedNewCaseCard
         caseDetails={item}
-        onUpdateHearingPress={() => handleUpdateHearing(item)}
+        onUpdateHearingPress={handleUpdateHearing}
         index={index}
       />
     ),
@@ -157,29 +172,45 @@ const YesterdaysCasesScreen = () => {
   );
 
   const keyExtractor = useCallback(
-    (item: CaseDataScreen) => `${item.id}-${(item as any).updated_at || ''}-${(item as any).fee_paid || 0}-${(item as any).date_fee_collected || 0}-${(item as any).date_fee_paid || 0}-${(item as any).date_fee || 0}-${item.nextHearing || ''}`,
+    (item: CaseDataScreen) => String(item.id),
     []
   );
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+      <View
+        style={[
+          styles.safeArea,
+          {
+            backgroundColor: theme.colors.background,
+            paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
+          },
+        ]}
+      >
         <SkeletonList count={3} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+    <View
+      style={[
+        styles.safeArea,
+        {
+          backgroundColor: theme.colors.background,
+          paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
+        },
+      ]}
+    >
       <FlatList
         data={yesterdaysCases}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        getItemLayout={(data, index) => ({ length: 160, offset: 160 * index, index })}
-        initialNumToRender={6}
-        maxToRenderPerBatch={6}
-        windowSize={3}
-        removeClippedSubviews={true}
+        initialNumToRender={8}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={Platform.OS === "android"}
         ListEmptyComponent={
           <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
             No cases found for yesterday.
@@ -191,12 +222,13 @@ const YesterdaysCasesScreen = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
+          currentNextDate={selectedCase.NextDate || selectedCase.nextHearing}
           onSave={async (notes, nextHearingDate, dateFeeCollectedToday, totalFeeCollectedToday, paymentMode, paymentNotes) =>
             handleSaveHearing(notes, nextHearingDate, await getCurrentUserId(), dateFeeCollectedToday, totalFeeCollectedToday, paymentMode, paymentNotes)
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 

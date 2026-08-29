@@ -59,7 +59,7 @@ const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({
         <View
           style={[
             styles.card,
-            { backgroundColor: theme.colors.surface || "#FFFFFF" },
+            { backgroundColor: (theme.colors as any).surface || theme.colors.cardBackground || "#FFFFFF" },
           ]}
         >
           {/* Top-Right Close Icon Button */}
@@ -82,7 +82,7 @@ const UpdateCheckModal: React.FC<UpdateCheckModalProps> = ({
           <View
             style={[
               styles.iconContainer,
-              { backgroundColor: theme.colors.primaryLight || "#DBEAFE" },
+              { backgroundColor: (theme.colors as any).primaryLight || "#DBEAFE" },
             ]}
           >
             <Icon

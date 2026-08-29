@@ -19,6 +19,7 @@ import {
   DeviceEventEmitter,
   ScrollView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ECourtsTextImportModal } from "./components/ECourtsTextImportModal";
 import NewCaseCard from "./components/NewCaseCard"; // Import the new case card
@@ -43,7 +44,6 @@ import dbCacheManager from "../../utils/dbCacheManager";
 import { promptClientNotification } from "../../utils/whatsappNotifier";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import { VoiceCaseNoteModal } from "../CommonComponents/VoiceCaseNoteModal";
-import AdBanner from "../CommonComponents/AdBanner";
 import { SkeletonList } from "../CommonComponents/SkeletonLoader";
 
 export type SmartFilterKey =
@@ -64,6 +64,7 @@ type CasesListRouteProp = RouteProp<{ params: { Filter?: string } }, "params">;
 const LIMIT = 20;
 
 const CasesList = () => {
+  const insets = useSafeAreaInsets();
   const route = useRoute<CasesListRouteProp>();
   const filterParam = route.params?.Filter;
   const navigation = useNavigation();
@@ -198,6 +199,10 @@ const CasesList = () => {
   useEffect(() => {
     fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilterKey);
   }, [debouncedSearchText, filterParam, activeFilterKey, fetchCasesList]);
+
+  useEffect(() => {
+    fetchCasesList(0, debouncedSearchText, filterParam || "", activeFilterKey);
+  }, []);
 
   // Re-fetch when screen gains focus if cache is stale
   useFocusEffect(
@@ -373,23 +378,24 @@ const CasesList = () => {
     navigation.navigate("AddCase");
   }, [navigation]);
 
+  const handleCardLongPress = useCallback((caseDetails: CaseDataScreen) => {
+    setNoteCase(caseDetails);
+    setNoteModalVisible(true);
+  }, []);
+
   const renderItem = useCallback(
     ({ item }: { item: CaseDataScreen }) => (
       <NewCaseCard
         caseDetails={item}
-        onUpdateHearingPress={() => handleUpdateHearing(item)}
-        onLongPress={() => {
-          setNoteCase(item);
-          setNoteModalVisible(true);
-        }}
+        onUpdateHearingPress={handleUpdateHearing}
+        onLongPress={handleCardLongPress}
       />
     ),
-    [handleUpdateHearing]
+    [handleUpdateHearing, handleCardLongPress]
   );
 
   const keyExtractor = useCallback(
-    (item: CaseDataScreen) =>
-      `${item.id}-${(item as any).updated_at || ""}-${(item as any).fee_paid || 0}-${(item as any).date_fee_collected || 0}-${(item as any).date_fee_paid || 0}-${(item as any).date_fee || 0}-${item.nextHearing || ""}`,
+    (item: CaseDataScreen) => String(item.id),
     []
   );
 
@@ -450,8 +456,14 @@ const CasesList = () => {
   ];
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
+    <View
+      style={[
+        styles.safeArea,
+        {
+          backgroundColor: theme.colors.background,
+          paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
+        },
+      ]}
     >
       <View style={styles.searchContainer}>
         <View
@@ -538,17 +550,13 @@ const CasesList = () => {
           data={cases}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
-          getItemLayout={(data, index) => ({
-            length: 160,
-            offset: 160 * index,
-            index,
-          })}
-          initialNumToRender={6}
-          maxToRenderPerBatch={6}
-          windowSize={3}
-          removeClippedSubviews
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={Platform.OS === "android"}
           onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
+          onEndReachedThreshold={0.4}
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
           ListEmptyComponent={
@@ -644,6 +652,7 @@ const CasesList = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
+          currentNextDate={selectedCase.NextDate || selectedCase.nextHearing}
           onSave={async (notes, nextHearingDate, feeReceivedToday) =>
             handleSaveHearing(
               notes,
@@ -706,7 +715,7 @@ const CasesList = () => {
           }}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -144,21 +144,21 @@ export const CustomAlertModal: React.FC = () => {
     case "success":
       statusIconName = "checkmark-circle";
       statusColor = theme.colors.success;
-      statusBgColor = theme.colors.dark
+      statusBgColor = theme.dark
         ? "rgba(52, 211, 153, 0.15)"
         : "rgba(16, 185, 129, 0.15)";
       break;
     case "danger":
       statusIconName = "alert-circle";
       statusColor = theme.colors.danger;
-      statusBgColor = theme.colors.dark
+      statusBgColor = theme.dark
         ? "rgba(248, 113, 113, 0.15)"
         : "rgba(239, 68, 68, 0.15)";
       break;
     case "warning":
       statusIconName = "warning";
       statusColor = theme.colors.warning;
-      statusBgColor = theme.colors.dark
+      statusBgColor = theme.dark
         ? "rgba(251, 191, 36, 0.15)"
         : "rgba(245, 158, 11, 0.15)";
       break;
@@ -166,7 +166,7 @@ export const CustomAlertModal: React.FC = () => {
     default:
       statusIconName = "information-circle";
       statusColor = theme.colors.primary;
-      statusBgColor = theme.colors.dark
+      statusBgColor = theme.dark
         ? "rgba(129, 140, 248, 0.15)"
         : "rgba(99, 102, 241, 0.15)";
       break;
@@ -243,20 +243,20 @@ export const CustomAlertModal: React.FC = () => {
               title={cancelButton.text || "Cancel"}
               type="secondary"
               onPress={() => handleButtonPress(cancelButton)}
-              style={[styles.rowButton, { marginRight: 8 }]}
+              style={StyleSheet.flatten([styles.rowButton, { marginRight: 8 }])}
             />
           )}
           <ActionButton
             title={actionButton.text || "OK"}
             type="primary"
             onPress={() => handleButtonPress(actionButton)}
-            style={[
+            style={StyleSheet.flatten([
               styles.rowButton,
               actionButton.style === "destructive" && {
                 backgroundColor: theme.colors.danger,
               },
               !cancelButton && { marginLeft: 8 },
-            ]}
+            ])}
             textStyle={
               actionButton.style === "destructive"
                 ? { color: "#FFF" }
@@ -276,13 +276,13 @@ export const CustomAlertModal: React.FC = () => {
             title={btn.text || "Option"}
             type={btn.style === "cancel" ? "secondary" : "primary"}
             onPress={() => handleButtonPress(btn)}
-            style={[
+            style={StyleSheet.flatten([
               styles.fullWidthButton,
               btn.style === "destructive" && {
                 backgroundColor: theme.colors.danger,
               },
               { marginVertical: 4 },
-            ]}
+            ])}
             textStyle={
               btn.style === "destructive" ? { color: "#FFF" } : undefined
             }

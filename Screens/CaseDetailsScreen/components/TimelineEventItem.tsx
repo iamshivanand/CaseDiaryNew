@@ -8,6 +8,7 @@ import { getTimelineEventItemStyles } from "./TimelineEventItemStyle";
 import { useTranslation } from "../../../Providers/LanguageProvider";
 import { ThemeContext } from "../../../Providers/ThemeProvider";
 import { TimelineEvent } from "../../../Types/appTypes";
+import { parseUtcDate, parseLocalDate } from "../../../utils/commonFunctions";
 
 interface TimelineEventItemProps {
   event: TimelineEvent;
@@ -31,9 +32,9 @@ const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
       return t("timeline_date_na");
     }
     try {
-      const dateObj = parseISO(event.date);
-      return isValid(dateObj)
-        ? dateObj.toLocaleDateString(locale === "hi" ? "hi-IN" : "en-US", {
+      const dateObj = parseLocalDate(event.date) || parseUtcDate(event.date);
+      return dateObj && isValid(dateObj)
+        ? dateObj.toLocaleDateString(locale === "hi" ? "hi-IN" : undefined, {
             year: "numeric",
             month: "short",
             day: "numeric",
@@ -47,9 +48,13 @@ const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
   const formattedCreatedAtTime = () => {
     if (!event.created_at) return null;
     try {
-      const dateObj = parseISO(event.created_at);
-      if (isValid(dateObj)) {
-        return format(dateObj, "hh:mm a");
+      const dateObj = parseUtcDate(event.created_at);
+      if (dateObj && !isNaN(dateObj.getTime())) {
+        return dateObj.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
       }
     } catch (e) {
       // ignore
@@ -205,6 +210,12 @@ const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
     };
   };
 
+  const formatTimelineDescription = (text: string): string => {
+    if (!text) return "";
+    // Converts any embedded YYYY-MM-DD date to DD-MM-YYYY (e.g. 2024-05-10 -> 10-05-2024)
+    return text.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, "$3-$2-$1");
+  };
+
   const badge = getBadgeDetails();
   const createdTime = formattedCreatedAtTime();
 
@@ -353,7 +364,7 @@ const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
 
         {/* Description / Notes text */}
         <Text style={styles.descriptionText}>
-          {desc || t("timeline_no_desc")}
+          {formatTimelineDescription(desc) || t("timeline_no_desc")}
         </Text>
       </View>
     </View>

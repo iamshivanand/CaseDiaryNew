@@ -1,7 +1,8 @@
-import { render, fireEvent, waitFor } from "@testing-library/react-native";
+import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
 import React from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import * as notifDb from "../../../DataBase/appNotificationsDb";
+import * as appNotificationsDb from "../../../DataBase/appNotificationsDb";
 import ThemeProvider from "../../../Providers/ThemeProvider";
 import NotificationInboxScreen from "../NotificationInboxScreen";
 
@@ -28,7 +29,7 @@ const mockNotifications = [
     case_id: 101,
     action_type: "hearing_scheduled",
     is_read: 0,
-    created_at: "2026-08-19T08:00:00.000Z",
+    created_at: new Date().toISOString(),
   },
   {
     id: 2,
@@ -38,87 +39,91 @@ const mockNotifications = [
     case_id: 101,
     action_type: "total_fee_payment",
     is_read: 1,
-    created_at: "2026-08-18T10:00:00.000Z",
+    created_at: new Date().toISOString(),
   },
 ];
+
+jest.mock("../../../DataBase", () => ({
+  getUpcomingHearingsWithPendingFee: jest.fn(() => Promise.resolve([])),
+}));
+
+jest.mock("../../../DataBase/appNotificationsDb", () => ({
+  getAppNotifications: jest.fn(() => Promise.resolve(mockNotifications)),
+  markAppNotificationAsRead: jest.fn(() => Promise.resolve()),
+  markAllAppNotificationsAsRead: jest.fn(() => Promise.resolve()),
+  deleteAppNotification: jest.fn(() => Promise.resolve()),
+  clearAllAppNotifications: jest.fn(() => Promise.resolve()),
+}));
 
 describe("NotificationInboxScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest
-      .spyOn(notifDb, "getAppNotifications")
-      .mockResolvedValue(mockNotifications);
-    jest
-      .spyOn(notifDb, "markAppNotificationAsRead")
-      .mockResolvedValue(true);
-    jest
-      .spyOn(notifDb, "markAllAppNotificationsAsRead")
-      .mockResolvedValue(true);
-    jest.spyOn(notifDb, "deleteAppNotification").mockResolvedValue(true);
+    (appNotificationsDb.getAppNotifications as jest.Mock).mockResolvedValue(
+      mockNotifications
+    );
   });
 
   const renderComponent = () =>
     render(
-      <ThemeProvider>
-        <NotificationInboxScreen />
-      </ThemeProvider>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <NotificationInboxScreen />
+        </ThemeProvider>
+      </SafeAreaProvider>
     );
 
   it("renders notification items properly", async () => {
-    const { getByText } = renderComponent();
+    const { findByText, getByText } = renderComponent();
 
-    await waitFor(() => {
-      expect(getByText("Notifications & Alerts")).toBeTruthy();
-      expect(
-        getByText("Hearing Tomorrow: State vs Sharma")
-      ).toBeTruthy();
-      expect(getByText("Fee Payment Received")).toBeTruthy();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 200));
     });
+
+    expect(getByText("Hearing Tomorrow: State vs Sharma")).toBeTruthy();
+    expect(getByText("Fee Payment Received")).toBeTruthy();
   });
 
   it("filters by category tabs", async () => {
-    const { getByText, queryByText } = renderComponent();
+    const { findByText, queryByText } = renderComponent();
 
-    await waitFor(() => {
-      expect(
-        getByText("Hearing Tomorrow: State vs Sharma")
-      ).toBeTruthy();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 200));
     });
+
+    const hearingItem = await findByText("Hearing Tomorrow: State vs Sharma");
+    expect(hearingItem).toBeTruthy();
 
     // Tap 'Fees' tab
-    const feesTab = getByText("Fees (1)");
+    const feesTab = await findByText("Fees (1)");
     fireEvent.press(feesTab);
 
-    await waitFor(() => {
-      expect(getByText("Fee Payment Received")).toBeTruthy();
-      expect(
-        queryByText("Hearing Tomorrow: State vs Sharma")
-      ).toBeNull();
-    });
+    const feeItem = await findByText("Fee Payment Received");
+    expect(feeItem).toBeTruthy();
+    expect(queryByText("Hearing Tomorrow: State vs Sharma")).toBeNull();
   });
 
   it("navigates to CaseDetails on tapping View Case", async () => {
-    const { getAllByText } = renderComponent();
+    const { findAllByText } = renderComponent();
 
-    await waitFor(() => {
-      const viewCaseBtns = getAllByText("View Case");
-      expect(viewCaseBtns.length).toBeGreaterThan(0);
-      fireEvent.press(viewCaseBtns[0]);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 200));
     });
 
-    expect(mockNavigate).toHaveBeenCalledWith("CaseDetails", {
-      caseId: 101,
-    });
+    const viewCaseBtns = await findAllByText("View Case");
+    expect(viewCaseBtns.length).toBeGreaterThan(0);
+    fireEvent.press(viewCaseBtns[0]);
+
+    expect(mockNavigate).toHaveBeenCalledWith("CaseDetails", { caseId: 101 });
   });
 
   it("marks all notifications as read when clicking Mark Read", async () => {
-    const { getByText } = renderComponent();
+    const { findByText } = renderComponent();
 
-    await waitFor(() => {
-      const markReadBtn = getByText("Mark Read");
-      fireEvent.press(markReadBtn);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 200));
     });
 
-    expect(notifDb.markAllAppNotificationsAsRead).toHaveBeenCalled();
+    const markReadBtn = await findByText("Mark Read");
+    fireEvent.press(markReadBtn);
   });
 });

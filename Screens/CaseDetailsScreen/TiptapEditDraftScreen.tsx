@@ -126,10 +126,10 @@ const TiptapEditDraftScreen: React.FC = () => {
     estimatedPages: 1,
   });
 
-  // Page setup & Layout State
+  // Page setup & Layout State (Default 12pt / 1.2x matching standard MS Word legal drafting)
   const [font, setFont] = useState("Times New Roman");
-  const [fontSize, setFontSize] = useState("14");
-  const [lineHeight, setLineHeight] = useState("1.6");
+  const [fontSize, setFontSize] = useState("12");
+  const [lineHeight, setLineHeight] = useState("1.2");
   const [topMargin, setTopMargin] = useState(16);
   const [bottomMargin, setBottomMargin] = useState(16);
   const [leftMargin, setLeftMargin] = useState(36);
@@ -906,23 +906,28 @@ const TiptapEditDraftScreen: React.FC = () => {
   const handleConfirmSave = async (destination: "case" | "standalone" | "template") => {
     setIsSaving(true);
     setIsSaveDialogVisible(false);
+    let finalSavedTitle = "";
+    let generatedPdfUri = "";
+
     try {
       const rawTitle = saveDialogTitle.trim() || title || "Draft Document";
       const isCustom = destination === "template" ? 1 : 0;
       const targetDraftId = destination === "template" ? uuidv4() : activeDraftId;
-      
+      const effTemplateType = docTemplateType || templateType || "draft";
+
       const finalTitle = await getUniqueDraftTitle(
         rawTitle,
         destination === "template" ? null : activeDraftId,
         isCustom
       );
-
+      finalSavedTitle = finalTitle;
       setTitle(finalTitle);
+
       const html = await getLatestHtml();
       const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, fontSize, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
       const contentWithMetadata = metadataComment + html;
 
-      const effTemplateType = docTemplateType || templateType || "draft";
+      // 1. Atomic Save to SQLite Database
       if (destination === "case") {
         await saveDocumentDraft({
           id: activeDraftId,
@@ -933,13 +938,6 @@ const TiptapEditDraftScreen: React.FC = () => {
           is_custom_template: 0,
           updated_at: new Date().toISOString(),
         });
-        isNewUnsavedDraftRef.current = false;
-        setHasUnsavedChanges(false);
-        setSaveStatus("saved");
-        const titleMsg = finalTitle !== rawTitle ? ` (Saved as "${finalTitle}" to avoid name conflict)` : "";
-        Alert.alert("Success", `Draft saved to current case successfully!${titleMsg}`, [
-          { text: "OK" },
-        ]);
       } else if (destination === "standalone") {
         await saveDocumentDraft({
           id: activeDraftId,
@@ -950,13 +948,6 @@ const TiptapEditDraftScreen: React.FC = () => {
           is_custom_template: 0,
           updated_at: new Date().toISOString(),
         });
-        isNewUnsavedDraftRef.current = false;
-        setHasUnsavedChanges(false);
-        setSaveStatus("saved");
-        const titleMsg = finalTitle !== rawTitle ? ` (Saved as "${finalTitle}" to avoid name conflict)` : "";
-        Alert.alert("Success", `Standalone draft saved successfully!${titleMsg}`, [
-          { text: "OK" },
-        ]);
       } else if (destination === "template") {
         await saveDocumentDraft({
           id: targetDraftId,
@@ -968,17 +959,327 @@ const TiptapEditDraftScreen: React.FC = () => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
-        const titleMsg = finalTitle !== rawTitle ? ` (Saved as "${finalTitle}")` : "";
-        Alert.alert("Success", `Saved as a reusable custom template in Drafts Hub!${titleMsg}`, [
-          { text: "OK" },
-        ]);
+      }
+
+      // Confirm save state immediately upon SQLite success
+      isNewUnsavedDraftRef.current = false;
+      setHasUnsavedChanges(false);
+      setSaveStatus("saved");
+
+      // 2. Auxiliary PDF Generation (isolated from database save)
+      try {
+        generatedPdfUri = await generatePdfFile(html, finalTitle);
+      } catch (pdfErr) {
+        console.warn("Background PDF compilation warning:", pdfErr);
+      }
+
+      const targetCaseId =
+        destination === "case" && caseId
+          ? Number(caseId)
+          : null;
+
+      if (targetCaseId && destination === "case" && generatedPdfUri) {
+        try {
+          await uploadCaseDocument({
+            originalFileName: `${finalTitle}.pdf`,
+            fileType: "application/pdf",
+            fileUri: generatedPdfUri,
+            caseId: targetCaseId,
+            userId: null,
+          });
+        } catch (e) {
+          console.warn("Auto-attach PDF to CaseDocuments:", e);
+        }
+      }
+
+      // 3. Prompt user with next actions
+      const showSaveSuccessAlert = () => {
+        Alert.alert(
+          "Document Saved Successfully",
+          `"${finalTitle}" has been saved to your Case Diary Drafts. What would you like to do next?`,
+          [
+            ...(generatedPdfUri
+              ? [
+                  {
+                    text: "Open / View PDF",
+                    onPress: () => {
+                      // @ts-ignore
+                      navigation.navigate("PdfViewer", {
+                        pdfUri: generatedPdfUri,
+                        title: finalTitle,
+                        returnToDraftsHub: !targetCaseId,
+                        returnToCaseId: targetCaseId,
+                        draftsHubParams: {
+                          tab: destination === "template" ? "templates" : "drafts",
+                        },
+                      });
+                    },
+                  },
+                  {
+                    text: "Share PDF",
+                    onPress: async () => {
+                      try {
+                        await shareNamedPdf(generatedPdfUri, finalTitle, finalTitle);
+                      } finally {
+                        if (targetCaseId) {
+                          // @ts-ignore
+                          navigation.navigate("CaseDetails", {
+                            caseId: targetCaseId,
+                            scrollToDocs: true,
+                          });
+                        } else {
+                          // @ts-ignore
+                          navigation.navigate("DraftsHub", {
+                            tab: destination === "template" ? "templates" : "drafts",
+                          });
+                        }
+                      }
+                    },
+                  },
+                ]
+              : []),
+            {
+              text: targetCaseId ? "Back to Case" : "Go to Drafts Hub",
+              onPress: () => {
+                if (targetCaseId) {
+                  // @ts-ignore
+                  navigation.navigate("CaseDetails", {
+                    caseId: targetCaseId,
+                    scrollToDocs: true,
+                  });
+                } else {
+                  // @ts-ignore
+                  navigation.navigate("DraftsHub", {
+                    tab: destination === "template" ? "templates" : "drafts",
+                  });
+                }
+              },
+            },
+          ]
+        );
+      };
+
+      try {
+        showAdWithPreload("rewarded", () => {
+          showSaveSuccessAlert();
+        });
+      } catch {
+        showSaveSuccessAlert();
       }
     } catch (err) {
-      console.error("Error saving draft:", err);
-      Alert.alert("Error", "Failed to save document draft.");
+      console.error("Error saving draft to database:", err);
+      Alert.alert("Save Error", "Failed to save document draft into database. Please check device storage.");
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Generate printable PDF file helper
+  const generatePdfFile = async (
+    rawHtml: string,
+    docTitle: string
+  ): Promise<string> => {
+    const effectiveTopMargin = (topMargin || 24) + (letterheadSpace || 0);
+    const pageCssSize = pageSize === "legal" ? "8.5in 14in" : "A4 portrait";
+    const cleanBodyHtml = rawHtml
+      .replace(/<!-- CD_LAYOUT:(.*?) -->/g, "")
+      .replace(/<div id="red-margin-line".*?<\/div>/g, "")
+      .replace(/<div id="margin-guide-overlay".*?<\/div>/g, "")
+      .replace(/<div class="page-sheet-divider".*?<\/div>/g, "")
+      .replace(/<div class="court-running-header".*?<\/div>/g, "")
+      .replace(/<div class="court-running-footer".*?<\/div>/g, "");
+
+    const printHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          @page {
+            size: ${pageCssSize};
+            margin-top: ${effectiveTopMargin}px;
+            margin-bottom: ${bottomMargin || 16}px;
+            margin-left: ${leftMargin || 36}px;
+            margin-right: ${rightMargin || 16}px;
+          }
+          * {
+            box-sizing: border-box;
+          }
+          html, body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+            color: #111827;
+            font-family: '${font}', 'Times New Roman', Georgia, serif;
+            font-size: ${fontSize || 12}pt;
+            line-height: ${lineHeight || 1.2};
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          body {
+            box-sizing: border-box;
+          }
+          p {
+            margin: 0 0 4pt 0;
+            text-align: justify;
+            text-justify: inter-word;
+            word-wrap: break-word;
+            font-size: ${fontSize || 12}pt;
+            line-height: ${lineHeight || 1.2};
+          }
+          p.court-header, .court-header, h1.court-header {
+            text-align: center !important;
+            font-weight: bold;
+            font-size: ${Math.round((parseInt(fontSize, 10) || 12) * 1.2)}pt;
+            margin-bottom: 8pt;
+          }
+          p.title, .title, h1, h2 {
+            text-align: center !important;
+            font-weight: bold;
+            font-size: ${Math.round((parseInt(fontSize, 10) || 12) * 1.1)}pt;
+            margin: 8pt 0 4pt 0;
+          }
+          h3, h4 {
+            font-weight: bold;
+            font-size: ${fontSize || 12}pt;
+            margin: 6pt 0 3pt 0;
+          }
+          blockquote {
+            border-left: 3px solid #cbd5e1;
+            padding-left: 10pt;
+            margin: 6pt 0;
+            color: #475569;
+            font-style: italic;
+          }
+          ul, ol {
+            margin: 0 0 6pt 18pt;
+            padding: 0;
+          }
+          li {
+            margin-bottom: 3pt;
+          }
+          table, .editor-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8pt 0;
+            table-layout: fixed;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          table td, table th, .editor-table td, .editor-table th {
+            border: 1px solid #94a3b8;
+            padding: 4pt 6pt;
+            font-size: ${fontSize || 12}pt;
+            text-align: left;
+            vertical-align: top;
+            box-sizing: border-box;
+          }
+          table th, .editor-table th {
+            background-color: #f1f5f9;
+            font-weight: bold;
+          }
+          table.borderless-table, table.borderless-columns, .editor-table.borderless-table, .editor-table.borderless-columns {
+            border: none !important;
+            margin: 4pt 0;
+          }
+          table.borderless-table td, table.borderless-columns td, table.borderless-table th, table.borderless-columns th,
+          .editor-table.borderless-table td, .editor-table.borderless-columns td, .editor-table.borderless-table th, .editor-table.borderless-columns th {
+            border: none !important;
+            outline: none !important;
+            background-color: transparent !important;
+            padding: 2pt 4pt;
+          }
+          .signature-stamp {
+            max-height: 90px;
+            max-width: 220px;
+            margin: 12pt 0;
+            display: block;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .interactive-shape {
+            display: inline-block;
+            min-width: 120px;
+            min-height: 44px;
+            padding: 8pt 12pt;
+            margin: 10pt 0;
+            box-sizing: border-box;
+            position: relative;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .shape-rect {
+            border: 2px solid #374151;
+            background: #f9fafb;
+            border-radius: 4px;
+          }
+          .shape-circle {
+            border: 2px dashed #1e3a8a;
+            background: #eff6ff;
+            border-radius: 50%;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 100px;
+            min-height: 100px;
+          }
+          .shape-arrow {
+            border: 1.5px solid #2563eb;
+            background: #dbeafe;
+            color: #1e40af;
+            border-radius: 20px;
+            font-weight: 600;
+            text-align: center;
+          }
+          .shape-stamp {
+            border: 2px double #991b1b;
+            background: #fef2f2;
+            color: #991b1b;
+            font-weight: 700;
+            text-align: center;
+            border-radius: 4px;
+          }
+          .shape-seal {
+            border: 3px double #1e3a8a;
+            background: #eff6ff;
+            border-radius: 8px;
+            font-weight: 700;
+          }
+          .legal-placeholder {
+            background-color: rgba(254, 240, 138, 0.75);
+            border-bottom: 1.5px dashed #ca8a04;
+            padding: 0 3px;
+            border-radius: 2px;
+            font-weight: 500;
+            color: #1c1917;
+          }
+          .legal-page-break, .page-break, hr.page-break {
+            page-break-before: always !important;
+            break-before: page !important;
+            height: 0 !important;
+            margin: 0 !important;
+            border: none !important;
+            display: block !important;
+          }
+          .page-margin-guide, #red-margin-line, #margin-guide-overlay, .page-sheet-divider, .court-running-header, .court-running-footer {
+            display: none !important;
+          }
+        </style>
+      </head>
+      <body>
+        ${cleanBodyHtml}
+      </body>
+      </html>
+    `;
+    const isLegal = pageSize === "legal";
+    const { uri } = await Print.printToFileAsync({
+      html: printHtml,
+      width: isLegal ? 612 : 595,
+      height: isLegal ? 1008 : 842,
+    });
+
+    return await createNamedPdfFile(uri, docTitle);
   };
 
   // 4. Print & Export PDF Execution with Legal CSS Pagination & Styling
@@ -986,197 +1287,8 @@ const TiptapEditDraftScreen: React.FC = () => {
     setIsExporting(true);
     try {
       const html = await getLatestHtml();
-      const effectiveTopMargin = (topMargin || 24) + (letterheadSpace || 0);
-      const pageCssSize = pageSize === "legal" ? "8.5in 14in" : "A4 portrait";
-      const cleanBodyHtml = html
-        .replace(/<!-- CD_LAYOUT:(.*?) -->/g, "")
-        .replace(/<div id="red-margin-line".*?<\/div>/g, "")
-        .replace(/<div id="margin-guide-overlay".*?<\/div>/g, "")
-        .replace(/<div class="page-sheet-divider".*?<\/div>/g, "")
-        .replace(/<div class="court-running-header".*?<\/div>/g, "")
-        .replace(/<div class="court-running-footer".*?<\/div>/g, "");
-
-      const printHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            @page {
-              size: ${pageCssSize};
-              margin-top: ${effectiveTopMargin}px;
-              margin-bottom: ${bottomMargin || 24}px;
-              margin-left: ${leftMargin || 55}px;
-              margin-right: ${rightMargin || 24}px;
-            }
-            * {
-              box-sizing: border-box;
-            }
-            html, body {
-              margin: 0;
-              padding: 0;
-              background: #ffffff;
-              color: #111827;
-              font-family: '${font}', 'Times New Roman', serif;
-              font-size: ${fontSize || 14}pt;
-              line-height: ${lineHeight || 1.6};
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            body {
-              box-sizing: border-box;
-            }
-            p {
-              margin: 0 0 12pt 0;
-              text-align: justify;
-              text-justify: inter-word;
-              word-wrap: break-word;
-              font-size: ${fontSize || 14}pt;
-              line-height: ${lineHeight || 1.6};
-            }
-            p.court-header, .court-header, h1.court-header {
-              text-align: center !important;
-              font-weight: bold;
-              font-size: ${Math.round((parseInt(fontSize, 10) || 14) * 1.25)}pt;
-              margin-bottom: 14pt;
-            }
-            p.title, .title, h1, h2 {
-              text-align: center !important;
-              font-weight: bold;
-              font-size: ${Math.round((parseInt(fontSize, 10) || 14) * 1.15)}pt;
-              margin: 14pt 0 10pt 0;
-            }
-            h3, h4 {
-              font-weight: bold;
-              font-size: ${fontSize || 14}pt;
-              margin: 12pt 0 8pt 0;
-            }
-            blockquote {
-              border-left: 4px solid #cbd5e1;
-              padding-left: 14pt;
-              margin: 12pt 0;
-              color: #475569;
-              font-style: italic;
-            }
-            ul, ol {
-              margin: 0 0 12pt 24pt;
-              padding: 0;
-            }
-            li {
-              margin-bottom: 6pt;
-            }
-            table, .editor-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin: 14pt 0;
-              table-layout: fixed;
-              page-break-inside: avoid;
-              break-inside: avoid;
-            }
-            table td, table th, .editor-table td, .editor-table th {
-              border: 1px solid #94a3b8;
-              padding: 8pt;
-              font-size: ${fontSize || 14}pt;
-              text-align: left;
-              vertical-align: top;
-              box-sizing: border-box;
-            }
-            table th, .editor-table th {
-              background-color: #f1f5f9;
-              font-weight: bold;
-            }
-            .signature-stamp {
-              max-height: 90px;
-              max-width: 220px;
-              margin: 12pt 0;
-              display: block;
-              page-break-inside: avoid;
-              break-inside: avoid;
-            }
-            .interactive-shape {
-              display: inline-block;
-              min-width: 120px;
-              min-height: 44px;
-              padding: 8pt 12pt;
-              margin: 10pt 0;
-              box-sizing: border-box;
-              position: relative;
-              page-break-inside: avoid;
-              break-inside: avoid;
-            }
-            .shape-rect {
-              border: 2px solid #374151;
-              background: #f9fafb;
-              border-radius: 4px;
-            }
-            .shape-circle {
-              border: 2px dashed #1e3a8a;
-              background: #eff6ff;
-              border-radius: 50%;
-              text-align: center;
-              display: inline-flex;
-              align-items: center;
-              justify-content: center;
-              min-width: 100px;
-              min-height: 100px;
-            }
-            .shape-arrow {
-              border: 1.5px solid #2563eb;
-              background: #dbeafe;
-              color: #1e40af;
-              border-radius: 20px;
-              font-weight: 600;
-              text-align: center;
-            }
-            .shape-stamp {
-              border: 2px double #991b1b;
-              background: #fef2f2;
-              color: #991b1b;
-              font-weight: 700;
-              text-align: center;
-              border-radius: 4px;
-            }
-            .shape-seal {
-              border: 3px double #1e3a8a;
-              background: #eff6ff;
-              border-radius: 8px;
-              font-weight: 700;
-            }
-            .legal-placeholder {
-              background-color: rgba(254, 240, 138, 0.75);
-              border-bottom: 1.5px dashed #ca8a04;
-              padding: 0 3px;
-              border-radius: 2px;
-              font-weight: 500;
-              color: #1c1917;
-            }
-            .legal-page-break, .page-break, hr.page-break {
-              page-break-before: always !important;
-              break-before: page !important;
-              height: 0 !important;
-              margin: 0 !important;
-              border: none !important;
-              display: block !important;
-            }
-            .page-margin-guide, #red-margin-line, #margin-guide-overlay, .page-sheet-divider, .court-running-header, .court-running-footer {
-              display: none !important;
-            }
-          </style>
-        </head>
-        <body>
-          ${cleanBodyHtml}
-        </body>
-        </html>
-      `;
-      const isLegal = pageSize === "legal";
-      const { uri } = await Print.printToFileAsync({
-        html: printHtml,
-        width: isLegal ? 612 : 595,
-        height: isLegal ? 1008 : 842,
-      });
-
       const docTitle = title || "Draft Document";
-      const namedUri = await createNamedPdfFile(uri, docTitle);
+      const namedUri = await generatePdfFile(html, docTitle);
 
       setIsExporting(false);
       Alert.alert(docTitle, "Choose an action for this PDF:", [
@@ -1757,11 +1869,11 @@ const TiptapEditDraftScreen: React.FC = () => {
 
               {/* Justify */}
               <TouchableOpacity
-                style={styles.labeledToolItem}
+                style={[styles.labeledToolItem, editorState.alignJustify && styles.labeledToolItemActive]}
                 onPress={() => triggerFormat("justifyFull")}
               >
-                <FontAwesome name="align-justify" size={14} color="#334155" />
-                <Text style={styles.toolLabel}>Justify</Text>
+                <FontAwesome name="align-justify" size={14} color={editorState.alignJustify ? "#2563eb" : "#334155"} />
+                <Text style={[styles.toolLabel, editorState.alignJustify && styles.toolLabelActive]}>Justify</Text>
               </TouchableOpacity>
 
               <View style={styles.toolbarDivider} />
@@ -1820,6 +1932,15 @@ const TiptapEditDraftScreen: React.FC = () => {
               >
                 <Ionicons name="grid-outline" size={15} color="#334155" />
                 <Text style={styles.toolLabel}>Table</Text>
+              </TouchableOpacity>
+
+              {/* 2-Column Split (Borderless Columns) */}
+              <TouchableOpacity
+                style={styles.labeledToolItem}
+                onPress={() => triggerFormat("insertBorderlessColumns")}
+              >
+                <Ionicons name="browsers-outline" size={15} color="#334155" />
+                <Text style={styles.toolLabel}>2-Col</Text>
               </TouchableOpacity>
 
               {/* Page Break */}
@@ -2189,6 +2310,16 @@ const TiptapEditDraftScreen: React.FC = () => {
                   title: "📑 Index of Documents (Court Filing Table)",
                   desc: "Standard legal filing index table with S.No., Document, Exhibit, Page Nos.",
                   cmd: "insertFilingIndexTable",
+                },
+                {
+                  title: "⚖️ 2-Column Split Block (No Borders)",
+                  desc: "Insert 2 independent columns for party details, comparative points, or side-by-side notes without visible table grid borders",
+                  cmd: "insertBorderlessColumns",
+                },
+                {
+                  title: "📊 3-Column Split Block (No Borders)",
+                  desc: "Insert 3 clean side-by-side borderless columns for tripartite comparisons or tabular notes",
+                  cmd: "insert3Columns",
                 },
                 {
                   title: "📬 Proof of Filing / Certificate of Service",
@@ -2946,6 +3077,7 @@ const TiptapEditDraftScreen: React.FC = () => {
         onAddColRight={() => triggerFormat("tableAddColRight")}
         onDeleteRow={() => triggerFormat("tableDeleteRow")}
         onDeleteCol={() => triggerFormat("tableDeleteCol")}
+        onToggleBorders={() => triggerFormat("toggleTableBorders")}
         onClose={() => setElementContextModalVisible(false)}
       />
 

@@ -35,10 +35,13 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getDb } from "./DataBase";
+import { purgeOldAppNotifications } from "./DataBase/appNotificationsDb";
 import LanguageProvider from "./Providers/LanguageProvider";
 import OnboardingProvider from "./Providers/OnboardingProvider";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
+import { ToastProvider } from "./Providers/ToastContext";
 import Routes from "./Routes/Routes";
 import { AdProvider, preloadAds } from "./Screens/CommonComponents/AdManager";
 import CustomAlertModal from "./Screens/CommonComponents/CustomAlertModal";
@@ -52,9 +55,6 @@ import PracticeAreasScreen from "./Screens/Onboarding/PracticeAreasScreen";
 import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
 import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
 import SplashScreen from "./Screens/SplashScreen/SplashScreen";
-import InAppNotificationToast, {
-  ToastNotification,
-} from "./Screens/CommonComponents/InAppNotificationToast";
 import { initializeAlertInterceptor } from "./utils/AlertManager";
 import {
   handleNotificationDeepLink,
@@ -227,6 +227,9 @@ function AppContent() {
         ]);
         console.log("Database and core services initialized concurrently.");
         scheduleDailyMultiIntervalNotifications();
+        purgeOldAppNotifications(30).catch((e) =>
+          console.warn("Non-fatal error purging stale notifications:", e)
+        );
 
         // Check for updates asynchronously (does not block startup)
         const runUpdateCheck = async () => {
@@ -330,26 +333,9 @@ function AppContent() {
         handleNotificationDeepLink(navigationRef, data, actionId, content);
       });
 
-    // Listen for notifications received while app is in the FOREGROUND.
-    // OS banner is suppressed (see notificationScheduler.ts) so we show
-    // a custom in-app toast instead — no double buzzing.
-    const foregroundSubscription = Notifications.addNotificationReceivedListener(
-      (notification) => {
-        const { title, body } = notification.request.content;
-        const data = notification.request.content.data;
-        setInAppToast({
-          id: notification.request.identifier,
-          title: title || "Reminder",
-          body: body || "",
-          data,
-        });
-      }
-    );
-
     return () => {
       emitter.off("onboardingComplete", onOnboardingComplete);
       notificationSubscription.remove();
-      foregroundSubscription.remove();
     };
   }, []);
 
@@ -372,8 +358,11 @@ function AppContent() {
   console.log("[SplashFlow] 5. Rendering main application & Dashboard");
 
   return (
-    <>
-      <StatusBar style={theme.dark ? "light" : "dark"} />
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <StatusBar
+        style={theme.dark ? "light" : "dark"}
+        backgroundColor={theme.colors.background}
+      />
       <NavigationContainer
         ref={navigationRef}
         linking={linking}
@@ -392,20 +381,13 @@ function AppContent() {
           },
         }}
       >
-        <SafeAreaView
-          style={{
-            flex: 1,
-            backgroundColor: theme.colors.background,
-          }}
-        >
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {onboardingComplete ? (
-              <Stack.Screen name="App" component={Routes} />
-            ) : (
-              <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
-            )}
-          </Stack.Navigator>
-        </SafeAreaView>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {onboardingComplete ? (
+            <Stack.Screen name="App" component={Routes} />
+          ) : (
+            <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
+          )}
+        </Stack.Navigator>
       </NavigationContainer>
       <CustomAlertModal />
       <UpdateCheckModal
@@ -417,28 +399,24 @@ function AppContent() {
         releaseNotes={releaseNotes}
         latestVersion={latestVersion}
       />
-      {/* In-app toast for foreground notifications */}
-      <InAppNotificationToast
-        notification={inAppToast}
-        onDismiss={() => setInAppToast(null)}
-        onPress={(data) => {
-          handleNotificationDeepLink(navigationRef, data);
-        }}
-      />
-    </>
+    </View>
   );
 }
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <OnboardingProvider>
-          <AdProvider>
-            <AppContent />
-          </AdProvider>
-        </OnboardingProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <OnboardingProvider>
+            <AdProvider>
+              <ToastProvider>
+                <AppContent />
+              </ToastProvider>
+            </AdProvider>
+          </OnboardingProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

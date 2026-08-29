@@ -16,6 +16,8 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import * as db from "../../DataBase";
 import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
+import { useToast } from "../../Providers/ToastContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CaseDataScreen } from "../../Types/appTypes";
 import { CASE_UPDATED_EVENT } from "../../utils/caseEvents";
 import { mapCaseDbToScreen } from "../../utils/caseMapper";
@@ -37,6 +39,8 @@ interface Props {
 const CalendarScreen: React.FC<Props> = () => {
   const { theme } = useContext(ThemeContext);
   const { t, locale } = useTranslation();
+  const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
   const currentDate = new Date();
   const [selected, setSelected] = useState(getLocalDateString(currentDate));
   const [ResultToshow, setResultToShow] = useState<CaseDataScreen[]>([]);
@@ -181,6 +185,13 @@ const CalendarScreen: React.FC<Props> = () => {
       fetchAllDates();
       getResultFromDate(selected);
 
+      const formattedNextDate = formatDate(getLocalDateString(nextHearingDate));
+      showToast({
+        title: "Hearing Updated",
+        message: `Next hearing set to ${formattedNextDate}`,
+        type: "success",
+      });
+
       setTimeout(() => {
         promptClientNotification(
           caseId,
@@ -256,12 +267,18 @@ const CalendarScreen: React.FC<Props> = () => {
   });
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
+    <View
+      style={[
+        styles.safeArea,
+        {
+          backgroundColor: theme.colors.background,
+          paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
+        },
+      ]}
     >
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+        contentContainerStyle={{ paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
       >
         <Calendar
@@ -360,7 +377,7 @@ const CalendarScreen: React.FC<Props> = () => {
             <Text style={[styles.dateSubheading, { color: theme.colors.text }]}>
               {t("cal_agenda_for")}{" "}
               {parseLocalDate(selected)?.toLocaleDateString(
-                locale === "hi" ? "hi-IN" : "en-US",
+                locale === "hi" ? "hi-IN" : undefined,
                 {
                   weekday: "long",
                   year: "numeric",
@@ -389,6 +406,7 @@ const CalendarScreen: React.FC<Props> = () => {
                 key={`${each.id}-${(each as any).updated_at || ""}-${(each as any).fee_paid || 0}-${(each as any).date_fee_collected || 0}-${(each as any).date_fee_paid || 0}-${(each as any).date_fee || 0}-${each.nextHearing || ""}`}
                 caseDetails={each}
                 onUpdateHearingPress={() => handleUpdateHearing(each)}
+                marginHorizontal={0}
                 onPress={() =>
                   navigation.navigate("CaseDetails", { caseId: each.id })
                 }
@@ -425,6 +443,7 @@ const CalendarScreen: React.FC<Props> = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
+          currentNextDate={selectedCase.NextDate || selectedCase.nextHearing}
           onSave={async (
             notes,
             nextHearingDate,
@@ -445,7 +464,7 @@ const CalendarScreen: React.FC<Props> = () => {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -454,7 +473,6 @@ export default CalendarScreen;
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? 25 : 0,
   },
   container: {
     flex: 1,

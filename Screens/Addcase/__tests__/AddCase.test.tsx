@@ -1,15 +1,24 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
 import React from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import * as db from "../../../DataBase";
+import LanguageProvider from "../../../Providers/LanguageProvider";
+import ThemeProvider from "../../../Providers/ThemeProvider";
+import { ToastProvider } from "../../../Providers/ToastContext";
 import AddCase from "../AddCase";
 
 jest.mock("../../../DataBase", () => ({
-  ...jest.requireActual("../../../DataBase"),
   addCase: jest.fn(() => Promise.resolve(1)),
+  updateCase: jest.fn(() => Promise.resolve(true)),
   addCaseType: jest.fn(() => Promise.resolve(1)),
+  addCourt: jest.fn(() => Promise.resolve(1)),
   addDistrict: jest.fn(() => Promise.resolve(1)),
+  addPoliceStation: jest.fn(() => Promise.resolve(1)),
+  addCaseTimelineEvent: jest.fn(() => Promise.resolve(1)),
+  getCourts: jest.fn(() => Promise.resolve([])),
+  getCaseTypes: jest.fn(() => Promise.resolve([])),
   getDistricts: jest.fn(() =>
     Promise.resolve([{ id: 1, name: "Test District", state: "Test State" }])
   ),
@@ -22,6 +31,7 @@ jest.mock("../../../DataBase", () => ({
     }
     return Promise.resolve([]);
   }),
+  getDb: jest.fn(() => Promise.resolve({})),
 }));
 
 const mockNavigate = jest.fn();
@@ -39,6 +49,15 @@ jest.mock("@react-navigation/native", () => ({
   }),
 }));
 
+jest.mock("react-native-animatable", () => {
+  const { View, Text } = require("react-native");
+  return {
+    View,
+    Text,
+    createAnimatableComponent: (Comp: any) => Comp,
+  };
+});
+
 jest.mock("react-native-webview", () => {
   const { View } = require("react-native");
   return {
@@ -51,13 +70,27 @@ jest.mock("../../../utils/locationService", () => ({
   getGeolocatedState: jest.fn(() => Promise.resolve("Uttar Pradesh")),
 }));
 
+const renderWithProviders = (props = { route: { params: {} } as any }) => {
+  return render(
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <ToastProvider>
+            <AddCase {...props} />
+          </ToastProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
+};
+
 describe("AddCase", () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
 
   it("should render the form with all fields", () => {
-    const { getByText } = render(<AddCase route={{ params: {} }} />);
+    const { getByText } = renderWithProviders();
     expect(getByText("Case Title*")).toBeTruthy();
     expect(getByText("Client Name")).toBeTruthy();
     expect(getByText("Case Number")).toBeTruthy();
@@ -82,18 +115,18 @@ describe("AddCase", () => {
   });
 
   it("should show an error message if the case title is not provided", async () => {
-    const { getByText } = render(<AddCase route={{ params: {} }} />);
+    const { getByText, findByText } = renderWithProviders();
     const saveButton = getByText("Save Case");
-    fireEvent.press(saveButton);
-    await waitFor(() => {
-      expect(getByText("Case Title is required")).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(saveButton);
+      await new Promise((r) => setTimeout(r, 200));
     });
+    const errorElement = await findByText("Case Title is required");
+    expect(errorElement).toBeTruthy();
   });
 
   it("should save the case and navigate to the case details screen", async () => {
-    const { getByText, getByPlaceholderText } = render(
-      <AddCase route={{ params: {} }} />
-    );
+    const { getByText, getByPlaceholderText } = renderWithProviders();
     const caseTitleInput = getByPlaceholderText("e.g., State vs. John Doe");
     fireEvent.changeText(caseTitleInput, "Test Case");
     const saveButton = getByText("Save Case");
@@ -107,9 +140,7 @@ describe("AddCase", () => {
   });
 
   it('should show the "Other" input field when "Other" is selected in the case type dropdown', async () => {
-    const { getByTestId, findByPlaceholderText } = render(
-      <AddCase route={{ params: {} }} />
-    );
+    const { getByTestId, findByPlaceholderText } = renderWithProviders();
     const caseTypeDropdown = getByTestId("case_type_id");
     fireEvent(caseTypeDropdown, "onValueChange", "Other");
     const otherInput = await findByPlaceholderText("Please specify");
@@ -122,7 +153,7 @@ describe("AddCase", () => {
       getByTestId,
       getByPlaceholderText,
       findByPlaceholderText,
-    } = render(<AddCase route={{ params: {} }} />);
+    } = renderWithProviders();
     const caseTypeDropdown = getByTestId("case_type_id");
     fireEvent(caseTypeDropdown, "onValueChange", "Other");
     const otherInput = await findByPlaceholderText("Please specify");
@@ -137,9 +168,10 @@ describe("AddCase", () => {
   });
 
   it("should show suggestions for the presiding judge field", async () => {
-    const { getByPlaceholderText, findByText } = render(
-      <AddCase route={{ params: {} }} />
-    );
+    const { getByPlaceholderText, findByText } = renderWithProviders();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 200));
+    });
     const judgeNameInput = getByPlaceholderText("Enter Judge's Name");
     fireEvent.changeText(judgeNameInput, "Test");
     const suggestion = await findByText("Test Judge");
@@ -147,7 +179,7 @@ describe("AddCase", () => {
   });
 
   it("should not show a duplicate placeholder in the dropdowns", async () => {
-    const { findAllByText } = render(<AddCase route={{ params: {} }} />);
+    const { findAllByText } = renderWithProviders();
     await waitFor(async () => {
       expect((await findAllByText("Select Case Type...")).length).toBe(1);
       expect((await findAllByText("Select Court...")).length).toBe(1);
@@ -161,16 +193,17 @@ describe("AddCase", () => {
         if (key === "@cases_edit_add_count") return Promise.resolve("10");
         return Promise.resolve(null);
       });
-    const { findByText } = render(<AddCase route={{ params: {} }} />);
+    const { findByText } = renderWithProviders();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 200));
+    });
     const lockTitle = await findByText("Case Action Limit Reached");
     expect(lockTitle).toBeTruthy();
     getItemSpy.mockRestore();
   });
 
   it("should render the Import from eCourts button and trigger the modal on click", async () => {
-    const { getByText, queryByText } = render(
-      <AddCase route={{ params: {} }} />
-    );
+    const { getByText, queryByText } = renderWithProviders();
     const importButton = getByText("Import Details from eCourts");
     expect(importButton).toBeTruthy();
 

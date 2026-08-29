@@ -25,6 +25,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import * as db from "../../DataBase";
 import { CaseWithDetails, DocumentDraft } from "../../DataBase";
@@ -33,6 +34,7 @@ import { useTranslation } from "../../Providers/LanguageProvider";
 import { compileLegalDocumentHtml } from "../../utils/documentTemplates";
 import { createNamedPdfFile, shareNamedPdf } from "../../utils/fileShareHelper";
 import ActionButton from "../CommonComponents/ActionButton";
+import { useAdTrigger } from "../CommonComponents/AdManager";
 import { SkeletonList, SkeletonTemplateGrid } from "../CommonComponents/SkeletonLoader";
 
 const documentTypeColors: { [key: string]: string } = {
@@ -343,11 +345,13 @@ const categories = [
 ];
 
 const DraftsHubScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute<any>();
   const isFocused = useIsFocused();
   const { theme } = useContext(ThemeContext);
   const { locale } = useTranslation();
+  const { showAdWithPreload } = useAdTrigger();
   const styles = getStyles(theme);
 
   const initialTab = route.params?.tab || route.params?.initialTab || "drafts";
@@ -391,7 +395,7 @@ const DraftsHubScreen: React.FC = () => {
     ) {
       const attachId = route.params.draftId;
       // Immediately clear route params so it won't repeatedly re-trigger on subsequent focuses
-      navigation.setParams({ action: undefined, draftId: undefined });
+      (navigation as any).setParams({ action: undefined, draftId: undefined });
       db.getDocumentDraftById(attachId).then((found) => {
         if (found) {
           openAttachModal(found);
@@ -644,9 +648,8 @@ const DraftsHubScreen: React.FC = () => {
 
     if (activeTab === "templates" && selectedCategory !== "all") {
       filtered = filtered.filter((item) => {
-        // @ts-ignore
         const cat =
-          item.category || getCategoryForTemplateType(item.template_type);
+          (item as any).category || getCategoryForTemplateType(item.template_type);
         return cat === selectedCategory;
       });
     }
@@ -742,54 +745,57 @@ const DraftsHubScreen: React.FC = () => {
 
   // View/Share Draft (Compiles HTML on-the-fly to PDF)
   const handleShareDraft = async (draft: DocumentDraft) => {
-    try {
-      setIsLoading(true);
-      let content = draft.html_content;
-      if (!content && draft.id) {
-        const fullDraft = await db.getDocumentDraftById(draft.id);
-        if (fullDraft) {
-          content = fullDraft.html_content;
+    showAdWithPreload("rewarded", async (success) => {
+      if (!success) return;
+      try {
+        setIsLoading(true);
+        let content = draft.html_content;
+        if (!content && draft.id) {
+          const fullDraft = await db.getDocumentDraftById(draft.id);
+          if (fullDraft) {
+            content = fullDraft.html_content;
+          }
         }
+        const rawHtml = content || "";
+        const formattedHtml = getFormattedHtmlForPrint(rawHtml);
+        const isLegal = rawHtml.includes('"pageSize":"legal"');
+        const { uri } = await Print.printToFileAsync({
+          html: formattedHtml,
+          width: isLegal ? 612 : 595,
+          height: isLegal ? 1008 : 842,
+        });
+
+        const namedUri = await createNamedPdfFile(uri, draft.title);
+
+        setIsLoading(false);
+        Alert.alert(draft.title, "Choose an action for this document:", [
+          {
+            text: "Open in App",
+            onPress: () => {
+              // @ts-ignore
+              navigation.navigate("PdfViewer", {
+                pdfUri: namedUri,
+                title: draft.title,
+              });
+            },
+          },
+          {
+            text: "Share PDF",
+            onPress: async () => {
+              await shareNamedPdf(namedUri, draft.title, draft.title);
+            },
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+        ]);
+      } catch (error) {
+        setIsLoading(false);
+        console.error("Error sharing draft:", error);
+        Alert.alert("Error", "Failed to generate PDF document.");
       }
-      const rawHtml = content || "";
-      const formattedHtml = getFormattedHtmlForPrint(rawHtml);
-      const isLegal = rawHtml.includes('"pageSize":"legal"');
-      const { uri } = await Print.printToFileAsync({
-        html: formattedHtml,
-        width: isLegal ? 612 : 595,
-        height: isLegal ? 1008 : 842,
-      });
-
-      const namedUri = await createNamedPdfFile(uri, draft.title);
-
-      setIsLoading(false);
-      Alert.alert(draft.title, "Choose an action for this document:", [
-        {
-          text: "Open in App",
-          onPress: () => {
-            // @ts-ignore
-            navigation.navigate("PdfViewer", {
-              pdfUri: namedUri,
-              title: draft.title,
-            });
-          },
-        },
-        {
-          text: "Share PDF",
-          onPress: async () => {
-            await shareNamedPdf(namedUri, draft.title, draft.title);
-          },
-        },
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-      ]);
-    } catch (error) {
-      setIsLoading(false);
-      console.error("Error sharing draft:", error);
-      Alert.alert("Error", "Failed to generate PDF document.");
-    }
+    });
   };
 
   // Delete Draft
@@ -1022,12 +1028,12 @@ const DraftsHubScreen: React.FC = () => {
       try {
         const d = new Date(rawDate);
         if (!isNaN(d.getTime())) {
-          const datePart = d.toLocaleDateString("en-IN", {
+          const datePart = d.toLocaleDateString(undefined, {
             day: "2-digit",
             month: "short",
             year: "numeric",
           });
-          const timePart = d.toLocaleTimeString("en-IN", {
+          const timePart = d.toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
             hour12: true,
@@ -1210,7 +1216,7 @@ const DraftsHubScreen: React.FC = () => {
       try {
         const d = new Date(rawDate);
         if (!isNaN(d.getTime())) {
-          dateStr = d.toLocaleDateString("en-IN", {
+          dateStr = d.toLocaleDateString(undefined, {
             day: "2-digit",
             month: "short",
             year: "numeric",
@@ -1483,7 +1489,7 @@ const DraftsHubScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0) }]}>
       {/* Segment Tabs */}
       <View style={styles.tabBar}>
         <TouchableOpacity
@@ -2016,6 +2022,12 @@ const getStyles = (theme: any) =>
       borderRadius: 8,
       paddingHorizontal: 12,
       height: 40,
+    },
+    searchInput: {
+      flex: 1,
+      color: theme.colors.text,
+      fontSize: 14,
+      paddingVertical: 0,
     },
     viewModeToggleBtn: {
       marginLeft: 10,

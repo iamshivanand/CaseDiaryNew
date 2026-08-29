@@ -35,7 +35,7 @@ const EditableStatItem: React.FC<EditableStatItemProps> = ({
 
   return (
     <LinearGradient
-      colors={cardGradient}
+      colors={cardGradient as [string, string]}
       style={[
         styles.card,
         isEditing && styles.editingCard,

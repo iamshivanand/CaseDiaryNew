@@ -25,11 +25,14 @@ import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import * as db from "../../DataBase";
 import { useSearchCases } from "../../Hooks/useCases";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
+import { useToast } from "../../Providers/ToastContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CaseDataScreen } from "../../Types/appTypes";
 import { CASE_UPDATED_EVENT } from "../../utils/caseEvents";
 import {
   getCurrentUserId,
   getLocalDateString,
+  formatDate,
 } from "../../utils/commonFunctions";
 import { promptClientNotification } from "../../utils/whatsappNotifier";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
@@ -39,6 +42,8 @@ import VoiceSearchBar from "../CommonComponents/VoiceSearchBar";
 
 const SearchScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
+  const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
   const styles = getSearchScreenStyles(theme);
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
@@ -148,6 +153,14 @@ const SearchScreen: React.FC = () => {
         // 3. Emit global event & refresh search
         DeviceEventEmitter.emit(CASE_UPDATED_EVENT);
         refreshSearch();
+        setPopupVisible(false);
+
+        const formattedNextDate = formatDate(getLocalDateString(nextHearingDate));
+        showToast({
+          title: "Hearing Updated",
+          message: `Next hearing set to ${formattedNextDate}`,
+          type: "success",
+        });
 
         // 4. Prompt WhatsApp notification to client
         setTimeout(() => {
@@ -161,7 +174,7 @@ const SearchScreen: React.FC = () => {
         console.error("Error updating hearing:", error);
       }
     },
-    [selectedCase, refreshSearch]
+    [selectedCase, refreshSearch, showToast]
   );
 
   const renderItem = useCallback(
@@ -175,13 +188,20 @@ const SearchScreen: React.FC = () => {
   );
 
   const keyExtractor = useCallback(
-    (item: CaseDataScreen) =>
-      `${item.id}-${(item as any).updated_at || ""}-${(item as any).fee_paid || 0}-${(item as any).date_fee_collected || 0}-${(item as any).date_fee_paid || 0}-${(item as any).date_fee || 0}-${item.nextHearing || ""}`,
+    (item: CaseDataScreen) => String(item.id),
     []
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View
+      style={[
+        styles.safeArea,
+        {
+          backgroundColor: theme.colors.background,
+          paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
+        },
+      ]}
+    >
       <View
         style={[
           styles.screenContainer,
@@ -205,17 +225,13 @@ const SearchScreen: React.FC = () => {
             data={results}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
-            getItemLayout={(data, index) => ({
-              length: 160,
-              offset: 160 * index,
-              index,
-            })}
-            initialNumToRender={6}
-            maxToRenderPerBatch={6}
-            windowSize={3}
-            removeClippedSubviews
+            initialNumToRender={8}
+            maxToRenderPerBatch={10}
+            windowSize={7}
+            updateCellsBatchingPeriod={50}
+            removeClippedSubviews={Platform.OS === "android"}
             onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
+            onEndReachedThreshold={0.4}
             contentContainerStyle={styles.listContentContainer}
             ListEmptyComponent={() => {
               if (!hasSearched) {
@@ -258,6 +274,7 @@ const SearchScreen: React.FC = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
+          currentNextDate={selectedCase.NextDate || selectedCase.nextHearing}
           onSave={async (notes, nextHearingDate, feeReceivedToday) =>
             handleSaveHearing(
               notes,
@@ -268,7 +285,7 @@ const SearchScreen: React.FC = () => {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -279,7 +296,6 @@ const getSearchScreenStyles = (theme: Theme) =>
     safeArea: {
       flex: 1,
       backgroundColor: theme.colors.background,
-      paddingTop: Platform.OS === "android" ? 25 : 0,
     },
     screenContainer: {
       flex: 1,

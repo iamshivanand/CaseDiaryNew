@@ -17,7 +17,7 @@ export const getSectionHeaderStyles = (theme: Theme) =>
     title: {
       fontSize: 20,
       fontWeight: "bold",
-      color: theme.colors.sectionHeaderText || theme.colors.text, // Use specific or fallback
+      color: (theme.colors as any).sectionHeaderText || theme.colors.text, // Use specific or fallback
     },
   });
 

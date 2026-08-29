@@ -320,6 +320,9 @@ jest.mock("./Screens/CommonComponents/AdManager", () => ({
     showAdWithPreload: jest.fn((adType, onComplete) => {
       onComplete(true);
     }),
+    recordCaseUpdateMilestone: jest.fn((onComplete) => {
+      if (onComplete) onComplete(true);
+    }),
   }),
 }));
 
@@ -347,3 +350,20 @@ jest.mock(
   },
   { virtual: true }
 );
+
+// Mock for react-native-safe-area-context
+jest.mock("react-native-safe-area-context", () => {
+  const inset = { top: 0, right: 0, bottom: 0, left: 0 };
+  return {
+    SafeAreaProvider: jest.fn(({ children }) => children),
+    SafeAreaConsumer: jest.fn(({ children }) => children(inset)),
+    useSafeAreaInsets: jest.fn(() => inset),
+    useSafeAreaFrame: jest.fn(() => ({ x: 0, y: 0, width: 390, height: 844 })),
+    SafeAreaView: jest.fn(({ children, style, ...props }) => {
+      const React = require("react");
+      const { View } = require("react-native");
+      return React.createElement(View, { style, ...props }, children);
+    }),
+  };
+});
+

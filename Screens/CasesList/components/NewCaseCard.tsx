@@ -16,6 +16,7 @@ interface NewCaseCardProps {
   caseDetails: CaseDataScreen;
   onUpdateHearingPress?: (caseDetails: CaseDataScreen) => void;
   onLongPress?: (caseDetails: CaseDataScreen) => void;
+  marginHorizontal?: number;
 }
 
 const statusColors = {
@@ -46,6 +47,7 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
   caseDetails,
   onUpdateHearingPress,
   onLongPress,
+  marginHorizontal,
 }) => {
   const { theme } = useContext(ThemeContext);
   const {
@@ -144,6 +146,9 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
   const isRetainerPartial = totFee > 0 && pdFee > 0 && totBal > 0;
   const isRetainerUnpaid = totFee > 0 && pdFee === 0;
 
+  const cardMarginHorizontal =
+    marginHorizontal !== undefined ? marginHorizontal : 16;
+
   return (
     <Pressable
       onPressIn={() => {
@@ -172,6 +177,7 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
             backgroundColor: theme.colors.cardBackground,
             borderColor: theme.colors.border,
             borderWidth: 1,
+            marginHorizontal: cardMarginHorizontal,
           },
           animatedStyle,
         ]}
@@ -498,8 +504,7 @@ const NewCaseCard: React.FC<NewCaseCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
-    marginVertical: 8,
-    marginHorizontal: 16,
+    marginVertical: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -510,7 +515,7 @@ const styles = StyleSheet.create({
   },
   accentBar: {
     width: 5,
-    height: "100%",
+    alignSelf: "stretch",
   },
   cardContent: {
     flex: 1,
@@ -521,12 +526,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 10,
+    gap: 8,
   },
   title: {
     fontSize: 16,
     fontWeight: "700",
     flex: 1,
-    marginRight: 8,
+    flexShrink: 1,
     lineHeight: 22,
   },
   badge: {

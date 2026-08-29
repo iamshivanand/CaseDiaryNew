@@ -151,7 +151,7 @@ export const VoiceCaseNoteModal: React.FC<VoiceCaseNoteModalProps> = ({
   };
 
   const formatDateDisplay = (d: Date) => {
-    return d.toLocaleDateString("en-IN", {
+    return d.toLocaleDateString(undefined, {
       day: "2-digit",
       month: "short",
       year: "numeric",

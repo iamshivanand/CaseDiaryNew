@@ -86,4 +86,32 @@ describe("UpdateHearingPopup", () => {
 
     expect(getByText("Voice Dictate (EN)")).toBeTruthy();
   });
+
+  it("pre-fills the next date from currentNextDate prop instead of defaulting to today", () => {
+    const targetDate = new Date(2026, 9, 15); // 15 Oct 2026
+    const { getByText } = render(
+      <UpdateHearingPopup
+        visible
+        onClose={() => {}}
+        onSave={() => {}}
+        currentNextDate={targetDate}
+      />
+    );
+
+    expect(getByText(`Next Date: ${targetDate.toDateString()}`)).toBeTruthy();
+  });
+
+  it("pre-fills next date when currentNextDate is a string in YYYY-MM-DD format", () => {
+    const { getByText } = render(
+      <UpdateHearingPopup
+        visible
+        onClose={() => {}}
+        onSave={() => {}}
+        currentNextDate="2026-11-20"
+      />
+    );
+
+    const expectedDate = new Date(2026, 10, 20); // 20 Nov 2026
+    expect(getByText(`Next Date: ${expectedDate.toDateString()}`)).toBeTruthy();
+  });
 });

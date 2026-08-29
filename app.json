@@ -3,7 +3,7 @@
     "name": "Advocase",
     "slug": "CaseDiary",
     "scheme": "advocase",
-    "version": "1.2.4",
+    "version": "1.2.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -30,7 +30,7 @@
         "backgroundColor": "#0F172A"
       },
       "package": "com.iamshiv.CaseDiary",
-      "versionCode": 13,
+      "versionCode": 16,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",

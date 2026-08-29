@@ -6,6 +6,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 
 import { AppNotificationRow } from "../../../DataBase/schema";
 import { ThemeContext } from "../../../Providers/ThemeProvider";
+import { parseUtcDate } from "../../../utils/commonFunctions";
 
 interface NotificationCardProps {
   notification: AppNotificationRow;
@@ -27,8 +28,8 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
   const getRelativeTime = () => {
     if (!notification.created_at) return "";
     try {
-      const d = parseISO(notification.created_at);
-      if (isValid(d)) {
+      const d = parseUtcDate(notification.created_at);
+      if (d && isValid(d)) {
         return formatDistanceToNow(d, { addSuffix: true });
       }
     } catch (e) {

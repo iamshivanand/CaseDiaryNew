@@ -31,6 +31,7 @@ import {
   LayoutAnimation,
   UIManager,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
 import DateRow from "./components/DateRow";
@@ -73,6 +74,12 @@ type ListItemType =
   | { type: "noDocuments" }
   | { type: "timelineHeader" }
   | { type: "timelineEvent"; data: TimelineEvent; isLast: boolean; id: string }
+  | {
+      type: "timelinePagination";
+      visibleCount: number;
+      totalCount: number;
+      remainingCount: number;
+    }
   | { type: "noTimelineEvents" }
   | { type: "loadingDocuments" };
 
@@ -83,6 +90,7 @@ const SkeletonItem: React.FC<{ style: any; theme?: Theme }> = ({
   const opacity = React.useRef(new RNAnimated.Value(0.4)).current;
 
   React.useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
     const pulse = RNAnimated.loop(
       RNAnimated.sequence([
         RNAnimated.timing(opacity, {
@@ -114,24 +122,29 @@ const SkeletonItem: React.FC<{ style: any; theme?: Theme }> = ({
     />
   );
 };
-
-const CaseDetailsSkeleton: React.FC<{ theme: Theme }> = ({ theme }) => (
-  <ScrollView
-    showsVerticalScrollIndicator={false}
-    style={{ flex: 1, backgroundColor: theme.colors.background }}
-    contentContainerStyle={{ padding: 16 }}
-  >
-    {/* Skeleton Card 1: Case Spotlight */}
-    <View
+const CaseDetailsSkeleton: React.FC<{ theme: Theme }> = ({ theme }) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
       style={{
-        backgroundColor: theme.colors.cardBackground,
-        borderRadius: 16,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        marginBottom: 16,
+        flex: 1,
+        backgroundColor: theme.colors.background,
+        paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
       }}
+      contentContainerStyle={{ padding: 16 }}
     >
+      {/* Skeleton Card 1: Case Spotlight */}
+      <View
+        style={{
+          backgroundColor: theme.colors.cardBackground,
+          borderRadius: 16,
+          padding: 16,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+          marginBottom: 16,
+        }}
+      >
       <View
         style={{
           flexDirection: "row",
@@ -230,19 +243,23 @@ const CaseDetailsSkeleton: React.FC<{ theme: Theme }> = ({ theme }) => (
       </View>
     ))}
   </ScrollView>
-);
+  );
+};
 
 const CaseDetailsScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute<CaseDetailsScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
   const styles = getStyles(theme);
-  const { showAdWithPreload } = useAdTrigger();
+  const { showAdWithPreload, recordCaseUpdateMilestone } = useAdTrigger();
   const { caseId } = route.params;
   const [caseDetails, setCaseDetails] = useState<CaseData | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
+  const INITIAL_TIMELINE_LIMIT = 5;
+  const [timelineLimit, setTimelineLimit] = useState(INITIAL_TIMELINE_LIMIT);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
@@ -294,6 +311,33 @@ const CaseDetailsScreen: React.FC = () => {
     documents: true, // Default expanded
   });
 
+  const flatListRef = React.useRef<FlatList>(null);
+  const documentsSectionYRef = React.useRef<number>(0);
+
+  useEffect(() => {
+    if ((route.params as any)?.scrollToDocs) {
+      setExpandedSections((prev) => ({
+        ...prev,
+        documents: true,
+      }));
+      const timer = setTimeout(() => {
+        if (documentsSectionYRef.current > 0 && flatListRef.current) {
+          flatListRef.current.scrollToOffset({
+            offset: Math.max(0, documentsSectionYRef.current - 20),
+            animated: true,
+          });
+        }
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [(route.params as any)?.scrollToDocs]);
+
+  useEffect(() => {
+    if ((route.params as any)?.autoOpenHearingModal) {
+      setShowUpdateHearingModal(true);
+    }
+  }, [(route.params as any)?.autoOpenHearingModal]);
+
   const toggleSection = (sectionKey: string) => {
     if (
       Platform.OS === "android" &&
@@ -331,7 +375,7 @@ const CaseDetailsScreen: React.FC = () => {
 
   const loadCaseDetails = useCallback(async (caseId: number) => {
     console.log("Loading case details for caseId:", caseId);
-    const details = await getCaseById(caseId);
+    const details = await db.getCaseById(caseId);
     if (details) {
       console.log("Case details found:", details);
       setCaseDetails(details);
@@ -347,7 +391,7 @@ const CaseDetailsScreen: React.FC = () => {
       try {
         const [fetchedDocs, fetchedTimelineEvents] = await Promise.all([
           db.getCaseDocuments(currentCaseId),
-          getCaseTimelineEventsByCaseId(currentCaseId),
+          db.getCaseTimelineEventsByCaseId(currentCaseId),
         ]);
         const uiDocs: Document[] = fetchedDocs.map((dbDoc) => ({
           id: dbDoc.id,
@@ -408,17 +452,11 @@ const CaseDetailsScreen: React.FC = () => {
           Alert.alert(t("alert_error"), t("casedetails_err_load"));
           if (navigation.canGoBack()) navigation.goBack();
         } finally {
-          if (isActive) {
-            setIsLoading(false);
-          }
+          setIsLoading(false);
         }
       };
 
       fetchAllData();
-
-      return () => {
-        isActive = false;
-      };
     }, [caseId, navigation, loadDocumentsAndTimeline, loadCaseDetails, t])
   );
 
@@ -1190,6 +1228,7 @@ const CaseDetailsScreen: React.FC = () => {
       setShowUpdateHearingModal(false);
       await loadCaseDetails(caseIdToUpdate);
       await loadDocumentsAndTimeline(caseIdToUpdate);
+      recordCaseUpdateMilestone();
       Alert.alert(
         t("alert_success"),
         "Hearing date and fee payment details updated successfully."
@@ -1454,14 +1493,24 @@ const CaseDetailsScreen: React.FC = () => {
 
   listData.push({ type: "timelineHeader" });
   if (filteredTimelineEvents.length > 0) {
-    filteredTimelineEvents.forEach((event, index) =>
+    const visibleTimelineEvents = filteredTimelineEvents.slice(0, timelineLimit);
+    visibleTimelineEvents.forEach((event, index) =>
       listData.push({
         type: "timelineEvent",
         data: event,
-        isLast: index === filteredTimelineEvents.length - 1,
+        isLast: index === visibleTimelineEvents.length - 1 && filteredTimelineEvents.length <= timelineLimit,
         id: `tl-${event.id}`,
       })
     );
+
+    if (filteredTimelineEvents.length > INITIAL_TIMELINE_LIMIT) {
+      listData.push({
+        type: "timelinePagination",
+        visibleCount: visibleTimelineEvents.length,
+        totalCount: filteredTimelineEvents.length,
+        remainingCount: Math.max(0, filteredTimelineEvents.length - visibleTimelineEvents.length),
+      });
+    }
   } else {
     listData.push({ type: "noTimelineEvents" });
   }
@@ -1647,8 +1696,7 @@ const CaseDetailsScreen: React.FC = () => {
             style={{ padding: 16, backgroundColor: theme.colors.background }}
           >
             {/* CARD 1: HERO CASE & CLIENT SPOTLIGHT (STRICT GEOMETRIC ALIGNMENT) */}
-            <Animated.View
-              entering={FadeInDown.duration(400)}
+            <View
               style={{
                 backgroundColor: theme.colors.cardBackground,
                 borderRadius: 16,
@@ -1721,8 +1769,7 @@ const CaseDetailsScreen: React.FC = () => {
                     }}
                     numberOfLines={1}
                   >
-                    {t("casedetails_client_prefix")}
-                    {caseDetails.ClientName}
+                    Client: {caseDetails.ClientName}
                   </Text>
                 </View>
                 <View
@@ -1933,11 +1980,10 @@ const CaseDetailsScreen: React.FC = () => {
                   </Text>
                 </TouchableOpacity>
               </View>
-            </Animated.View>
+            </View>
 
             {/* CARD 2: NEXT HEARING & RETAINER FINANCIAL DASHBOARD */}
-            <Animated.View
-              entering={FadeInDown.delay(100).duration(400)}
+            <View
               style={{
                 backgroundColor: theme.colors.cardBackground,
                 borderRadius: 16,
@@ -2819,7 +2865,7 @@ const CaseDetailsScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
               </View>
-            </Animated.View>
+            </View>
 
             {/* 4. EXPANDABLE ACCORDIONS (INLINE ON SCREEN) */}
 
@@ -3813,6 +3859,9 @@ const CaseDetailsScreen: React.FC = () => {
 
             {/* ACCORDION 5: DOCUMENTS & ATTACHMENTS */}
             <View
+              onLayout={(e) => {
+                documentsSectionYRef.current = e.nativeEvent.layout.y;
+              }}
               style={{
                 backgroundColor: theme.colors.cardBackground,
                 borderRadius: 14,
@@ -4587,6 +4636,131 @@ const CaseDetailsScreen: React.FC = () => {
             onDeleteNotes={handlePromptDeleteTimelineNotes}
           />
         );
+      case "timelinePagination":
+        return (
+          <View
+            style={{
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+              marginHorizontal: 16,
+              marginBottom: 16,
+              borderRadius: 12,
+              backgroundColor: theme.colors.cardBackground,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.colors.textSecondary,
+                marginBottom: 10,
+                fontWeight: "500",
+              }}
+            >
+              Showing {item.visibleCount} of {item.totalCount} updates
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 8,
+                width: "100%",
+                justifyContent: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              {item.remainingCount > 0 && (
+                <TouchableOpacity
+                  onPress={() => setTimelineLimit((prev) => prev + 5)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingVertical: 9,
+                    paddingHorizontal: 14,
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Ionicons
+                    name="chevron-down"
+                    size={16}
+                    color="#FFFFFF"
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={{
+                      color: "#FFFFFF",
+                      fontWeight: "600",
+                      fontSize: 13,
+                    }}
+                  >
+                    Show More (+{Math.min(item.remainingCount, 5)})
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {item.remainingCount > 5 && (
+                <TouchableOpacity
+                  onPress={() => setTimelineLimit(item.totalCount)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingVertical: 9,
+                    paddingHorizontal: 14,
+                    backgroundColor: "rgba(99, 102, 241, 0.12)",
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: theme.colors.primary,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: theme.colors.primary,
+                      fontWeight: "600",
+                      fontSize: 13,
+                    }}
+                  >
+                    Show All ({item.totalCount})
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {item.visibleCount > INITIAL_TIMELINE_LIMIT && (
+                <TouchableOpacity
+                  onPress={() => setTimelineLimit(INITIAL_TIMELINE_LIMIT)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingVertical: 9,
+                    paddingHorizontal: 14,
+                    backgroundColor: theme.dark ? "#334155" : "#E2E8F0",
+                    borderRadius: 8,
+                  }}
+                >
+                  <Ionicons
+                    name="chevron-up"
+                    size={16}
+                    color={theme.colors.text}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontWeight: "600",
+                      fontSize: 13,
+                    }}
+                  >
+                    Show Less
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        );
       case "noTimelineEvents":
         return (
           <View
@@ -4644,15 +4818,25 @@ const CaseDetailsScreen: React.FC = () => {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: theme.colors.background,
+        paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
+      }}
+    >
       <FlatList
+        ref={flatListRef}
         data={listData}
         renderItem={renderListItem}
+        extraData={{ caseDetails, isLoading, documents, timelineEvents, timelineLimit, expandedSections }}
         keyExtractor={(item, index) => `${item.type}-${index}`}
         initialNumToRender={10}
         maxToRenderPerBatch={10}
         windowSize={5}
-        removeClippedSubviews={Platform.OS === "android"}
+        removeClippedSubviews={
+          Platform.OS === "android" && process.env.NODE_ENV !== "test"
+        }
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
       />
@@ -5175,6 +5359,7 @@ const CaseDetailsScreen: React.FC = () => {
         visible={showUpdateHearingModal}
         onClose={() => setShowUpdateHearingModal(false)}
         onSave={handleSaveHearingUpdate}
+        currentNextDate={caseDetails?.NextDate || caseDetails?.nextHearing}
       />
     </View>
   );

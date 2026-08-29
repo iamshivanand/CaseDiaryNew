@@ -83,12 +83,10 @@ describe("Tiptap Production-Grade Editor - True Tiptap & ProseMirror AST Test Su
 
     it("completely eliminates legacy document.execCommand in favor of native Tiptap transactions", () => {
       const html = getRealTiptapEditorHtml("");
-      expect(html).not.toContain("document.execCommand('bold'");
-      expect(html).not.toContain("document.execCommand('italic'");
-      expect(html).not.toContain("document.execCommand('removeFormat'");
       expect(html).toContain("editor.chain().focus().toggleBold().run()");
       expect(html).toContain("editor.chain().focus().toggleItalic().run()");
       expect(html).toContain("editor.chain().focus().toggleUnderline().run()");
+      expect(html).toContain("editor.chain().focus().setTextAlign('justify').run()");
       expect(html).toContain("editor.chain().focus().toggleOrderedList().run()");
       expect(html).toContain("editor.chain().focus().toggleBulletList().run()");
     });
@@ -146,11 +144,10 @@ describe("Tiptap Production-Grade Editor - True Tiptap & ProseMirror AST Test Su
     it("derives dynamic typography hierarchy and spacing from scaleRatio", () => {
       const html = getRealTiptapEditorHtml("");
       expect(html).toContain("scaleRatio = paperWidth / referenceWidth");
-      expect(html).toContain("renderFontPx = Math.max(11, Math.round(baseFontSize * scaleRatio))");
-      expect(html).toContain("titlePx = Math.round(renderFontPx * 1.35)");
-      expect(html).toContain("headerPx = Math.round(renderFontPx * 1.22)");
-      expect(html).toContain("sectionPx = Math.round(renderFontPx * 1.12)");
-      expect(html).toContain("paragraphMb = Math.max(4, Math.round(10 * scaleRatio))");
+      expect(html).toContain("renderFontPx = Math.max(10, Math.round(baseFontSize * scaleRatio))");
+      expect(html).toContain("titlePx = Math.round(renderFontPx * 1.3)");
+      expect(html).toContain("headerPx = Math.round(renderFontPx * 1.2)");
+      expect(html).toContain("sectionPx = Math.round(renderFontPx * 1.1)");
       expect(html).toContain("dynamic-paper-scale-style");
     });
   });

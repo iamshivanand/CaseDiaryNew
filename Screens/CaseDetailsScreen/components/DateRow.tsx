@@ -27,7 +27,7 @@ const DateRow: React.FC<DateRowProps> = ({ label, dateString, iconName }) => {
       const dateObj = parseISO(dateString);
       if (isValid(dateObj)) {
         displayDate = dateObj.toLocaleDateString(
-          locale === "hi" ? "hi-IN" : "en-US",
+          locale === "hi" ? "hi-IN" : undefined,
           {
             year: "numeric",
             month: "long",

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  Platform,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -13,6 +14,8 @@ import Animated, {
   withSpring,
   runOnJS,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
 const { width } = Dimensions.get("window");
 
@@ -20,7 +23,10 @@ export interface ToastNotification {
   id: string;
   title: string;
   body: string;
+  type?: "success" | "info" | "warning" | "error";
+  duration?: number;
   data?: any;
+  onPress?: (data: any) => void;
 }
 
 interface InAppNotificationToastProps {
@@ -29,13 +35,39 @@ interface InAppNotificationToastProps {
   onPress?: (data: any) => void;
 }
 
-const AUTO_DISMISS_MS = 4500;
+const TYPE_CONFIG = {
+  success: {
+    accentColor: "#10B981",
+    bgTint: "rgba(16, 185, 129, 0.16)",
+    iconName: "checkmark-circle" as const,
+    iconColor: "#34D399",
+  },
+  info: {
+    accentColor: "#3B82F6",
+    bgTint: "rgba(59, 130, 246, 0.16)",
+    iconName: "information-circle" as const,
+    iconColor: "#60A5FA",
+  },
+  warning: {
+    accentColor: "#F59E0B",
+    bgTint: "rgba(245, 158, 11, 0.16)",
+    iconName: "alert-circle" as const,
+    iconColor: "#FBBF24",
+  },
+  error: {
+    accentColor: "#EF4444",
+    bgTint: "rgba(239, 68, 68, 0.16)",
+    iconName: "close-circle" as const,
+    iconColor: "#F87171",
+  },
+};
 
 const InAppNotificationToast: React.FC<InAppNotificationToastProps> = ({
   notification,
   onDismiss,
   onPress,
 }) => {
+  const insets = useSafeAreaInsets();
   const translateY = useSharedValue(-120);
   const opacity = useSharedValue(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,8 +77,8 @@ const InAppNotificationToast: React.FC<InAppNotificationToastProps> = ({
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    translateY.value = withTiming(-120, { duration: 280 });
-    opacity.value = withTiming(0, { duration: 280 }, (finished) => {
+    translateY.value = withTiming(-120, { duration: 240 });
+    opacity.value = withTiming(0, { duration: 240 }, (finished) => {
       if (finished) {
         runOnJS(onDismiss)();
       }
@@ -58,19 +90,21 @@ const InAppNotificationToast: React.FC<InAppNotificationToastProps> = ({
 
     // Animate in
     translateY.value = withSpring(0, { damping: 18, stiffness: 220, mass: 0.6 });
-    opacity.value = withTiming(1, { duration: 220 });
+    opacity.value = withTiming(1, { duration: 200 });
+
+    const dismissDuration = notification.duration || 3000;
 
     // Auto-dismiss after delay
     timerRef.current = setTimeout(() => {
       hide();
-    }, AUTO_DISMISS_MS);
+    }, dismissDuration);
 
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
     };
-  }, [notification?.id]);
+  }, [notification?.id, hide, notification?.duration, translateY, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
@@ -79,31 +113,59 @@ const InAppNotificationToast: React.FC<InAppNotificationToastProps> = ({
 
   if (!notification) return null;
 
+  const typeConfig =
+    TYPE_CONFIG[notification.type || "success"] || TYPE_CONFIG.success;
+
+  const topOffset = Math.max(insets.top + (Platform.OS === "android" ? 10 : 6), 20);
+
   return (
-    <Animated.View style={[styles.container, animatedStyle]} pointerEvents="box-none">
+    <Animated.View
+      style={[
+        styles.container,
+        { paddingTop: topOffset },
+        animatedStyle,
+      ]}
+      pointerEvents="box-none"
+    >
       <TouchableOpacity
         style={styles.toast}
-        activeOpacity={0.92}
+        activeOpacity={0.94}
         onPress={() => {
           hide();
           onPress?.(notification.data);
         }}
       >
         {/* Left accent bar */}
-        <View style={styles.accentBar} />
+        <View
+          style={[
+            styles.accentBar,
+            { backgroundColor: typeConfig.accentColor },
+          ]}
+        />
 
         {/* Content */}
         <View style={styles.content}>
-          <View style={styles.iconContainer}>
-            <Text style={styles.icon}>📅</Text>
+          <View
+            style={[
+              styles.iconContainer,
+              { backgroundColor: typeConfig.bgTint },
+            ]}
+          >
+            <Ionicons
+              name={typeConfig.iconName}
+              size={20}
+              color={typeConfig.iconColor}
+            />
           </View>
           <View style={styles.textContainer}>
             <Text style={styles.title} numberOfLines={1}>
               {notification.title}
             </Text>
-            <Text style={styles.body} numberOfLines={2}>
-              {notification.body}
-            </Text>
+            {Boolean(notification.body) && (
+              <Text style={styles.body} numberOfLines={2}>
+                {notification.body}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -113,7 +175,7 @@ const InAppNotificationToast: React.FC<InAppNotificationToastProps> = ({
           onPress={hide}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={styles.dismissText}>✕</Text>
+          <Ionicons name="close" size={16} color="#64748B" />
         </TouchableOpacity>
       </TouchableOpacity>
     </Animated.View>
@@ -127,12 +189,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 9999,
-    paddingTop: 52,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     alignItems: "center",
   },
   toast: {
-    width: width - 24,
+    width: Math.min(width - 32, 420),
     backgroundColor: "#1E293B",
     borderRadius: 14,
     flexDirection: "row",
@@ -143,13 +204,12 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 12,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
   accentBar: {
     width: 4,
     alignSelf: "stretch",
-    backgroundColor: "#6366F1",
-    borderTopLeftRadius: 14,
-    borderBottomLeftRadius: 14,
   },
   content: {
     flex: 1,
@@ -160,15 +220,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(99, 102, 241, 0.15)",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-  },
-  icon: {
-    fontSize: 18,
   },
   textContainer: {
     flex: 1,
@@ -178,7 +234,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#F1F5F9",
     letterSpacing: 0.2,
-    marginBottom: 2,
+    marginBottom: 1,
   },
   body: {
     fontSize: 12,
@@ -186,16 +242,12 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   dismissButton: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     alignSelf: "stretch",
     justifyContent: "center",
   },
-  dismissText: {
-    color: "#64748B",
-    fontSize: 13,
-    fontWeight: "600",
-  },
 });
 
 export default InAppNotificationToast;
+

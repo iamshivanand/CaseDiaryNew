@@ -22,6 +22,7 @@ import { notifyCaseUpdated } from "../utils/caseEvents";
 import {
   getLocalDateString,
   normalizeDateToYYYYMMDD,
+  formatDate,
 } from "../utils/commonFunctions";
 import {
   scheduleCaseReminder,
@@ -201,6 +202,8 @@ export const uploadCaseDocument = async (
     console.log("Copying file from", fileUri, "to", destinationUri);
     await FileSystem.copyAsync({ from: fileUri, to: destinationUri });
     console.log("File copied successfully");
+    const effectiveUserId =
+      userId && userId > 0 ? userId : caseExists.user_id || null;
     const result = await db.runAsync(
       "INSERT INTO CaseDocuments (case_id, stored_filename, original_display_name, file_type, file_size, user_id) VALUES (?, ?, ?, ?, ?, ?)",
       [
@@ -209,7 +212,7 @@ export const uploadCaseDocument = async (
         originalFileName,
         mimeTypeForDb,
         fileSize ?? null,
-        userId ?? null,
+        effectiveUserId,
       ]
     );
     return result.lastInsertRowId;
@@ -370,7 +373,7 @@ export const addCase = async (
           await addCaseTimelineEvent({
             case_id: caseId,
             hearing_date: validCaseData.NextDate,
-            notes: `Initial hearing scheduled for ${validCaseData.NextDate}`,
+            notes: `Initial hearing scheduled for ${formatDate(validCaseData.NextDate)}`,
             event_type: "hearing_scheduled",
           });
         }
@@ -635,13 +638,25 @@ export const updateCase = async (
     return false;
   }
 
+  const updateData: CaseUpdateData = { ...data };
+
+  // If NextDate is being updated and PreviousDate was not explicitly provided,
+  // automatically shift the previous NextDate into PreviousDate
+  if (updateData.NextDate !== undefined && updateData.PreviousDate === undefined) {
+    const oldNextDate = currentCaseData.NextDate;
+    const newNextDate = normalizeDateToYYYYMMDD(updateData.NextDate);
+    if (oldNextDate && oldNextDate !== newNextDate) {
+      updateData.PreviousDate = oldNextDate;
+    }
+  }
+
   const setClauses: string[] = [];
   const params: any[] = [];
 
-  for (const key in data) {
-    if (Object.prototype.hasOwnProperty.call(data, key)) {
+  for (const key in updateData) {
+    if (Object.prototype.hasOwnProperty.call(updateData, key)) {
       const typedKey = key as keyof CaseUpdateData;
-      let val = data[typedKey];
+      let val = updateData[typedKey];
       if (val !== undefined) {
         if (
           key === "NextDate" ||
@@ -688,8 +703,8 @@ export const updateCase = async (
               case_id: id,
               hearing_date: newNextDate,
               notes: isAdjourned
-                ? `Hearing adjourned / rescheduled: ${oldNextDate} ➔ ${newNextDate}`
-                : `Next hearing scheduled for ${newNextDate}`,
+                ? `Hearing adjourned / rescheduled: ${formatDate(oldNextDate)} ➔ ${formatDate(newNextDate)}`
+                : `Next hearing scheduled for ${formatDate(newNextDate)}`,
               event_type: isAdjourned ? "hearing_adjourned" : "hearing_scheduled",
             });
           }
@@ -766,18 +781,15 @@ export const updateCase = async (
 
         // F. Total Fee modified
         if (data.total_fee !== undefined) {
-          const oldTotalFee = currentCaseData.total_fee || 0;
-          const newTotalFee =
-            typeof data.total_fee === "string"
-              ? parseFloat(data.total_fee)
-              : data.total_fee || 0;
-          if (newTotalFee !== oldTotalFee && newTotalFee > 0) {
+          const oldTotal = currentCaseData.total_fee || 0;
+          const newTotal = Number(data.total_fee) || 0;
+          if (newTotal !== oldTotal) {
             await addCaseTimelineEvent({
               case_id: id,
               hearing_date: todayStr,
-              notes: `Total agreed retainer fee updated: ₹${newTotalFee.toLocaleString("en-IN")}${oldTotalFee > 0 ? ` (Previous: ₹${oldTotalFee.toLocaleString("en-IN")})` : ""}`,
+              notes: `Agreed total case fee updated: ₹${oldTotal.toLocaleString("en-IN")} ➔ ₹${newTotal.toLocaleString("en-IN")}`,
               event_type: "total_fee_agreed",
-              amount: newTotalFee,
+              amount: newTotal,
             });
           }
         }
@@ -790,8 +802,8 @@ export const updateCase = async (
               ? `📅 Hearing Adjourned: ${currentCaseData.CaseTitle || "Case"}`
               : `📅 Hearing Scheduled: ${currentCaseData.CaseTitle || "Case"}`,
             body: isAdj
-              ? `Rescheduled to ${data.NextDate} (Previous: ${currentCaseData.NextDate})`
-              : `Hearing listed for ${data.NextDate}`,
+              ? `Rescheduled to ${formatDate(data.NextDate)} (Previous: ${formatDate(currentCaseData.NextDate)})`
+              : `Hearing listed for ${formatDate(data.NextDate)}`,
             category: "hearing",
             case_id: id,
             action_type: isAdj ? "hearing_adjourned" : "hearing_scheduled",
@@ -964,10 +976,14 @@ export const getSuggestionsForField = async (
   userId?: number | null
 ): Promise<{ id: number; name: string }[]> => {
   const db = await getDb();
-  const results = await db.getAllAsync<any>(
-    `SELECT DISTINCT ${fieldName} as name FROM Cases WHERE ${fieldName} IS NOT NULL AND user_id = ?`,
-    [userId]
-  );
+  let sql = `SELECT DISTINCT ${fieldName} as name FROM Cases WHERE ${fieldName} IS NOT NULL AND TRIM(${fieldName}) != ''`;
+  const params: any[] = [];
+  if (userId != null) {
+    sql += " AND user_id = ?";
+    params.push(userId);
+  }
+  sql += ` ORDER BY ${fieldName} ASC`;
+  const results = await db.getAllAsync<any>(sql, params);
   return results.map((row, index) => ({ id: index, name: row.name }));
 };
 

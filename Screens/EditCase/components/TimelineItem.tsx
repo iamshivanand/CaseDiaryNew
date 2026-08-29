@@ -7,6 +7,7 @@ import { View, Text } from "react-native";
 import { TimelineItemStyles } from "./TimelineItemStyle";
 import { TimelineEvent } from "../../../Types/appTypes"; // Adjusted path
 import IconOnlyButton from "../../CommonComponents/IconOnlyButton"; // Adjusted path
+import { parseLocalDate, parseUtcDate } from "../../../utils/commonFunctions";
 
 interface TimelineItemProps {
   item: TimelineEvent;
@@ -26,8 +27,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
       return "Date N/A";
     }
     try {
-      const date = parseISO(item.date);
-      return format(date, "MMM dd, yyyy");
+      const date = parseLocalDate(item.date) || parseUtcDate(item.date);
+      return date ? format(date, "MMM dd, yyyy") : item.date;
     } catch (error) {
       return item.date.trim() !== "" ? item.date : "Invalid Date Format";
     }

@@ -181,4 +181,60 @@ describe("deepLinkHandler", () => {
     const result = await processInitialNotificationResponse(mockNavigationRef);
     expect(result).toBe(false);
   });
+
+  it("should handle DRAFT_DOCUMENT and proactive_draft action", async () => {
+    const result = await handleNotificationDeepLink(
+      mockNavigationRef,
+      { caseId: 55, templateType: "bail" },
+      "DRAFT_DOCUMENT"
+    );
+    expect(result).toBe(true);
+    expect(mockNavigationRef.navigate).toHaveBeenCalledWith("App", {
+      screen: "MainApp",
+      params: {
+        screen: "Home",
+        params: {
+          screen: "GenerateDocument",
+          params: { caseId: 55, templateType: "bail" },
+        },
+      },
+    });
+  });
+
+  it("should handle SCAN_FILES action", async () => {
+    const result = await handleNotificationDeepLink(
+      mockNavigationRef,
+      { caseId: 77 },
+      "SCAN_FILES"
+    );
+    expect(result).toBe(true);
+    expect(mockNavigationRef.navigate).toHaveBeenCalledWith("App", {
+      screen: "MainApp",
+      params: {
+        screen: "Home",
+        params: {
+          screen: "PdfScanner",
+          params: { caseId: 77 },
+        },
+      },
+    });
+  });
+
+  it("should handle feature_discovery deep links", async () => {
+    const result = await handleNotificationDeepLink(mockNavigationRef, {
+      type: "feature_discovery",
+      feature: "scanner",
+    });
+    expect(result).toBe(true);
+    expect(mockNavigationRef.navigate).toHaveBeenCalledWith("App", {
+      screen: "MainApp",
+      params: {
+        screen: "Home",
+        params: {
+          screen: "PdfScanner",
+        },
+      },
+    });
+  });
 });
+

@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
 } from "react-native";
-import * as Animatable from "react-native-animatable";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { v4 as uuidv4 } from "uuid";
 import * as Yup from "yup";
 
@@ -589,7 +589,9 @@ const FormFieldRenderer: React.FC<{
   const commonInputProps = {
     label: translatedLabel,
     error:
-      touched[fieldName] && errors[fieldName] ? errors[fieldName] : undefined,
+      (touched[fieldName] || formik.submitCount > 0) && errors[fieldName]
+        ? errors[fieldName]
+        : undefined,
   };
 
   switch (fieldConfig.type) {
@@ -706,6 +708,7 @@ const deduplicateOptions = (
 };
 
 const AddCase: React.FC<AddCaseProps> = ({ route }) => {
+  const insets = useSafeAreaInsets();
   const params = route.params;
   const {
     update = false,
@@ -1526,7 +1529,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background, paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0) }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}

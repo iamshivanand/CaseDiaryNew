@@ -211,7 +211,7 @@ export const translations = {
     reminder_copy_success: "Reminder copied to clipboard!",
     reminder_template:
       'Dear {clientName},\n\nThis is a reminder regarding your case "{caseTitle}" (Case Number: {caseNumber}) listed for hearing on {nextDate} in {courtName}.\n\nKindly be present. Let us know if you have any questions.\n\nRegards,\n{advocateName}',
-    onboarding_import_link:
+    onboarding_migrate_link:
       "Already using another Case Management tool? Import data in 1 click",
     import_title: "Import & Migrate Data",
     import_btn_select: "Select CSV/JSON File",
@@ -240,9 +240,15 @@ export const translations = {
     settings_restore_btn: "Restore Database Backup (.db)",
     settings_restore_desc:
       "Restore and overwrite active database from a backup file",
-    settings_import_csv_btn: "Import Cases (CSV/JSON)",
+    settings_export_csv_btn: "Export Cases (CSV / Excel)",
+    settings_export_csv_desc:
+      "Export all cases to spreadsheet for Excel bulk editing & records",
+    settings_download_template_btn: "Download Import Template",
+    settings_download_template_desc:
+      "Get a ready-to-fill Excel/CSV template with instructions",
+    settings_import_csv_btn: "Import & Bulk Update Cases",
     settings_import_csv_desc:
-      "Import cases from spreadsheets or other app exports",
+      "Import new cases or bulk update existing hearing dates & stages",
     settings_scan_duplicates_btn: "Find & Merge Duplicates",
     settings_scan_duplicates_desc:
       "Scan the database to resolve duplicate case records",
@@ -722,7 +728,7 @@ export const translations = {
     reminder_copy_success: "अनुस्मारक क्लिपबोर्ड पर कॉपी किया गया!",
     reminder_template:
       'प्रिय {clientName},\n\nयह आपके केस "{caseTitle}" (केस संख्या: {caseNumber}) के संबंध में एक अनुस्मारक है, जो कि न्यायालय {courtName} में {nextDate} को सुनवाई के लिए सूचीबद्ध है।\n\nकृपया उपस्थित रहें। यदि आपके कोई प्रश्न हैं तो हमें बताएं।\n\nसादर,\n{advocateName}',
-    onboarding_import_link:
+    onboarding_migrate_link:
       "पहले से ही किसी अन्य केस प्रबंधन उपकरण का उपयोग कर रहे हैं? १ क्लिक में डेटा आयात करें",
     import_title: "डेटा आयात और माइग्रेट करें",
     import_btn_select: "CSV/JSON फ़ाइल चुनें",
@@ -751,9 +757,15 @@ export const translations = {
     settings_restore_btn: "डेटाबेस बैकअप पुनर्स्थापित करें (.db)",
     settings_restore_desc:
       "बैकअप फ़ाइल से सक्रिय डेटाबेस को पुनर्स्थापित और अधिलेखित करें",
-    settings_import_csv_btn: "मुकदमे आयात करें (CSV/JSON)",
+    settings_export_csv_btn: "मुकदमे निर्यात करें (CSV / Excel)",
+    settings_export_csv_desc:
+      "थोक संपादन और रिकॉर्ड के लिए सभी केस स्प्रेडशीट में निर्यात करें",
+    settings_download_template_btn: "आयात टेम्पलेट डाउनलोड करें",
+    settings_download_template_desc:
+      "निर्देशों के साथ तैयार एक्सेल/सीएसवी टेम्पलेट प्राप्त करें",
+    settings_import_csv_btn: "केस आयात और थोक अपडेट करें",
     settings_import_csv_desc:
-      "स्प्रेडशीट या अन्य ऐप निर्यात से मुकदमे आयात करें",
+      "नए केस जोड़ें या एक क्लिक में मौजूदा सुनवाई की तारीखें अपडेट करें",
     settings_scan_duplicates_btn: "डुप्लिकेट ढूंढें और हटाएं",
     settings_scan_duplicates_desc:
       "डुप्लिकेट केस रिकॉर्ड को हल करने के लिए डेटाबेस को स्कैन करें",

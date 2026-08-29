@@ -53,6 +53,7 @@ let interstitialAd: InterstitialAd;
 
 export const createRewardedAd = () => {
   try {
+    isRewardedAdLoading = false;
     rewardedAd = RewardedAd.createForAdRequest(rewardedAdUnitId, {
       requestNonPersonalizedAdsOnly: false,
     });
@@ -83,6 +84,7 @@ export const createRewardedAd = () => {
 
 export const createInterstitialAd = () => {
   try {
+    isInterstitialAdLoading = false;
     interstitialAd = InterstitialAd.createForAdRequest(interstitialAdUnitId, {
       requestNonPersonalizedAdsOnly: false,
     });
@@ -143,6 +145,9 @@ interface AdContextProps {
     adType: "rewarded" | "interstitial",
     onComplete: (success: boolean) => void
   ) => Promise<void>;
+  recordCaseUpdateMilestone: (
+    onComplete?: (success: boolean) => void
+  ) => Promise<void>;
 }
 
 const AdContext = createContext<AdContextProps | null>(null);
@@ -164,6 +169,8 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Cleanup timers and subscriptions
   const cleanUpAdRequest = () => {
+    isRewardedAdLoading = false;
+    isInterstitialAdLoading = false;
     setLoading(false);
     setShowSkip(false);
     setSecondsRemaining(8);
@@ -389,8 +396,60 @@ export const AdProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
-  return (
-    <AdContext.Provider value={{ showAdWithPreload }}>
+    const recordCaseUpdateMilestone = async (
+      onComplete?: (success: boolean) => void
+    ) => {
+      try {
+        const isPremiumVal = await AsyncStorage.getItem("@user_is_premium");
+        if (isPremiumVal === "true") {
+          if (onComplete) onComplete(true);
+          return;
+        }
+
+        const currentCountStr = await AsyncStorage.getItem(
+          "@case_update_counter"
+        );
+        let currentCount = currentCountStr ? parseInt(currentCountStr, 10) : 0;
+        currentCount += 1;
+
+        const lastAdTimeStr = await AsyncStorage.getItem(
+          "@case_update_last_ad_time"
+        );
+        const lastAdTime = lastAdTimeStr ? parseInt(lastAdTimeStr, 10) : 0;
+        const now = Date.now();
+        const tenMinutesMs = 10 * 60 * 1000;
+
+        // Trigger ad if 5 updates reached OR (at least 1 update and 10 minutes passed since last update ad)
+        const shouldTrigger =
+          currentCount >= 5 ||
+          (now - lastAdTime >= tenMinutesMs && currentCount >= 1);
+
+        if (shouldTrigger) {
+          await AsyncStorage.setItem("@case_update_counter", "0");
+          await AsyncStorage.setItem(
+            "@case_update_last_ad_time",
+            now.toString()
+          );
+          await showAdWithPreload("interstitial", (success) => {
+            if (onComplete) onComplete(success);
+          });
+        } else {
+          await AsyncStorage.setItem(
+            "@case_update_counter",
+            currentCount.toString()
+          );
+          if (onComplete) onComplete(true);
+        }
+      } catch (e) {
+        console.warn("Error in recordCaseUpdateMilestone:", e);
+        if (onComplete) onComplete(true);
+      }
+    };
+
+    return (
+      <AdContext.Provider
+        value={{ showAdWithPreload, recordCaseUpdateMilestone }}
+      >
       {children}
       {loading && (
         <Modal visible={loading} transparent animationType="fade">
@@ -518,6 +577,11 @@ export const useAdTrigger = () => {
         onComplete: (success: boolean) => void
       ) => {
         onComplete(true);
+      },
+      recordCaseUpdateMilestone: async (
+        onComplete?: (success: boolean) => void
+      ) => {
+        if (onComplete) onComplete(true);
       },
     };
   }

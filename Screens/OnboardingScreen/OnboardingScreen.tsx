@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useRef } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  FadeIn,
+  FadeOut,
 } from "react-native-reanimated";
 
 import { getDb, updateUserProfile, addUser } from "../../DataBase";

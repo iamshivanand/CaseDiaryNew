@@ -127,7 +127,9 @@ describe("TiptapEditDraftScreen (Behavior-Driven Testing)", () => {
       await waitFor(() => {
         const titleInput = getByDisplayValue("Default Title");
         fireEvent.changeText(titleInput, "Updated Legal Petition 2026");
-        expect(titleInput.props.value).toBe("Updated Legal Petition 2026");
+      });
+      await waitFor(() => {
+        expect(getByDisplayValue("Updated Legal Petition 2026")).toBeTruthy();
       });
     });
   });

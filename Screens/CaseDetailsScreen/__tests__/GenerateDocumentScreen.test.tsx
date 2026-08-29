@@ -115,62 +115,32 @@ describe("GenerateDocumentScreen", () => {
     });
   });
 
-  it("should render client details and document type selection options", async () => {
-    mockRouteParams = { caseId: undefined, templateType: "bail" };
-    const { findAllByText, findByText, queryByText } = renderWithProviders();
+  it("should render template cards and library options", async () => {
+    mockRouteParams = { caseId: undefined, templateType: "" };
+    const { findByText } = renderWithProviders();
 
-    // Wait for the loading indicator to disappear
-    await waitFor(
-      () => {
-        expect(queryByText("Preparing document...")).toBeNull();
-      },
-      { timeout: 15000 }
-    );
+    const blankTemplate = await findByText("Blank Canvas (Start from Scratch)");
+    const bailTemplate = await findByText("Bail Application (Sec 439)");
 
-    const sectionTitles = await findAllByText("Case/Client Details");
-    expect(sectionTitles.length).toBeGreaterThan(0);
-  }, 30000);
+    expect(blankTemplate).toBeTruthy();
+    expect(bailTemplate).toBeTruthy();
+  });
 
-  it("should request rewarded ad before generating PDF document", async () => {
-    // Mock Alert.alert to auto-trigger the "Share PDF" option
-    const alertSpy = jest
-      .spyOn(Alert, "alert")
-      .mockImplementation((title, message, buttons) => {
-        const shareBtn = buttons?.find(
-          (btn) => btn.text === "Share PDF" || btn.text === "Share"
-        );
-        if (shareBtn && shareBtn.onPress) {
-          shareBtn.onPress();
-        }
-      });
+  it("should navigate to TiptapEditDraft on template selection", async () => {
+    mockRouteParams = { caseId: 1, templateType: "" };
+    const { findByText } = renderWithProviders();
 
-    mockRouteParams = { caseId: 1, templateType: "bail" };
-    const { findByText, queryByText } = renderWithProviders();
+    const bailTemplate = await findByText("Bail Application (Sec 439)");
+    fireEvent.press(bailTemplate);
 
-    // Wait for the loading indicator to disappear
-    await waitFor(
-      () => {
-        expect(queryByText("Preparing document...")).toBeNull();
-      },
-      { timeout: 15000 }
-    );
-
-    const exportButton = await findByText("Quick PDF Export");
-
-    fireEvent.press(exportButton);
-
-    await waitFor(
-      () => {
-        expect(mockShowAd).toHaveBeenCalledWith(
-          "rewarded",
-          expect.any(Function)
-        );
-        expect(Print.printToFileAsync).toHaveBeenCalled();
-        expect(Sharing.shareAsync).toHaveBeenCalled();
-      },
-      { timeout: 15000 }
-    );
-
-    alertSpy.mockRestore();
-  }, 30000);
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith(
+        "TiptapEditDraft",
+        expect.objectContaining({
+          caseId: 1,
+          templateType: "bail",
+        })
+      );
+    });
+  });
 });

@@ -2,7 +2,8 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React, { useContext, useEffect } from "react";
-import { View, Platform } from "react-native"; // Removed ScrollView, Text
+import { View, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -158,7 +159,7 @@ const HomeStack = () => {
       <HomeStackNav.Screen
         name="PdfViewer"
         component={PdfViewerScreen}
-        options={{ title: "PDF Viewer" }}
+        options={{ headerShown: false }}
       />
       <HomeStackNav.Screen
         name="PdfScanner"
@@ -359,13 +360,17 @@ const TabIcon = ({
 };
 
 const Appro: React.FC = () => {
-  // Props interface removed as it was empty
   const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+
+  const bottomInset =
+    Platform.OS === "ios"
+      ? Math.max(insets.bottom, 16)
+      : Math.max(insets.bottom, 12);
+
   return (
-    // View style={{ flex: 1 }} is important for the navigator to fill the space
-    // Removed the ScrollView that was wrapping Tab.Navigator
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <Tab.Navigator
         screenOptions={({ route }) => {
           const routeName = getFocusedRouteNameFromRoute(route) ?? "";
@@ -395,7 +400,7 @@ const Appro: React.FC = () => {
             headerShown: false, // Headers are managed by inner stacks
             tabBarStyle: {
               position: "absolute",
-              bottom: Platform.OS === "ios" ? 24 : 16,
+              bottom: bottomInset,
               left: 16,
               right: 16,
               borderRadius: 24,

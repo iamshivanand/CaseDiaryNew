@@ -16,6 +16,7 @@ interface ElementContextModalProps {
   onAddColRight?: () => void;
   onDeleteRow?: () => void;
   onDeleteCol?: () => void;
+  onToggleBorders?: () => void;
   onClose: () => void;
 }
 
@@ -30,6 +31,7 @@ export const ElementContextModal: React.FC<ElementContextModalProps> = ({
   onAddColRight,
   onDeleteRow,
   onDeleteCol,
+  onToggleBorders,
   onClose,
 }) => {
   if (!elementType) return null;
@@ -146,6 +148,22 @@ export const ElementContextModal: React.FC<ElementContextModalProps> = ({
                   >
                     <Ionicons name="remove-circle-outline" size={18} color="#ef4444" />
                     <Text style={[styles.actionGridText, { color: "#ef4444" }]}>Delete Column</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.sectionLabel}>Border & Column Style</Text>
+                <View style={styles.btnRow}>
+                  <TouchableOpacity
+                    style={[styles.actionGridBtn, { flex: 1, backgroundColor: "#f8fafc" }]}
+                    onPress={() => {
+                      onToggleBorders?.();
+                      onClose();
+                    }}
+                  >
+                    <Ionicons name="scan-outline" size={18} color={theme.colors.primary} />
+                    <Text style={[styles.actionGridText, { color: theme.colors.primary, fontWeight: "700" }]}>
+                      Toggle Borders (Visible ↔ Borderless Columns)
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
