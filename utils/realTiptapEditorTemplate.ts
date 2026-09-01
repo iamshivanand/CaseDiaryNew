@@ -499,6 +499,56 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
         content: initialContentHtml,
         autofocus: false,
         editable: true,
+        editorProps: {
+          transformPastedHTML(html) {
+            if (!html) return html;
+            try {
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(html, 'text/html');
+
+              const allElements = doc.body.querySelectorAll('*');
+              allElements.forEach(el => {
+                if (el.hasAttribute('style')) {
+                  // Strip fixed font size, font family, line height, text colors, background colors from foreign pasted HTML
+                  el.style.removeProperty('font-size');
+                  el.style.removeProperty('font-family');
+                  el.style.removeProperty('line-height');
+                  el.style.removeProperty('color');
+                  el.style.removeProperty('background-color');
+                  el.style.removeProperty('background');
+                  
+                  const cleanStyle = el.getAttribute('style');
+                  if (!cleanStyle || cleanStyle.trim() === '') {
+                    el.removeAttribute('style');
+                  }
+                }
+                
+                // Remove legacy font tag styling attributes
+                if (el.tagName && el.tagName.toLowerCase() === 'font') {
+                  el.removeAttribute('size');
+                  el.removeAttribute('face');
+                  el.removeAttribute('color');
+                }
+
+                // Unwrap bare spans that have no attributes
+                if (el.tagName && el.tagName.toLowerCase() === 'span' && !el.hasAttributes()) {
+                  const parent = el.parentNode;
+                  if (parent) {
+                    while (el.firstChild) {
+                      parent.insertBefore(el.firstChild, el);
+                    }
+                    parent.removeChild(el);
+                  }
+                }
+              });
+
+              return doc.body.innerHTML;
+            } catch (e) {
+              console.warn('[Tiptap:Paste] Failed to sanitize pasted HTML:', e);
+              return html;
+            }
+          },
+        },
         onUpdate() {
           sendStateToRN(false);
         },
@@ -603,7 +653,16 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       const dynamicTopMargin = Math.round((configuredTopMargin + configuredLetterhead) * scaleRatio);
       const dynamicBottomMargin = Math.round(configuredBottomMargin * scaleRatio);
 
-      const printableSheetHeight = Math.max(100, singleSheetHeight - (dynamicTopMargin + dynamicBottomMargin));
+      // Proportional font, line-height, spacing & padding derived strictly from scaleRatio
+      const baseFontSize = window.userFontSize || 12;
+      const renderFontPx = Math.max(10, Math.round(baseFontSize * scaleRatio));
+
+      // Font expansion factor on mobile screens (due to Math.max(10, ...) readability minimum)
+      const idealFontPx = baseFontSize * scaleRatio;
+      const fontExpansionFactor = idealFontPx > 0 ? (renderFontPx / idealFontPx) : 1;
+      const visualSheetHeight = Math.round(singleSheetHeight * fontExpansionFactor);
+
+      const printableSheetHeight = Math.max(100, visualSheetHeight - (dynamicTopMargin + dynamicBottomMargin));
       const pageBreakElements = editorEl.querySelectorAll('.legal-page-break, hr.page-break');
       const pageBreakCount = pageBreakElements.length;
 
@@ -613,15 +672,11 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       const totalPages = Math.max(1, pageBreakCount + 1, overflowPages);
       
       const pageGap = Math.round(20 * scaleRatio);
-      const canvasHeight = Math.round((singleSheetHeight * totalPages) + (pageGap * (totalPages - 1)));
+      const canvasHeight = Math.round((visualSheetHeight * totalPages) + (pageGap * (totalPages - 1)));
       container.style.width = paperWidth + 'px';
       container.style.margin = '0 auto';
       editorEl.style.minHeight = canvasHeight + 'px';
       container.style.height = canvasHeight + 'px';
-      
-      // Proportional font, line-height, spacing & padding derived strictly from scaleRatio
-      const baseFontSize = window.userFontSize || 12;
-      const renderFontPx = Math.max(10, Math.round(baseFontSize * scaleRatio));
 
       const baseLineRatio = window.userLineHeightRatio || (metrics.isLegal ? 1.25 : 1.2);
       const renderLineHeightPx = (renderFontPx * baseLineRatio).toFixed(1);
@@ -684,13 +739,13 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
 
       guideOverlay.innerHTML = '';
       for (let i = 0; i < totalPages; i++) {
-        const sheetTop = i * (singleSheetHeight + pageGap);
+        const sheetTop = i * (visualSheetHeight + pageGap);
         const guide = document.createElement('div');
         guide.className = 'page-margin-guide';
         guide.style.left = dynamicLeftMargin + 'px';
         guide.style.top = (sheetTop + dynamicTopMargin) + 'px';
         guide.style.width = Math.max(10, paperWidth - (dynamicLeftMargin + dynamicRightMargin)) + 'px';
-        guide.style.height = Math.max(10, singleSheetHeight - (dynamicTopMargin + dynamicBottomMargin)) + 'px';
+        guide.style.height = Math.max(10, visualSheetHeight - (dynamicTopMargin + dynamicBottomMargin)) + 'px';
         guideOverlay.appendChild(guide);
 
         if (window.userHeaderText) {
@@ -706,7 +761,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           const footerText = window.userFooterText.replace('{page}', i + 1).replace('{total}', totalPages);
           const runningFooter = document.createElement('div');
           runningFooter.className = 'court-running-footer';
-          runningFooter.style.top = (sheetTop + singleSheetHeight - Math.max(14, dynamicBottomMargin * 0.8)) + 'px';
+          runningFooter.style.top = (sheetTop + visualSheetHeight - Math.max(14, dynamicBottomMargin * 0.8)) + 'px';
           runningFooter.style.fontSize = Math.max(8, Math.round(10 * scaleRatio)) + 'px';
           runningFooter.textContent = footerText;
           guideOverlay.appendChild(runningFooter);
@@ -716,7 +771,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           const watermark = document.createElement('div');
           watermark.className = 'court-watermark-overlay';
           watermark.style.position = 'absolute';
-          watermark.style.top = (sheetTop + (singleSheetHeight / 2) - 30) + 'px';
+          watermark.style.top = (sheetTop + (visualSheetHeight / 2) - 30) + 'px';
           watermark.style.left = '0';
           watermark.style.right = '0';
           watermark.style.textAlign = 'center';
@@ -736,7 +791,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
         if (i < totalPages - 1) {
           const divider = document.createElement('div');
           divider.className = 'page-sheet-divider';
-          divider.style.top = (sheetTop + singleSheetHeight) + 'px';
+          divider.style.top = (sheetTop + visualSheetHeight) + 'px';
           divider.style.height = pageGap + 'px';
           divider.textContent = '--- MS Word Page Sheet ' + (i + 1) + ' of ' + totalPages + ' ---';
           guideOverlay.appendChild(divider);
@@ -873,6 +928,74 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       editor.chain().focus().insertContentAt({ from, to }, converted).run();
     }
 
+    let activeCellElement = null;
+    let activeTableElement = null;
+
+    function updateActiveTableContext(target) {
+      if (!target) return;
+      const table = target.closest ? target.closest('table, .editor-table') : null;
+      const cell = target.closest ? target.closest('td, th') : null;
+      if (table) {
+        activeTableElement = table;
+        document.querySelectorAll('.active-selected-element').forEach(el => el.classList.remove('active-selected-element'));
+        table.classList.add('active-selected-element');
+      }
+      if (cell) {
+        activeCellElement = cell;
+      }
+    }
+
+    function alignActiveTableColumn(align) {
+      if (!editor) return;
+      let cell = activeCellElement;
+      if (!cell) {
+        const sel = window.getSelection();
+        if (sel && sel.anchorNode) {
+          const node = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+          cell = node ? node.closest('td, th') : null;
+        }
+      }
+      if (!cell && activeTableElement) {
+        cell = activeTableElement.querySelector('td, th');
+      }
+      if (!cell) return;
+      const table = cell.closest('table, .editor-table');
+      if (!table) return;
+
+      const colIndex = cell.cellIndex;
+      if (colIndex === undefined || colIndex < 0) return;
+
+      const rows = table.querySelectorAll('tr');
+      rows.forEach(row => {
+        const targetCell = row.children[colIndex];
+        if (targetCell) {
+          targetCell.style.textAlign = align;
+          targetCell.querySelectorAll('p, div, span, h1, h2, h3, h4').forEach(el => {
+            el.style.textAlign = align;
+          });
+        }
+      });
+      sendStateToRN(true);
+    }
+
+    function alignActiveTableCell(align) {
+      if (!editor) return;
+      let cell = activeCellElement;
+      if (!cell) {
+        const sel = window.getSelection();
+        if (sel && sel.anchorNode) {
+          const node = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+          cell = node ? node.closest('td, th') : null;
+        }
+      }
+      if (!cell) return;
+      cell.style.textAlign = align;
+      cell.querySelectorAll('p, div, span, h1, h2, h3, h4').forEach(el => {
+        el.style.textAlign = align;
+      });
+      sendStateToRN(true);
+    }
+
     // Native Bridge Dispatcher for True Tiptap Engine
     window.handleRNMessage = function(messageData) {
       try {
@@ -933,6 +1056,13 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             }
           } else if (cmd === 'insertTable') {
             editor.chain().focus().insertTable({ rows: data.rows || 3, cols: data.cols || 3, withHeaderRow: true }).run();
+            setTimeout(function() {
+              const insertedTable = editorEl ? editorEl.querySelector('table') : null;
+              if (insertedTable) {
+                updateActiveTableContext(insertedTable);
+                postMessage({ type: 'openElementContextModal', elementType: 'table' });
+              }
+            }, 120);
           } else if (cmd === 'insertPageBreak') {
             editor.chain().focus().insertContent('<div class="legal-page-break" data-type="page-break" contenteditable="false" style="break-before: page; page-break-before: always; user-select: none;"></div><p></p>').run();
           } else if (cmd === 'insertFilingIndexTable') {
@@ -954,22 +1084,22 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             }
             editor.chain().focus().insertContent(shapeHtml).run();
           } else if (cmd === 'insertMemoOfParties') {
-            const memoHtml = '<p style="text-align: center; font-weight: bold; margin-bottom: 12px;"><strong><u>MEMO OF PARTIES</u></strong></p><table style="width: 100%; border: none; margin-bottom: 14px;"><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>1. [PETITIONER / PLAINTIFF NAME]</strong><br/>S/o, D/o, W/o: [Parent/Spouse Name]<br/>Age: [Age] Years, Occ: [Occupation]<br/>R/o: [Complete Residential Address]<br/>Phone: [Phone Number]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>PETITIONER / PLAINTIFF</strong></td></tr><tr><td colspan="2" style="border: none; text-align: center; padding: 8px 0; font-weight: bold;">VERSUS</td></tr><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>1. [RESPONDENT / DEFENDANT NAME]</strong><br/>S/o, D/o, W/o: [Parent/Spouse Name]<br/>Age: [Age] Years, Occ: [Occupation]<br/>R/o: [Complete Residential Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>RESPONDENT / DEFENDANT</strong></td></tr></table><p></p>';
+            const memoHtml = '<p style="text-align: center; font-weight: bold; margin-bottom: 12px;"><strong><u>MEMO OF PARTIES</u></strong></p><table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin-bottom: 14px;"><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>1. [PETITIONER / PLAINTIFF NAME]</strong><br/>S/o, D/o, W/o: [Parent/Spouse Name]<br/>Age: [Age] Years, Occ: [Occupation]<br/>R/o: [Complete Residential Address]<br/>Phone: [Phone Number]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>PETITIONER / PLAINTIFF</strong></td></tr><tr><td colspan="2" style="border: none; text-align: center; padding: 8px 0; font-weight: bold;">VERSUS</td></tr><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>1. [RESPONDENT / DEFENDANT NAME]</strong><br/>S/o, D/o, W/o: [Parent/Spouse Name]<br/>Age: [Age] Years, Occ: [Occupation]<br/>R/o: [Complete Residential Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>RESPONDENT / DEFENDANT</strong></td></tr></table><p></p>';
             editor.chain().focus().insertContent(memoHtml).run();
           } else if (cmd === 'insertCourtFeeBox') {
             const feeHtml = '<div style="border: 2px dashed #475569; padding: 12px; margin: 16px 0; text-align: center; background-color: #f8fafc; border-radius: 4px;"><p style="margin: 0; font-weight: bold; font-size: 13px; color: #1e293b;">COURT FEE STAMP / E-CHALLAN</p><p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;">[ Affix Court Fee Stamp of ₹________/- Here ]<br/>CNR / Deficit Fee Reg: __________________</p></div><p></p>';
             editor.chain().focus().insertContent(feeHtml).run();
           } else if (cmd === 'insertUniversalCaption') {
-            const captionHtml = '<p class="court-header" style="text-align: center; font-weight: bold; margin-bottom: 8px;"><strong>IN THE COURT OF [NAME OF COURT / TRIBUNAL]</strong><br/><strong>AT [CITY / JURISDICTION]</strong></p><p style="text-align: center; margin-bottom: 16px;"><strong>CASE NO.: ____________ OF 2026</strong></p><table style="width: 100%; border: none; margin-bottom: 16px;"><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>[PLAINTIFF / PETITIONER NAME]</strong><br/>Address: [Full Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>PLAINTIFF / PETITIONER</strong></td></tr><tr><td colspan="2" style="border: none; text-align: center; padding: 6px 0;"><strong>VERSUS</strong></td></tr><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>[DEFENDANT / RESPONDENT NAME]</strong><br/>Address: [Full Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>DEFENDANT / RESPONDENT</strong></td></tr></table><p></p>';
+            const captionHtml = '<p class="court-header" style="text-align: center; font-weight: bold; margin-bottom: 8px;"><strong>IN THE COURT OF [NAME OF COURT / TRIBUNAL]</strong><br/><strong>AT [CITY / JURISDICTION]</strong></p><p style="text-align: center; margin-bottom: 16px;"><strong>CASE NO.: ____________ OF 2026</strong></p><table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin-bottom: 16px;"><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>[PLAINTIFF / PETITIONER NAME]</strong><br/>Address: [Full Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>PLAINTIFF / PETITIONER</strong></td></tr><tr><td colspan="2" style="border: none; text-align: center; padding: 6px 0;"><strong>VERSUS</strong></td></tr><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>[DEFENDANT / RESPONDENT NAME]</strong><br/>Address: [Full Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>DEFENDANT / RESPONDENT</strong></td></tr></table><p></p>';
             editor.chain().focus().insertContent(captionHtml).run();
           } else if (cmd === 'insertPrayerClause') {
             const prayerHtml = '<p style="text-align: center; font-weight: bold; margin: 18px 0 10px 0;"><strong><u>PRAYER / RELIEF SOUGHT</u></strong></p><p>WHEREFORE, in light of the facts and circumstances stated hereinabove, it is most respectfully prayed that this Hon&apos;ble Court may graciously be pleased to:</p><p>a) Pass an order granting [Specific Relief / Order Requested];</p><p>b) Award the costs of this proceeding in favor of the [Petitioner / Plaintiff]; and</p><p>c) Pass such other and further order(s) as this Hon&apos;ble Court may deem fit and proper in the interest of justice.</p><p></p>';
             editor.chain().focus().insertContent(prayerHtml).run();
           } else if (cmd === 'insertAffidavitBlock') {
-            const affHtml = '<div style="border: 1.5px solid #334155; padding: 14px; margin-top: 20px; border-radius: 4px; line-height: 1.6;"><p style="text-align: center; margin: 0 0 10px 0;"><strong><u>SWORN VERIFICATION / AFFIDAVIT</u></strong></p><p style="margin: 0 0 10px 0;">I, the Deponent / Declarant above named, do hereby solemnly declare and affirm that the contents of the foregoing paragraphs are true and correct to the best of my personal knowledge, information, and belief, and nothing material has been concealed therefrom.</p><p style="margin: 0 0 16px 0;">Verified and executed at <strong>[Place / City]</strong> on this <strong>[Day]</strong> day of <strong>[Month]</strong>, 2026.</p><table style="width: 100%; border: none; margin-top: 14px;"><tr><td style="width: 50%; border: none;"><strong>DEPONENT / DECLARANT</strong></td><td style="width: 50%; text-align: right; border: none;"><strong>ADVOCATE / COUNSEL</strong></td></tr></table></div><p></p>';
+            const affHtml = '<div style="border: 1.5px solid #334155; padding: 14px; margin-top: 20px; border-radius: 4px; line-height: 1.6;"><p style="text-align: center; margin: 0 0 10px 0;"><strong><u>SWORN VERIFICATION / AFFIDAVIT</u></strong></p><p style="margin: 0 0 10px 0;">I, the Deponent / Declarant above named, do hereby solemnly declare and affirm that the contents of the foregoing paragraphs are true and correct to the best of my personal knowledge, information, and belief, and nothing material has been concealed therefrom.</p><p style="margin: 0 0 16px 0;">Verified and executed at <strong>[Place / City]</strong> on this <strong>[Day]</strong> day of <strong>[Month]</strong>, 2026.</p><table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin-top: 14px;"><tr><td style="width: 50%; border: none;"><strong>DEPONENT / DECLARANT</strong></td><td style="width: 50%; text-align: right; border: none;"><strong>ADVOCATE / COUNSEL</strong></td></tr></table></div><p></p>';
             editor.chain().focus().insertContent(affHtml).run();
           } else if (cmd === 'insertCertificateOfService') {
-            const certHtml = '<div style="border-top: 1px dashed #64748b; padding-top: 14px; margin-top: 24px;"><p style="text-align: center; font-weight: bold; margin-bottom: 8px;"><strong><u>CERTIFICATE OF SERVICE / PROOF OF FILING</u></strong></p><p style="margin-bottom: 10px;">I hereby certify that on this date, a true and complete copy of the foregoing document was duly served upon all opposing parties / counsels of record via [Hand Delivery / Registered Post / Electronic Service].</p><table style="width: 100%; border: none; margin-top: 12px;"><tr><td style="width: 50%; border: none;">Date: [DD/MM/YYYY]</td><td style="width: 50%; text-align: right; border: none;"><strong>[ADVOCATE / COUNSEL SIGNATURE]</strong></td></tr></table></div><p></p>';
+            const certHtml = '<div style="border-top: 1px dashed #64748b; padding-top: 14px; margin-top: 24px;"><p style="text-align: center; font-weight: bold; margin-bottom: 8px;"><strong><u>CERTIFICATE OF SERVICE / PROOF OF FILING</u></strong></p><p style="margin-bottom: 10px;">I hereby certify that on this date, a true and complete copy of the foregoing document was duly served upon all opposing parties / counsels of record via [Hand Delivery / Registered Post / Electronic Service].</p><table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin-top: 12px;"><tr><td style="width: 50%; border: none;">Date: [DD/MM/YYYY]</td><td style="width: 50%; text-align: right; border: none;"><strong>[ADVOCATE / COUNSEL SIGNATURE]</strong></td></tr></table></div><p></p>';
             editor.chain().focus().insertContent(certHtml).run();
           } else if (cmd === 'insertText') {
             editor.chain().focus().insertContent(data.value).run();
@@ -989,6 +1119,10 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             editor.chain().focus().deleteRow().run();
           } else if (cmd === 'tableDeleteCol') {
             editor.chain().focus().deleteColumn().run();
+          } else if (cmd === 'tableAlignColumn') {
+            alignActiveTableColumn(data.value || 'left');
+          } else if (cmd === 'tableAlignCell') {
+            alignActiveTableCell(data.value || 'left');
           } else if (cmd === 'toggleTableBorders') {
             const activeTable = document.querySelector('.active-selected-element') || (editorEl ? editorEl.querySelector('table') : null);
             if (activeTable && (activeTable.tagName === 'TABLE' || activeTable.classList.contains('editor-table'))) {
@@ -999,9 +1133,23 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           } else if (cmd === 'insertBorderlessColumns' || cmd === 'insert2Columns') {
             const col2Html = '<table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin: 8px 0;"><tbody><tr><td style="width: 50%; border: none; vertical-align: top; padding: 4px 8px 4px 0;"><p><strong>[Left Column / Party 1]</strong></p><p>Type left column details, address, or grounds here...</p></td><td style="width: 50%; border: none; vertical-align: top; padding: 4px 0 4px 8px;"><p><strong>[Right Column / Party 2]</strong></p><p>Type right column details, status, or reply here...</p></td></tr></tbody></table><p></p>';
             editor.chain().focus().insertContent(col2Html).run();
+            setTimeout(function() {
+              const insertedTable = editorEl ? editorEl.querySelector('table') : null;
+              if (insertedTable) {
+                updateActiveTableContext(insertedTable);
+                postMessage({ type: 'openElementContextModal', elementType: 'table' });
+              }
+            }, 120);
           } else if (cmd === 'insert3Columns') {
             const col3Html = '<table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin: 8px 0;"><tbody><tr><td style="width: 33.33%; border: none; vertical-align: top; padding: 4px 6px;"><p><strong>[Column 1]</strong></p><p>Details...</p></td><td style="width: 33.33%; border: none; vertical-align: top; padding: 4px 6px;"><p><strong>[Column 2]</strong></p><p>Details...</p></td><td style="width: 33.33%; border: none; vertical-align: top; padding: 4px 6px;"><p><strong>[Column 3]</strong></p><p>Details...</p></td></tr></tbody></table><p></p>';
             editor.chain().focus().insertContent(col3Html).run();
+            setTimeout(function() {
+              const insertedTable = editorEl ? editorEl.querySelector('table') : null;
+              if (insertedTable) {
+                updateActiveTableContext(insertedTable);
+                postMessage({ type: 'openElementContextModal', elementType: 'table' });
+              }
+            }, 120);
           } else if (cmd === 'deleteSelectedElement') {
             if (editor.isActive('table')) {
               editor.chain().focus().deleteTable().run();
@@ -1096,18 +1244,83 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       }
     };
 
-    // Element Click & Selection Modal Triggers
+    // Element Long-Press (Tap & Hold) & Click Triggers
+    let longPressTimer = null;
+    let touchStartPos = { x: 0, y: 0 };
+
+    document.addEventListener('touchstart', function(e) {
+      const table = e.target.closest('table, .editor-table');
+      const signature = e.target.closest('.signature-stamp');
+      if (e.touches && e.touches[0]) {
+        touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+
+      if (table || signature) {
+        updateActiveTableContext(e.target);
+        longPressTimer = setTimeout(function() {
+          logTiptapEvent('LONG_PRESS_ELEMENT', 'Table or signature long-pressed (tap and hold)');
+          if (table) {
+            postMessage({ type: 'openElementContextModal', elementType: 'table' });
+          } else if (signature) {
+            postMessage({ type: 'openElementContextModal', elementType: 'signature' });
+          }
+          longPressTimer = null;
+        }, 500);
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+      if (longPressTimer && e.touches && e.touches[0]) {
+        const dx = Math.abs(e.touches[0].clientX - touchStartPos.x);
+        const dy = Math.abs(e.touches[0].clientY - touchStartPos.y);
+        if (dx > 12 || dy > 12) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', function() {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', function() {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }, { passive: true });
+
+    document.addEventListener('contextmenu', function(e) {
+      const table = e.target.closest('table, .editor-table');
+      const signature = e.target.closest('.signature-stamp');
+      if (table || signature) {
+        e.preventDefault();
+        updateActiveTableContext(e.target);
+        if (table) {
+          postMessage({ type: 'openElementContextModal', elementType: 'table' });
+        } else if (signature) {
+          postMessage({ type: 'openElementContextModal', elementType: 'signature' });
+        }
+      }
+    });
+
     document.addEventListener('click', function(e) {
       const table = e.target.closest('table, .editor-table');
       const signature = e.target.closest('.signature-stamp');
       const placeholder = e.target.closest('.legal-placeholder');
 
-      document.querySelectorAll('.active-selected-element').forEach(el => el.classList.remove('active-selected-element'));
-
       if (table) {
-        table.classList.add('active-selected-element');
-        logTiptapEvent('TOUCH_ELEMENT', 'Table tapped and selected');
-        postMessage({ type: 'openElementContextModal', elementType: 'table' });
+        updateActiveTableContext(e.target);
+        // Regular tap inside a table cell focuses the editor and allows smooth typing without modal intrusion
       } else if (signature) {
         signature.classList.add('active-selected-element');
         logTiptapEvent('TOUCH_ELEMENT', 'Signature stamp tapped');

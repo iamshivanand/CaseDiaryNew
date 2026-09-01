@@ -41,6 +41,7 @@ const safeScheduleNotification = async (params: {
         priority: params.priority || Notifications.AndroidNotificationPriority.HIGH,
         channelId: params.channelId,
         categoryIdentifier: params.categoryIdentifier,
+        color: "#6366F1",
       } as any,
       trigger: { date: params.triggerDate } as any,
     });

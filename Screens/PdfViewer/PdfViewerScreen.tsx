@@ -66,20 +66,51 @@ export const PdfViewerScreen: React.FC = () => {
       } else {
         Alert.alert("Share Unavailable", "No PDF file available to share.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error sharing PDF:", err);
+      Alert.alert(
+        "Share Error",
+        `Failed to share document: ${err?.message || "Unknown error"}`
+      );
     }
   };
 
   const handlePrint = async () => {
     try {
-      if (pdfUri) {
-        await Print.printAsync({ uri: pdfUri });
-      } else {
+      if (!pdfUri) {
         Alert.alert("Print Unavailable", "No PDF file available to print.");
+        return;
       }
-    } catch (err) {
+
+      let b64 = base64Data;
+      if (!b64) {
+        let fileUri = pdfUri;
+        if (!fileUri.startsWith("file://") && !fileUri.startsWith("content://")) {
+          fileUri = `file://${fileUri}`;
+        }
+        const fileInfo = await FileSystem.getInfoAsync(fileUri);
+        if (!fileInfo.exists) {
+          Alert.alert("Print Error", "The PDF file could not be found.");
+          return;
+        }
+        b64 = await FileSystem.readAsStringAsync(fileUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
+
+      if (b64) {
+        await Print.printAsync({
+          uri: `data:application/pdf;base64,${b64}`,
+        });
+      } else {
+        Alert.alert("Print Error", "Unable to prepare PDF for printing.");
+      }
+    } catch (err: any) {
       console.error("Error printing PDF:", err);
+      Alert.alert(
+        "Print Error",
+        `Failed to start print job: ${err?.message || "Unknown error"}`
+      );
     }
   };
 

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
+  Image,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -145,17 +146,24 @@ const InAppNotificationToast: React.FC<InAppNotificationToastProps> = ({
 
         {/* Content */}
         <View style={styles.content}>
-          <View
-            style={[
-              styles.iconContainer,
-              { backgroundColor: typeConfig.bgTint },
-            ]}
-          >
-            <Ionicons
-              name={typeConfig.iconName}
-              size={20}
-              color={typeConfig.iconColor}
+          <View style={styles.logoWrapper}>
+            <Image
+              source={require("../../assets/icon.png")}
+              style={styles.logoImage}
+              resizeMode="contain"
             />
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: typeConfig.accentColor },
+              ]}
+            >
+              <Ionicons
+                name={typeConfig.iconName}
+                size={9}
+                color="#FFFFFF"
+              />
+            </View>
           </View>
           <View style={styles.textContainer}>
             <Text style={styles.title} numberOfLines={1}>
@@ -219,12 +227,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     gap: 10,
   },
-  iconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  logoWrapper: {
+    width: 36,
+    height: 36,
+    position: "relative",
     justifyContent: "center",
     alignItems: "center",
+  },
+  logoImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+  },
+  statusBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#1E293B",
   },
   textContainer: {
     flex: 1,

@@ -91,6 +91,9 @@ const TiptapEditDraftScreen: React.FC = () => {
     language: initialLanguage,
   } = route.params || {};
 
+  const [activeCaseId, setActiveCaseId] = useState<number | null>(
+    caseId ? Number(caseId) : null
+  );
   const [docTemplateType, setDocTemplateType] = useState<string>(templateType || "draft");
   const [activeDraftId, setActiveDraftId] = useState<string>(initialDraftId || uuidv4());
   const [title, setTitle] = useState(
@@ -157,8 +160,17 @@ const TiptapEditDraftScreen: React.FC = () => {
   const [selectedElementType, setSelectedElementType] = useState<"table" | "signature" | null>(null);
   const [shapeModalVisible, setShapeModalVisible] = useState(false);
   const [isMoreMenuVisible, setIsMoreMenuVisible] = useState(false);
+  const [isExistingSavePromptVisible, setIsExistingSavePromptVisible] = useState(false);
   const [isSaveDialogVisible, setIsSaveDialogVisible] = useState(false);
+  const [isSaveAsMode, setIsSaveAsMode] = useState(false);
   const [saveDialogTitle, setSaveDialogTitle] = useState(title);
+
+  // Language content cache for zero-data-loss language toggling
+  const languageContentMapRef = useRef<{ [key: string]: string }>({
+    [docDraftLanguage]: initialHtml || "",
+  });
+  const lastSavedHtmlRef = useRef<string>(initialHtml || "");
+  const lastSavedTitleRef = useRef<string>(initialTitle || title || "");
 
   // Case Picker Attachment State
   const [isCasePickerVisible, setIsCasePickerVisible] = useState(false);
@@ -200,7 +212,6 @@ const TiptapEditDraftScreen: React.FC = () => {
 
   // Voice dictation & Autocomplete state
   const [isDictating, setIsDictating] = useState(false);
-  const [liveSpeechPreview, setLiveSpeechPreview] = useState("");
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
 
   // Walkthrough tour state
@@ -238,8 +249,8 @@ const TiptapEditDraftScreen: React.FC = () => {
       title: locale === "hi" ? "वॉइस-फर्स्ट ड्राफ्टिंग" : "Voice-First Legal Dictation",
       description:
         locale === "hi"
-          ? "निचले दाएं कोने में मौजूद फ्लोटिंग माइक पर टैप करें। बोलते समय लाइव विराम चिह्न और कानूनी स्निपेट्स तुरंत डालें।"
-          : "Tap the floating thumb mic at the bottom-right. While speaking, tap one-touch legal punctuation chips on the fly!",
+          ? "निचले दाएं कोने में मौजूद फ्लोटिंग माइक पर टैप करें और बोलते ही सीधे दस्तावेज़ में लिखें।"
+          : "Tap the floating mic at the bottom-right to instantly dictate legal text directly into your document.",
       icon: "mic-outline",
     },
     {
@@ -269,10 +280,11 @@ const TiptapEditDraftScreen: React.FC = () => {
   ];
 
   useEffect(() => {
+    let isMounted = true;
     const checkTourSeen = async () => {
       try {
         const seen = await AsyncStorage.getItem("@tiptap_editor_tour_seen");
-        if (seen !== "true") {
+        if (seen !== "true" && isMounted) {
           setShowTour(true);
         }
       } catch (e) {
@@ -280,6 +292,9 @@ const TiptapEditDraftScreen: React.FC = () => {
       }
     };
     checkTourSeen();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -318,9 +333,20 @@ const TiptapEditDraftScreen: React.FC = () => {
   }, []);
 
   const handleOpenSaveDialog = useCallback(() => {
+    setIsSaveAsMode(false);
     setSaveDialogTitle(title || `Draft ${new Date().toLocaleDateString("en-IN")}`);
     setIsSaveDialogVisible(true);
   }, [title]);
+
+  const handleSaveButtonPress = useCallback(() => {
+    if (!isNewUnsavedDraftRef.current && initialDraftId) {
+      // Existing saved draft: Show prompt with Save (Overwrite) vs Save As options
+      setIsExistingSavePromptVisible(true);
+    } else {
+      // New unsaved draft: Open standard Save destination dialog
+      handleOpenSaveDialog();
+    }
+  }, [initialDraftId, handleOpenSaveDialog]);
 
   const handleBackPress = useCallback(() => {
     if (hasUnsavedChanges) {
@@ -331,7 +357,11 @@ const TiptapEditDraftScreen: React.FC = () => {
           {
             text: "Save & Exit",
             onPress: () => {
-              handleOpenSaveDialog();
+              if (!isNewUnsavedDraftRef.current && initialDraftId) {
+                handleDirectOverwriteSave();
+              } else {
+                handleOpenSaveDialog();
+              }
             },
           },
           {
@@ -352,7 +382,7 @@ const TiptapEditDraftScreen: React.FC = () => {
     }
     navigation.goBack();
     return true;
-  }, [hasUnsavedChanges, navigation, handleOpenSaveDialog]);
+  }, [hasUnsavedChanges, navigation, handleOpenSaveDialog, initialDraftId]);
 
   // Backgrounding & Navigation Auto-Save Listeners
   useEffect(() => {
@@ -365,6 +395,10 @@ const TiptapEditDraftScreen: React.FC = () => {
     });
 
     const backAction = () => {
+      if (isExistingSavePromptVisible) {
+        setIsExistingSavePromptVisible(false);
+        return true;
+      }
       if (isSaveDialogVisible) {
         setIsSaveDialogVisible(false);
         return true;
@@ -385,7 +419,7 @@ const TiptapEditDraftScreen: React.FC = () => {
       subscription.remove();
       backHandler.remove();
     };
-  }, [hasUnsavedChanges, handleBackPress, isSaveDialogVisible, isCasePickerVisible, isPageSetupVisible]);
+  }, [hasUnsavedChanges, handleBackPress, isExistingSavePromptVisible, isSaveDialogVisible, isCasePickerVisible, isPageSetupVisible]);
 
   // Load existing draft if draftId is provided and no initialHtml was passed
   useEffect(() => {
@@ -394,15 +428,22 @@ const TiptapEditDraftScreen: React.FC = () => {
         try {
           const draft = await getDocumentDraftById(initialDraftId);
           if (draft) {
+            if (draft.case_id) {
+              setActiveCaseId(Number(draft.case_id));
+            }
             if (draft.title) {
               setTitle(draft.title);
               setSaveDialogTitle(draft.title);
+              lastSavedTitleRef.current = draft.title;
             }
             if (draft.template_type) {
               setDocTemplateType(draft.template_type);
             }
             if (draft.html_content) {
               setHtmlContent(draft.html_content);
+              lastSavedHtmlRef.current = draft.html_content;
+              languageContentMapRef.current[docDraftLanguage] = draft.html_content;
+
               const layoutMatch = draft.html_content.match(/<!-- CD_LAYOUT:(.*?) -->/);
               if (layoutMatch && layoutMatch[1]) {
                 try {
@@ -429,7 +470,7 @@ const TiptapEditDraftScreen: React.FC = () => {
       }
     };
     loadDraft();
-  }, [initialDraftId, initialHtml]);
+  }, [initialDraftId, initialHtml, docDraftLanguage]);
 
   const postMessageToWebView = (message: object) => {
     const jsonLiteral = JSON.stringify(JSON.stringify(message));
@@ -554,23 +595,27 @@ const TiptapEditDraftScreen: React.FC = () => {
   // Auto-Save Mechanism (Silently saves to SQLite with current title/default name after 2s inactivity)
   const performSilentAutoSave = async () => {
     try {
+      if (isNewUnsavedDraftRef.current) {
+        // Do not silently create unnamed database rows for uncommitted new drafts
+        return;
+      }
       setSaveStatus("saving");
       const html = await getLatestHtml();
       const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, fontSize, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
       const contentWithMetadata = metadataComment + html;
 
-      if (!isNewUnsavedDraftRef.current) {
-        await saveDocumentDraft({
-          id: activeDraftId,
-          case_id: caseId ? Number(caseId) : null,
-          title: title || `Draft ${new Date().toLocaleDateString("en-IN")}`,
-          template_type: docTemplateType || templateType || "draft",
-          html_content: contentWithMetadata,
-          is_custom_template: 0,
-          updated_at: new Date().toISOString(),
-        });
-      }
+      await saveDocumentDraft({
+        id: activeDraftId,
+        case_id: activeCaseId ?? (caseId ? Number(caseId) : null),
+        title: title || `Draft ${new Date().toLocaleDateString("en-IN")}`,
+        template_type: docTemplateType || templateType || "draft",
+        html_content: contentWithMetadata,
+        is_custom_template: 0,
+        updated_at: new Date().toISOString(),
+      });
 
+      lastSavedHtmlRef.current = html;
+      lastSavedTitleRef.current = title;
       setHasUnsavedChanges(false);
       setSaveStatus("saved");
     } catch (e) {
@@ -582,12 +627,14 @@ const TiptapEditDraftScreen: React.FC = () => {
   const markAsEditingAndScheduleAutoSave = () => {
     setHasUnsavedChanges(true);
     setSaveStatus("editing");
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
+    if (!isNewUnsavedDraftRef.current) {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      autoSaveTimerRef.current = setTimeout(() => {
+        performSilentAutoSave();
+      }, 2000);
     }
-    autoSaveTimerRef.current = setTimeout(() => {
-      performSilentAutoSave();
-    }, 2000);
   };
 
   const handleFindText = (text: string) => {
@@ -649,13 +696,24 @@ const TiptapEditDraftScreen: React.FC = () => {
         }
         if (data.html) {
           setHtmlContent(data.html);
+          if (!hasInitialLoadedRef.current) {
+            hasInitialLoadedRef.current = true;
+            lastSavedHtmlRef.current = data.html;
+            languageContentMapRef.current[docDraftLanguage] = data.html;
+          } else {
+            // Check if document content has actually changed from the saved baseline
+            const isContentDifferent = data.html !== lastSavedHtmlRef.current;
+            const isTitleDifferent = (title || "").trim() !== (lastSavedTitleRef.current || "").trim();
+
+            if (isContentDifferent || isTitleDifferent) {
+              markAsEditingAndScheduleAutoSave();
+            } else if (!isNewUnsavedDraftRef.current) {
+              setHasUnsavedChanges(false);
+              setSaveStatus("saved");
+            }
+          }
         }
         setIsLoading(false);
-        if (!hasInitialLoadedRef.current) {
-          hasInitialLoadedRef.current = true;
-        } else {
-          markAsEditingAndScheduleAutoSave();
-        }
       } else if (data.type === "searchResult") {
         setSearchMatchCount(data.total || 0);
         setCurrentMatchIndex(data.current || 0);
@@ -679,15 +737,13 @@ const TiptapEditDraftScreen: React.FC = () => {
     }
   };
 
-  // 1. Voice-First Dictation Handlers with Universal Punctuation & Speech Assistant
+  // 1. Voice-First Dictation Handlers (Direct Instant Dictation)
   const toggleVoiceDictation = async () => {
     if (isDictating) {
       await speechRecognitionService.stopListening();
       setIsDictating(false);
-      setLiveSpeechPreview("");
     } else {
       setIsDictating(true);
-      setLiveSpeechPreview("Listening...");
       const dictationLocale =
         docDraftLanguage === "hi" || locale === "hi" ? "hi-IN" : "en-IN";
       const started = await speechRecognitionService.startListening(
@@ -695,11 +751,9 @@ const TiptapEditDraftScreen: React.FC = () => {
         {
           onStart: () => {
             setIsDictating(true);
-            setLiveSpeechPreview("Listening...");
           },
           onResult: (text) => {
             if (text) {
-              setLiveSpeechPreview(text);
               const processed = text
                 .replace(/\b(full stop|period)\b/gi, ".")
                 .replace(/\b(पूर्ण विराम)\b/gi, "।")
@@ -716,18 +770,15 @@ const TiptapEditDraftScreen: React.FC = () => {
           },
           onError: (err) => {
             setIsDictating(false);
-            setLiveSpeechPreview("");
             Alert.alert("Dictation Error", err || "Speech recognition error");
           },
           onEnd: () => {
             setIsDictating(false);
-            setLiveSpeechPreview("");
           },
         }
       );
       if (!started) {
         setIsDictating(false);
-        setLiveSpeechPreview("");
       }
     }
   };
@@ -902,6 +953,145 @@ const TiptapEditDraftScreen: React.FC = () => {
     }
   };
 
+  // Direct overwrite save for existing draft
+  const handleDirectOverwriteSave = async () => {
+    setIsExistingSavePromptVisible(false);
+    setIsSaving(true);
+    let finalSavedTitle = "";
+    let generatedPdfUri = "";
+
+    try {
+      const finalTitle = title.trim() || "Draft Document";
+      finalSavedTitle = finalTitle;
+      const html = await getLatestHtml();
+      const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, fontSize, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
+      const contentWithMetadata = metadataComment + html;
+
+      const targetCaseId = activeCaseId ?? (caseId ? Number(caseId) : null);
+      const effTemplateType = docTemplateType || templateType || "draft";
+
+      await saveDocumentDraft({
+        id: activeDraftId,
+        case_id: targetCaseId,
+        title: finalTitle,
+        template_type: effTemplateType,
+        html_content: contentWithMetadata,
+        is_custom_template: 0,
+        updated_at: new Date().toISOString(),
+      });
+
+      lastSavedHtmlRef.current = html;
+      lastSavedTitleRef.current = finalTitle;
+      languageContentMapRef.current[docDraftLanguage] = html;
+      isNewUnsavedDraftRef.current = false;
+      setHasUnsavedChanges(false);
+      setSaveStatus("saved");
+
+      try {
+        generatedPdfUri = await generatePdfFile(html, finalTitle);
+      } catch (pdfErr) {
+        console.warn("Background PDF compilation warning:", pdfErr);
+      }
+
+      if (targetCaseId && generatedPdfUri) {
+        try {
+          await uploadCaseDocument({
+            originalFileName: `${finalTitle}.pdf`,
+            fileType: "application/pdf",
+            fileUri: generatedPdfUri,
+            caseId: targetCaseId,
+            userId: null,
+          });
+        } catch (e) {
+          console.warn("Auto-attach PDF to CaseDocuments:", e);
+        }
+      }
+
+      const showSaveSuccessAlert = () => {
+        Alert.alert(
+          "Document Saved",
+          `Changes to "${finalTitle}" have been successfully saved.`,
+          [
+            ...(generatedPdfUri
+              ? [
+                  {
+                    text: "Open / View PDF",
+                    onPress: () => {
+                      // @ts-ignore
+                      navigation.navigate("PdfViewer", {
+                        pdfUri: generatedPdfUri,
+                        title: finalTitle,
+                        returnToDraftsHub: !targetCaseId,
+                        returnToCaseId: targetCaseId,
+                      });
+                    },
+                  },
+                  {
+                    text: "Share PDF",
+                    onPress: async () => {
+                      try {
+                        await shareNamedPdf(generatedPdfUri, finalTitle, finalTitle);
+                      } finally {
+                        if (targetCaseId) {
+                          // @ts-ignore
+                          navigation.navigate("CaseDetails", {
+                            caseId: targetCaseId,
+                            scrollToDocs: true,
+                          });
+                        } else {
+                          // @ts-ignore
+                          navigation.navigate("DraftsHub", { tab: "drafts" });
+                        }
+                      }
+                    },
+                  },
+                ]
+              : []),
+            {
+              text: targetCaseId ? "Back to Case" : "Go to Drafts Hub",
+              onPress: () => {
+                if (targetCaseId) {
+                  // @ts-ignore
+                  navigation.navigate("CaseDetails", {
+                    caseId: targetCaseId,
+                    scrollToDocs: true,
+                  });
+                } else {
+                  // @ts-ignore
+                  navigation.navigate("DraftsHub", { tab: "drafts" });
+                }
+              },
+            },
+            {
+              text: "Keep Editing",
+              style: "cancel",
+            },
+          ]
+        );
+      };
+
+      try {
+        showAdWithPreload("rewarded", () => {
+          showSaveSuccessAlert();
+        });
+      } catch {
+        showSaveSuccessAlert();
+      }
+    } catch (err) {
+      console.error("Error overwriting draft in database:", err);
+      Alert.alert("Save Error", "Failed to update draft in database. Please check device storage.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleOpenSaveAs = () => {
+    setIsExistingSavePromptVisible(false);
+    setIsSaveAsMode(true);
+    setSaveDialogTitle(`${title} (Copy)`);
+    setIsSaveDialogVisible(true);
+  };
+
   // 3. User Explicit Save with Title Confirmation & Destination Options
   const handleConfirmSave = async (destination: "case" | "standalone" | "template") => {
     setIsSaving(true);
@@ -912,16 +1102,18 @@ const TiptapEditDraftScreen: React.FC = () => {
     try {
       const rawTitle = saveDialogTitle.trim() || title || "Draft Document";
       const isCustom = destination === "template" ? 1 : 0;
-      const targetDraftId = destination === "template" ? uuidv4() : activeDraftId;
+      const targetDraftId = isSaveAsMode || destination === "template" ? uuidv4() : activeDraftId;
       const effTemplateType = docTemplateType || templateType || "draft";
 
       const finalTitle = await getUniqueDraftTitle(
         rawTitle,
-        destination === "template" ? null : activeDraftId,
+        isSaveAsMode || destination === "template" ? null : activeDraftId,
         isCustom
       );
       finalSavedTitle = finalTitle;
-      setTitle(finalTitle);
+      if (!isSaveAsMode) {
+        setTitle(finalTitle);
+      }
 
       const html = await getLatestHtml();
       const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, fontSize, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
@@ -930,8 +1122,8 @@ const TiptapEditDraftScreen: React.FC = () => {
       // 1. Atomic Save to SQLite Database
       if (destination === "case") {
         await saveDocumentDraft({
-          id: activeDraftId,
-          case_id: caseId ? Number(caseId) : null,
+          id: targetDraftId,
+          case_id: activeCaseId ?? (caseId ? Number(caseId) : null),
           title: finalTitle,
           template_type: effTemplateType,
           html_content: contentWithMetadata,
@@ -940,7 +1132,7 @@ const TiptapEditDraftScreen: React.FC = () => {
         });
       } else if (destination === "standalone") {
         await saveDocumentDraft({
-          id: activeDraftId,
+          id: targetDraftId,
           case_id: null,
           title: finalTitle,
           template_type: effTemplateType,
@@ -962,6 +1154,12 @@ const TiptapEditDraftScreen: React.FC = () => {
       }
 
       // Confirm save state immediately upon SQLite success
+      lastSavedHtmlRef.current = html;
+      lastSavedTitleRef.current = finalTitle;
+      languageContentMapRef.current[docDraftLanguage] = html;
+      if (!isSaveAsMode) {
+        setActiveDraftId(targetDraftId);
+      }
       isNewUnsavedDraftRef.current = false;
       setHasUnsavedChanges(false);
       setSaveStatus("saved");
@@ -974,8 +1172,8 @@ const TiptapEditDraftScreen: React.FC = () => {
       }
 
       const targetCaseId =
-        destination === "case" && caseId
-          ? Number(caseId)
+        destination === "case" && (activeCaseId || caseId)
+          ? Number(activeCaseId || caseId)
           : null;
 
       if (targetCaseId && destination === "case" && generatedPdfUri) {
@@ -1178,14 +1376,18 @@ const TiptapEditDraftScreen: React.FC = () => {
             background-color: #f1f5f9;
             font-weight: bold;
           }
-          table.borderless-table, table.borderless-columns, .editor-table.borderless-table, .editor-table.borderless-columns {
+          table.borderless-table, table.borderless-columns, .editor-table.borderless-table, .editor-table.borderless-columns,
+          table[style*="border: none"], table[style*="border:none"], table[style*="border: 0"], table[style*="border:0"] {
             border: none !important;
             margin: 4pt 0;
           }
           table.borderless-table td, table.borderless-columns td, table.borderless-table th, table.borderless-columns th,
-          .editor-table.borderless-table td, .editor-table.borderless-columns td, .editor-table.borderless-table th, .editor-table.borderless-columns th {
+          .editor-table.borderless-table td, .editor-table.borderless-columns td, .editor-table.borderless-table th, .editor-table.borderless-columns th,
+          table[style*="border: none"] td, table[style*="border:none"] td, table[style*="border: 0"] td, table[style*="border:0"] td,
+          table[style*="border: none"] th, table[style*="border:none"] th, table[style*="border: 0"] th, table[style*="border:0"] th {
             border: none !important;
             outline: none !important;
+            box-shadow: none !important;
             background-color: transparent !important;
             padding: 2pt 4pt;
           }
@@ -1372,64 +1574,56 @@ const TiptapEditDraftScreen: React.FC = () => {
   };
 
   const handleToggleTemplateLanguage = useCallback(async () => {
-    const nextLang = docDraftLanguage === "en" ? "hi" : "en";
-    const langLabel = nextLang === "hi" ? "Hindi (हिन्दी)" : "English";
+    const currentLang = docDraftLanguage;
+    const nextLang = currentLang === "en" ? "hi" : "en";
 
-    const performLanguageReload = async () => {
-      try {
-        setIsLoading(true);
+    try {
+      setIsLoading(true);
+      // 1. Fetch latest HTML from WebView and cache current language content to prevent any data loss
+      const currentHtml = await getLatestHtml();
+      languageContentMapRef.current[currentLang] = currentHtml;
+
+      // 2. Check if next language content is already cached
+      let targetHtml = languageContentMapRef.current[nextLang];
+
+      if (!targetHtml) {
+        // Compile initial legal template for target language if not yet cached
+        let caseData: any = {};
+        if (caseId || activeCaseId) {
+          try {
+            caseData = (await getCaseById(Number(caseId || activeCaseId))) || {};
+          } catch (e) {}
+        }
         const advocateName = (await AsyncStorage.getItem("@advocate_name")) || "";
         const advocateEnrollment = (await AsyncStorage.getItem("@advocate_enrollment")) || "";
         const advocateAddress = (await AsyncStorage.getItem("@advocate_address")) || "";
+        const combinedData = { ...caseData, advocateName, advocateEnrollment, advocateAddress };
 
-        const recompiledHtml = compileLegalDocumentHtml(
+        targetHtml = compileLegalDocumentHtml(
           docTemplateType || "blank_page",
-          { advocateName, advocateEnrollment, advocateAddress },
+          combinedData,
           nextLang === "hi"
         );
-
-        setDocDraftLanguage(nextLang);
-        setHtmlContent(recompiledHtml);
-        postMessageToWebView({
-          type: "setContent",
-          html: recompiledHtml,
-        });
-        postMessageToWebView({ type: "setEditorLanguage", lang: nextLang });
-        speechRecognitionService?.setLanguage?.(nextLang === "hi" ? "hi-IN" : "en-IN");
-        setHasUnsavedChanges(false);
-        setSaveStatus("saved");
-      } catch (err) {
-        console.error("Error reloading template language:", err);
-        Alert.alert("Error", "Failed to switch template language.");
-      } finally {
-        setIsLoading(false);
+        languageContentMapRef.current[nextLang] = targetHtml;
       }
-    };
 
-    if (hasUnsavedChanges) {
-      Alert.alert(
-        "Switch Document Language",
-        `Switching the document language to ${langLabel} will reload standard legal clauses in ${langLabel}. Any unsaved manual edits will be replaced.\n\nWould you like to save your current draft first or switch now?`,
-        [
-          {
-            text: "Save Draft First",
-            onPress: () => handleOpenSaveDialog(),
-          },
-          {
-            text: `Switch to ${langLabel}`,
-            style: "destructive",
-            onPress: performLanguageReload,
-          },
-          {
-            text: "Cancel",
-            style: "cancel",
-          },
-        ]
-      );
-    } else {
-      await performLanguageReload();
+      // 3. Switch editor language state & load preserved HTML into TipTap editor
+      setDocDraftLanguage(nextLang);
+      setHtmlContent(targetHtml);
+      lastSavedHtmlRef.current = targetHtml;
+      postMessageToWebView({
+        type: "setContent",
+        html: targetHtml,
+      });
+      postMessageToWebView({ type: "setEditorLanguage", lang: nextLang });
+      speechRecognitionService?.setLanguage?.(nextLang === "hi" ? "hi-IN" : "en-IN");
+    } catch (err) {
+      console.error("Error toggling document language:", err);
+      Alert.alert("Error", "Failed to switch document language.");
+    } finally {
+      setIsLoading(false);
     }
-  }, [docDraftLanguage, docTemplateType, hasUnsavedChanges, handleOpenSaveDialog]);
+  }, [docDraftLanguage, docTemplateType, caseId, activeCaseId]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -1511,11 +1705,11 @@ const TiptapEditDraftScreen: React.FC = () => {
           <Ionicons name="settings-outline" size={17} color="#cbd5e1" />
         </TouchableOpacity>
 
-        {/* Save Draft Button (Opens confirmation dialog) */}
+        {/* Save Draft Button (Save Overwrite vs Save As) */}
         <TouchableOpacity
           style={[styles.headerActionBtn, { backgroundColor: "#2563eb", borderColor: "#3b82f6" }]}
           hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
-          onPress={handleOpenSaveDialog}
+          onPress={handleSaveButtonPress}
           disabled={isSaving}
         >
           {isSaving ? (
@@ -1934,15 +2128,6 @@ const TiptapEditDraftScreen: React.FC = () => {
                 <Text style={styles.toolLabel}>Table</Text>
               </TouchableOpacity>
 
-              {/* 2-Column Split (Borderless Columns) */}
-              <TouchableOpacity
-                style={styles.labeledToolItem}
-                onPress={() => triggerFormat("insertBorderlessColumns")}
-              >
-                <Ionicons name="browsers-outline" size={15} color="#334155" />
-                <Text style={styles.toolLabel}>2-Col</Text>
-              </TouchableOpacity>
-
               {/* Page Break */}
               <TouchableOpacity
                 style={styles.labeledToolItem}
@@ -2123,78 +2308,8 @@ const TiptapEditDraftScreen: React.FC = () => {
             keyboardDisplayRequiresUserAction={false}
           />
 
-          {/* Floating Smart Voice Dictation Assistant Island (Bottom-Right Thumb Reach) */}
+          {/* Floating Smart Voice Dictation Button (Direct Instant Dictation) */}
           <View style={styles.floatingDictationWrapper} pointerEvents="box-none">
-            {isDictating && (
-              <View style={styles.liveSpeechIsland}>
-                <View style={styles.speechHeaderRow}>
-                  <View style={styles.speechIndicatorPulse}>
-                    <Ionicons name="mic" size={14} color="#ffffff" />
-                  </View>
-                  <Text style={styles.speechStatusTitle}>
-                    {docDraftLanguage === "hi" ? "हिंदी डिक्टेशन सक्रिय" : "Dictating (English)..."}
-                  </Text>
-
-                  {/* Language Toggle Chip */}
-                  <TouchableOpacity
-                    style={styles.speechLangChip}
-                    onPress={() => {
-                      const nextLang = docDraftLanguage === "en" ? "hi" : "en";
-                      setDocDraftLanguage(nextLang);
-                      postMessageToWebView({ type: "setEditorLanguage", lang: nextLang });
-                    }}
-                  >
-                    <Text style={styles.speechLangText}>
-                      {docDraftLanguage === "en" ? "EN ➔ HI" : "HI ➔ EN"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {liveSpeechPreview !== "" && (
-                  <Text style={styles.speechLivePreviewText} numberOfLines={2}>
-                    "{liveSpeechPreview}"
-                  </Text>
-                )}
-
-                {/* Universal Legal Voice Punctuation & Helper Strip */}
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={styles.punctuationRow}
-                >
-                  {[
-                    { label: " , ", val: ", " },
-                    { label: docDraftLanguage === "hi" ? " । " : " . ", val: docDraftLanguage === "hi" ? "। " : ". " },
-                    { label: " ; ", val: "; " },
-                    { label: ' " ', val: '"' },
-                    { label: " ¶ New Para ", val: "\n\n" },
-                    { label: " § Section ", val: "§ " },
-                    { label: " v. ", val: " v. " },
-                    { label: " Next [__] ", cmd: "nextPlaceholder" },
-                    { label: " ⏹️ Stop ", action: toggleVoiceDictation },
-                  ].map((p, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={styles.punctuationChip}
-                      onPress={() => {
-                        if (p.action) {
-                          p.action();
-                        } else if (p.cmd) {
-                          triggerFormat(p.cmd);
-                        } else if (p.val) {
-                          triggerFormat("insertText", p.val);
-                        }
-                      }}
-                    >
-                      <Text style={styles.punctuationChipText}>{p.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            {/* Floating Thumb Mic Button */}
             <TouchableOpacity
               style={[
                 styles.floatingThumbMicBtn,
@@ -2344,6 +2459,60 @@ const TiptapEditDraftScreen: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Existing Document Save Options (Save vs Save As) */}
+      <Modal
+        visible={isExistingSavePromptVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsExistingSavePromptVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.saveDialogContent}>
+            <Text style={styles.saveDialogTitle}>Save Document</Text>
+            <Text style={styles.saveDialogSubtitle}>
+              You are editing an existing document. Choose an option to proceed:
+            </Text>
+
+            <View style={{ gap: 10, marginTop: 10 }}>
+              {/* Option 1: Just Save (Overwrite Previous) */}
+              <TouchableOpacity
+                style={[styles.saveDestOptionBtn, { backgroundColor: "#1e3a8a33", borderColor: "#3b82f6" }]}
+                onPress={handleDirectOverwriteSave}
+              >
+                <Ionicons name="checkmark-circle" size={22} color="#3b82f6" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.saveDestOptionTitle, { color: "#93c5fd" }]}>Save (Overwrite)</Text>
+                  <Text style={styles.saveDestOptionDesc}>
+                    Directly update and save changes to current draft in Case Diary
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Option 2: Save As (New Copy / Custom Template / Another Case) */}
+              <TouchableOpacity
+                style={styles.saveDestOptionBtn}
+                onPress={handleOpenSaveAs}
+              >
+                <Ionicons name="copy-outline" size={22} color="#a855f7" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.saveDestOptionTitle, { color: "#c084fc" }]}>Save As...</Text>
+                  <Text style={styles.saveDestOptionDesc}>
+                    Save as a new draft copy, reusable custom template, or link to another case
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.saveDialogCancelBtn}
+              onPress={() => setIsExistingSavePromptVisible(false)}
+            >
+              <Text style={styles.saveDialogCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Save Draft Dialog (Allows Renaming and Selecting Destination) */}
       <Modal
         visible={isSaveDialogVisible}
@@ -2353,7 +2522,9 @@ const TiptapEditDraftScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.saveDialogContent}>
-            <Text style={styles.saveDialogTitle}>Save Document Draft</Text>
+            <Text style={styles.saveDialogTitle}>
+              {isSaveAsMode ? "Save As New Document" : "Save Document Draft"}
+            </Text>
             <Text style={styles.saveDialogSubtitle}>
               Confirm title and choose where to save this document:
             </Text>
@@ -2367,7 +2538,7 @@ const TiptapEditDraftScreen: React.FC = () => {
             />
 
             <View style={{ gap: 10, marginTop: 14 }}>
-              {caseId ? (
+              {activeCaseId || caseId ? (
                 <>
                   <TouchableOpacity
                     style={styles.saveDestOptionBtn}
@@ -3063,6 +3234,10 @@ const TiptapEditDraftScreen: React.FC = () => {
           });
           setTableConfigModalVisible(false);
         }}
+        onInsertBorderlessColumns={(cols) => {
+          triggerFormat(cols === 3 ? "insert3Columns" : "insertBorderlessColumns");
+          setTableConfigModalVisible(false);
+        }}
         onClose={() => setTableConfigModalVisible(false)}
       />
 
@@ -3078,6 +3253,8 @@ const TiptapEditDraftScreen: React.FC = () => {
         onDeleteRow={() => triggerFormat("tableDeleteRow")}
         onDeleteCol={() => triggerFormat("tableDeleteCol")}
         onToggleBorders={() => triggerFormat("toggleTableBorders")}
+        onAlignColumn={(align) => triggerFormat("tableAlignColumn", align)}
+        onAlignCell={(align) => triggerFormat("tableAlignCell", align)}
         onClose={() => setElementContextModalVisible(false)}
       />
 
@@ -3705,8 +3882,6 @@ const getStyles = (theme: any) =>
       position: "absolute",
       right: 16,
       bottom: 20,
-      left: 16,
-      alignItems: "flex-end",
     },
     floatingThumbMicBtn: {
       width: 58,
@@ -3732,78 +3907,6 @@ const getStyles = (theme: any) =>
       fontWeight: "800",
       color: "#ffffff",
       marginTop: 1,
-    },
-    liveSpeechIsland: {
-      width: "100%",
-      backgroundColor: "#0f172aee",
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: "#3b82f6",
-      padding: 12,
-      marginBottom: 10,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 6,
-      elevation: 6,
-    },
-    speechHeaderRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 6,
-    },
-    speechIndicatorPulse: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      backgroundColor: "#ef4444",
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: 6,
-    },
-    speechStatusTitle: {
-      flex: 1,
-      fontSize: 12,
-      fontWeight: "bold",
-      color: "#ffffff",
-    },
-    speechLangChip: {
-      backgroundColor: "#2563eb",
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 10,
-    },
-    speechLangText: {
-      fontSize: 10,
-      fontWeight: "bold",
-      color: "#ffffff",
-    },
-    speechLivePreviewText: {
-      fontSize: 13,
-      color: "#93c5fd",
-      fontStyle: "italic",
-      marginBottom: 8,
-      lineHeight: 18,
-    },
-    punctuationRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      paddingVertical: 2,
-    },
-    punctuationChip: {
-      backgroundColor: "#1e293b",
-      paddingHorizontal: 9,
-      paddingVertical: 6,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: "#334155",
-    },
-    punctuationChipText: {
-      color: "#e2e8f0",
-      fontSize: 11,
-      fontWeight: "700",
     },
     macroCard: {
       backgroundColor: "#1e293b",

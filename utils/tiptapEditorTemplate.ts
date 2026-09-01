@@ -620,6 +620,32 @@ export const getTiptapEditorHtml = (initialHtml: string): string => {
       sendStateToRN();
     }
 
+    function alignTableColumn(align) {
+      const table = selectedElement || (activeTableCell ? activeTableCell.closest('.editor-table') : null);
+      if (!table) return;
+      const targetCellIdx = activeTableCell ? activeTableCell.cellIndex : 0;
+      const rows = table.querySelectorAll('tr');
+      rows.forEach(row => {
+        const cell = row.children[targetCellIdx];
+        if (cell) {
+          cell.style.textAlign = align;
+          cell.querySelectorAll('p, div, span').forEach(el => {
+            el.style.textAlign = align;
+          });
+        }
+      });
+      sendStateToRN();
+    }
+
+    function alignTableCell(align) {
+      if (!activeTableCell) return;
+      activeTableCell.style.textAlign = align;
+      activeTableCell.querySelectorAll('p, div, span').forEach(el => {
+        el.style.textAlign = align;
+      });
+      sendStateToRN();
+    }
+
     // Modern Bridge Dispatcher
     window.handleRNMessage = function(messageData) {
       try {
@@ -681,6 +707,10 @@ export const getTiptapEditorHtml = (initialHtml: string): string => {
             modifyTableStructure('deleteRow');
           } else if (data.command === 'tableDeleteCol') {
             modifyTableStructure('deleteCol');
+          } else if (data.command === 'tableAlignColumn') {
+            alignTableColumn(data.value || 'left');
+          } else if (data.command === 'tableAlignCell') {
+            alignTableCell(data.value || 'left');
           } else if (data.command === 'deleteSelectedElement') {
             if (selectedElement) {
               selectedElement.remove();
@@ -1122,6 +1152,81 @@ export const getTiptapEditorHtml = (initialHtml: string): string => {
       }
     }
 
+    let longPressTimer = null;
+    let touchStartPos = { x: 0, y: 0 };
+
+    document.addEventListener('touchstart', function(e) {
+      const table = e.target.closest('.editor-table');
+      const signature = e.target.closest('.signature-stamp');
+      const cell = e.target.closest('td, th');
+      if (cell) activeTableCell = cell;
+      if (e.touches && e.touches[0]) {
+        touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+
+      if (table || signature) {
+        if (table) {
+          selectedElement = table;
+          document.querySelectorAll('.active-selected-element').forEach(el => el.classList.remove('active-selected-element'));
+          table.classList.add('active-selected-element');
+        }
+        longPressTimer = setTimeout(function() {
+          if (table) {
+            postMessage({ type: 'openElementContextModal', elementType: 'table' });
+          } else if (signature) {
+            postMessage({ type: 'openElementContextModal', elementType: 'signature' });
+          }
+          longPressTimer = null;
+        }, 500);
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+      if (longPressTimer && e.touches && e.touches[0]) {
+        const dx = Math.abs(e.touches[0].clientX - touchStartPos.x);
+        const dy = Math.abs(e.touches[0].clientY - touchStartPos.y);
+        if (dx > 12 || dy > 12) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', function() {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', function() {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }, { passive: true });
+
+    document.addEventListener('contextmenu', function(e) {
+      const table = e.target.closest('.editor-table');
+      const signature = e.target.closest('.signature-stamp');
+      if (table || signature) {
+        e.preventDefault();
+        if (table) {
+          selectedElement = table;
+          document.querySelectorAll('.active-selected-element').forEach(el => el.classList.remove('active-selected-element'));
+          table.classList.add('active-selected-element');
+          postMessage({ type: 'openElementContextModal', elementType: 'table' });
+        } else if (signature) {
+          postMessage({ type: 'openElementContextModal', elementType: 'signature' });
+        }
+      }
+    });
+
     document.addEventListener('click', function(e) {
       const cell = e.target.closest('td, th');
       if (cell) {
@@ -1131,15 +1236,10 @@ export const getTiptapEditorHtml = (initialHtml: string): string => {
       const signature = e.target.closest('.signature-stamp');
       const placeholder = e.target.closest('.legal-placeholder');
 
-      document.querySelectorAll('.active-selected-element').forEach(el => el.classList.remove('active-selected-element'));
-
       if (table) {
         selectedElement = table;
+        document.querySelectorAll('.active-selected-element').forEach(el => el.classList.remove('active-selected-element'));
         table.classList.add('active-selected-element');
-        postMessage({
-          type: 'openElementContextModal',
-          elementType: 'table'
-        });
       } else if (signature) {
         selectedElement = signature;
         signature.classList.add('active-selected-element');

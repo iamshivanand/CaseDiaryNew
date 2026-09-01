@@ -16,6 +16,7 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Animatable from "react-native-animatable";
 import { v4 as uuidv4 } from "uuid";
 import * as Yup from "yup";
 

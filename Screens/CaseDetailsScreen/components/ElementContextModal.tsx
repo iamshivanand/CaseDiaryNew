@@ -1,11 +1,11 @@
-// Screens/CaseDetailsScreen/components/ElementContextModal.tsx
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, FontAwesome } from "@expo/vector-icons";
 import React from "react";
-import { Modal, View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import { Modal, View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Theme } from "../../../Providers/ThemeProvider";
 
-interface ElementContextModalProps {
+export interface ElementContextModalProps {
   visible: boolean;
   elementType: "table" | "signature" | null;
   theme: Theme;
@@ -17,6 +17,8 @@ interface ElementContextModalProps {
   onDeleteRow?: () => void;
   onDeleteCol?: () => void;
   onToggleBorders?: () => void;
+  onAlignColumn?: (alignment: "left" | "center" | "right" | "justify") => void;
+  onAlignCell?: (alignment: "left" | "center" | "right" | "justify") => void;
   onClose: () => void;
 }
 
@@ -32,11 +34,14 @@ export const ElementContextModal: React.FC<ElementContextModalProps> = ({
   onDeleteRow,
   onDeleteCol,
   onToggleBorders,
+  onAlignColumn,
+  onAlignCell,
   onClose,
 }) => {
+  const insets = useSafeAreaInsets();
   if (!elementType) return null;
 
-  const styles = getStyles(theme);
+  const styles = getStyles(theme, insets.bottom);
   const isTable = elementType === "table";
   const title = isTable ? "Court Table Options" : "Signature Stamp Options";
 
@@ -73,10 +78,122 @@ export const ElementContextModal: React.FC<ElementContextModalProps> = ({
             {isTable ? "table" : "signature stamp"}:
           </Text>
 
-          <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={styles.scrollArea} 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={true}
+            bounces={false}
+          >
             {isTable && (
               <View style={styles.tableActionsGroup}>
-                <Text style={styles.sectionLabel}>Row Controls</Text>
+                {/* Column-Wise Text Alignment */}
+                <Text style={styles.sectionLabel}>Column Text Alignment</Text>
+                <Text style={styles.sectionHint}>
+                  Applies text alignment to all rows in the active column:
+                </Text>
+                <View style={styles.alignBtnRow}>
+                  <TouchableOpacity
+                    style={styles.alignBtn}
+                    onPress={() => {
+                      onAlignColumn?.("left");
+                      onClose();
+                    }}
+                    testID="align-col-left-btn"
+                  >
+                    <FontAwesome name="align-left" size={15} color={theme.colors.primary} />
+                    <Text style={styles.alignBtnText}>Col Left</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.alignBtn}
+                    onPress={() => {
+                      onAlignColumn?.("center");
+                      onClose();
+                    }}
+                    testID="align-col-center-btn"
+                  >
+                    <FontAwesome name="align-center" size={15} color={theme.colors.primary} />
+                    <Text style={styles.alignBtnText}>Col Center</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.alignBtn}
+                    onPress={() => {
+                      onAlignColumn?.("right");
+                      onClose();
+                    }}
+                    testID="align-col-right-btn"
+                  >
+                    <FontAwesome name="align-right" size={15} color={theme.colors.primary} />
+                    <Text style={styles.alignBtnText}>Col Right</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.alignBtn}
+                    onPress={() => {
+                      onAlignColumn?.("justify");
+                      onClose();
+                    }}
+                    testID="align-col-justify-btn"
+                  >
+                    <FontAwesome name="align-justify" size={15} color={theme.colors.primary} />
+                    <Text style={styles.alignBtnText}>Col Justify</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Single Cell Text Alignment */}
+                <Text style={[styles.sectionLabel, { marginTop: 8 }]}>Single Cell Alignment</Text>
+                <View style={styles.alignBtnRow}>
+                  <TouchableOpacity
+                    style={styles.alignBtn}
+                    onPress={() => {
+                      onAlignCell?.("left");
+                      onClose();
+                    }}
+                    testID="align-cell-left-btn"
+                  >
+                    <FontAwesome name="align-left" size={14} color={theme.colors.text} />
+                    <Text style={[styles.alignBtnText, { color: theme.colors.text }]}>Cell Left</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.alignBtn}
+                    onPress={() => {
+                      onAlignCell?.("center");
+                      onClose();
+                    }}
+                    testID="align-cell-center-btn"
+                  >
+                    <FontAwesome name="align-center" size={14} color={theme.colors.text} />
+                    <Text style={[styles.alignBtnText, { color: theme.colors.text }]}>Cell Center</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.alignBtn}
+                    onPress={() => {
+                      onAlignCell?.("right");
+                      onClose();
+                    }}
+                    testID="align-cell-right-btn"
+                  >
+                    <FontAwesome name="align-right" size={14} color={theme.colors.text} />
+                    <Text style={[styles.alignBtnText, { color: theme.colors.text }]}>Cell Right</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.alignBtn}
+                    onPress={() => {
+                      onAlignCell?.("justify");
+                      onClose();
+                    }}
+                    testID="align-cell-justify-btn"
+                  >
+                    <FontAwesome name="align-justify" size={14} color={theme.colors.text} />
+                    <Text style={[styles.alignBtnText, { color: theme.colors.text }]}>Cell Justify</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={[styles.sectionLabel, { marginTop: 10 }]}>Row Controls</Text>
                 <View style={styles.btnRow}>
                   <TouchableOpacity
                     style={styles.actionGridBtn}
@@ -183,22 +300,22 @@ export const ElementContextModal: React.FC<ElementContextModalProps> = ({
                 Delete Entire {isTable ? "Table" : "Signature Stamp"}
               </Text>
             </TouchableOpacity>
-          </ScrollView>
 
-          <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-            <Text style={styles.cancelText}>Keep Element</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+              <Text style={styles.cancelText}>Keep Element</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </View>
     </Modal>
   );
 };
 
-const getStyles = (theme: Theme) =>
+const getStyles = (theme: Theme, bottomInset: number = 0) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
-      justify: "flex-end",
+      justifyContent: "flex-end",
       backgroundColor: "rgba(0,0,0,0.5)",
     },
     backdrop: {
@@ -208,7 +325,10 @@ const getStyles = (theme: Theme) =>
       backgroundColor: theme.colors.cardBackground,
       borderTopLeftRadius: 16,
       borderTopRightRadius: 16,
-      padding: 20,
+      paddingTop: 18,
+      paddingHorizontal: 18,
+      paddingBottom: Math.max(bottomInset, 16),
+      maxHeight: Dimensions.get("window").height * 0.78,
       borderTopWidth: 1,
       borderTopColor: theme.colors.border,
     },
@@ -216,7 +336,7 @@ const getStyles = (theme: Theme) =>
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 12,
+      marginBottom: 10,
     },
     titleRow: {
       flexDirection: "row",
@@ -231,7 +351,13 @@ const getStyles = (theme: Theme) =>
     subtitle: {
       fontSize: 13,
       color: theme.colors.subText,
-      marginBottom: 16,
+      marginBottom: 12,
+    },
+    scrollArea: {
+      flexGrow: 0,
+    },
+    scrollContent: {
+      paddingBottom: 16,
     },
     tableActionsGroup: {
       marginBottom: 16,
@@ -242,8 +368,36 @@ const getStyles = (theme: Theme) =>
       color: theme.colors.subText,
       textTransform: "uppercase",
       letterSpacing: 0.5,
-      marginBottom: 6,
+      marginBottom: 4,
       marginTop: 4,
+    },
+    sectionHint: {
+      fontSize: 11,
+      color: theme.colors.subText,
+      marginBottom: 8,
+    },
+    alignBtnRow: {
+      flexDirection: "row",
+      gap: 6,
+      marginBottom: 8,
+    },
+    alignBtn: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4,
+      paddingVertical: 9,
+      paddingHorizontal: 4,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
+    },
+    alignBtnText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.colors.primary,
     },
     btnRow: {
       flexDirection: "row",

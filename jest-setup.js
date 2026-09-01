@@ -52,6 +52,7 @@ jest.mock("expo-document-picker", () => ({
 // Mock for expo-file-system (basic, expand as needed)
 jest.mock("expo-file-system", () => ({
   documentDirectory: "file:///mockDocumentDirectory/", // Expo's FS paths often have file:// prefix
+  cacheDirectory: "file:///mockCacheDirectory/",
   getInfoAsync: jest.fn((uri) => {
     // console.log(`Mock FS: getInfoAsync for ${uri}`);
     // Simulate file existence based on a known path or a convention
@@ -69,6 +70,12 @@ jest.mock("expo-file-system", () => ({
   makeDirectoryAsync: jest.fn(() => Promise.resolve()),
   copyAsync: jest.fn(() => Promise.resolve()), // Assume copy always succeeds
   deleteAsync: jest.fn(() => Promise.resolve()), // Assume delete always succeeds
+  readAsStringAsync: jest.fn(() => Promise.resolve("")),
+  writeAsStringAsync: jest.fn(() => Promise.resolve()),
+  EncodingType: {
+    Base64: "base64",
+    UTF8: "utf8",
+  },
   getContentUriAsync: jest.fn((uri) =>
     Promise.resolve("content://mocked/" + uri.split("/").pop())
   ),

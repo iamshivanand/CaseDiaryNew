@@ -230,5 +230,15 @@ describe("TiptapEditDraftScreen (Behavior-Driven Testing)", () => {
       const { queryByPlaceholderText } = renderScreen();
       expect(queryByPlaceholderText("Search by case title, number, party...")).toBeDefined();
     });
+
+    it("presents Save (Overwrite) and Save As options when saving an existing draft", async () => {
+      mockRouteParams = getMockDraftParams({ draftId: "existing-draft-id" });
+      const { getByText, queryByText } = renderScreen();
+
+      // Look for the Save (Overwrite) and Save As modal options
+      expect(queryByText("Save (Overwrite)")).toBeDefined();
+      expect(queryByText("Save As...")).toBeDefined();
+    });
   });
 });
+
