@@ -134,7 +134,15 @@ export function Navigation() {
             className="w-8 h-8 rounded-xl object-contain shadow-xs"
           />
           <div>
-            <span className="font-bold text-base tracking-tight block leading-tight text-zinc-950 dark:text-white">Advocase Web</span>
+            <div className="flex items-center space-x-1.5">
+              <span className="font-bold text-base tracking-tight leading-tight text-zinc-950 dark:text-white">Advocase</span>
+              {isAuthenticated && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse" />
+                  Synced
+                </span>
+              )}
+            </div>
             <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium tracking-wide">
               {language === "en" ? "DIGITAL COURT MUNSHI" : "डिजिटल कोर्ट मुंशी"}
             </span>

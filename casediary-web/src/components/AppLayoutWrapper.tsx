@@ -7,6 +7,9 @@ import { PublicNavbar } from "@/components/PublicNavbar";
 import { PublicLandingPage } from "@/components/PublicLandingPage";
 import { useAuth } from "@/context/AuthContext";
 
+import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+
 export function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isAuthenticated, isLoading } = useAuth();
@@ -14,7 +17,12 @@ export function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
   // 1. Auth routes (distraction-free, no sidebar or navbar)
   const isAuthRoute = pathname.startsWith("/auth/");
   if (isAuthRoute) {
-    return <main className="flex-1 min-h-screen w-full">{children}</main>;
+    return (
+      <main className="flex-1 min-h-screen w-full">
+        {children}
+        <PWAInstallPrompt />
+      </main>
+    );
   }
 
   // 2. Dedicated public tool & knowledge routes (render PublicNavbar, NO sidebar)
@@ -27,7 +35,8 @@ export function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex flex-col min-h-screen w-full">
         <PublicNavbar />
-        <main className="flex-1 w-full">{children}</main>
+        <main className="flex-1 w-full pb-12">{children}</main>
+        <PWAInstallPrompt />
       </div>
     );
   }
@@ -41,6 +50,7 @@ export function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
           <main className="flex-1 w-full">
             <PublicLandingPage />
           </main>
+          <PWAInstallPrompt />
         </div>
       );
     }
@@ -48,9 +58,11 @@ export function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen w-full">
         <Navigation />
-        <main className="flex-1 min-w-0 flex flex-col min-h-screen overflow-x-hidden">
+        <main className="flex-1 min-w-0 flex flex-col min-h-screen overflow-x-hidden pb-20 md:pb-0">
           {children}
         </main>
+        <MobileBottomNav />
+        <PWAInstallPrompt />
       </div>
     );
   }
@@ -61,9 +73,17 @@ export function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div className={`flex w-full ${isDrafts ? "h-screen overflow-hidden" : "min-h-screen"}`}>
       <Navigation />
-      <main className={`flex-1 min-w-0 flex flex-col ${isDrafts ? "h-screen overflow-hidden" : "min-h-screen overflow-x-hidden"}`}>
+      <main
+        className={`flex-1 min-w-0 flex flex-col ${
+          isDrafts
+            ? "h-screen overflow-hidden"
+            : "min-h-screen overflow-x-hidden pb-20 md:pb-0"
+        }`}
+      >
         {children}
       </main>
+      {!isDrafts && <MobileBottomNav />}
+      <PWAInstallPrompt />
     </div>
   );
 }
