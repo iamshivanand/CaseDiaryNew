@@ -192,12 +192,66 @@ async function main() {
       );
     `;
 
+    // 9. Chamber Invitations & QR Codes
+    await sql`
+      CREATE TABLE IF NOT EXISTS chamber_invitations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        chamber_id UUID NOT NULL REFERENCES chambers(id) ON DELETE CASCADE,
+        created_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role VARCHAR(50) NOT NULL DEFAULT 'Associate Advocate',
+        invite_token VARCHAR(100) UNIQUE NOT NULL,
+        target_email VARCHAR(255),
+        target_phone VARCHAR(20),
+        max_uses INTEGER NOT NULL DEFAULT 1,
+        used_count INTEGER NOT NULL DEFAULT 0,
+        expires_at TIMESTAMP NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'active',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `;
+
+    // 10. Active Sessions & Device Radar
+    await sql`
+      CREATE TABLE IF NOT EXISTS chamber_active_sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        chamber_id UUID NOT NULL REFERENCES chambers(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        session_token_hash TEXT NOT NULL,
+        device_name TEXT NOT NULL,
+        ip_address VARCHAR(100),
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        last_heartbeat_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `;
+
+    // 11. Cross-Advocate Case Shares
+    await sql`
+      CREATE TABLE IF NOT EXISTS case_shares (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+        case_unique_id TEXT NOT NULL,
+        chamber_id UUID NOT NULL REFERENCES chambers(id) ON DELETE CASCADE,
+        shared_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        share_token VARCHAR(100) UNIQUE NOT NULL,
+        access_level VARCHAR(50) NOT NULL DEFAULT 'view_brief',
+        shared_with_counsel_name TEXT,
+        shared_with_email VARCHAR(255),
+        expires_at TIMESTAMP,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `;
+
     // Indexes
     await sql`CREATE INDEX IF NOT EXISTS idx_cases_unique_id ON cases("uniqueId");`;
     await sql`CREATE INDEX IF NOT EXISTS idx_cases_chamber ON cases(chamber_id);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_cases_next_date ON cases("NextDate");`;
     await sql`CREATE INDEX IF NOT EXISTS idx_timeline_case_unique ON case_timeline(case_unique_id);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_assignments_duty_date ON case_assignments(duty_date);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_invitations_token ON chamber_invitations(invite_token);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_sessions_chamber ON chamber_active_sessions(chamber_id);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_case_shares_token ON case_shares(share_token);`;
 
     console.log("✅ All PostgreSQL tables & indexes created successfully in Docker!");
   } catch (err) {
@@ -208,3 +262,4 @@ async function main() {
 }
 
 main();
+

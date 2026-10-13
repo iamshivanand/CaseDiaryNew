@@ -107,6 +107,21 @@ function RegisterForm() {
             {language === "en" ? "Selected Plan:" : "चुना गया प्लान:"} {planParam.toUpperCase()}
           </div>
         )}
+
+        {/* Associate Join Callout */}
+        <div className="mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between gap-2">
+          <span>
+            {language === "en"
+              ? "Joining an existing Chamber as an Associate?"
+              : "क्या आप किसी चेंबर में एसोसिएट के रूप में जुड़ रहे हैं?"}
+          </span>
+          <Link
+            href="/auth/join"
+            className="font-bold underline text-amber-700 dark:text-amber-400 hover:text-amber-800 transition-colors whitespace-nowrap"
+          >
+            {language === "en" ? "Join via Invite / QR →" : "QR या लिंक से जुड़ें →"}
+          </Link>
+        </div>
       </div>
 
       <form onSubmit={handleRegister} className="space-y-4">

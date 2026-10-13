@@ -20,15 +20,18 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
+import { ActiveSessionsRadar } from "@/components/ActiveSessionsRadar";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
+import { isSeniorAdvocate } from "@/lib/auth";
 
 export default function ChamberSettingsPage() {
   const { t, language } = useLanguage();
   const { theme, resolvedTheme, setTheme } = useTheme();
   const { user, logout } = useAuth();
+  const isSenior = isSeniorAdvocate(user?.role);
   const toast = useToast();
   const router = useRouter();
   const [profile, setProfile] = useState({
@@ -406,6 +409,14 @@ export default function ChamberSettingsPage() {
               </button>
             </div>
           )}
+        </div>
+
+        {/* Connected Terminals & Concurrency Radar */}
+        <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            {language === "en" ? "Connected Terminals & Active Devices" : "कनेक्टेड टर्मिनल्स एवं सक्रिय डिवाइस"}
+          </h3>
+          <ActiveSessionsRadar isSenior={isSenior} />
         </div>
       </div>
     </div>

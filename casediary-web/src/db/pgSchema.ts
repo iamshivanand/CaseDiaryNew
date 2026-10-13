@@ -260,3 +260,90 @@ export const case_assignments = pgTable(
     chamberAssignmentIdx: index("idx_assignments_chamber").on(table.chamber_id),
   })
 );
+
+// ============================================================================
+// 9. CHAMBER INVITATIONS & QR CODES
+// ============================================================================
+export const chamber_invitations = pgTable(
+  "chamber_invitations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chamber_id: uuid("chamber_id")
+      .references(() => chambers.id, { onDelete: "cascade" })
+      .notNull(),
+    created_by_user_id: uuid("created_by_user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    role: varchar("role", { length: 50 }).default("Associate Advocate").notNull(),
+    invite_token: varchar("invite_token", { length: 100 }).unique().notNull(),
+    target_email: varchar("target_email", { length: 255 }),
+    target_phone: varchar("target_phone", { length: 20 }),
+    max_uses: integer("max_uses").default(1).notNull(),
+    used_count: integer("used_count").default(0).notNull(),
+    expires_at: timestamp("expires_at").notNull(),
+    status: varchar("status", { length: 50 }).default("active").notNull(), // active | exhausted | revoked
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    inviteTokenIdx: index("idx_chamber_invitations_token").on(table.invite_token),
+    inviteChamberIdx: index("idx_chamber_invitations_chamber").on(table.chamber_id),
+  })
+);
+
+// ============================================================================
+// 10. ACTIVE SESSIONS & DEVICE CONCURRENCY RADAR
+// ============================================================================
+export const chamber_active_sessions = pgTable(
+  "chamber_active_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chamber_id: uuid("chamber_id")
+      .references(() => chambers.id, { onDelete: "cascade" })
+      .notNull(),
+    user_id: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    session_token_hash: text("session_token_hash").notNull(),
+    device_name: text("device_name").notNull(),
+    ip_address: varchar("ip_address", { length: 100 }),
+    is_active: boolean("is_active").default(true).notNull(),
+    last_heartbeat_at: timestamp("last_heartbeat_at").defaultNow().notNull(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    sessionChamberIdx: index("idx_chamber_sessions_chamber").on(table.chamber_id),
+    sessionUserIdx: index("idx_chamber_sessions_user").on(table.user_id),
+  })
+);
+
+// ============================================================================
+// 11. CROSS-ADVOCATE & INTER-CHAMBER CASE SHARING (SCOPED ACCESS)
+// ============================================================================
+export const case_shares = pgTable(
+  "case_shares",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    case_id: integer("case_id")
+      .references(() => cases.id, { onDelete: "cascade" })
+      .notNull(),
+    case_unique_id: text("case_unique_id").notNull(),
+    chamber_id: uuid("chamber_id")
+      .references(() => chambers.id, { onDelete: "cascade" })
+      .notNull(),
+    shared_by_user_id: uuid("shared_by_user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    share_token: varchar("share_token", { length: 100 }).unique().notNull(),
+    access_level: varchar("access_level", { length: 50 }).default("view_brief").notNull(), // "view_brief" | "co_counsel"
+    shared_with_counsel_name: text("shared_with_counsel_name"),
+    shared_with_email: varchar("shared_with_email", { length: 255 }),
+    expires_at: timestamp("expires_at"),
+    is_active: boolean("is_active").default(true).notNull(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    caseShareTokenIdx: index("idx_case_shares_token").on(table.share_token),
+    caseShareCaseIdx: index("idx_case_shares_case").on(table.case_id),
+  })
+);
+

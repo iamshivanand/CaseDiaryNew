@@ -136,6 +136,34 @@ export async function POST(req: NextRequest) {
       sameSite: "lax",
     });
 
+    // 7. Track Active Session in Chamber Radar
+    try {
+      const userAgent = req.headers.get("user-agent") || "Advocase Web Client";
+      let deviceName = "Web Browser";
+      if (userAgent.includes("Windows")) deviceName = "Windows PC / Laptop";
+      else if (userAgent.includes("Macintosh")) deviceName = "Mac Desktop";
+      else if (userAgent.includes("Android")) deviceName = "Android Mobile";
+      else if (userAgent.includes("iPhone")) deviceName = "Apple iPhone";
+      else if (userAgent.includes("iPad")) deviceName = "Apple iPad";
+
+      const crypto = await import("crypto");
+      const sessionHash = crypto.createHash("sha256").update(token).digest("hex");
+      const forwarded = req.headers.get("x-forwarded-for");
+      const ip = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+
+      await pgDb.insert(schema.chamber_active_sessions).values({
+        chamber_id: newChamber.id,
+        user_id: newUser.id,
+        session_token_hash: sessionHash,
+        device_name: deviceName,
+        ip_address: ip,
+        is_active: true,
+        last_heartbeat_at: new Date(),
+      });
+    } catch (sessErr) {
+      console.warn("Could not log active session on register:", sessErr);
+    }
+
     return response;
   } catch (error: any) {
     console.error("Register Error:", error);

@@ -266,3 +266,54 @@ export const CaseAssignments = sqliteTable("CaseAssignments", {
     .default(sql`(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))`),
 });
 
+export const ChamberInvitations = sqliteTable("ChamberInvitations", {
+  id: text("id").primaryKey(),
+  chamber_id: text("chamber_id").notNull(),
+  created_by_user_id: text("created_by_user_id").notNull(),
+  role: text("role").default("Associate Advocate").notNull(),
+  invite_token: text("invite_token").unique().notNull(),
+  target_email: text("target_email"),
+  target_phone: text("target_phone"),
+  max_uses: integer("max_uses").default(1).notNull(),
+  used_count: integer("used_count").default(0).notNull(),
+  expires_at: text("expires_at").notNull(),
+  status: text("status").default("active").notNull(),
+  created_at: text("created_at")
+    .notNull()
+    .default(sql`(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))`),
+});
+
+export const ChamberActiveSessions = sqliteTable("ChamberActiveSessions", {
+  id: text("id").primaryKey(),
+  chamber_id: text("chamber_id").notNull(),
+  user_id: text("user_id").notNull(),
+  session_token_hash: text("session_token_hash").notNull(),
+  device_name: text("device_name").notNull(),
+  ip_address: text("ip_address"),
+  is_active: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  last_heartbeat_at: text("last_heartbeat_at")
+    .notNull()
+    .default(sql`(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))`),
+  created_at: text("created_at")
+    .notNull()
+    .default(sql`(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))`),
+});
+
+export const CaseShares = sqliteTable("CaseShares", {
+  id: text("id").primaryKey(),
+  case_id: integer("case_id").notNull().references(() => Cases.id, { onDelete: "cascade" }),
+  case_unique_id: text("case_unique_id").notNull(),
+  chamber_id: text("chamber_id").notNull(),
+  shared_by_user_id: text("shared_by_user_id").notNull(),
+  share_token: text("share_token").unique().notNull(),
+  access_level: text("access_level").default("view_brief").notNull(),
+  shared_with_counsel_name: text("shared_with_counsel_name"),
+  shared_with_email: text("shared_with_email"),
+  expires_at: text("expires_at"),
+  is_active: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  created_at: text("created_at")
+    .notNull()
+    .default(sql`(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))`),
+});
+
+

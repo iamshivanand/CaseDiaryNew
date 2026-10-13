@@ -35,6 +35,7 @@ import { generateWhatsAppHearingUpdate } from "@/lib/whatsapp";
 import { generateSingleMatterJuniorBriefing } from "@/lib/teamWhatsapp";
 import { apiFetch } from "@/lib/apiClient";
 import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
+import { CaseShareModal } from "@/components/CaseShareModal";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
@@ -57,6 +58,7 @@ export default function CaseDetailsPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "timeline" | "finance" | "drafts" | "documents">("overview");
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -324,8 +326,16 @@ export default function CaseDetailsPage({ params }: PageProps) {
           <ChevronLeft className="w-4 h-4" />
           <span>{t("casesDirectory")}</span>
         </Link>
-        {isSenior && (
-          <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsShareModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 font-semibold text-xs border border-amber-500/30 flex items-center space-x-1.5 transition-all cursor-pointer"
+            title={language === "en" ? "Share Matter Brief with External Counsel" : "बाहरी वकील के साथ केस विवरण साझा करें"}
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>{language === "en" ? "Share Brief (QR)" : "केस ब्रीफ (QR)"}</span>
+          </button>
+          {isSenior && (
             <button
               onClick={handleDelete}
               disabled={deleting}
@@ -334,8 +344,8 @@ export default function CaseDetailsPage({ params }: PageProps) {
             >
               <Trash2 className="w-4 h-4" />
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Case Header Hero Banner */}
@@ -1082,6 +1092,15 @@ export default function CaseDetailsPage({ params }: PageProps) {
           </div>
         </div>
       )}
+
+      {/* Case Sharing Modal (Scoped QR & External Counsel Brief) */}
+      <CaseShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        caseId={parseInt(caseId, 10)}
+        caseTitle={c.CaseTitle || "Court Matter"}
+        cnrNumber={c.CNRNumber}
+      />
     </div>
     </ChamberAuthGuard>
   );

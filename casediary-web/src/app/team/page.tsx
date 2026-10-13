@@ -22,10 +22,14 @@ import {
   Send,
   X,
   FileText,
+  QrCode,
+  Laptop,
 } from "lucide-react";
 import { formatDate, getTodayDateString, getTomorrowDateString } from "@/lib/utils";
 import { generateJuniorDutyWhatsApp } from "@/lib/teamWhatsapp";
 import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
+import { ChamberInviteModal } from "@/components/ChamberInviteModal";
+import { ActiveSessionsRadar } from "@/components/ActiveSessionsRadar";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { isSeniorAdvocate } from "@/lib/auth";
@@ -34,7 +38,7 @@ export default function ChamberTeamPage() {
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const isSenior = isSeniorAdvocate(user?.role);
-  const [activeTab, setActiveTab] = useState<"duties" | "roster" | "junior-list">("duties");
+  const [activeTab, setActiveTab] = useState<"duties" | "roster" | "junior-list" | "sessions">("duties");
   const [members, setMembers] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [cases, setCases] = useState<any[]>([]);
@@ -273,10 +277,10 @@ export default function ChamberTeamPage() {
           {isSenior && (
             <button
               onClick={() => setIsAddMemberOpen(true)}
-              className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white border border-zinc-700 text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white border border-zinc-700 text-xs font-semibold flex items-center space-x-2 transition-all cursor-pointer shadow-xs"
             >
-              <Users className="w-4 h-4 text-amber-400" />
-              <span>{t("addMemberBtn")}</span>
+              <QrCode className="w-4 h-4 text-amber-400" />
+              <span>{language === "en" ? "Invite Associate (QR)" : "एसोसिएट जोड़ें (QR)"}</span>
             </button>
           )}
         </div>
@@ -321,6 +325,18 @@ export default function ChamberTeamPage() {
           }`}
         >
           {t("tabJuniorList")}
+        </button>
+
+        <button
+          onClick={() => setActiveTab("sessions")}
+          className={`pb-3 px-1 border-b-2 transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+            activeTab === "sessions"
+              ? "border-amber-500 text-amber-600 dark:text-amber-400"
+              : "border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
+          }`}
+        >
+          <Laptop className="w-3.5 h-3.5 text-amber-500" />
+          <span>{language === "en" ? "Active Sessions Radar" : "सक्रिय सत्र रडार"}</span>
         </button>
       </div>
 
@@ -645,107 +661,35 @@ export default function ChamberTeamPage() {
         </div>
       )}
 
-      {/* Modal 1: Add Chamber Member */}
-      {isAddMemberOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center space-x-2">
-                <Users className="w-4 h-4 text-amber-500" />
-                <span>Add Chamber Member</span>
+      {/* TAB 4: Active Sessions Radar */}
+      {activeTab === "sessions" && (
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-4">
+            <div>
+              <h3 className="font-bold text-base text-zinc-900 dark:text-white flex items-center space-x-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                <span>{language === "en" ? "Chamber Concurrency & Device Management" : "चेंबर समवर्ती सत्र एवं डिवाइस प्रबंधन"}</span>
               </h3>
-              <button onClick={() => setIsAddMemberOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                {language === "en"
+                  ? "Live radar of active advocate logins and device terminals. Monitor concurrent seat allocation and revoke unauthorized sessions."
+                  : "सक्रिय अधिवक्ता लॉगिन और डिवाइस का लाइव रडार। अनधिकृत सत्रों को तुरंत समाप्त करें।"}
+              </p>
             </div>
-
-            <form onSubmit={handleAddMember} className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={memberForm.name}
-                  onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
-                  placeholder="e.g. Adv. Ananya Deshmukh"
-                  className="w-full px-3 py-2 rounded-xl text-xs border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Chamber Role
-                </label>
-                <select
-                  value={memberForm.role}
-                  onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl text-xs border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
-                >
-                  <option value="Associate Advocate">Associate Advocate / Junior Counsel</option>
-                  <option value="Senior Advocate">Senior Advocate / Partner</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Bar Council Enrollment No.
-                </label>
-                <input
-                  type="text"
-                  value={memberForm.barCouncilNumber}
-                  onChange={(e) => setMemberForm({ ...memberForm, barCouncilNumber: e.target.value })}
-                  placeholder="e.g. D/5412/2021"
-                  className="w-full px-3 py-2 rounded-xl text-xs font-mono border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Phone (for WhatsApp duty dispatch)
-                </label>
-                <input
-                  type="text"
-                  value={memberForm.phone}
-                  onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })}
-                  placeholder="e.g. +91 98111 22334"
-                  className="w-full px-3 py-2 rounded-xl text-xs border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Courts Handled
-                </label>
-                <input
-                  type="text"
-                  value={memberForm.assigned_courts}
-                  onChange={(e) => setMemberForm({ ...memberForm, assigned_courts: e.target.value })}
-                  placeholder="e.g. Tis Hazari, Patiala House, Saket"
-                  className="w-full px-3 py-2 rounded-xl text-xs border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end space-x-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setIsAddMemberOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-sm"
-                >
-                  Save Member
-                </button>
-              </div>
-            </form>
           </div>
+          <ActiveSessionsRadar isSenior={isSenior} />
         </div>
       )}
+
+      {/* Chamber Invite & QR Code Modal */}
+      <ChamberInviteModal
+        isOpen={isAddMemberOpen}
+        onClose={() => setIsAddMemberOpen(false)}
+        onMemberAdded={fetchData}
+        chamberName={user?.chamber?.name || "Advocate Law Chamber"}
+        seniorName={user?.name || "Senior Advocate"}
+      />
+
 
       {/* Modal 2: Assign Court Duty */}
       {isAssignDutyOpen && (
