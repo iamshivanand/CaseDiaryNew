@@ -33,8 +33,12 @@ import { HearingUpdateModal } from "@/components/HearingUpdateModal";
 import { formatDate, formatINR } from "@/lib/utils";
 import { generateWhatsAppHearingUpdate } from "@/lib/whatsapp";
 import { generateSingleMatterJuniorBriefing } from "@/lib/teamWhatsapp";
+import { apiFetch } from "@/lib/apiClient";
 import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { useAuth } from "@/context/AuthContext";
+import { isSeniorAdvocate } from "@/lib/auth";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -42,6 +46,9 @@ interface PageProps {
 
 export default function CaseDetailsPage({ params }: PageProps) {
   const { t, language } = useLanguage();
+  const toast = useToast();
+  const { user } = useAuth();
+  const isSenior = isSeniorAdvocate(user?.role);
   const resolvedParams = use(params);
   const router = useRouter();
   const caseId = resolvedParams.id;
@@ -51,6 +58,12 @@ export default function CaseDetailsPage({ params }: PageProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "timeline" | "finance" | "drafts" | "documents">("overview");
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "finance" && !isSenior) {
+      setActiveTab("overview");
+    }
+  }, [activeTab, isSenior]);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [uploadCategory, setUploadCategory] = useState("pleading");
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -67,7 +80,7 @@ export default function CaseDetailsPage({ params }: PageProps) {
 
   const fetchTeam = async () => {
     try {
-      const res = await fetch("/api/team");
+      const res = await apiFetch("/api/team");
       const json = await res.json();
       if (json.success) {
         setTeamMembers(json.members || []);
@@ -80,7 +93,7 @@ export default function CaseDetailsPage({ params }: PageProps) {
   const fetchCaseDetails = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/cases/${caseId}`);
+      const res = await apiFetch(`/api/cases/${caseId}`);
       const json = await res.json();
       if (json.success) {
         setData(json);
@@ -102,7 +115,7 @@ export default function CaseDetailsPage({ params }: PageProps) {
   const handleAssignMember = async (memberId: number | null) => {
     setUpdatingMember(true);
     try {
-      const res = await fetch(`/api/cases/${caseId}`, {
+      const res = await apiFetch(`/api/cases/${caseId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assigned_member_id: memberId }),
@@ -122,7 +135,7 @@ export default function CaseDetailsPage({ params }: PageProps) {
 
   const handleUpdateDutyStatus = async (dutyId: number, status: string) => {
     try {
-      const res = await fetch("/api/team/assignments", {
+      const res = await apiFetch("/api/team/assignments", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: dutyId, status }),
@@ -144,7 +157,7 @@ export default function CaseDetailsPage({ params }: PageProps) {
     }
     setSavingDuty(true);
     try {
-      const res = await fetch("/api/team/assignments", {
+      const res = await apiFetch("/api/team/assignments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -199,16 +212,25 @@ export default function CaseDetailsPage({ params }: PageProps) {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this case and its entire timeline? This cannot be undone.")) return;
+    if (!confirm(language === "en" ? "Are you sure you want to delete this case and its entire timeline? This cannot be undone." : "क्या आप वाकई इस मामले और इसकी पूरी समयरेखा को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।")) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/cases/${caseId}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/cases/${caseId}`, { method: "DELETE" });
       const json = await res.json();
       if (json.success) {
+        toast.info(
+          language === "en" ? "Case Dossier Removed" : "मामला हटाया गया",
+          `"${data?.case?.CaseTitle || "Matter"}" ${language === "en" ? "has been removed from your active diary." : "आपकी सक्रिय डायरी से हटा दिया गया है।"}`
+        );
         router.push("/cases");
+      } else {
+        throw new Error(json.error || "Failed to delete case");
       }
-    } catch (err) {
-      alert("Failed to delete case");
+    } catch (err: any) {
+      toast.error(
+        language === "en" ? "Failed to Delete Case" : "मामला हटाने में विफल",
+        err.message || "Could not remove case dossier"
+      );
       setDeleting(false);
     }
   };
@@ -224,16 +246,23 @@ export default function CaseDetailsPage({ params }: PageProps) {
       formData.append("category", uploadCategory);
       formData.append("file", file);
 
-      const res = await fetch("/api/documents", {
+      const res = await apiFetch("/api/documents", {
         method: "POST",
         body: formData,
       });
 
       const json = await res.json();
       if (!json.success) throw new Error(json.error || "Upload failed");
+      toast.success(
+        language === "en" ? "Document Uploaded" : "दस्तावेज़ अपलोड हुआ",
+        `"${file.name}" ${language === "en" ? "attached to case dossier." : "मामले के डॉसियर में संलग्न किया गया।"}`
+      );
       await fetchCaseDetails();
     } catch (err: any) {
-      alert(err.message || "Failed to upload file");
+      toast.error(
+        language === "en" ? "Upload Failed" : "अपलोड विफल",
+        err.message || "Failed to upload file"
+      );
     } finally {
       setUploadingDoc(false);
       e.target.value = "";
@@ -295,16 +324,18 @@ export default function CaseDetailsPage({ params }: PageProps) {
           <ChevronLeft className="w-4 h-4" />
           <span>{t("casesDirectory")}</span>
         </Link>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-            title={language === "en" ? "Delete Matter" : "केस हटाएं"}
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
+        {isSenior && (
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+              title={language === "en" ? "Delete Matter" : "केस हटाएं"}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Case Header Hero Banner */}
@@ -444,16 +475,18 @@ export default function CaseDetailsPage({ params }: PageProps) {
             {timeline.length}
           </span>
         </button>
-        <button
-          onClick={() => setActiveTab("finance")}
-          className={`pb-3 px-1 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "finance"
-              ? "border-amber-500 text-amber-600 dark:text-amber-400"
-              : "border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
-          }`}
-        >
-          {t("tabFinancials")}
-        </button>
+        {isSenior && (
+          <button
+            onClick={() => setActiveTab("finance")}
+            className={`pb-3 px-1 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "finance"
+                ? "border-amber-500 text-amber-600 dark:text-amber-400"
+                : "border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
+            }`}
+          >
+            {t("tabFinancials")}
+          </button>
+        )}
         <button
           onClick={() => setActiveTab("drafts")}
           className={`pb-3 px-1 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
@@ -755,8 +788,8 @@ export default function CaseDetailsPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* Tab 3: Financial Accounting */}
-      {activeTab === "finance" && (
+      {/* Tab 3: Financial Accounting (Restricted to Senior Counsel) */}
+      {activeTab === "finance" && isSenior && (
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
           <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
             <h3 className="text-base font-bold text-slate-900 dark:text-white">

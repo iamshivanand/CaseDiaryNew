@@ -35,12 +35,17 @@ import { NotificationCenter } from "./NotificationCenter";
 import { ThemeToggle } from "./ThemeToggle";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
+import { apiFetch } from "@/lib/apiClient";
+import { isSeniorAdvocate } from "@/lib/auth";
 
 export function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
   const { user, isAuthenticated, logout } = useAuth();
+  const isSenior = isSeniorAdvocate(user?.role);
+  const toast = useToast();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -69,12 +74,18 @@ export function Navigation() {
 
   const handleSignOut = () => {
     logout();
+    toast.info(
+      language === "en" ? "Session Closed" : "सत्र समाप्त",
+      language === "en"
+        ? "You have securely signed out of your chamber workspace."
+        : "आप अपने चेंबर वर्कस्पेस से सुरक्षित रूप से लॉग आउट हो गए हैं।"
+    );
     router.push("/auth/login");
   };
 
   const fetchUnread = async () => {
     try {
-      const res = await fetch("/api/notifications");
+      const res = await apiFetch("/api/notifications");
       const data = await res.json();
       if (data.success && typeof data.unreadCount === "number") {
         setUnreadCount(data.unreadCount);
@@ -112,7 +123,7 @@ export function Navigation() {
     { label: t("addNewCase"), href: "/cases/new", icon: PlusCircle, color: "text-emerald-500 dark:text-emerald-400" },
     { label: t("dailyCauseList"), href: "/cause-list", icon: FileText, color: "text-sky-500 dark:text-sky-400" },
     { label: t("legalDrafting"), href: "/drafts", icon: FileEdit, badge: "Word/Docs", color: "text-fuchsia-500 dark:text-fuchsia-400" },
-    { label: t("feeLedger"), href: "/finance", icon: DollarSign, color: "text-emerald-600 dark:text-emerald-400" },
+    { label: t("feeLedger"), href: "/finance", icon: DollarSign, color: "text-emerald-600 dark:text-emerald-400", seniorOnly: true },
     { label: t("ecourtsSync"), href: "/sync", icon: RefreshCw, color: "text-indigo-500 dark:text-indigo-400" },
   ];
 
@@ -207,78 +218,131 @@ export function Navigation() {
           mobileOpen ? "translate-x-0 w-72" : "-translate-x-full md:translate-x-0"
         } ${collapsed ? "md:w-20" : "md:w-72"}`}
       >
-        {/* Brand Header */}
-        <div className={`border-b border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between transition-all ${collapsed ? "p-3.5 justify-center flex-col gap-2" : "p-4"}`}>
-          <Link href="/" className="flex items-center space-x-3 group min-w-0" title="Advocase Home">
-            <img
-              src="/logo.png"
-              alt="Advocase Logo"
-              className="w-9 h-9 rounded-xl object-contain shadow-xs shrink-0"
-            />
-            {!collapsed && (
-              <div className="min-w-0">
-                <div className="flex items-center space-x-2">
-                  <span className="font-bold text-lg tracking-tight text-zinc-950 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
-                    Advocase
-                  </span>
-                  <span className="text-[10px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200/80 dark:border-zinc-800 shrink-0">
-                    {isAuthenticated ? (language === "en" ? "Chamber" : "चेंबर") : (language === "en" ? "Public" : "पब्लिक")}
+        {/* Brand Header & Utility Strip */}
+        <div className={`border-b border-zinc-200/80 dark:border-zinc-800/80 transition-all ${collapsed ? "p-3 flex flex-col items-center gap-2.5" : "px-4 pt-3.5 pb-3"}`}>
+          {collapsed ? (
+            /* Collapsed Mode: Clean vertical icon stack */
+            <div className="flex flex-col items-center gap-2.5 w-full">
+              <Link href="/" className="p-1 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors" title="Advocase Home">
+                <img
+                  src="/logo.png"
+                  alt="Advocase Logo"
+                  className="w-9 h-9 rounded-xl object-contain shadow-xs"
+                />
+              </Link>
+              <button
+                onClick={toggleCollapse}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
+                title={t("expandSidebar")}
+              >
+                <PanelLeftOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              </button>
+              {isAuthenticated && (
+                <button
+                  onClick={() => setNotifOpen(true)}
+                  className="relative p-2 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
+                  title={`Chamber Alerts ${unreadCount > 0 ? `(${unreadCount} unread)` : ""}`}
+                >
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-zinc-950 animate-pulse" />
+                  )}
+                </button>
+              )}
+              <ThemeToggle variant="icon" className="w-8 h-8 p-1.5 justify-center" />
+              <button
+                onClick={toggleLanguage}
+                className="w-8 h-8 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 flex items-center justify-center transition-colors"
+                title="Toggle English / Hindi"
+              >
+                <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">{language === "en" ? "HI" : "EN"}</span>
+              </button>
+            </div>
+          ) : (
+            /* Expanded Mode: High-Breathing Room Dual-Row Executive Architecture */
+            <div className="space-y-2.5">
+              {/* Row 1: Company Brand & Collapse Control */}
+              <div className="flex items-center justify-between">
+                <Link href="/" className="flex items-center space-x-2.5 group min-w-0" title="Advocase Home">
+                  <img
+                    src="/logo.png"
+                    alt="Advocase Logo"
+                    className="w-9 h-9 rounded-xl object-contain shadow-xs shrink-0"
+                  />
+                  <div className="min-w-0 flex flex-col">
+                    <div className="flex items-center space-x-1.5">
+                      <span className="font-extrabold text-base tracking-tight text-zinc-950 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                        ADVOCASE
+                      </span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    </div>
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-semibold tracking-wide uppercase">
+                      {language === "en" ? "Court Diary & Chambers" : "डिजिटल कोर्ट डायरी"}
+                    </span>
+                  </div>
+                </Link>
+
+                <button
+                  onClick={toggleCollapse}
+                  className="hidden md:flex p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
+                  title={t("collapseSidebar")}
+                >
+                  <PanelLeftClose className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Row 2: Active Chamber / Workspace Identifier + Clear-Spaced Utility Controls */}
+              <div className="flex items-center justify-between pt-0.5">
+                {/* Active Chamber Tag */}
+                <div className="flex items-center space-x-1.5 min-w-0 max-w-[130px]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                  <span
+                    className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 truncate"
+                    title={user?.chamber?.name || "Active Chamber"}
+                  >
+                    {user?.chamber?.name
+                      ? user.chamber.name.replace(/ Law Chambers?/i, "").replace(/ Chambers?/i, "")
+                      : (isAuthenticated ? (language === "en" ? "Chamber" : "चेंबर") : (language === "en" ? "Public OS" : "पब्लिक"))}
                   </span>
                 </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium truncate">
-                  {language === "en" ? "Court Diary & Litigation" : "कोर्ट डायरी व मुकदमे"}
-                </p>
+
+                {/* Utility Buttons with generous breathing space */}
+                <div className="flex items-center space-x-1.5 shrink-0">
+                  {/* Language Switcher */}
+                  <button
+                    onClick={toggleLanguage}
+                    className="h-7 px-2 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white bg-zinc-100/90 dark:bg-zinc-900/90 hover:bg-zinc-200/80 dark:hover:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-800 transition-all flex items-center space-x-1 cursor-pointer active:scale-95 shadow-2xs"
+                    title={`Switch to ${language === "en" ? "Hindi (हिन्दी)" : "English"}`}
+                  >
+                    <Languages className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                    <span className="text-[11px] font-medium">{language === "en" ? "HI" : "EN"}</span>
+                  </button>
+
+                  {/* Theme Switcher */}
+                  <ThemeToggle
+                    variant="icon"
+                    className="h-7 w-7 p-0 flex items-center justify-center rounded-lg bg-zinc-100/90 dark:bg-zinc-900/90 hover:bg-zinc-200/80 dark:hover:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                  />
+
+                  {/* Notification Bell Trigger */}
+                  {isAuthenticated && (
+                    <button
+                      onClick={() => setNotifOpen(true)}
+                      className="relative h-7 w-7 rounded-lg flex items-center justify-center bg-zinc-100/90 dark:bg-zinc-900/90 hover:bg-zinc-200/80 dark:hover:bg-zinc-800 border border-zinc-200/80 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white transition-all cursor-pointer active:scale-95 shadow-2xs"
+                      title={`Chamber Alerts ${unreadCount > 0 ? `(${unreadCount} unread)` : ""}`}
+                    >
+                      <Bell className="w-3.5 h-3.5" />
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center ring-2 ring-white dark:ring-zinc-950">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
-            )}
-          </Link>
-
-          {/* Header Action Controls */}
-          <div className={`flex items-center ${collapsed ? "flex-col space-y-1.5" : "space-x-1"}`}>
-            {/* Language Switcher */}
-            <button
-              onClick={toggleLanguage}
-              className={`p-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors flex items-center ${
-                collapsed ? "justify-center w-8 h-8" : "px-2 py-1 space-x-1 border border-zinc-200 dark:border-zinc-800"
-              }`}
-              title={`Switch to ${language === "en" ? "Hindi (हिन्दी)" : "English"}`}
-            >
-              <Languages className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              {!collapsed && <span>{language === "en" ? "HI" : "EN"}</span>}
-            </button>
-
-            {/* Theme Switcher */}
-            <ThemeToggle
-              variant="icon"
-              className={collapsed ? "justify-center w-8 h-8 p-1.5" : "p-1.5 border border-zinc-200 dark:border-zinc-800 rounded-lg"}
-            />
-
-            {/* Notification Bell Trigger (Only if authenticated) */}
-            {isAuthenticated && (
-              <button
-                onClick={() => setNotifOpen(true)}
-                className="relative p-2 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
-                title={`Chamber Alerts ${unreadCount > 0 ? `(${unreadCount} unread)` : ""}`}
-              >
-                <Bell className="w-4 h-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-zinc-950 animate-pulse" />
-                )}
-              </button>
-            )}
-
-            {/* Sidebar Collapse Toggle Button (Desktop Only) */}
-            <button
-              onClick={toggleCollapse}
-              className="hidden md:flex p-2 rounded-lg text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
-              title={collapsed ? t("expandSidebar") : t("collapseSidebar")}
-            >
-              {collapsed ? (
-                <PanelLeftOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              ) : (
-                <PanelLeftClose className="w-4 h-4" />
-              )}
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Quick Search Trigger */}
@@ -347,11 +411,11 @@ export function Navigation() {
                 </div>
               </div>
               <Link
-                href="/auth/login"
+                href="/settings"
                 className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors"
-                title={t("switchProfile")}
+                title={t("settingsTitle")}
               >
-                <LogIn className="w-3.5 h-3.5" />
+                <Settings className="w-3.5 h-3.5" />
               </Link>
             </div>
           ) : (
@@ -416,6 +480,12 @@ export function Navigation() {
                     </div>
                     {!collapsed && (
                       <div className="flex items-center space-x-1">
+                        {item.seniorOnly && !isSenior && (
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center space-x-0.5">
+                            <Lock className="w-2.5 h-2.5" />
+                            <span>Senior</span>
+                          </span>
+                        )}
                         {!isAuthenticated && (
                           <Lock className="w-3 h-3 text-zinc-400 dark:text-zinc-500" />
                         )}
@@ -529,14 +599,14 @@ export function Navigation() {
               <div className="flex items-center justify-between text-[10px] text-zinc-400 dark:text-zinc-500 pt-0.5">
                 <span>Advocase Web v2.6</span>
                 {isAuthenticated ? (
-                  <button
-                    onClick={handleSignOut}
-                    className="text-zinc-500 dark:text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 flex items-center space-x-1 transition-colors"
-                    title="Sign out of chamber"
+                  <Link
+                    href="/settings"
+                    className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center space-x-1 transition-colors"
+                    title={t("settingsTitle")}
                   >
-                    <LogOut className="w-3 h-3" />
-                    <span>{t("logout")}</span>
-                  </button>
+                    <Settings className="w-3 h-3" />
+                    <span>{t("settingsTitle")}</span>
+                  </Link>
                 ) : (
                   <Link
                     href="/auth/login"

@@ -27,9 +27,13 @@ import { formatDate, getTodayDateString, getTomorrowDateString } from "@/lib/uti
 import { generateJuniorDutyWhatsApp } from "@/lib/teamWhatsapp";
 import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
+import { isSeniorAdvocate } from "@/lib/auth";
 
 export default function ChamberTeamPage() {
   const { t, language } = useLanguage();
+  const { user } = useAuth();
+  const isSenior = isSeniorAdvocate(user?.role);
   const [activeTab, setActiveTab] = useState<"duties" | "roster" | "junior-list">("duties");
   const [members, setMembers] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -45,7 +49,7 @@ export default function ChamberTeamPage() {
   // Add Member Form State
   const [memberForm, setMemberForm] = useState({
     name: "",
-    role: "Junior Advocate",
+    role: "Associate Advocate",
     barCouncilNumber: "",
     phone: "",
     email: "",
@@ -112,7 +116,7 @@ export default function ChamberTeamPage() {
         setIsAddMemberOpen(false);
         setMemberForm({
           name: "",
-          role: "Junior Advocate",
+          role: "Associate Advocate",
           barCouncilNumber: "",
           phone: "",
           email: "",
@@ -186,6 +190,10 @@ export default function ChamberTeamPage() {
   };
 
   const handleDeleteMember = async (id: number) => {
+    if (!isSenior) {
+      alert("Permission Denied: Only Senior Advocates / Chamber Heads can remove members from the chamber roster.");
+      return;
+    }
     if (!confirm("Are you sure you want to remove this chamber member?")) return;
     try {
       await fetch(`/api/team/${id}`, { method: "DELETE" });
@@ -262,13 +270,15 @@ export default function ChamberTeamPage() {
             <span>{t("assignDutyBtn")}</span>
           </button>
 
-          <button
-            onClick={() => setIsAddMemberOpen(true)}
-            className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white border border-zinc-700 text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer"
-          >
-            <Users className="w-4 h-4 text-amber-400" />
-            <span>{t("addMemberBtn")}</span>
-          </button>
+          {isSenior && (
+            <button
+              onClick={() => setIsAddMemberOpen(true)}
+              className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white border border-zinc-700 text-xs font-medium flex items-center space-x-2 transition-all cursor-pointer"
+            >
+              <Users className="w-4 h-4 text-amber-400" />
+              <span>{t("addMemberBtn")}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -505,13 +515,15 @@ export default function ChamberTeamPage() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleDeleteMember(m.id)}
-                      className="text-slate-400 hover:text-rose-600 p-1"
-                      title="Remove member"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {isSenior && (
+                      <button
+                        onClick={() => handleDeleteMember(m.id)}
+                        className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
+                        title="Remove member"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
 
                   <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400 pt-1">
@@ -671,10 +683,8 @@ export default function ChamberTeamPage() {
                   onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl text-xs border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none"
                 >
-                  <option value="Junior Advocate">Junior Advocate</option>
-                  <option value="Senior Associate">Senior Associate</option>
-                  <option value="Court Clerk / Munshi">Court Clerk / Munshi</option>
-                  <option value="Intern / Trainee">Intern / Trainee</option>
+                  <option value="Associate Advocate">Associate Advocate / Junior Counsel</option>
+                  <option value="Senior Advocate">Senior Advocate / Partner</option>
                 </select>
               </div>
 
@@ -772,7 +782,7 @@ export default function ChamberTeamPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Assign To Junior Advocate / Clerk *
+                  Assign To Advocate / Counsel *
                 </label>
                 <select
                   required

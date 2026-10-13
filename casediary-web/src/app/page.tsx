@@ -26,6 +26,7 @@ import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { formatDate, formatINR } from "@/lib/utils";
 
 import { useLanguage } from "@/context/LanguageContext";
+import { apiFetch } from "@/lib/apiClient";
 
 export default function DashboardPage() {
   const { t, language } = useLanguage();
@@ -40,8 +41,8 @@ export default function DashboardPage() {
     try {
       // Parallelize requests to prevent sequential network lag
       const [statsRes, casesRes] = await Promise.all([
-        fetch("/api/stats"),
-        fetch(`/api/cases?filter=${activeTab}&limit=20`),
+        apiFetch("/api/stats"),
+        apiFetch(`/api/cases?filter=${activeTab}&limit=20`),
       ]);
 
       const [statsData, casesData] = await Promise.all([

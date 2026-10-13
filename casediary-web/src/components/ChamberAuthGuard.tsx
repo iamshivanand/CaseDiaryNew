@@ -86,43 +86,29 @@ export function ChamberAuthGuard({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               onClick={() => demoLogin("Senior")}
-              className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all text-left group"
+              className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-amber-500/50 dark:hover:border-amber-500/50 transition-all text-left group"
             >
               <div className="text-xs font-semibold text-zinc-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 flex items-center justify-between">
                 <span>{language === "en" ? "Senior Advocate" : "वरिष्ठ अधिवक्ता"}</span>
                 <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <p className="text-[11px] text-zinc-500 mt-0.5">{language === "en" ? "Adv. Rajesh Sharma" : "अधिवक्ता राजेश शर्मा"}</p>
+              <p className="text-[11px] text-zinc-500 mt-0.5">{language === "en" ? "Adv. Rajesh Sharma • Full Access" : "अधिवक्ता राजेश शर्मा • पूर्ण पहुंच"}</p>
               <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">Bar: D/1248/2012</span>
             </button>
 
             <button
               onClick={() => demoLogin("Junior")}
-              className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all text-left group"
+              className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-all text-left group"
             >
-              <div className="text-xs font-semibold text-zinc-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 flex items-center justify-between">
-                <span>{language === "en" ? "Junior Counsel" : "कनिष्ठ वकील"}</span>
+              <div className="text-xs font-semibold text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center justify-between">
+                <span>{language === "en" ? "Associate Advocate" : "सहयोगी अधिवक्ता"}</span>
                 <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <p className="text-[11px] text-zinc-500 mt-0.5">{language === "en" ? "Adv. Vikram Mehra" : "अधिवक्ता विक्रम मेहरा"}</p>
+              <p className="text-[11px] text-zinc-500 mt-0.5">{language === "en" ? "Adv. Vikram Mehra • Briefings & Duties" : "अधिवक्ता विक्रम मेहरा • ब्रीफिंग व ड्यूटी"}</p>
               <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">Bar: D/4590/2021</span>
-            </button>
-
-            <button
-              onClick={() => demoLogin("Munshi")}
-              className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all text-left group"
-            >
-              <div className="text-xs font-semibold text-zinc-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 flex items-center justify-between">
-                <span>{language === "en" ? "Chamber Munshi" : "चेंबर मुंशी"}</span>
-                <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-[11px] text-zinc-500 mt-0.5">{language === "en" ? "Ramesh Kumar" : "रमेश कुमार"}</p>
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
-                {language === "en" ? "District Courts Clerk" : "जिला न्यायालय लिपिक"}
-              </span>
             </button>
           </div>
         </div>

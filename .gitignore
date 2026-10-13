@@ -58,6 +58,12 @@ credentials.json
 yarn-error.log
 npm-debug.log
 
+# Google Credentials & Env secrets
+client_secret*.json
+.env*
+.env
+.env.local
+
 # Test outputs & Playwright fixtures
 test-results/
 playwright-report/

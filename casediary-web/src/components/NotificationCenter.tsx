@@ -16,6 +16,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { apiFetch } from "@/lib/apiClient";
 
 interface NotificationItem {
   id: string;
@@ -50,7 +51,7 @@ export function NotificationCenter({
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/notifications");
+      const res = await apiFetch("/api/notifications");
       const data = await res.json();
       if (data.success) {
         setNotifications(data.notifications || []);
@@ -76,7 +77,7 @@ export function NotificationCenter({
 
   const handleMarkAllRead = async () => {
     try {
-      await fetch("/api/notifications", {
+      await apiFetch("/api/notifications", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ markAllRead: true }),

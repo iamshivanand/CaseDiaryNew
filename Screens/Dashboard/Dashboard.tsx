@@ -53,33 +53,60 @@ import SectionHeader from "../CommonComponents/SectionHeader";
 import VoiceSearchBar from "../CommonComponents/VoiceSearchBar";
 import NotificationBellButton from "../CommonComponents/NotificationBellButton";
 
+import { syncCasesToCloud } from "../../utils/cloudSyncService";
+
 const WelcomeCard = () => {
   const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
+  const navigation = useNavigation<any>();
   const [userName, setUserName] = useState("User");
+  const [isCloudLinked, setIsCloudLinked] = useState(false);
+  const [chamberName, setChamberName] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const today = new Date();
   const formattedDate = format(today, "eeee, MMMM d, yyyy");
 
+  const checkCloudStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem("@auth_token");
+      const chamber = await AsyncStorage.getItem("@chamber_name");
+      const user = await AsyncStorage.getItem("@user_name");
+      setIsCloudLinked(!!token);
+      setChamberName(chamber || null);
+      if (user) setUserName(user);
+    } catch (e) {
+      console.warn("Failed checking cloud status:", e);
+    }
+  };
+
   useEffect(() => {
-    const fetchUserName = async () => {
-      try {
-        const database = await db.getDb();
-        const userId = await AsyncStorage.getItem("@user_id");
-        if (userId) {
-          const profile = await db.getUserProfile(
-            database,
-            parseInt(userId, 10)
-          );
-          if (profile && profile.name) {
-            setUserName(profile.name);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch user name for WelcomeCard:", error);
-      }
-    };
-    fetchUserName();
+    checkCloudStatus();
   }, []);
+
+  const handleSyncPress = async () => {
+    if (!isCloudLinked) {
+      // Navigate to Login screen to link device
+      navigation.navigate("Login");
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const res = await syncCasesToCloud();
+      if (res.success) {
+        Alert.alert(
+          "Cloud Sync Complete",
+          `All courtroom cases are safely backed up to ${chamberName || "your Chamber"}!`
+        );
+      } else {
+        Alert.alert("Sync Issue", res.error || "Could not complete cloud sync.");
+      }
+    } catch (err: any) {
+      Alert.alert("Offline", "Working in offline mode. Cases remain saved locally.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const getGreeting = () => {
     const hours = new Date().getHours();
@@ -97,8 +124,8 @@ const WelcomeCard = () => {
   const greeting = getGreeting();
 
   const welcomeGradient = theme.dark
-    ? ["#312E81", "#0F172A"] // Premium dark Indigo-Slate gradient
-    : ["#6366F1", "#312E81"]; // Premium Indigo gradient for light mode
+    ? ["#312E81", "#0F172A"]
+    : ["#6366F1", "#312E81"];
 
   return (
     <LinearGradient
@@ -131,6 +158,61 @@ const WelcomeCard = () => {
           >
             {formattedDate}
           </Text>
+
+          {/* Cloud Status Badge */}
+          <TouchableOpacity
+            onPress={handleSyncPress}
+            disabled={isSyncing}
+            activeOpacity={0.8}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: isCloudLinked
+                ? "rgba(16, 185, 129, 0.2)"
+                : "rgba(245, 158, 11, 0.25)",
+              borderColor: isCloudLinked
+                ? "rgba(16, 185, 129, 0.4)"
+                : "rgba(245, 158, 11, 0.5)",
+              borderWidth: 1,
+              borderRadius: 16,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              marginTop: 8,
+              alignSelf: "flex-start",
+            }}
+          >
+            {isSyncing ? (
+              <ActivityIndicator
+                size="small"
+                color="#FFFFFF"
+                style={{ marginRight: 6 }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 4,
+                  backgroundColor: isCloudLinked ? "#10B981" : "#F59E0B",
+                  marginRight: 6,
+                }}
+              />
+            )}
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 11,
+                fontWeight: "600",
+                letterSpacing: 0.2,
+              }}
+            >
+              {isSyncing
+                ? "Syncing Cases..."
+                : isCloudLinked
+                ? `Cloud Synced • ${chamberName || "Chamber"}`
+                : "Courtroom Offline Mode • Tap to Link Cloud"}
+            </Text>
+          </TouchableOpacity>
         </View>
         <View
           style={{

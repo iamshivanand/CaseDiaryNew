@@ -3,6 +3,8 @@ import { X, Calendar, Send, CheckCircle2, MessageSquare, IndianRupee, AlertCircl
 import { generateWhatsAppHearingUpdate } from "@/lib/whatsapp";
 import { getTodayDateString } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { apiFetch } from "@/lib/apiClient";
 
 interface HearingUpdateModalProps {
   isOpen: boolean;
@@ -24,6 +26,7 @@ interface HearingUpdateModalProps {
 
 export function HearingUpdateModal({ isOpen, onClose, caseItem, onSuccess }: HearingUpdateModalProps) {
   const { t, language } = useLanguage();
+  const toast = useToast();
   const [hearingDate, setHearingDate] = useState("");
   const [nextDate, setNextDate] = useState("");
   const [isReserved, setIsReserved] = useState(false);
@@ -66,7 +69,8 @@ export function HearingUpdateModal({ isOpen, onClose, caseItem, onSuccess }: Hea
 
   const handleSubmit = async (openWhatsApp: boolean) => {
     if (!isReserved && !nextDate) {
-      alert(
+      toast.error(
+        language === "en" ? "Date Selection Required" : "तारीख चयन आवश्यक है",
         language === "en"
           ? "Please select a Next Hearing Date or check 'Order Reserved / Undated'"
           : "कृपया अगली सुनवाई की तिथि चुनें अथवा 'निर्णय सुरक्षित' चेक करें"
@@ -78,7 +82,7 @@ export function HearingUpdateModal({ isOpen, onClose, caseItem, onSuccess }: Hea
     setStatusMessage(null);
 
     try {
-      const res = await fetch(`/api/cases/${caseItem.id}/timeline`, {
+      const res = await apiFetch(`/api/cases/${caseItem.id}/timeline`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -104,6 +108,13 @@ export function HearingUpdateModal({ isOpen, onClose, caseItem, onSuccess }: Hea
         window.open(waUrl, "_blank");
       }
 
+      toast.success(
+        language === "en" ? "Hearing Outcome Recorded" : "सुनवाई परिणाम दर्ज किया गया",
+        isReserved
+          ? (language === "en" ? "Marked as Order/Judgment Reserved." : "निर्णय हेतु सुरक्षित चिन्हित किया गया।")
+          : `${language === "en" ? "Next hearing scheduled for " : "अगली तारीख: "}${nextDate}`
+      );
+
       setStatusMessage(
         language === "en"
           ? "Hearing update successfully recorded in diary!"
@@ -112,9 +123,12 @@ export function HearingUpdateModal({ isOpen, onClose, caseItem, onSuccess }: Hea
       setTimeout(() => {
         if (onSuccess) onSuccess();
         onClose();
-      }, 700);
+      }, 500);
     } catch (err: any) {
-      alert(err.message || "Failed to update hearing");
+      toast.error(
+        language === "en" ? "Update Failed" : "अपडेट विफल",
+        err.message || "Failed to update hearing"
+      );
     } finally {
       setSubmitting(false);
     }

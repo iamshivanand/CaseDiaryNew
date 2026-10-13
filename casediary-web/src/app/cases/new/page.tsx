@@ -18,10 +18,13 @@ import {
 import { getTodayDateString } from "@/lib/utils";
 import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { useLanguage } from "@/context/LanguageContext";
+import { useToast } from "@/context/ToastContext";
+import { apiFetch } from "@/lib/apiClient";
 
 export default function AddNewCasePage() {
   const { t, language } = useLanguage();
   const router = useRouter();
+  const toast = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [lookups, setLookups] = useState<any>({ courts: [], caseTypes: [], districts: [], policeStations: [], stages: [] });
 
@@ -79,13 +82,16 @@ export default function AddNewCasePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.CaseTitle.trim()) {
-      alert("Please provide a Case Title");
+      toast.error(
+        language === "en" ? "Case Title Required" : "मामले का शीर्षक आवश्यक है",
+        language === "en" ? "Please enter the title or parties involved." : "कृपया मामले का शीर्षक या पक्षों के नाम दर्ज करें।"
+      );
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/cases", {
+      const res = await apiFetch("/api/cases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -94,9 +100,16 @@ export default function AddNewCasePage() {
       if (!data.success) {
         throw new Error(data.error || "Failed to create case");
       }
+      toast.success(
+        language === "en" ? "Case Added to Diary" : "मामला डायरी में दर्ज किया गया",
+        `"${form.CaseTitle}" ${language === "en" ? "registered successfully in chamber." : "सफलतापूर्वक दर्ज किया गया।"}`
+      );
       router.push(`/cases/${data.case.id}`);
     } catch (err: any) {
-      alert(err.message || "Failed to create case");
+      toast.error(
+        language === "en" ? "Failed to Create Case" : "मामला दर्ज करने में विफल",
+        err.message || "An unexpected error occurred."
+      );
       setSubmitting(false);
     }
   };

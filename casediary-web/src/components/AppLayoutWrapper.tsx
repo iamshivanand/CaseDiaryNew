@@ -43,6 +43,19 @@ export function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
 
   // 3. Homepage (root '/')
   if (pathname === "/") {
+    if (isLoading) {
+      return (
+        <div className="flex-1 min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+          <div className="flex flex-col items-center space-y-3">
+            <div className="w-8 h-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
+            <p className="text-xs font-semibold tracking-wider text-slate-500 dark:text-zinc-400 uppercase">
+              Verifying Chamber Session...
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     if (!isAuthenticated) {
       return (
         <div className="flex flex-col min-h-screen w-full">

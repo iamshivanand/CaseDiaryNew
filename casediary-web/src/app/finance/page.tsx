@@ -11,19 +11,30 @@ import {
   ChevronRight,
   Search,
   Filter,
+  Lock,
+  ShieldCheck,
+  ArrowRight,
 } from "lucide-react";
 import { formatINR } from "@/lib/utils";
 import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
+import { isSeniorAdvocate } from "@/lib/auth";
 
 export default function FinanceLedgerPage() {
   const { t, language } = useLanguage();
+  const { user } = useAuth();
+  const isSenior = isSeniorAdvocate(user?.role);
   const [stats, setStats] = useState<any>(null);
   const [cases, setCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
+    if (!isSenior) {
+      setLoading(false);
+      return;
+    }
     Promise.all([
       fetch("/api/stats").then((r) => r.json()),
       fetch("/api/cases?limit=all").then((r) => r.json()),
@@ -32,7 +43,52 @@ export default function FinanceLedgerPage() {
       if (casesData.success) setCases(casesData.cases);
       setLoading(false);
     });
-  }, []);
+  }, [isSenior]);
+
+  if (!isSenior) {
+    return (
+      <ChamberAuthGuard featureName={t("financeTitle")}>
+        <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto w-full my-auto py-12">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-xl p-8 sm:p-12 text-center space-y-6">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center mx-auto shadow-xs">
+              <Lock className="w-8 h-8" />
+            </div>
+
+            <div className="max-w-md mx-auto space-y-2">
+              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                <span>{language === "en" ? "CHAMBER CONFIDENTIAL" : "चेंबर गोपनीयता"}</span>
+              </div>
+              <h2 className="text-2xl font-bold text-zinc-950 dark:text-white tracking-tight">
+                {language === "en" ? "Senior Counsel Restricted Area" : "वरिष्ठ अधिवक्ता सुरक्षित क्षेत्र"}
+              </h2>
+              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                {language === "en"
+                  ? "Chamber financial ledgers, fee agreements, and billing receivables are confidential and accessible only to Senior Advocates and Chamber Partners."
+                  : "चेंबर वित्तीय बहीखाता, शुल्क समझौते और प्राप्तियां गोपनीय हैं और केवल वरिष्ठ अधिवक्ताओं और भागीदारों के लिए सुलभ हैं।"}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <Link
+                href="/"
+                className="px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-950 text-xs font-semibold flex items-center space-x-2 transition-all shadow-xs"
+              >
+                <span>{language === "en" ? "Return to Daily Diary" : "दैनिक डायरी पर लौटें"}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <Link
+                href="/cause-list"
+                className="px-5 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold flex items-center space-x-2 transition-all border border-zinc-200 dark:border-zinc-700"
+              >
+                <span>{language === "en" ? "View Today's Cause List" : "आज की कॉज लिस्ट देखें"}</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </ChamberAuthGuard>
+    );
+  }
 
   const filteredCases = cases.filter((c) => {
     if (!search) return true;

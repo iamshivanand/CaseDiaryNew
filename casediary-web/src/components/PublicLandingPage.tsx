@@ -266,7 +266,7 @@ export function PublicLandingPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl mx-auto">
             {/* Senior Advocate: Midnight Navy / Oxford Theme */}
             <button
               onClick={() => demoLogin("Senior")}
@@ -275,16 +275,16 @@ export function PublicLandingPage() {
               <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between">
                 <span className="flex items-center space-x-1.5">
                   <span className="w-2 h-2 rounded-full bg-blue-600" />
-                  <span>{language === "en" ? "Senior Advocate" : "वरिष्ठ अधिवक्ता"}</span>
+                  <span>{language === "en" ? "Senior Advocate / Partner" : "वरिष्ठ अधिवक्ता / भागीदार"}</span>
                 </span>
                 <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
               </div>
               <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 font-medium">
-                {language === "en" ? "Adv. Rajesh Sharma • High Court" : "अधिवक्ता राजेश शर्मा • उच्च न्यायालय"}
+                {language === "en" ? "Adv. Rajesh Sharma • Full Chamber Authority" : "अधिवक्ता राजेश शर्मा • पूर्ण चेंबर अधिकार"}
               </p>
             </button>
 
-            {/* Junior Counsel: British Racing Emerald Theme */}
+            {/* Associate Advocate: British Racing Emerald Theme */}
             <button
               onClick={() => demoLogin("Junior")}
               className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-sm hover:shadow-emerald-500/10 transition-all text-left group cursor-pointer"
@@ -292,29 +292,12 @@ export function PublicLandingPage() {
               <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between">
                 <span className="flex items-center space-x-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                  <span>{language === "en" ? "Junior Counsel" : "जूनियर अधिवक्ता"}</span>
+                  <span>{language === "en" ? "Associate Advocate" : "सहयोगी अधिवक्ता"}</span>
                 </span>
                 <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
               </div>
               <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 font-medium">
-                {language === "en" ? "Adv. Vikram Mehra • District Courts" : "अधिवक्ता विक्रम मेहरा • जिला न्यायालय"}
-              </p>
-            </button>
-
-            {/* Court Munshi: Cool Slate Theme */}
-            <button
-              onClick={() => demoLogin("Munshi")}
-              className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 hover:border-slate-400 dark:hover:border-slate-600 hover:shadow-sm transition-all text-left group cursor-pointer"
-            >
-              <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-                <span className="flex items-center space-x-1.5">
-                  <span className="w-2 h-2 rounded-full bg-slate-500" />
-                  <span>{language === "en" ? "Court Munshi" : "कोर्ट मुंशी"}</span>
-                </span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors" />
-              </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 font-medium">
-                {language === "en" ? "Ramesh Kumar • Daily Cause Lists" : "रमेश कुमार • दैनिक कॉज लिस्ट"}
+                {language === "en" ? "Adv. Vikram Mehra • Briefings & Court Duties" : "अधिवक्ता विक्रम मेहरा • ब्रीफिंग व कोर्ट ड्यूटी"}
               </p>
             </button>
           </div>
@@ -425,8 +408,8 @@ export function PublicLandingPage() {
                 <span>
                   <strong className="text-slate-950 dark:text-white">{language === "en" ? "Synchronized chamber workspace:" : "सिंक्रनाइज़्ड चेंबर वर्कस्पेस:"}</strong>{" "}
                   {language === "en"
-                    ? "Real-time access across Senior Counsel, Junior Advocates, and Munshi devices."
-                    : "सीनियर वकील, जूनियर सहयोगी और मुंशी के मध्य एक साथ रीयल-टाइम डेटा एक्सेस।"}
+                    ? "Real-time access across Senior Counsel and Associate Advocates."
+                    : "सीनियर वकील और सहयोगी अधिवक्ताओं के मध्य एक साथ रीयल-टाइम डेटा एक्सेस।"}
                 </span>
               </li>
               <li className="flex items-start space-x-2.5">

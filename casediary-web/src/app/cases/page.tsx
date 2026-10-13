@@ -22,6 +22,7 @@ import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { formatDate } from "@/lib/utils";
 
 import { useLanguage } from "@/context/LanguageContext";
+import { apiFetch } from "@/lib/apiClient";
 
 export default function CasesDirectoryPage() {
   const { t, language } = useLanguage();
@@ -57,7 +58,7 @@ export default function CasesDirectoryPage() {
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (priorityFilter !== "all") params.set("priority", priorityFilter);
 
-      const res = await fetch(`/api/cases?${params.toString()}`, {
+      const res = await apiFetch(`/api/cases?${params.toString()}`, {
         signal: controller.signal,
       });
       const json = await res.json();

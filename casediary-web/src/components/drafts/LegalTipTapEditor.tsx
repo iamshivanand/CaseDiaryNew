@@ -123,7 +123,7 @@ interface OutlineItem {
 interface ChamberComment {
   id: string;
   author: string;
-  authorRole: "Senior Advocate" | "Junior Counsel" | "Munshi";
+  authorRole: string;
   text: string;
   quoteExcerpt?: string;
   timestamp: string;
@@ -306,11 +306,9 @@ export default function LegalTipTapEditor({
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [showSaveAsTemplateModal, setShowSaveAsTemplateModal] = useState(false);
 
-  // Role-based permission enforcement: Junior Associates / Clerks start in Review Mode
+  // Role-based permission: Both Senior and Associate Advocates have drafting access
   useEffect(() => {
-    if (user?.role === "Court Clerk / Munshi" || user?.role === "Intern") {
-      setEditorMode("suggesting");
-    }
+    // Ready for multi-advocate collaboration
   }, [user?.role]);
 
   // Cases list for variable autofill
@@ -1025,8 +1023,8 @@ export default function LegalTipTapEditor({
 
     const newComment: ChamberComment = {
       id: `comm-${Date.now()}`,
-      author: "Adv. Rajesh Sharma",
-      authorRole: "Senior Advocate",
+      author: user?.name || "Adv. Rajesh Sharma",
+      authorRole: user?.role || "Senior Advocate",
       text: newCommentText.trim(),
       quoteExcerpt: selectedText || undefined,
       timestamp: "Just now",

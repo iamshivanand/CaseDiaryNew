@@ -1,23 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthUser } from "@/lib/auth";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { desc, eq, and, like, or } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
+    const authUser = getAuthUser(request);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     const caseId = searchParams.get("case_id");
     const isTemplate = searchParams.get("is_template");
-    const chamberId = searchParams.get("chamber_id");
+    const chamberIdParam = searchParams.get("chamber_id");
     const search = searchParams.get("search");
+
+    const activeChamberId = authUser?.chamberId || chamberIdParam || "demo-chamber-id";
 
     // Single draft lookup
     if (id) {
       const draft = db
         .select()
         .from(schema.DocumentDrafts)
-        .where(eq(schema.DocumentDrafts.id, id))
+        .where(
+          and(
+            eq(schema.DocumentDrafts.id, id),
+            eq(schema.DocumentDrafts.chamber_id, activeChamberId)
+          )
+        )
         .get();
 
       if (!draft) {
@@ -27,7 +36,9 @@ export async function GET(request: NextRequest) {
     }
 
     // List query with filters
-    const conditions = [];
+    const conditions: any[] = [
+      eq(schema.DocumentDrafts.chamber_id, activeChamberId),
+    ];
 
     if (caseId) {
       conditions.push(eq(schema.DocumentDrafts.case_id, Number(caseId)));
@@ -37,28 +48,25 @@ export async function GET(request: NextRequest) {
       conditions.push(eq(schema.DocumentDrafts.is_custom_template, Number(isTemplate)));
     }
 
-    if (chamberId) {
-      conditions.push(eq(schema.DocumentDrafts.chamber_id, chamberId));
-    }
-
     if (search && search.trim()) {
       const q = `%${search.trim()}%`;
-      conditions.push(
-        or(
-          like(schema.DocumentDrafts.title, q),
-          like(schema.DocumentDrafts.case_title, q),
-          like(schema.DocumentDrafts.client_name, q),
-          like(schema.DocumentDrafts.template_category, q)
-        )
+      const searchCondition = or(
+        like(schema.DocumentDrafts.title, q),
+        like(schema.DocumentDrafts.case_title, q),
+        like(schema.DocumentDrafts.client_name, q),
+        like(schema.DocumentDrafts.template_category, q)
       );
+      if (searchCondition) {
+        conditions.push(searchCondition);
+      }
     }
 
-    const query = db.select().from(schema.DocumentDrafts);
-    const drafts = (
-      conditions.length > 0
-        ? query.where(and(...conditions)).orderBy(desc(schema.DocumentDrafts.updated_at))
-        : query.orderBy(desc(schema.DocumentDrafts.updated_at))
-    ).all();
+    const drafts = db
+      .select()
+      .from(schema.DocumentDrafts)
+      .where(and(...conditions))
+      .orderBy(desc(schema.DocumentDrafts.updated_at))
+      .all();
 
     return NextResponse.json({ success: true, drafts, total: drafts.length });
   } catch (error: any) {
@@ -71,8 +79,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authUser = getAuthUser(request);
     const body = await request.json();
     const id = body.id || `draft-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+    const effectiveChamberId = authUser?.chamberId || body.chamber_id || "demo-chamber-id";
+    const authorName = authUser?.name || body.author_name || "Adv. Rajesh Sharma";
+    const authorRole = authUser?.role || body.author_role || "Senior Advocate";
 
     // Check if draft already exists
     const existing = db
@@ -96,9 +108,9 @@ export async function POST(request: NextRequest) {
           client_name: body.client_name !== undefined ? body.client_name : existing.client_name,
           case_number: body.case_number !== undefined ? body.case_number : existing.case_number,
           user_id: body.user_id !== undefined ? (body.user_id ? Number(body.user_id) : null) : existing.user_id,
-          chamber_id: body.chamber_id !== undefined ? body.chamber_id : existing.chamber_id,
-          author_name: body.author_name !== undefined ? body.author_name : existing.author_name,
-          author_role: body.author_role !== undefined ? body.author_role : existing.author_role,
+          chamber_id: effectiveChamberId,
+          author_name: authorName,
+          author_role: authorRole,
         })
         .where(eq(schema.DocumentDrafts.id, id))
         .returning()
@@ -112,9 +124,9 @@ export async function POST(request: NextRequest) {
       .values({
         id,
         user_id: body.user_id ? Number(body.user_id) : null,
-        chamber_id: body.chamber_id || "delhi_main_chamber",
-        author_name: body.author_name || "Adv. Rajesh Sharma",
-        author_role: body.author_role || "Senior Advocate",
+        chamber_id: effectiveChamberId,
+        author_name: authorName,
+        author_role: authorRole,
         case_id: body.case_id ? Number(body.case_id) : null,
         case_title: body.case_title || null,
         client_name: body.client_name || null,

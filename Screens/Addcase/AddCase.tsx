@@ -58,6 +58,7 @@ import {
 import { convertIndianDateToLocal } from "../../utils/ecourtsParser";
 import { getUserState } from "../../utils/locationService";
 import { promptClientNotification } from "../../utils/whatsappNotifier";
+import { syncCasesToCloud } from "../../utils/cloudSyncService";
 import { CaseDetails } from "../CaseDetailsScreen/CaseDetailsScreen";
 import ActionButton from "../CommonComponents/ActionButton";
 import { useAdTrigger } from "../CommonComponents/AdManager";
@@ -1424,6 +1425,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           if (success) {
             Alert.alert(t("alert_success"), t("editcase_success_updated"));
             await incrementCaseActionCount();
+            syncCasesToCloud().catch((err) => console.log("Background cloud sync on update:", err));
             navigation.navigate("CaseDetails", {
               caseId: caseIdToUpdate,
             });
@@ -1504,6 +1506,7 @@ const AddCase: React.FC<AddCaseProps> = ({ route }) => {
           if (newCaseId) {
             Alert.alert(t("alert_success"), t("editcase_success_saved"));
             await incrementCaseActionCount();
+            syncCasesToCloud().catch((err) => console.log("Background cloud sync on create:", err));
             (navigation as any).replace("CaseDetails", {
               caseId: newCaseId,
             });

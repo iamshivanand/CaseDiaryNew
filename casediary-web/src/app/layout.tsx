@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono, Noto_Sans_Devanagari } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { ToastProvider } from "@/context/ToastContext";
 import { AppLayoutWrapper } from "@/components/AppLayoutWrapper";
 
 const geistSans = Geist({
@@ -133,6 +135,7 @@ export default function RootLayout({
             `,
           }}
         />
+        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
       </head>
       <body
         suppressHydrationWarning
@@ -141,7 +144,9 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <LanguageProvider>
-              <AppLayoutWrapper>{children}</AppLayoutWrapper>
+              <ToastProvider>
+                <AppLayoutWrapper>{children}</AppLayoutWrapper>
+              </ToastProvider>
             </LanguageProvider>
           </AuthProvider>
         </ThemeProvider>

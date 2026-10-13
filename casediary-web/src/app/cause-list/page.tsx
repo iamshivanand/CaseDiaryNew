@@ -17,6 +17,7 @@ import {
 import { formatDate, getTodayDateString, getTomorrowDateString } from "@/lib/utils";
 import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { useLanguage } from "@/context/LanguageContext";
+import { apiFetch } from "@/lib/apiClient";
 
 export default function CauseListPage() {
   const { t, language } = useLanguage();
@@ -32,7 +33,7 @@ export default function CauseListPage() {
   const fetchCauseList = async (date: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/cause-list?date=${date}`);
+      const res = await apiFetch(`/api/cause-list?date=${date}`);
       const json = await res.json();
       if (json.success) {
         setData(json);

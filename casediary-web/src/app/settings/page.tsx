@@ -15,14 +15,22 @@ import {
   Sun,
   Moon,
   Monitor,
+  LogOut,
+  Lock,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 
 export default function ChamberSettingsPage() {
   const { t, language } = useLanguage();
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const { user, logout } = useAuth();
+  const toast = useToast();
+  const router = useRouter();
   const [profile, setProfile] = useState({
     name: "",
     designation: "",
@@ -78,6 +86,19 @@ export default function ChamberSettingsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const [showConfirmSignOut, setShowConfirmSignOut] = useState(false);
+
+  const executeSignOut = () => {
+    logout();
+    toast.info(
+      language === "en" ? "Session Terminated" : "सत्र समाप्त",
+      language === "en"
+        ? "You have been securely signed out. All local tokens and credentials have been purged."
+        : "आप सुरक्षित रूप से साइन आउट हो गए हैं। सभी स्थानीय टोकन और क्रेडेंशियल्स हटा दिए गए हैं।"
+    );
+    router.replace("/auth/login");
   };
 
   return (
@@ -323,6 +344,70 @@ export default function ChamberSettingsPage() {
           </button>
         </div>
       </form>
+
+      {/* Chamber Session Security & Sign Out Section */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center space-x-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              <span>{language === "en" ? "Session Security & Authentication" : "सत्र सुरक्षा एवं प्रमाणीकरण"}</span>
+            </h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xl">
+              {language === "en"
+                ? "Your active chamber session is securely encrypted. To prevent unauthorized access on shared courthouse terminals, you may terminate this session to purge all local tokens."
+                : "आपका सक्रिय चेंबर सत्र सुरक्षित रूप से एन्क्रिप्टेड है। साझा न्यायालय टर्मिनलों पर अनधिकृत पहुंच रोकने के लिए आप इस सत्र को समाप्त कर सकते हैं।"}
+            </p>
+          </div>
+          <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>{language === "en" ? "Active Protected Session" : "सक्रिय सुरक्षित सत्र"}</span>
+          </span>
+        </div>
+
+        <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/70 dark:border-zinc-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="space-y-0.5">
+            <div className="flex items-center space-x-2">
+              <span className="font-bold text-zinc-900 dark:text-zinc-100">{user?.name || "Active Advocate"}</span>
+              <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.2 rounded border border-amber-500/20">
+                {user?.role}
+              </span>
+            </div>
+            <span className="text-zinc-500 dark:text-zinc-400 block text-[11px]">
+              {user?.email || user?.phone || user?.enrollment || "Chamber Counsel"} • {user?.chamber?.name || "Advocate Chambers"}
+            </span>
+          </div>
+
+          {!showConfirmSignOut ? (
+            <button
+              onClick={() => setShowConfirmSignOut(true)}
+              type="button"
+              className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 font-semibold text-xs border border-rose-200 dark:border-rose-800/60 flex items-center justify-center space-x-2 transition-all cursor-pointer shrink-0"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>{language === "en" ? "Terminate Chamber Session" : "चेंबर सत्र समाप्त करें"}</span>
+            </button>
+          ) : (
+            <div className="flex items-center space-x-2 shrink-0">
+              <button
+                onClick={() => setShowConfirmSignOut(false)}
+                type="button"
+                className="px-3 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 border border-zinc-300 dark:border-zinc-700 font-medium text-xs transition-colors"
+              >
+                {language === "en" ? "Cancel" : "रद्द करें"}
+              </button>
+              <button
+                onClick={executeSignOut}
+                type="button"
+                className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>{language === "en" ? "Confirm & Purge Tokens" : "पुष्टि करें एवं टोकन हटाएं"}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
     </ChamberAuthGuard>
   );

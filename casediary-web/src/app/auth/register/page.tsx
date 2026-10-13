@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -17,12 +17,16 @@ import {
 
 import { useLanguage } from "@/context/LanguageContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 
 function RegisterForm() {
   const { t, language } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const planParam = searchParams.get("plan") || "pro";
+  const { isAuthenticated, isLoading, registerChamber } = useAuth();
+  const toast = useToast();
 
   const [fullName, setFullName] = useState("");
   const [enrollment, setEnrollment] = useState("");
@@ -31,23 +35,56 @@ function RegisterForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = (e: React.FormEvent) => {
+  // If already authenticated, redirect straight to dashboard
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace("/");
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!fullName || !email || !password) {
+      toast.error(
+        language === "en" ? "Required Fields Missing" : "आवश्यक फ़ील्ड छूटे हैं",
+        language === "en" ? "Please fill all required fields" : "कृपया सभी आवश्यक फ़ील्ड भरें"
+      );
+      return;
+    }
     setLoading(true);
 
-    const userProfile = {
-      name: fullName || "Advocate",
-      enrollment: enrollment || "D/XXXX/2026",
-      court,
-      role: "Lead Advocate",
-      plan: planParam === "chamber" ? "CHAMBER ENTERPRISE" : planParam === "free" ? "SOLO FREE" : "PRO ADVOCATE",
-    };
+    const planTier =
+      planParam === "chamber"
+        ? "firm_enterprise"
+        : planParam === "free"
+        ? "solo"
+        : "chamber_pro";
 
-    localStorage.setItem("advocase_user", JSON.stringify(userProfile));
+    const result = await registerChamber({
+      name: fullName.trim(),
+      email: email.trim(),
+      password: password.trim(),
+      barCouncilNumber: enrollment.trim(),
+      chamberName: `${fullName.trim()}'s Law Chamber`,
+      planTier,
+    });
 
-    setTimeout(() => {
-      router.push("/");
-    }, 600);
+    setLoading(false);
+
+    if (result.success && result.user) {
+      toast.welcome({
+        name: result.user.name,
+        role: result.user.role,
+        isNewUser: true,
+        chamberName: result.user.chamber?.name,
+      });
+      router.replace("/");
+    } else {
+      toast.error(
+        language === "en" ? "Registration Failed" : "पंजीकरण विफल रहा",
+        result.error || (language === "en" ? "Could not register chamber." : "चेंबर पंजीकृत नहीं हो सका।")
+      );
+    }
   };
 
   return (
