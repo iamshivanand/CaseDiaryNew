@@ -1,9 +1,12 @@
-import { render, fireEvent, waitFor } from "@testing-library/react-native";
+import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
 import React from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import * as db from "../../../DataBase";
 import LanguageProvider from "../../../Providers/LanguageProvider";
 import ThemeProvider from "../../../Providers/ThemeProvider";
+import { ToastProvider } from "../../../Providers/ToastContext";
+import dbCacheManager from "../../../utils/dbCacheManager";
 import { exportUndatedCasesToPdf } from "../../../utils/pdfExporter";
 import UndatedCasesScreen from "../UndatedCasesScreen";
 
@@ -39,12 +42,12 @@ const mockCases = [
 ];
 
 jest.mock("../../../DataBase", () => ({
-  ...jest.requireActual("../../../DataBase"),
   getCases: jest.fn(() => Promise.resolve(mockCases)),
   getUndatedCases: jest.fn(() => Promise.resolve(mockCases)),
   getCaseById: jest.fn((id) =>
     Promise.resolve(mockCases.find((c) => c.id === id))
   ),
+  getDb: jest.fn(() => Promise.resolve({})),
 }));
 
 // Mock PDF Exporter
@@ -61,26 +64,37 @@ jest.mock("../../CommonComponents/AdManager", () => ({
   AdProvider: ({ children }: any) => children,
   useAdTrigger: () => ({
     showAdWithPreload: mockShowAd,
+    recordCaseUpdateMilestone: jest.fn((cb) => {
+      if (cb) cb(true);
+    }),
   }),
 }));
 
 const renderWithProviders = () => {
   return render(
-    <ThemeProvider>
-      <LanguageProvider>
-        <UndatedCasesScreen />
-      </LanguageProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <ToastProvider>
+            <UndatedCasesScreen />
+          </ToastProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 };
 
 describe("UndatedCasesScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    dbCacheManager.resetForTesting();
   });
 
   it("should render the undated cases header and lists correctly", async () => {
     const { findByText } = renderWithProviders();
+    await waitFor(() => {
+      expect(db.getUndatedCases).toHaveBeenCalled();
+    });
     const caseTitle = await findByText("State vs John (Undated)");
     expect(caseTitle).toBeTruthy();
     expect(mockNavigationObj.setOptions).toHaveBeenCalled();
@@ -88,7 +102,11 @@ describe("UndatedCasesScreen", () => {
 
   it("should trigger ad preloading and undated cause list PDF export on Share List press", async () => {
     const { findByText } = renderWithProviders();
-    await findByText("State vs John (Undated)");
+    await waitFor(() => {
+      expect(db.getUndatedCases).toHaveBeenCalled();
+    });
+    const caseTitle = await findByText("State vs John (Undated)");
+    expect(caseTitle).toBeTruthy();
 
     expect(mockNavigationObj.setOptions).toHaveBeenCalled();
 
@@ -97,16 +115,17 @@ describe("UndatedCasesScreen", () => {
         mockNavigationObj.setOptions.mock.calls.length - 1
       ][0];
     const HeaderRight = lastCall.headerRight;
-    const { getByText } = render(HeaderRight());
-    const shareButton = getByText("Share PDF");
-    expect(shareButton).toBeTruthy();
-
-    fireEvent.press(shareButton);
+    const headerElement = HeaderRight();
+    await act(async () => {
+      headerElement.props.onPress();
+    });
 
     const generatePdfButton = await findByText("Generate PDF");
     expect(generatePdfButton).toBeTruthy();
 
-    fireEvent.press(generatePdfButton);
+    await act(async () => {
+      fireEvent.press(generatePdfButton);
+    });
 
     await waitFor(() => {
       expect(mockShowAd).toHaveBeenCalledWith("rewarded", expect.any(Function));

@@ -67,13 +67,16 @@ jest.mock("react-native-google-mobile-ads", () => {
   };
 });
 
-jest.mock(
-  "expo-network",
-  () => ({
-    getNetworkStateAsync: jest.fn(() => Promise.resolve({ isConnected: true })),
-  }),
-  { virtual: true }
-);
+jest.mock("expo-network", () => ({
+  getNetworkStateAsync: jest.fn(() => Promise.resolve({ isConnected: true })),
+}));
+
+jest.mock("react-native", () => {
+  const RN = jest.requireActual("react-native");
+  RN.Modal = ({ children, visible }: any) =>
+    visible ? children : null;
+  return RN;
+});
 
 const getMockRewarded = () => {
   const { RewardedAd } = require("react-native-google-mobile-ads");
@@ -90,7 +93,7 @@ const TestComponent = ({
 }: {
   onComplete: (success: boolean) => void;
 }) => {
-  const { showAdWithPreload } = useAdTrigger();
+  const { showAdWithPreload, recordCaseUpdateMilestone } = useAdTrigger();
   return (
     <View>
       <Button
@@ -100,6 +103,10 @@ const TestComponent = ({
       <Button
         title="Show Interstitial"
         onPress={() => showAdWithPreload("interstitial", onComplete)}
+      />
+      <Button
+        title="Record Update Milestone"
+        onPress={() => recordCaseUpdateMilestone(onComplete)}
       />
     </View>
   );
@@ -186,7 +193,9 @@ describe("AdManager", () => {
     const onComplete = jest.fn();
     const { getByText, queryByText } = renderWithProviders(onComplete);
 
-    fireEvent.press(getByText("Show Rewarded"));
+    await act(async () => {
+      fireEvent.press(getByText("Show Rewarded"));
+    });
 
     // Verify preload modal is displayed
     await waitFor(() => {
@@ -194,7 +203,7 @@ describe("AdManager", () => {
     });
 
     // Simulate ad loaded event
-    act(() => {
+    await act(async () => {
       if (global.rewardedListeners["rewarded_loaded"]) {
         global.rewardedListeners["rewarded_loaded"]();
       }
@@ -203,6 +212,28 @@ describe("AdManager", () => {
     await waitFor(() => {
       expect(queryByText("Preloading Ad...")).toBeNull();
       expect(getMockRewarded().show).toHaveBeenCalled();
+    });
+  });
+
+  it("should trigger ad on reaching 5 case updates milestone", async () => {
+    jest.spyOn(AsyncStorage, "getItem").mockImplementation((key) => {
+      if (key === "@user_is_premium") return Promise.resolve("false");
+      if (key === "@case_update_counter") return Promise.resolve("4"); // 4 previous updates + 1 new = 5
+      if (key === "@case_update_last_ad_time") return Promise.resolve(Date.now().toString());
+      return Promise.resolve(null);
+    });
+    (Network.getNetworkStateAsync as jest.Mock).mockResolvedValue({
+      isConnected: true,
+    });
+    getMockInterstitial().loaded = true;
+    const onComplete = jest.fn();
+    const { getByText } = renderWithProviders(onComplete);
+
+    fireEvent.press(getByText("Record Update Milestone"));
+
+    await waitFor(() => {
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith("@case_update_counter", "0");
+      expect(getMockInterstitial().show).toHaveBeenCalled();
     });
   });
 });

@@ -98,9 +98,18 @@ export interface Document {
 
 export type TimelineEventType =
   | "hearing_proceeding"
+  | "hearing_scheduled"
+  | "hearing_adjourned"
+  | "status_change"
+  | "judge_change"
+  | "court_change"
+  | "stage_change"
+  | "case_created"
   | "date_fee_payment"
   | "total_fee_payment"
-  | "date_fee_agreed";
+  | "date_fee_agreed"
+  | "total_fee_agreed"
+  | string;
 
 export interface TimelineEvent {
   id: number | string; // number from DB, string for temporary _clientSideId if 'new'
@@ -111,6 +120,7 @@ export interface TimelineEvent {
   event_type?: TimelineEventType;
   amount?: number | null;
   payment_mode?: string | null;
+  created_at?: string;
 
   // Client-side flags for managing state before saving
   _clientSideId?: string; // For 'new' items before they have a DB id (e.g., uuidv4())

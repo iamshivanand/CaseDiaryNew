@@ -52,6 +52,7 @@ jest.mock("expo-document-picker", () => ({
 // Mock for expo-file-system (basic, expand as needed)
 jest.mock("expo-file-system", () => ({
   documentDirectory: "file:///mockDocumentDirectory/", // Expo's FS paths often have file:// prefix
+  cacheDirectory: "file:///mockCacheDirectory/",
   getInfoAsync: jest.fn((uri) => {
     // console.log(`Mock FS: getInfoAsync for ${uri}`);
     // Simulate file existence based on a known path or a convention
@@ -69,6 +70,12 @@ jest.mock("expo-file-system", () => ({
   makeDirectoryAsync: jest.fn(() => Promise.resolve()),
   copyAsync: jest.fn(() => Promise.resolve()), // Assume copy always succeeds
   deleteAsync: jest.fn(() => Promise.resolve()), // Assume delete always succeeds
+  readAsStringAsync: jest.fn(() => Promise.resolve("")),
+  writeAsStringAsync: jest.fn(() => Promise.resolve()),
+  EncodingType: {
+    Base64: "base64",
+    UTF8: "utf8",
+  },
   getContentUriAsync: jest.fn((uri) =>
     Promise.resolve("content://mocked/" + uri.split("/").pop())
   ),
@@ -90,6 +97,7 @@ jest.mock(
   "expo-notifications",
   () => ({
     setNotificationHandler: jest.fn(),
+    setNotificationChannelAsync: jest.fn(() => Promise.resolve()),
     getPermissionsAsync: jest.fn(() => Promise.resolve({ status: "granted" })),
     requestPermissionsAsync: jest.fn(() =>
       Promise.resolve({ status: "granted" })
@@ -99,6 +107,24 @@ jest.mock(
     ),
     getAllScheduledNotificationsAsync: jest.fn(() => Promise.resolve([])),
     cancelScheduledNotificationAsync: jest.fn(() => Promise.resolve()),
+    cancelAllScheduledNotificationsAsync: jest.fn(() => Promise.resolve()),
+    addNotificationResponseReceivedListener: jest.fn(() => ({
+      remove: jest.fn(),
+    })),
+    addNotificationReceivedListener: jest.fn(() => ({
+      remove: jest.fn(),
+    })),
+    getLastNotificationResponseAsync: jest.fn(() => Promise.resolve(null)),
+    AndroidImportance: {
+      HIGH: 4,
+      DEFAULT: 3,
+      LOW: 2,
+    },
+    AndroidNotificationPriority: {
+      HIGH: "high",
+      DEFAULT: "default",
+      LOW: "low",
+    },
   }),
   { virtual: true }
 );
@@ -301,6 +327,9 @@ jest.mock("./Screens/CommonComponents/AdManager", () => ({
     showAdWithPreload: jest.fn((adType, onComplete) => {
       onComplete(true);
     }),
+    recordCaseUpdateMilestone: jest.fn((onComplete) => {
+      if (onComplete) onComplete(true);
+    }),
   }),
 }));
 
@@ -328,3 +357,20 @@ jest.mock(
   },
   { virtual: true }
 );
+
+// Mock for react-native-safe-area-context
+jest.mock("react-native-safe-area-context", () => {
+  const inset = { top: 0, right: 0, bottom: 0, left: 0 };
+  return {
+    SafeAreaProvider: jest.fn(({ children }) => children),
+    SafeAreaConsumer: jest.fn(({ children }) => children(inset)),
+    useSafeAreaInsets: jest.fn(() => inset),
+    useSafeAreaFrame: jest.fn(() => ({ x: 0, y: 0, width: 390, height: 844 })),
+    SafeAreaView: jest.fn(({ children, style, ...props }) => {
+      const React = require("react");
+      const { View } = require("react-native");
+      return React.createElement(View, { style, ...props }, children);
+    }),
+  };
+});
+

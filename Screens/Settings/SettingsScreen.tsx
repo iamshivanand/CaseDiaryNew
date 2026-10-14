@@ -18,6 +18,12 @@ import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { RootStackParamList } from "../../Types/navigationtypes";
 import { exportDatabaseBackup } from "../../utils/backupManager";
+import {
+  generateCasesCSV,
+  generateSampleTemplateCSV,
+  shareCsvFile,
+} from "../../utils/bulkCaseManager";
+import { getDb } from "../../DataBase";
 import { reScheduleAllNotifications } from "../../utils/notificationScheduler";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 
@@ -291,6 +297,60 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const handleRestore = () => {
     // @ts-ignore
     navigation.navigate("DatabaseImportScreen");
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      await showAdWithPreload("rewarded", async (success) => {
+        if (!success) return;
+        try {
+          const database = await getDb();
+          const userIdStr = await AsyncStorage.getItem("@user_id");
+          const userId = userIdStr ? parseInt(userIdStr, 10) : null;
+          const cases = await database.getAllAsync<any>(
+            "SELECT * FROM Cases WHERE user_id IS NULL OR user_id = ? ORDER BY id ASC",
+            [userId]
+          );
+          if (!cases || cases.length === 0) {
+            Alert.alert(
+              locale === "en" ? "No Cases Found" : "कोई केस नहीं मिला",
+              locale === "en"
+                ? "There are no cases in your database to export."
+                : "निर्यात करने के लिए आपके डेटाबेस में कोई केस नहीं है।"
+            );
+            return;
+          }
+          const csv = generateCasesCSV(cases);
+          await shareCsvFile(csv, "Advocase_Cases_Export.csv");
+        } catch (err: any) {
+          Alert.alert(
+            locale === "en" ? "Export Failed" : "निर्यात विफल",
+            err.message || "Could not export cases."
+          );
+        }
+      });
+    } catch (adError) {
+      console.warn("Ad preloading or display encountered an error:", adError);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      await showAdWithPreload("interstitial", async (success) => {
+        if (!success) return;
+        try {
+          const csv = generateSampleTemplateCSV();
+          await shareCsvFile(csv, "Advocase_Import_Template.csv");
+        } catch (err: any) {
+          Alert.alert(
+            locale === "en" ? "Download Failed" : "डाउनलोड विफल",
+            err.message || "Could not download template."
+          );
+        }
+      });
+    } catch (adError) {
+      console.warn("Ad preloading or display encountered an error:", adError);
+    }
   };
 
   const handleImportCSV = () => {
@@ -579,6 +639,58 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
               />
             )}
             onPress={handleRestore}
+            titleStyle={{ color: theme.colors.text, fontWeight: "600" }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+          <Divider
+            style={[styles.divider, { backgroundColor: theme.colors.border }]}
+          />
+
+          <List.Item
+            title={t("settings_export_csv_btn")}
+            description={t("settings_export_csv_desc")}
+            left={(props) => (
+              <List.Icon
+                {...props}
+                icon="file-excel-outline"
+                color={theme.colors.primary}
+              />
+            )}
+            right={(props) => (
+              <List.Icon
+                {...props}
+                icon="chevron-right"
+                color={theme.colors.textSecondary}
+              />
+            )}
+            onPress={handleExportCSV}
+            titleStyle={{ color: theme.colors.text, fontWeight: "600" }}
+            descriptionStyle={{ color: theme.colors.textSecondary }}
+            style={styles.listItem}
+          />
+          <Divider
+            style={[styles.divider, { backgroundColor: theme.colors.border }]}
+          />
+
+          <List.Item
+            title={t("settings_download_template_btn")}
+            description={t("settings_download_template_desc")}
+            left={(props) => (
+              <List.Icon
+                {...props}
+                icon="download-outline"
+                color={theme.colors.primary}
+              />
+            )}
+            right={(props) => (
+              <List.Icon
+                {...props}
+                icon="chevron-right"
+                color={theme.colors.textSecondary}
+              />
+            )}
+            onPress={handleDownloadTemplate}
             titleStyle={{ color: theme.colors.text, fontWeight: "600" }}
             descriptionStyle={{ color: theme.colors.textSecondary }}
             style={styles.listItem}

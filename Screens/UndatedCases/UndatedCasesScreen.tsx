@@ -8,20 +8,24 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  SafeAreaView,
   Platform,
   DeviceEventEmitter,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
 import * as db from "../../DataBase";
+import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
+import { useToast } from "../../Providers/ToastContext";
 import { CaseDataScreen } from "../../Types/appTypes";
 import { CASE_UPDATED_EVENT } from "../../utils/caseEvents";
 import { mapCaseDbToScreen } from "../../utils/caseMapper";
 import {
   getCurrentUserId,
+  formatDate,
   getLocalDateString,
+  normalizeDateToYYYYMMDD,
 } from "../../utils/commonFunctions";
 import dbCacheManager from "../../utils/dbCacheManager";
 import { exportUndatedCasesToPdf } from "../../utils/pdfExporter";
@@ -47,18 +51,21 @@ const AnimatedNewCaseCard = ({
       <NewCaseCard
         caseDetails={caseDetails}
         onUpdateHearingPress={onUpdateHearingPress}
+        marginHorizontal={0}
       />
     </Animated.View>
   );
 };
 
 const UndatedCasesScreen = () => {
+  const insets = useSafeAreaInsets();
   const { theme } = useContext(ThemeContext);
+  const { showToast } = useToast();
   const [undatedCases, setUndatedCases] = useState<CaseDataScreen[]>([]);
   const [rawCases, setRawCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<any>();
-  const { showAdWithPreload } = useAdTrigger();
+  const { showAdWithPreload, recordCaseUpdateMilestone } = useAdTrigger();
   const [isPopupVisible, setPopupVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
   const [isCauseListModalVisible, setIsCauseListModalVisible] = useState(false);
@@ -186,6 +193,14 @@ const UndatedCasesScreen = () => {
       );
 
       fetchUndatedCases();
+      recordCaseUpdateMilestone();
+
+      const formattedNextDate = formatDate(getLocalDateString(nextHearingDate));
+      showToast({
+        title: "Hearing Scheduled",
+        message: `Next hearing set to ${formattedNextDate}`,
+        type: "success",
+      });
 
       setTimeout(() => {
         promptClientNotification(
@@ -203,7 +218,7 @@ const UndatedCasesScreen = () => {
     ({ item, index }: { item: CaseDataScreen; index: number }) => (
       <AnimatedNewCaseCard
         caseDetails={item}
-        onUpdateHearingPress={() => handleUpdateHearing(item)}
+        onUpdateHearingPress={handleUpdateHearing}
         index={index}
       />
     ),
@@ -211,8 +226,7 @@ const UndatedCasesScreen = () => {
   );
 
   const keyExtractor = useCallback(
-    (item: CaseDataScreen) =>
-      `${item.id}-${(item as any).updated_at || ""}-${(item as any).fee_paid || 0}-${(item as any).date_fee_collected || 0}-${(item as any).date_fee_paid || 0}-${(item as any).date_fee || 0}-${item.nextHearing || ""}`,
+    (item: CaseDataScreen) => String(item.id),
     []
   );
 
@@ -285,31 +299,39 @@ const UndatedCasesScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView
-        style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
+      <View
+        style={[
+          styles.safeArea,
+          {
+            backgroundColor: theme.colors.background,
+            paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
+          },
+        ]}
       >
         <SkeletonList count={3} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
+    <View
+      style={[
+        styles.safeArea,
+        {
+          backgroundColor: theme.colors.background,
+          paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
+        },
+      ]}
     >
       <FlatList
         data={undatedCases}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        getItemLayout={(data, index) => ({
-          length: 160,
-          offset: 160 * index,
-          index,
-        })}
-        initialNumToRender={6}
-        maxToRenderPerBatch={6}
-        windowSize={3}
-        removeClippedSubviews
+        initialNumToRender={8}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={Platform.OS === "android"}
         ListEmptyComponent={
           <Text
             style={[styles.emptyText, { color: theme.colors.textSecondary }]}
@@ -323,6 +345,7 @@ const UndatedCasesScreen = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
+          currentNextDate={selectedCase.NextDate || selectedCase.nextHearing}
           onSave={async (notes, nextHearingDate, feeReceivedToday) =>
             handleSaveHearing(
               notes,
@@ -339,7 +362,7 @@ const UndatedCasesScreen = () => {
         onGenerate={handleGenerateUndatedPdf}
         title="Customize Undated Cases List"
       />
-    </SafeAreaView>
+    </View>
   );
 };
 

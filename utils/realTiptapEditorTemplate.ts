@@ -44,23 +44,24 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       box-sizing: border-box;
       -webkit-tap-highlight-color: transparent;
     }
-    html, body {
-      margin: 0;
-      padding: 0;
+    html {
       width: 100%;
       min-height: 100%;
       background-color: #e5e7eb;
       font-family: 'Times New Roman', Georgia, serif;
+      scroll-padding-top: 80px;
     }
     body {
-      padding: 8px 4px 40px 4px;
+      margin: 0;
+      padding: 55px 4px 60px 4px;
       display: flex;
       justify-content: center;
       box-sizing: border-box;
+      scroll-padding-top: 80px;
     }
     .page-container {
       position: relative;
-      margin: 0 auto;
+      margin: 10px auto 0 auto;
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
       border-radius: 6px;
       overflow: hidden;
@@ -69,6 +70,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       box-sizing: border-box;
       width: 100%;
       max-width: 816px;
+      scroll-margin-top: 80px;
     }
     .page-margin-guide {
       position: absolute;
@@ -220,7 +222,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
     .tiptap td, .tiptap th, .editor-table td, .editor-table th {
       border: 1px solid #94a3b8;
       padding: 8px;
-      font-size: 15px;
+      font-size: inherit;
       vertical-align: top;
       box-sizing: border-box;
       position: relative;
@@ -228,6 +230,43 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
     .tiptap th, .editor-table th {
       background-color: #f1f5f9;
       font-weight: bold;
+    }
+    /* Borderless Multi-Column Grid Tables (Method 1) */
+    .tiptap table.borderless-table, .editor-table.borderless-table,
+    .tiptap table.borderless-columns, .editor-table.borderless-columns,
+    table.borderless-table, table.borderless-columns {
+      border: none !important;
+      margin: 8px 0;
+      width: 100%;
+    }
+    .tiptap table.borderless-table td, .editor-table.borderless-table td,
+    .tiptap table.borderless-columns td, .editor-table.borderless-columns td,
+    table.borderless-table td, table.borderless-columns td {
+      border: 1px dashed #cbd5e1 !important; /* Subtle guide in editor mode */
+      padding: 6px 8px;
+    }
+    .tiptap table.borderless-table th, .editor-table.borderless-table th,
+    .tiptap table.borderless-columns th, .editor-table.borderless-columns th,
+    table.borderless-table th, table.borderless-columns th {
+      border: 1px dashed #cbd5e1 !important;
+      background-color: transparent !important;
+    }
+    @media print {
+      .tiptap table.borderless-table, .editor-table.borderless-table,
+      .tiptap table.borderless-columns, .editor-table.borderless-columns,
+      table.borderless-table, table.borderless-columns {
+        border: none !important;
+      }
+      .tiptap table.borderless-table td, .editor-table.borderless-table td,
+      .tiptap table.borderless-columns td, .editor-table.borderless-columns td,
+      .tiptap table.borderless-table th, .editor-table.borderless-table th,
+      .tiptap table.borderless-columns th, .editor-table.borderless-columns th,
+      table.borderless-table td, table.borderless-columns td,
+      table.borderless-table th, table.borderless-columns th {
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+      }
     }
     .signature-stamp {
       max-height: 90px;
@@ -348,6 +387,90 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       } catch (e) {}
     }
 
+    // Selection preservation on blur (for native ribbon buttons)
+    let savedSelection = { from: 0, to: 0 };
+
+    // Native ProseMirror Mark for Font Sizing (preserves bold, italic, paragraphs, links)
+    const FontSizeMark = Tiptap.Mark.create({
+      name: 'fontSize',
+      addAttributes() {
+        return {
+          size: {
+            default: null,
+            parseHTML: element => element.style.fontSize || element.getAttribute('data-size'),
+            renderHTML: attributes => {
+              if (!attributes.size) return {};
+              return {
+                style: 'font-size: ' + attributes.size,
+              };
+            },
+          },
+        };
+      },
+      parseHTML() {
+        return [
+          {
+            tag: 'span[style*="font-size"]',
+            getAttrs: element => {
+              const fs = element.style.fontSize;
+              return fs ? { size: fs } : false;
+            },
+          },
+        ];
+      },
+      renderHTML({ HTMLAttributes }) {
+        return ['span', HTMLAttributes, 0];
+      },
+      addCommands() {
+        return {
+          setFontSize: size => ({ chain }) => {
+            return chain().setMark(this.name, { size: size }).run();
+          },
+          unsetFontSize: () => ({ chain }) => {
+            return chain().unsetMark(this.name).run();
+          },
+        };
+      },
+    });
+
+    // Native ProseMirror Extension for Block Text Alignment (Left, Center, Right, Justify)
+    const TextAlignExtension = Tiptap.Extension.create({
+      name: 'textAlign',
+      addGlobalAttributes() {
+        return [
+          {
+            types: ['heading', 'paragraph', 'blockquote'],
+            attributes: {
+              textAlign: {
+                default: null,
+                parseHTML: element => element.style.textAlign || null,
+                renderHTML: attributes => {
+                  if (!attributes.textAlign) return {};
+                  return {
+                    style: 'text-align: ' + attributes.textAlign + ';',
+                  };
+                },
+              },
+            },
+          },
+        ];
+      },
+      addCommands() {
+        return {
+          setTextAlign: (alignment) => ({ commands }) => {
+            return ['paragraph', 'heading', 'blockquote'].some(type =>
+              commands.updateAttributes(type, { textAlign: alignment })
+            );
+          },
+          unsetTextAlign: () => ({ commands }) => {
+            return ['paragraph', 'heading', 'blockquote'].some(type =>
+              commands.resetAttributes(type, 'textAlign')
+            );
+          },
+        };
+      },
+    });
+
     // Initialize True Tiptap Engine with ProseMirror AST
     let editor = null;
     try {
@@ -358,6 +481,8 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             heading: { levels: [1, 2, 3, 4, 5, 6] },
           }),
           Tiptap.Underline,
+          FontSizeMark,
+          TextAlignExtension,
           Tiptap.Table.configure({
             resizable: true,
             HTMLAttributes: {
@@ -374,10 +499,76 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
         content: initialContentHtml,
         autofocus: false,
         editable: true,
+        editorProps: {
+          transformPastedHTML(html) {
+            if (!html) return html;
+            try {
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(html, 'text/html');
+
+              const allElements = doc.body.querySelectorAll('*');
+              allElements.forEach(el => {
+                if (el.hasAttribute('style')) {
+                  // Strip fixed font size, font family, line height, text colors, background colors from foreign pasted HTML
+                  el.style.removeProperty('font-size');
+                  el.style.removeProperty('font-family');
+                  el.style.removeProperty('line-height');
+                  el.style.removeProperty('color');
+                  el.style.removeProperty('background-color');
+                  el.style.removeProperty('background');
+                  
+                  const cleanStyle = el.getAttribute('style');
+                  if (!cleanStyle || cleanStyle.trim() === '') {
+                    el.removeAttribute('style');
+                  }
+                }
+                
+                // Remove legacy font tag styling attributes
+                if (el.tagName && el.tagName.toLowerCase() === 'font') {
+                  el.removeAttribute('size');
+                  el.removeAttribute('face');
+                  el.removeAttribute('color');
+                }
+
+                // Unwrap bare spans that have no attributes
+                if (el.tagName && el.tagName.toLowerCase() === 'span' && !el.hasAttributes()) {
+                  const parent = el.parentNode;
+                  if (parent) {
+                    while (el.firstChild) {
+                      parent.insertBefore(el.firstChild, el);
+                    }
+                    parent.removeChild(el);
+                  }
+                }
+              });
+
+              return doc.body.innerHTML;
+            } catch (e) {
+              console.warn('[Tiptap:Paste] Failed to sanitize pasted HTML:', e);
+              return html;
+            }
+          },
+        },
         onUpdate() {
           sendStateToRN(false);
         },
         onSelectionUpdate() {
+          if (editor) {
+            const { from, to } = editor.state.selection;
+            if (from !== to) {
+              savedSelection = { from, to };
+              try {
+                const domSelection = window.getSelection();
+                if (domSelection && domSelection.rangeCount > 0) {
+                  const range = domSelection.getRangeAt(0);
+                  const rect = range.getBoundingClientRect();
+                  if (rect.top < 95) {
+                    window.scrollBy({ top: rect.top - 110, behavior: 'smooth' });
+                  }
+                }
+              } catch (e) {}
+            }
+          }
           sendStateToRN(false);
         },
       });
@@ -462,7 +653,16 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       const dynamicTopMargin = Math.round((configuredTopMargin + configuredLetterhead) * scaleRatio);
       const dynamicBottomMargin = Math.round(configuredBottomMargin * scaleRatio);
 
-      const printableSheetHeight = Math.max(100, singleSheetHeight - (dynamicTopMargin + dynamicBottomMargin));
+      // Proportional font, line-height, spacing & padding derived strictly from scaleRatio
+      const baseFontSize = window.userFontSize || 12;
+      const renderFontPx = Math.max(10, Math.round(baseFontSize * scaleRatio));
+
+      // Font expansion factor on mobile screens (due to Math.max(10, ...) readability minimum)
+      const idealFontPx = baseFontSize * scaleRatio;
+      const fontExpansionFactor = idealFontPx > 0 ? (renderFontPx / idealFontPx) : 1;
+      const visualSheetHeight = Math.round(singleSheetHeight * fontExpansionFactor);
+
+      const printableSheetHeight = Math.max(100, visualSheetHeight - (dynamicTopMargin + dynamicBottomMargin));
       const pageBreakElements = editorEl.querySelectorAll('.legal-page-break, hr.page-break');
       const pageBreakCount = pageBreakElements.length;
 
@@ -472,17 +672,13 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       const totalPages = Math.max(1, pageBreakCount + 1, overflowPages);
       
       const pageGap = Math.round(20 * scaleRatio);
-      const canvasHeight = Math.round((singleSheetHeight * totalPages) + (pageGap * (totalPages - 1)));
+      const canvasHeight = Math.round((visualSheetHeight * totalPages) + (pageGap * (totalPages - 1)));
       container.style.width = paperWidth + 'px';
       container.style.margin = '0 auto';
       editorEl.style.minHeight = canvasHeight + 'px';
       container.style.height = canvasHeight + 'px';
-      
-      // Proportional font, line-height, spacing & padding derived strictly from scaleRatio
-      const baseFontSize = window.userFontSize || 14;
-      const renderFontPx = Math.max(11, Math.round(baseFontSize * scaleRatio));
 
-      const baseLineRatio = window.userLineHeightRatio || (metrics.isLegal ? 1.8 : 1.5);
+      const baseLineRatio = window.userLineHeightRatio || (metrics.isLegal ? 1.25 : 1.2);
       const renderLineHeightPx = (renderFontPx * baseLineRatio).toFixed(1);
 
       const baseLetterSpace = window.userLetterSpacing || 0;
@@ -491,11 +687,11 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       const baseWordSpace = window.userWordSpacing || 0;
       const renderWordSpacePx = (baseWordSpace * scaleRatio).toFixed(2);
 
-      const titlePx = Math.round(renderFontPx * 1.35);
-      const headerPx = Math.round(renderFontPx * 1.22);
-      const sectionPx = Math.round(renderFontPx * 1.12);
-      const paragraphMb = Math.max(4, Math.round(10 * scaleRatio));
-      const padBottomPx = Math.round(30 * scaleRatio);
+      const titlePx = Math.round(renderFontPx * 1.3);
+      const headerPx = Math.round(renderFontPx * 1.2);
+      const sectionPx = Math.round(renderFontPx * 1.1);
+      const paragraphMb = Math.max(3, Math.round(5 * scaleRatio));
+      const padBottomPx = Math.round(20 * scaleRatio);
 
       let dynamicStyle = document.getElementById('dynamic-paper-scale-style');
       if (!dynamicStyle) {
@@ -543,13 +739,13 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
 
       guideOverlay.innerHTML = '';
       for (let i = 0; i < totalPages; i++) {
-        const sheetTop = i * (singleSheetHeight + pageGap);
+        const sheetTop = i * (visualSheetHeight + pageGap);
         const guide = document.createElement('div');
         guide.className = 'page-margin-guide';
         guide.style.left = dynamicLeftMargin + 'px';
         guide.style.top = (sheetTop + dynamicTopMargin) + 'px';
         guide.style.width = Math.max(10, paperWidth - (dynamicLeftMargin + dynamicRightMargin)) + 'px';
-        guide.style.height = Math.max(10, singleSheetHeight - (dynamicTopMargin + dynamicBottomMargin)) + 'px';
+        guide.style.height = Math.max(10, visualSheetHeight - (dynamicTopMargin + dynamicBottomMargin)) + 'px';
         guideOverlay.appendChild(guide);
 
         if (window.userHeaderText) {
@@ -565,7 +761,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           const footerText = window.userFooterText.replace('{page}', i + 1).replace('{total}', totalPages);
           const runningFooter = document.createElement('div');
           runningFooter.className = 'court-running-footer';
-          runningFooter.style.top = (sheetTop + singleSheetHeight - Math.max(14, dynamicBottomMargin * 0.8)) + 'px';
+          runningFooter.style.top = (sheetTop + visualSheetHeight - Math.max(14, dynamicBottomMargin * 0.8)) + 'px';
           runningFooter.style.fontSize = Math.max(8, Math.round(10 * scaleRatio)) + 'px';
           runningFooter.textContent = footerText;
           guideOverlay.appendChild(runningFooter);
@@ -575,7 +771,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           const watermark = document.createElement('div');
           watermark.className = 'court-watermark-overlay';
           watermark.style.position = 'absolute';
-          watermark.style.top = (sheetTop + (singleSheetHeight / 2) - 30) + 'px';
+          watermark.style.top = (sheetTop + (visualSheetHeight / 2) - 30) + 'px';
           watermark.style.left = '0';
           watermark.style.right = '0';
           watermark.style.textAlign = 'center';
@@ -595,7 +791,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
         if (i < totalPages - 1) {
           const divider = document.createElement('div');
           divider.className = 'page-sheet-divider';
-          divider.style.top = (sheetTop + singleSheetHeight) + 'px';
+          divider.style.top = (sheetTop + visualSheetHeight) + 'px';
           divider.style.height = pageGap + 'px';
           divider.textContent = '--- MS Word Page Sheet ' + (i + 1) + ' of ' + totalPages + ' ---';
           guideOverlay.appendChild(divider);
@@ -703,9 +899,16 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
 
     function replaceAllMatches(query, replacement) {
       if (!editor || !query) return;
-      const currentHtml = editor.getHTML();
-      const newHtml = currentHtml.split(query).join(replacement || '');
-      editor.commands.setContent(newHtml);
+      findSearchMatches(query, false);
+      if (searchMatches.length === 0) return;
+
+      const matchesToReplace = [...searchMatches].sort((a, b) => b.from - a.from);
+      matchesToReplace.forEach(match => {
+        try {
+          editor.chain().insertContentAt({ from: match.from, to: match.to }, replacement || '').run();
+        } catch (e) {}
+      });
+
       searchMatches = [];
       currentSearchIndex = -1;
       postMessage({ type: 'searchResult', total: 0, current: 0, query: '' });
@@ -723,6 +926,74 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       else if (mode === 'lower') converted = selectedText.toLowerCase();
       else if (mode === 'title') converted = selectedText.replace(/\b\w/g, function(c) { return c.toUpperCase(); });
       editor.chain().focus().insertContentAt({ from, to }, converted).run();
+    }
+
+    let activeCellElement = null;
+    let activeTableElement = null;
+
+    function updateActiveTableContext(target) {
+      if (!target) return;
+      const table = target.closest ? target.closest('table, .editor-table') : null;
+      const cell = target.closest ? target.closest('td, th') : null;
+      if (table) {
+        activeTableElement = table;
+        document.querySelectorAll('.active-selected-element').forEach(el => el.classList.remove('active-selected-element'));
+        table.classList.add('active-selected-element');
+      }
+      if (cell) {
+        activeCellElement = cell;
+      }
+    }
+
+    function alignActiveTableColumn(align) {
+      if (!editor) return;
+      let cell = activeCellElement;
+      if (!cell) {
+        const sel = window.getSelection();
+        if (sel && sel.anchorNode) {
+          const node = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+          cell = node ? node.closest('td, th') : null;
+        }
+      }
+      if (!cell && activeTableElement) {
+        cell = activeTableElement.querySelector('td, th');
+      }
+      if (!cell) return;
+      const table = cell.closest('table, .editor-table');
+      if (!table) return;
+
+      const colIndex = cell.cellIndex;
+      if (colIndex === undefined || colIndex < 0) return;
+
+      const rows = table.querySelectorAll('tr');
+      rows.forEach(row => {
+        const targetCell = row.children[colIndex];
+        if (targetCell) {
+          targetCell.style.textAlign = align;
+          targetCell.querySelectorAll('p, div, span, h1, h2, h3, h4').forEach(el => {
+            el.style.textAlign = align;
+          });
+        }
+      });
+      sendStateToRN(true);
+    }
+
+    function alignActiveTableCell(align) {
+      if (!editor) return;
+      let cell = activeCellElement;
+      if (!cell) {
+        const sel = window.getSelection();
+        if (sel && sel.anchorNode) {
+          const node = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+          cell = node ? node.closest('td, th') : null;
+        }
+      }
+      if (!cell) return;
+      cell.style.textAlign = align;
+      cell.querySelectorAll('p, div, span, h1, h2, h3, h4').forEach(el => {
+        el.style.textAlign = align;
+      });
+      sendStateToRN(true);
     }
 
     // Native Bridge Dispatcher for True Tiptap Engine
@@ -762,13 +1033,13 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           } else if (cmd === 'underline') {
             editor.chain().focus().toggleUnderline().run();
           } else if (cmd === 'justifyLeft') {
-            editor.chain().focus().setParagraph().run();
+            editor.chain().focus().setTextAlign('left').run();
           } else if (cmd === 'justifyCenter') {
-            editor.chain().focus().setHeading({ level: 2 }).run();
+            editor.chain().focus().setTextAlign('center').run();
           } else if (cmd === 'justifyRight') {
-            editor.chain().focus().setHeading({ level: 3 }).run();
-          } else if (cmd === 'justifyFull') {
-            editor.chain().focus().setParagraph().run();
+            editor.chain().focus().setTextAlign('right').run();
+          } else if (cmd === 'justifyFull' || cmd === 'justify') {
+            editor.chain().focus().setTextAlign('justify').run();
           } else if (cmd === 'insertOrderedList' || cmd === 'toggleLegalList') {
             editor.chain().focus().toggleOrderedList().run();
           } else if (cmd === 'insertUnorderedList') {
@@ -785,6 +1056,13 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             }
           } else if (cmd === 'insertTable') {
             editor.chain().focus().insertTable({ rows: data.rows || 3, cols: data.cols || 3, withHeaderRow: true }).run();
+            setTimeout(function() {
+              const insertedTable = editorEl ? editorEl.querySelector('table') : null;
+              if (insertedTable) {
+                updateActiveTableContext(insertedTable);
+                postMessage({ type: 'openElementContextModal', elementType: 'table' });
+              }
+            }, 120);
           } else if (cmd === 'insertPageBreak') {
             editor.chain().focus().insertContent('<div class="legal-page-break" data-type="page-break" contenteditable="false" style="break-before: page; page-break-before: always; user-select: none;"></div><p></p>').run();
           } else if (cmd === 'insertFilingIndexTable') {
@@ -806,22 +1084,22 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             }
             editor.chain().focus().insertContent(shapeHtml).run();
           } else if (cmd === 'insertMemoOfParties') {
-            const memoHtml = '<p style="text-align: center; font-weight: bold; margin-bottom: 12px;"><strong><u>MEMO OF PARTIES</u></strong></p><table style="width: 100%; border: none; margin-bottom: 14px;"><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>1. [PETITIONER / PLAINTIFF NAME]</strong><br/>S/o, D/o, W/o: [Parent/Spouse Name]<br/>Age: [Age] Years, Occ: [Occupation]<br/>R/o: [Complete Residential Address]<br/>Phone: [Phone Number]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>PETITIONER / PLAINTIFF</strong></td></tr><tr><td colspan="2" style="border: none; text-align: center; padding: 8px 0; font-weight: bold;">VERSUS</td></tr><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>1. [RESPONDENT / DEFENDANT NAME]</strong><br/>S/o, D/o, W/o: [Parent/Spouse Name]<br/>Age: [Age] Years, Occ: [Occupation]<br/>R/o: [Complete Residential Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>RESPONDENT / DEFENDANT</strong></td></tr></table><p></p>';
+            const memoHtml = '<p style="text-align: center; font-weight: bold; margin-bottom: 12px;"><strong><u>MEMO OF PARTIES</u></strong></p><table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin-bottom: 14px;"><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>1. [PETITIONER / PLAINTIFF NAME]</strong><br/>S/o, D/o, W/o: [Parent/Spouse Name]<br/>Age: [Age] Years, Occ: [Occupation]<br/>R/o: [Complete Residential Address]<br/>Phone: [Phone Number]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>PETITIONER / PLAINTIFF</strong></td></tr><tr><td colspan="2" style="border: none; text-align: center; padding: 8px 0; font-weight: bold;">VERSUS</td></tr><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>1. [RESPONDENT / DEFENDANT NAME]</strong><br/>S/o, D/o, W/o: [Parent/Spouse Name]<br/>Age: [Age] Years, Occ: [Occupation]<br/>R/o: [Complete Residential Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>RESPONDENT / DEFENDANT</strong></td></tr></table><p></p>';
             editor.chain().focus().insertContent(memoHtml).run();
           } else if (cmd === 'insertCourtFeeBox') {
             const feeHtml = '<div style="border: 2px dashed #475569; padding: 12px; margin: 16px 0; text-align: center; background-color: #f8fafc; border-radius: 4px;"><p style="margin: 0; font-weight: bold; font-size: 13px; color: #1e293b;">COURT FEE STAMP / E-CHALLAN</p><p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b;">[ Affix Court Fee Stamp of ₹________/- Here ]<br/>CNR / Deficit Fee Reg: __________________</p></div><p></p>';
             editor.chain().focus().insertContent(feeHtml).run();
           } else if (cmd === 'insertUniversalCaption') {
-            const captionHtml = '<p class="court-header" style="text-align: center; font-weight: bold; margin-bottom: 8px;"><strong>IN THE COURT OF [NAME OF COURT / TRIBUNAL]</strong><br/><strong>AT [CITY / JURISDICTION]</strong></p><p style="text-align: center; margin-bottom: 16px;"><strong>CASE NO.: ____________ OF 2026</strong></p><table style="width: 100%; border: none; margin-bottom: 16px;"><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>[PLAINTIFF / PETITIONER NAME]</strong><br/>Address: [Full Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>PLAINTIFF / PETITIONER</strong></td></tr><tr><td colspan="2" style="border: none; text-align: center; padding: 6px 0;"><strong>VERSUS</strong></td></tr><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>[DEFENDANT / RESPONDENT NAME]</strong><br/>Address: [Full Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>DEFENDANT / RESPONDENT</strong></td></tr></table><p></p>';
+            const captionHtml = '<p class="court-header" style="text-align: center; font-weight: bold; margin-bottom: 8px;"><strong>IN THE COURT OF [NAME OF COURT / TRIBUNAL]</strong><br/><strong>AT [CITY / JURISDICTION]</strong></p><p style="text-align: center; margin-bottom: 16px;"><strong>CASE NO.: ____________ OF 2026</strong></p><table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin-bottom: 16px;"><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>[PLAINTIFF / PETITIONER NAME]</strong><br/>Address: [Full Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>PLAINTIFF / PETITIONER</strong></td></tr><tr><td colspan="2" style="border: none; text-align: center; padding: 6px 0;"><strong>VERSUS</strong></td></tr><tr><td style="width: 60%; border: none; vertical-align: top;"><strong>[DEFENDANT / RESPONDENT NAME]</strong><br/>Address: [Full Address]</td><td style="width: 40%; border: none; text-align: right; vertical-align: top;">... <strong>DEFENDANT / RESPONDENT</strong></td></tr></table><p></p>';
             editor.chain().focus().insertContent(captionHtml).run();
           } else if (cmd === 'insertPrayerClause') {
             const prayerHtml = '<p style="text-align: center; font-weight: bold; margin: 18px 0 10px 0;"><strong><u>PRAYER / RELIEF SOUGHT</u></strong></p><p>WHEREFORE, in light of the facts and circumstances stated hereinabove, it is most respectfully prayed that this Hon&apos;ble Court may graciously be pleased to:</p><p>a) Pass an order granting [Specific Relief / Order Requested];</p><p>b) Award the costs of this proceeding in favor of the [Petitioner / Plaintiff]; and</p><p>c) Pass such other and further order(s) as this Hon&apos;ble Court may deem fit and proper in the interest of justice.</p><p></p>';
             editor.chain().focus().insertContent(prayerHtml).run();
           } else if (cmd === 'insertAffidavitBlock') {
-            const affHtml = '<div style="border: 1.5px solid #334155; padding: 14px; margin-top: 20px; border-radius: 4px; line-height: 1.6;"><p style="text-align: center; margin: 0 0 10px 0;"><strong><u>SWORN VERIFICATION / AFFIDAVIT</u></strong></p><p style="margin: 0 0 10px 0;">I, the Deponent / Declarant above named, do hereby solemnly declare and affirm that the contents of the foregoing paragraphs are true and correct to the best of my personal knowledge, information, and belief, and nothing material has been concealed therefrom.</p><p style="margin: 0 0 16px 0;">Verified and executed at <strong>[Place / City]</strong> on this <strong>[Day]</strong> day of <strong>[Month]</strong>, 2026.</p><table style="width: 100%; border: none; margin-top: 14px;"><tr><td style="width: 50%; border: none;"><strong>DEPONENT / DECLARANT</strong></td><td style="width: 50%; text-align: right; border: none;"><strong>ADVOCATE / COUNSEL</strong></td></tr></table></div><p></p>';
+            const affHtml = '<div style="border: 1.5px solid #334155; padding: 14px; margin-top: 20px; border-radius: 4px; line-height: 1.6;"><p style="text-align: center; margin: 0 0 10px 0;"><strong><u>SWORN VERIFICATION / AFFIDAVIT</u></strong></p><p style="margin: 0 0 10px 0;">I, the Deponent / Declarant above named, do hereby solemnly declare and affirm that the contents of the foregoing paragraphs are true and correct to the best of my personal knowledge, information, and belief, and nothing material has been concealed therefrom.</p><p style="margin: 0 0 16px 0;">Verified and executed at <strong>[Place / City]</strong> on this <strong>[Day]</strong> day of <strong>[Month]</strong>, 2026.</p><table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin-top: 14px;"><tr><td style="width: 50%; border: none;"><strong>DEPONENT / DECLARANT</strong></td><td style="width: 50%; text-align: right; border: none;"><strong>ADVOCATE / COUNSEL</strong></td></tr></table></div><p></p>';
             editor.chain().focus().insertContent(affHtml).run();
           } else if (cmd === 'insertCertificateOfService') {
-            const certHtml = '<div style="border-top: 1px dashed #64748b; padding-top: 14px; margin-top: 24px;"><p style="text-align: center; font-weight: bold; margin-bottom: 8px;"><strong><u>CERTIFICATE OF SERVICE / PROOF OF FILING</u></strong></p><p style="margin-bottom: 10px;">I hereby certify that on this date, a true and complete copy of the foregoing document was duly served upon all opposing parties / counsels of record via [Hand Delivery / Registered Post / Electronic Service].</p><table style="width: 100%; border: none; margin-top: 12px;"><tr><td style="width: 50%; border: none;">Date: [DD/MM/YYYY]</td><td style="width: 50%; text-align: right; border: none;"><strong>[ADVOCATE / COUNSEL SIGNATURE]</strong></td></tr></table></div><p></p>';
+            const certHtml = '<div style="border-top: 1px dashed #64748b; padding-top: 14px; margin-top: 24px;"><p style="text-align: center; font-weight: bold; margin-bottom: 8px;"><strong><u>CERTIFICATE OF SERVICE / PROOF OF FILING</u></strong></p><p style="margin-bottom: 10px;">I hereby certify that on this date, a true and complete copy of the foregoing document was duly served upon all opposing parties / counsels of record via [Hand Delivery / Registered Post / Electronic Service].</p><table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin-top: 12px;"><tr><td style="width: 50%; border: none;">Date: [DD/MM/YYYY]</td><td style="width: 50%; text-align: right; border: none;"><strong>[ADVOCATE / COUNSEL SIGNATURE]</strong></td></tr></table></div><p></p>';
             editor.chain().focus().insertContent(certHtml).run();
           } else if (cmd === 'insertText') {
             editor.chain().focus().insertContent(data.value).run();
@@ -841,6 +1119,37 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             editor.chain().focus().deleteRow().run();
           } else if (cmd === 'tableDeleteCol') {
             editor.chain().focus().deleteColumn().run();
+          } else if (cmd === 'tableAlignColumn') {
+            alignActiveTableColumn(data.value || 'left');
+          } else if (cmd === 'tableAlignCell') {
+            alignActiveTableCell(data.value || 'left');
+          } else if (cmd === 'toggleTableBorders') {
+            const activeTable = document.querySelector('.active-selected-element') || (editorEl ? editorEl.querySelector('table') : null);
+            if (activeTable && (activeTable.tagName === 'TABLE' || activeTable.classList.contains('editor-table'))) {
+              activeTable.classList.toggle('borderless-table');
+              activeTable.classList.toggle('borderless-columns');
+              sendStateToRN(true);
+            }
+          } else if (cmd === 'insertBorderlessColumns' || cmd === 'insert2Columns') {
+            const col2Html = '<table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin: 8px 0;"><tbody><tr><td style="width: 50%; border: none; vertical-align: top; padding: 4px 8px 4px 0;"><p><strong>[Left Column / Party 1]</strong></p><p>Type left column details, address, or grounds here...</p></td><td style="width: 50%; border: none; vertical-align: top; padding: 4px 0 4px 8px;"><p><strong>[Right Column / Party 2]</strong></p><p>Type right column details, status, or reply here...</p></td></tr></tbody></table><p></p>';
+            editor.chain().focus().insertContent(col2Html).run();
+            setTimeout(function() {
+              const insertedTable = editorEl ? editorEl.querySelector('table') : null;
+              if (insertedTable) {
+                updateActiveTableContext(insertedTable);
+                postMessage({ type: 'openElementContextModal', elementType: 'table' });
+              }
+            }, 120);
+          } else if (cmd === 'insert3Columns') {
+            const col3Html = '<table class="editor-table borderless-table borderless-columns" style="width: 100%; border: none; margin: 8px 0;"><tbody><tr><td style="width: 33.33%; border: none; vertical-align: top; padding: 4px 6px;"><p><strong>[Column 1]</strong></p><p>Details...</p></td><td style="width: 33.33%; border: none; vertical-align: top; padding: 4px 6px;"><p><strong>[Column 2]</strong></p><p>Details...</p></td><td style="width: 33.33%; border: none; vertical-align: top; padding: 4px 6px;"><p><strong>[Column 3]</strong></p><p>Details...</p></td></tr></tbody></table><p></p>';
+            editor.chain().focus().insertContent(col3Html).run();
+            setTimeout(function() {
+              const insertedTable = editorEl ? editorEl.querySelector('table') : null;
+              if (insertedTable) {
+                updateActiveTableContext(insertedTable);
+                postMessage({ type: 'openElementContextModal', elementType: 'table' });
+              }
+            }, 120);
           } else if (cmd === 'deleteSelectedElement') {
             if (editor.isActive('table')) {
               editor.chain().focus().deleteTable().run();
@@ -852,16 +1161,40 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             const newVal = data.value;
             if (label && newVal) {
               const currentHtml = editor.getHTML();
-              const updatedHtml = currentHtml.split(label).join(newVal);
+              let updatedHtml = currentHtml.split('<span class="legal-placeholder">' + label + '</span>').join(newVal);
+              updatedHtml = updatedHtml.split(label).join(newVal);
               editor.commands.setContent(updatedHtml);
               sendStateToRN(true);
             }
+          } else if (cmd === 'toggleHeading') {
+            const level = parseInt(data.value, 10) || 1;
+            editor.chain().focus().toggleHeading({ level: level }).run();
+          } else if (cmd === 'setParagraph') {
+            editor.chain().focus().setParagraph().run();
           } else if (cmd === 'setFontSize') {
             const sizeVal = data.value || '14';
             const numSize = parseInt(sizeVal, 10) || 14;
-            window.userFontSize = numSize;
-            updateDynamicPaperRatio();
-            sendStateToRN();
+            const sizeStr = numSize + 'pt';
+
+            const { state } = editor;
+            let from = state.selection.from;
+            let to = state.selection.to;
+
+            // If native blur collapsed selection, check if we have a saved active selection
+            if (from === to && savedSelection.from !== savedSelection.to) {
+              from = savedSelection.from;
+              to = savedSelection.to;
+            }
+
+            if (from !== to) {
+              // Apply native ProseMirror Mark to exact selection range
+              editor.chain().setTextSelection({ from, to }).setFontSize(sizeStr).run();
+            } else {
+              // No selection -> Change base document font size
+              window.userFontSize = numSize;
+              updateDynamicPaperRatio();
+            }
+            sendStateToRN(true);
           } else if (cmd === 'setLineHeight') {
             const lhVal = parseFloat(data.value) || 1.8;
             window.userLineHeightRatio = lhVal;
@@ -873,8 +1206,13 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
             editor.chain().focus().redo().run();
           }
         } else if (data.type === 'layout') {
-          if (data.font) editorEl.style.fontFamily = data.font;
-          if (data.lineHeight) editorEl.style.lineHeight = data.lineHeight;
+          if (data.font && editorEl) editorEl.style.fontFamily = data.font;
+          if (data.lineHeight) {
+            window.userLineHeightRatio = parseFloat(data.lineHeight) || 1.8;
+          }
+          if (data.fontSize) {
+            window.userFontSize = parseInt(data.fontSize, 10) || 14;
+          }
           if (data.headerText !== undefined) window.userHeaderText = data.headerText;
           if (data.footerText !== undefined) window.userFooterText = data.footerText;
           if (data.watermarkText !== undefined) window.userWatermarkText = data.watermarkText;
@@ -906,18 +1244,83 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       }
     };
 
-    // Element Click & Selection Modal Triggers
+    // Element Long-Press (Tap & Hold) & Click Triggers
+    let longPressTimer = null;
+    let touchStartPos = { x: 0, y: 0 };
+
+    document.addEventListener('touchstart', function(e) {
+      const table = e.target.closest('table, .editor-table');
+      const signature = e.target.closest('.signature-stamp');
+      if (e.touches && e.touches[0]) {
+        touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+
+      if (table || signature) {
+        updateActiveTableContext(e.target);
+        longPressTimer = setTimeout(function() {
+          logTiptapEvent('LONG_PRESS_ELEMENT', 'Table or signature long-pressed (tap and hold)');
+          if (table) {
+            postMessage({ type: 'openElementContextModal', elementType: 'table' });
+          } else if (signature) {
+            postMessage({ type: 'openElementContextModal', elementType: 'signature' });
+          }
+          longPressTimer = null;
+        }, 500);
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+      if (longPressTimer && e.touches && e.touches[0]) {
+        const dx = Math.abs(e.touches[0].clientX - touchStartPos.x);
+        const dy = Math.abs(e.touches[0].clientY - touchStartPos.y);
+        if (dx > 12 || dy > 12) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', function() {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', function() {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }, { passive: true });
+
+    document.addEventListener('contextmenu', function(e) {
+      const table = e.target.closest('table, .editor-table');
+      const signature = e.target.closest('.signature-stamp');
+      if (table || signature) {
+        e.preventDefault();
+        updateActiveTableContext(e.target);
+        if (table) {
+          postMessage({ type: 'openElementContextModal', elementType: 'table' });
+        } else if (signature) {
+          postMessage({ type: 'openElementContextModal', elementType: 'signature' });
+        }
+      }
+    });
+
     document.addEventListener('click', function(e) {
       const table = e.target.closest('table, .editor-table');
       const signature = e.target.closest('.signature-stamp');
       const placeholder = e.target.closest('.legal-placeholder');
 
-      document.querySelectorAll('.active-selected-element').forEach(el => el.classList.remove('active-selected-element'));
-
       if (table) {
-        table.classList.add('active-selected-element');
-        logTiptapEvent('TOUCH_ELEMENT', 'Table tapped and selected');
-        postMessage({ type: 'openElementContextModal', elementType: 'table' });
+        updateActiveTableContext(e.target);
+        // Regular tap inside a table cell focuses the editor and allows smooth typing without modal intrusion
       } else if (signature) {
         signature.classList.add('active-selected-element');
         logTiptapEvent('TOUCH_ELEMENT', 'Signature stamp tapped');
@@ -942,19 +1345,47 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
       
       const doSend = function() {
         if (!editor) return;
+        let activeFontSize = String(window.userFontSize || 14);
+        try {
+          const markAttrs = editor.getAttributes('fontSize');
+          if (markAttrs && markAttrs.size) {
+            activeFontSize = String(parseInt(markAttrs.size, 10) || markAttrs.size).replace(/[^0-9]/g, '') || activeFontSize;
+          } else if (editor.isActive('heading', { level: 1 })) {
+            activeFontSize = String(Math.round((window.userFontSize || 14) * 1.35));
+          } else if (editor.isActive('heading', { level: 2 })) {
+            activeFontSize = String(Math.round((window.userFontSize || 14) * 1.22));
+          } else if (editor.isActive('heading', { level: 3 })) {
+            activeFontSize = String(Math.round((window.userFontSize || 14) * 1.12));
+          }
+        } catch (e) {}
+
+        const isSelected = editor.state.selection.from !== editor.state.selection.to;
+        
+        let activeAlign = 'left';
+        if (editor.isActive({ textAlign: 'center' })) activeAlign = 'center';
+        else if (editor.isActive({ textAlign: 'right' })) activeAlign = 'right';
+        else if (editor.isActive({ textAlign: 'justify' })) activeAlign = 'justify';
+
         const state = {
           bold: editor.isActive('bold'),
           italic: editor.isActive('italic'),
           underline: editor.isActive('underline'),
-          alignLeft: !editor.isActive('heading', { level: 2 }) && !editor.isActive('heading', { level: 3 }),
-          alignCenter: editor.isActive('heading', { level: 2 }) || editor.isActive('heading', { level: 1 }),
-          alignRight: editor.isActive('heading', { level: 3 }),
-          alignJustify: false,
+          fontSize: activeFontSize,
+          hasSelection: isSelected,
+          h1: editor.isActive('heading', { level: 1 }),
+          h2: editor.isActive('heading', { level: 2 }),
+          h3: editor.isActive('heading', { level: 3 }),
+          paragraph: !editor.isActive('heading'),
+          alignLeft: activeAlign === 'left',
+          alignCenter: activeAlign === 'center',
+          alignRight: activeAlign === 'right',
+          alignJustify: activeAlign === 'justify',
           orderedList: editor.isActive('orderedList'),
           unorderedList: editor.isActive('bulletList'),
         };
         const stats = calculateStats();
-        const payloadJson = JSON.stringify({ state, stats });
+        const html = editor.getHTML();
+        const payloadJson = JSON.stringify({ state, stats, html });
         if (payloadJson === lastSentStateJson && !immediate) {
           return;
         }
@@ -965,6 +1396,7 @@ export const getRealTiptapEditorHtml = (initialHtml: string = ""): string => {
           engine: 'tiptap-v3-prosemirror-ast',
           state: state,
           stats: stats,
+          html: html,
         });
       };
 

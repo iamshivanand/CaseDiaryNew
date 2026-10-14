@@ -1,0 +1,71 @@
+{
+  "name": "Advocase - Digital Court Munshi & Litigation Workspace",
+  "short_name": "Advocase",
+  "description": "Digital Court Diary, Case Dossier & Legal Drafting Studio for Indian Advocates",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "window-controls-overlay"],
+  "orientation": "portrait-primary",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "scope": "/",
+  "lang": "en-IN",
+  "categories": ["productivity", "business", "legal"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Today's Cause List",
+      "short_name": "Cause List",
+      "description": "View today's court cause list and hearings",
+      "url": "/cause-list",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Add New Case",
+      "short_name": "Add Case",
+      "description": "File or register a new case dossier",
+      "url": "/cases/new",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Legal Drafting Studio",
+      "short_name": "Drafts",
+      "description": "Draft bail applications, notices, and petitions",
+      "url": "/drafts",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Court Calendar",
+      "short_name": "Calendar",
+      "description": "View hearing dates and limitation deadlines",
+      "url": "/calendar",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

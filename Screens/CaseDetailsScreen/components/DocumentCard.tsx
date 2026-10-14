@@ -1,5 +1,5 @@
 // Screens/CaseDetailsScreen/components/DocumentCard.tsx
-import { format, parseISO, isValid } from "date-fns";
+import { format, isValid } from "date-fns";
 import React, { useContext } from "react"; // Added useContext
 import { View, Text, TouchableOpacity, Alert } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
@@ -8,17 +8,20 @@ import { getDocumentCardStyles } from "./DocumentCardStyle"; // Import function
 import { ThemeContext } from "../../../Providers/ThemeProvider"; // Adjust path
 import { Document } from "../../../Types/appTypes";
 import IconOnlyButton from "../../CommonComponents/IconOnlyButton";
+import { parseUtcDate } from "../../../utils/commonFunctions";
 
 interface DocumentCardProps {
   document: Document;
   onPress?: (document: Document) => void;
   onDownloadPress?: (document: Document) => void;
+  onDeletePress?: (document: Document) => void;
 }
 
 const DocumentCard: React.FC<DocumentCardProps> = ({
   document,
   onPress,
   onDownloadPress,
+  onDeletePress,
 }) => {
   const { theme } = useContext(ThemeContext); // Get theme
   const styles = getDocumentCardStyles(theme); // Generate styles
@@ -47,8 +50,8 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
       return "N/A";
     }
     try {
-      const dateObj = parseISO(document.uploadDate);
-      return isValid(dateObj)
+      const dateObj = parseUtcDate(document.uploadDate);
+      return dateObj && isValid(dateObj)
         ? format(dateObj, "MMM dd, yyyy")
         : document.uploadDate;
     } catch (e) {

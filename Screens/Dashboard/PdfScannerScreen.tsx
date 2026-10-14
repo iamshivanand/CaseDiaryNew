@@ -20,11 +20,11 @@ import {
   Modal,
   TextInput,
   Dimensions,
-  SafeAreaView,
   ActivityIndicator,
   Platform,
   StatusBar,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DocumentScanner from "react-native-document-scanner-plugin";
 
 import * as db from "../../DataBase";
@@ -32,13 +32,13 @@ import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext, Theme } from "../../Providers/ThemeProvider";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { shareNamedPdf } from "../../utils/fileShareHelper";
-import AdBanner from "../CommonComponents/AdBanner";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 
 type PdfScannerRouteProp = RouteProp<HomeStackParamList, "PdfScanner">;
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const PdfScannerScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute<PdfScannerRouteProp>();
   const { theme } = useContext(ThemeContext);
@@ -413,10 +413,10 @@ const PdfScannerScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView
+    <View
       style={[
         styles.container,
-        { paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0 },
+        { paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0) },
       ]}
     >
       <View style={styles.screenHeader}>
@@ -768,7 +768,7 @@ const PdfScannerScreen: React.FC = () => {
                           />
                         ) : (
                           <Ionicons
-                            name="circle-outline"
+                            name="ellipse-outline"
                             size={20}
                             color={theme.colors.textSecondary}
                           />
@@ -811,8 +811,7 @@ const PdfScannerScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-      <AdBanner />
-    </SafeAreaView>
+    </View>
   );
 };
 

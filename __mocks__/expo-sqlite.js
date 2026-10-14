@@ -91,8 +91,19 @@ const getFirstSyncInternal = (
           );
           paramIndex++;
         }
+      } else if (cond.includes("=")) {
+        const [rawColName, rawVal] = cond.split("=").map((s) => s.trim());
+        const colName = extractColumnName(rawColName);
+        const cleanVal = rawVal.replace(/['"]/g, "");
+        filtered = filtered.filter(
+          (row) => String(row[colName]) === cleanVal
+        );
       }
     });
+  }
+
+  if (sql.toUpperCase().includes("COUNT(*)")) {
+    return { count: filtered.length, "COUNT(*)": filtered.length };
   }
 
   if (sql.toUpperCase().includes("SUM(")) {
@@ -322,6 +333,9 @@ const runSyncInternal = (currentDbName, sql, params = []) => {
       const parameterizedAssignments = setAssignmentsText.filter((s) =>
         /=\s*\?/.test(s)
       );
+      const literalAssignments = setAssignmentsText.filter(
+        (s) => !/=\s*\?/.test(s) && /=/.test(s)
+      );
       const paramCols = parameterizedAssignments.map((s) =>
         s.split("=")[0].trim().replace(/["`]/g, "")
       );
@@ -332,9 +346,12 @@ const runSyncInternal = (currentDbName, sql, params = []) => {
           let matchesWhere = true;
           const whereClauseMatch = sql.match(/WHERE\s+(.*)/i);
           if (whereClauseMatch && whereClauseMatch[1].trim() !== "") {
-            if (/\bid\s*=\s*\?/i.test(whereClauseMatch[1])) {
+            const whereCond = whereClauseMatch[1].trim();
+            if (/\bid\s*=\s*\?/i.test(whereCond)) {
               matchesWhere =
                 String(row.id) === String(params[whereParamStartIndex]);
+            } else if (/\bis_read\s*=\s*0/i.test(whereCond)) {
+              matchesWhere = row.is_read === 0 || row.is_read === "0";
             }
           }
           if (matchesWhere) {
@@ -342,10 +359,14 @@ const runSyncInternal = (currentDbName, sql, params = []) => {
             paramCols.forEach((colName, index) => {
               updatedRow[colName] = params[index];
             });
-            console.log(
-              `MOCK UPDATE [${currentOperationTableName}] row id=${row.id}:`,
-              updatedRow
-            );
+            literalAssignments.forEach((assignStr) => {
+              const [col, val] = assignStr.split("=").map((s) => s.trim());
+              const cleanCol = col.replace(/["`]/g, "");
+              const cleanVal = val.replace(/['"]/g, "");
+              updatedRow[cleanCol] = isNaN(Number(cleanVal))
+                ? cleanVal
+                : Number(cleanVal);
+            });
             if (JSON.stringify(row) !== JSON.stringify(updatedRow)) {
               affectedRows++;
             }
@@ -357,18 +378,20 @@ const runSyncInternal = (currentDbName, sql, params = []) => {
     }
   } else if (deleteTableName) {
     const initialLength = table.length;
-    const rowsToKeep = table.filter((row) => {
-      const whereMatch = sql.match(/WHERE\s+(.*)/i);
-      if (whereMatch && whereMatch[1]) {
-        const conditionsStr = whereMatch[1].trim().toUpperCase();
-        if (conditionsStr === "ID = ?") {
-          if (params.length >= 1) {
-            return row.id !== params[0];
-          }
+    const whereMatch = sql.match(/WHERE\s+(.*)/i);
+    let rowsToKeep = [];
+    if (whereMatch && whereMatch[1]) {
+      const conditionsStr = whereMatch[1].trim().toUpperCase();
+      if (conditionsStr === "ID = ?") {
+        if (params.length >= 1) {
+          rowsToKeep = table.filter((row) => row.id !== params[0]);
         }
+      } else if (conditionsStr.includes("<")) {
+        rowsToKeep = [...table];
       }
-      return true;
-    });
+    } else {
+      rowsToKeep = [];
+    }
     mockDatabases[currentDbName].tables[currentOperationTableName] = rowsToKeep;
     changes = initialLength - rowsToKeep.length;
   }

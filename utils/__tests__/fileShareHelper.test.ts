@@ -55,8 +55,11 @@ describe("fileShareHelper", () => {
       const mockSourceUri = "file:///temp/123-abc.pdf";
       const desiredName = "Daily Cause List: 14 Aug 2026";
 
-      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({
-        exists: false,
+      (FileSystem.getInfoAsync as jest.Mock).mockImplementation((uri: string) => {
+        if (uri.includes("123-abc.pdf")) {
+          return Promise.resolve({ exists: true });
+        }
+        return Promise.resolve({ exists: false });
       });
       (FileSystem.makeDirectoryAsync as jest.Mock).mockResolvedValue(undefined);
       (FileSystem.copyAsync as jest.Mock).mockResolvedValue(undefined);
@@ -74,11 +77,37 @@ describe("fileShareHelper", () => {
       expect(result).toContain("Daily_Cause_List_14_Aug_2026.pdf");
     });
 
+    it("should return targetUri directly if source is already at target path without deleting it", async () => {
+      const targetUri = `${FileSystem.cacheDirectory}Advocase_Exports/My_Doc.pdf`;
+      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({ exists: true });
+      (FileSystem.deleteAsync as jest.Mock).mockResolvedValue(undefined);
+      (FileSystem.copyAsync as jest.Mock).mockResolvedValue(undefined);
+
+      const result = await createNamedPdfFile(targetUri, "My_Doc");
+      expect(result).toBe(targetUri);
+      expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+      expect(FileSystem.copyAsync).not.toHaveBeenCalled();
+    });
+
+    it("should fallback to sourceUri if source file does not exist", async () => {
+      const mockSourceUri = "file:///temp/non_existent.pdf";
+      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({
+        exists: false,
+      });
+
+      const result = await createNamedPdfFile(mockSourceUri, "My_Doc");
+      expect(result).toBe(mockSourceUri);
+      expect(FileSystem.copyAsync).not.toHaveBeenCalled();
+    });
+
     it("should fallback to sourceUri if copying throws an error", async () => {
       const mockSourceUri = "file:///temp/fallback.pdf";
-      (FileSystem.getInfoAsync as jest.Mock).mockRejectedValue(
-        new Error("Disk error")
-      );
+      (FileSystem.getInfoAsync as jest.Mock).mockImplementation((uri: string) => {
+        if (uri.includes("fallback.pdf")) {
+          return Promise.resolve({ exists: true });
+        }
+        return Promise.reject(new Error("Disk error"));
+      });
 
       const result = await createNamedPdfFile(mockSourceUri, "My_Doc");
       expect(result).toBe(mockSourceUri);
@@ -89,7 +118,7 @@ describe("fileShareHelper", () => {
     it("should share the named file when sharing is available", async () => {
       (Sharing.isAvailableAsync as jest.Mock).mockResolvedValue(true);
       (Sharing.shareAsync as jest.Mock).mockResolvedValue(undefined);
-      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({ exists: true });
+      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({ exists: true, size: 1024 });
       (FileSystem.copyAsync as jest.Mock).mockResolvedValue(undefined);
 
       const mockUri = "file:///temp/abc.pdf";
@@ -107,6 +136,7 @@ describe("fileShareHelper", () => {
 
     it("should not crash if Sharing is unavailable", async () => {
       (Sharing.isAvailableAsync as jest.Mock).mockResolvedValue(false);
+      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({ exists: true, size: 1024 });
 
       const mockUri = "file:///temp/abc.pdf";
       await expect(shareNamedPdf(mockUri, "Doc")).resolves.not.toThrow();

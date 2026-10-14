@@ -22,11 +22,17 @@ import { notifyCaseUpdated } from "../utils/caseEvents";
 import {
   getLocalDateString,
   normalizeDateToYYYYMMDD,
+  formatDate,
 } from "../utils/commonFunctions";
 import {
   scheduleCaseReminder,
   cancelCaseReminder,
 } from "../utils/notificationScheduler";
+import { addCaseTimelineEvent } from "./caseTimelineDb";
+import {
+  addAppNotification,
+  purgeOldAppNotifications,
+} from "./appNotificationsDb";
 
 // Re-export getDb so it's available when importing from './DataBase'
 export { getDb, getDrizzleDb };
@@ -196,6 +202,8 @@ export const uploadCaseDocument = async (
     console.log("Copying file from", fileUri, "to", destinationUri);
     await FileSystem.copyAsync({ from: fileUri, to: destinationUri });
     console.log("File copied successfully");
+    const effectiveUserId =
+      userId && userId > 0 ? userId : caseExists.user_id || null;
     const result = await db.runAsync(
       "INSERT INTO CaseDocuments (case_id, stored_filename, original_display_name, file_type, file_size, user_id) VALUES (?, ?, ?, ?, ?, ?)",
       [
@@ -204,7 +212,7 @@ export const uploadCaseDocument = async (
         originalFileName,
         mimeTypeForDb,
         fileSize ?? null,
-        userId ?? null,
+        effectiveUserId,
       ]
     );
     return result.lastInsertRowId;
@@ -344,6 +352,68 @@ export const addCase = async (
     const caseId = result[0]?.id || null;
     if (caseId) {
       try {
+        const todayStr = getLocalDateString(new Date());
+        // 1. Initial Case Created event
+        const filingDate = validCaseData.dateFiled || todayStr;
+        const courtInfo = validCaseData.court_name
+          ? ` (Court: ${validCaseData.court_name})`
+          : "";
+        const caseNoInfo = validCaseData.case_number
+          ? ` [Case No: ${validCaseData.case_number}]`
+          : "";
+        await addCaseTimelineEvent({
+          case_id: caseId,
+          hearing_date: filingDate,
+          notes: `Case registered: ${validCaseData.CaseTitle || "New Case"}${courtInfo}${caseNoInfo}`,
+          event_type: "case_created",
+        });
+
+        // 2. Initial Hearing Date if provided
+        if (validCaseData.NextDate) {
+          await addCaseTimelineEvent({
+            case_id: caseId,
+            hearing_date: validCaseData.NextDate,
+            notes: `Initial hearing scheduled for ${formatDate(validCaseData.NextDate)}`,
+            event_type: "hearing_scheduled",
+          });
+        }
+
+        // 3. Initial Agreed Total Fee if provided
+        if (validCaseData.total_fee && Number(validCaseData.total_fee) > 0) {
+          await addCaseTimelineEvent({
+            case_id: caseId,
+            hearing_date: todayStr,
+            notes: `Total agreed retainer fee: ₹${Number(validCaseData.total_fee).toLocaleString("en-IN")}`,
+            event_type: "total_fee_agreed",
+            amount: Number(validCaseData.total_fee),
+          });
+        }
+
+        // 4. Initial Fee Paid if provided
+        if (validCaseData.fee_paid && Number(validCaseData.fee_paid) > 0) {
+          await addCaseTimelineEvent({
+            case_id: caseId,
+            hearing_date: todayStr,
+            notes: `Initial fee payment received: ₹${Number(validCaseData.fee_paid).toLocaleString("en-IN")}`,
+            event_type: "total_fee_payment",
+            amount: Number(validCaseData.fee_paid),
+          });
+        }
+
+        // 5. In-app notification for new case registration
+        await addAppNotification({
+          title: `📁 New Case Registered: ${validCaseData.CaseTitle || "New Case"}`,
+          body: `Client: ${validCaseData.ClientName || "N/A"}${validCaseData.court_name ? ` • Court: ${validCaseData.court_name}` : ""}`,
+          category: "case_update",
+          case_id: caseId,
+          action_type: "case_created",
+          data_json: JSON.stringify({ caseId }),
+        });
+      } catch (tleErr) {
+        console.warn("Could not create initial timeline events for case:", tleErr);
+      }
+
+      try {
         const newCase = await getCaseById(caseId);
         if (newCase && newCase.NextDate) {
           await scheduleCaseReminder(newCase);
@@ -376,12 +446,20 @@ export const getCases = async (
   limit: number = -1,
   offset: number = 0,
   options?: {
-    status?: "Active" | "Closed" | "All";
+    status?: string | "Active" | "Closed" | "All";
+    smartFilter?:
+      | "overdue"
+      | "feePending"
+      | "highPriority"
+      | "dormant"
+      | "thisWeek"
+      | null;
     dateFilter?:
       | "today"
       | "tomorrow"
       | "yesterday"
       | "undated"
+      | "thisWeek"
       | "specific"
       | null;
     specificDate?: string | null;
@@ -405,18 +483,56 @@ export const getCases = async (
   }
 
   if (options) {
-    const { status, dateFilter, specificDate, searchQuery } = options;
+    const { status, smartFilter, dateFilter, specificDate, searchQuery } =
+      options;
+    const todayStr = getLocalDateString(new Date());
 
     if (status && status !== "All") {
       if (status === "Active") {
         whereClauses.push("(c.CaseStatus IS NULL OR c.CaseStatus != 'Closed')");
       } else if (status === "Closed") {
         whereClauses.push("c.CaseStatus = 'Closed'");
+      } else {
+        // Specific status e.g. "Open", "In Progress", "On Hold", "Appealed"
+        whereClauses.push("c.CaseStatus = ?");
+        params.push(status);
+      }
+    }
+
+    if (smartFilter) {
+      if (smartFilter === "overdue") {
+        whereClauses.push(
+          "c.NextDate IS NOT NULL AND c.NextDate != '' AND c.NextDate != 'N/A' AND c.NextDate < ? AND (c.CaseStatus IS NULL OR c.CaseStatus != 'Closed')"
+        );
+        params.push(todayStr);
+      } else if (smartFilter === "feePending") {
+        whereClauses.push(
+          "COALESCE(c.total_fee, 0) > COALESCE(c.fee_paid, 0) AND (c.CaseStatus IS NULL OR c.CaseStatus != 'Closed')"
+        );
+      } else if (smartFilter === "highPriority") {
+        whereClauses.push(
+          "c.Priority = 'High' AND (c.CaseStatus IS NULL OR c.CaseStatus != 'Closed')"
+        );
+      } else if (smartFilter === "dormant") {
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        const sixtyDaysAgoStr = sixtyDaysAgo.toISOString();
+        whereClauses.push(
+          "c.updated_at < ? AND (c.NextDate IS NULL OR c.NextDate < ?) AND (c.CaseStatus IS NULL OR c.CaseStatus != 'Closed')"
+        );
+        params.push(sixtyDaysAgoStr, todayStr);
+      } else if (smartFilter === "thisWeek") {
+        const nextWeek = new Date();
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        const nextWeekStr = getLocalDateString(nextWeek);
+        whereClauses.push(
+          "c.NextDate >= ? AND c.NextDate <= ? AND (c.CaseStatus IS NULL OR c.CaseStatus != 'Closed')"
+        );
+        params.push(todayStr, nextWeekStr);
       }
     }
 
     if (dateFilter) {
-      const todayStr = getLocalDateString(new Date());
       if (dateFilter === "today") {
         whereClauses.push("c.NextDate = ?");
         params.push(todayStr);
@@ -432,6 +548,12 @@ export const getCases = async (
         const yesterdayStr = getLocalDateString(yesterday);
         whereClauses.push("c.NextDate = ?");
         params.push(yesterdayStr);
+      } else if (dateFilter === "thisWeek") {
+        const nextWeek = new Date();
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        const nextWeekStr = getLocalDateString(nextWeek);
+        whereClauses.push("c.NextDate >= ? AND c.NextDate <= ?");
+        params.push(todayStr, nextWeekStr);
       } else if (dateFilter === "specific" && specificDate) {
         whereClauses.push("c.NextDate = ?");
         params.push(normalizeDateToYYYYMMDD(specificDate));
@@ -516,13 +638,25 @@ export const updateCase = async (
     return false;
   }
 
+  const updateData: CaseUpdateData = { ...data };
+
+  // If NextDate is being updated and PreviousDate was not explicitly provided,
+  // automatically shift the previous NextDate into PreviousDate
+  if (updateData.NextDate !== undefined && updateData.PreviousDate === undefined) {
+    const oldNextDate = currentCaseData.NextDate;
+    const newNextDate = normalizeDateToYYYYMMDD(updateData.NextDate);
+    if (oldNextDate && oldNextDate !== newNextDate) {
+      updateData.PreviousDate = oldNextDate;
+    }
+  }
+
   const setClauses: string[] = [];
   const params: any[] = [];
 
-  for (const key in data) {
-    if (Object.prototype.hasOwnProperty.call(data, key)) {
+  for (const key in updateData) {
+    if (Object.prototype.hasOwnProperty.call(updateData, key)) {
       const typedKey = key as keyof CaseUpdateData;
-      let val = data[typedKey];
+      let val = updateData[typedKey];
       if (val !== undefined) {
         if (
           key === "NextDate" ||
@@ -556,6 +690,169 @@ export const updateCase = async (
     const result = await db.runAsync(sql, params);
     if (result.changes > 0) {
       notifyCaseUpdated(id);
+      try {
+        const todayStr = getLocalDateString(new Date());
+
+        // A. Next Hearing Date changed
+        if (data.NextDate !== undefined) {
+          const oldNextDate = currentCaseData.NextDate;
+          const newNextDate = normalizeDateToYYYYMMDD(data.NextDate);
+          if (oldNextDate !== newNextDate && newNextDate) {
+            const isAdjourned = Boolean(oldNextDate && oldNextDate !== "N/A");
+            await addCaseTimelineEvent({
+              case_id: id,
+              hearing_date: newNextDate,
+              notes: isAdjourned
+                ? `Hearing adjourned / rescheduled: ${formatDate(oldNextDate)} ➔ ${formatDate(newNextDate)}`
+                : `Next hearing scheduled for ${formatDate(newNextDate)}`,
+              event_type: isAdjourned ? "hearing_adjourned" : "hearing_scheduled",
+            });
+          }
+        }
+
+        // B. Case Status changed
+        if (data.CaseStatus !== undefined) {
+          const oldStatus = currentCaseData.CaseStatus || "Open";
+          const newStatus = data.CaseStatus;
+          if (newStatus && oldStatus !== newStatus) {
+            await addCaseTimelineEvent({
+              case_id: id,
+              hearing_date: todayStr,
+              notes: `Case status changed: ${oldStatus} ➔ ${newStatus}`,
+              event_type: "status_change",
+            });
+          }
+        }
+
+        // C. Judge Name changed
+        if (data.JudgeName !== undefined) {
+          const oldJudge = currentCaseData.JudgeName?.trim() || "";
+          const newJudge = data.JudgeName?.trim() || "";
+          if (newJudge && oldJudge !== newJudge) {
+            await addCaseTimelineEvent({
+              case_id: id,
+              hearing_date: todayStr,
+              notes: oldJudge
+                ? `Presiding Judge changed: ${oldJudge} ➔ ${newJudge}`
+                : `Presiding Judge assigned: ${newJudge}`,
+              event_type: "judge_change",
+            });
+          }
+        }
+
+        // D. Court changed
+        if (
+          data.court_name !== undefined ||
+          (data.court_id !== undefined &&
+            data.court_id !== currentCaseData.court_id)
+        ) {
+          const oldCourt =
+            currentCaseData.court_name?.trim() ||
+            currentCaseData.lookupCourtName?.trim() ||
+            "";
+          const newCourt = data.court_name?.trim() || "";
+          if (newCourt && oldCourt !== newCourt) {
+            await addCaseTimelineEvent({
+              case_id: id,
+              hearing_date: todayStr,
+              notes: oldCourt
+                ? `Court / Establishment transferred: ${oldCourt} ➔ ${newCourt}`
+                : `Court assigned: ${newCourt}`,
+              event_type: "court_change",
+            });
+          }
+        }
+
+        // E. Case Stage changed
+        if (data.case_stage !== undefined) {
+          const oldStage = currentCaseData.case_stage?.trim() || "";
+          const newStage = data.case_stage?.trim() || "";
+          if (newStage && oldStage !== newStage) {
+            await addCaseTimelineEvent({
+              case_id: id,
+              hearing_date: todayStr,
+              notes: oldStage
+                ? `Case stage progressed: ${oldStage} ➔ ${newStage}`
+                : `Case stage set to: ${newStage}`,
+              event_type: "stage_change",
+            });
+          }
+        }
+
+        // F. Total Fee modified
+        if (data.total_fee !== undefined) {
+          const oldTotal = currentCaseData.total_fee || 0;
+          const newTotal = Number(data.total_fee) || 0;
+          if (newTotal !== oldTotal) {
+            await addCaseTimelineEvent({
+              case_id: id,
+              hearing_date: todayStr,
+              notes: `Agreed total case fee updated: ₹${oldTotal.toLocaleString("en-IN")} ➔ ₹${newTotal.toLocaleString("en-IN")}`,
+              event_type: "total_fee_agreed",
+              amount: newTotal,
+            });
+          }
+        }
+
+        // G. In-App Notifications for key changes
+        if (data.NextDate !== undefined && data.NextDate !== currentCaseData.NextDate) {
+          const isAdj = Boolean(currentCaseData.NextDate && currentCaseData.NextDate !== "N/A");
+          await addAppNotification({
+            title: isAdj
+              ? `📅 Hearing Adjourned: ${currentCaseData.CaseTitle || "Case"}`
+              : `📅 Hearing Scheduled: ${currentCaseData.CaseTitle || "Case"}`,
+            body: isAdj
+              ? `Rescheduled to ${formatDate(data.NextDate)} (Previous: ${formatDate(currentCaseData.NextDate)})`
+              : `Hearing listed for ${formatDate(data.NextDate)}`,
+            category: "hearing",
+            case_id: id,
+            action_type: isAdj ? "hearing_adjourned" : "hearing_scheduled",
+            data_json: JSON.stringify({ caseId: id, NextDate: data.NextDate }),
+          });
+        }
+
+        if (data.CaseStatus !== undefined && data.CaseStatus !== currentCaseData.CaseStatus) {
+          await addAppNotification({
+            title: `🔄 Status Updated: ${currentCaseData.CaseTitle || "Case"}`,
+            body: `Status changed from ${currentCaseData.CaseStatus || "Open"} to ${data.CaseStatus}`,
+            category: "case_update",
+            case_id: id,
+            action_type: "status_change",
+            data_json: JSON.stringify({ caseId: id, status: data.CaseStatus }),
+          });
+        }
+
+        if (data.JudgeName !== undefined && data.JudgeName?.trim() !== (currentCaseData.JudgeName || "")?.trim()) {
+          await addAppNotification({
+            title: `⚖️ Presiding Judge Updated: ${currentCaseData.CaseTitle || "Case"}`,
+            body: currentCaseData.JudgeName
+              ? `Changed: ${currentCaseData.JudgeName} ➔ ${data.JudgeName}`
+              : `Assigned: ${data.JudgeName}`,
+            category: "case_update",
+            case_id: id,
+            action_type: "judge_change",
+            data_json: JSON.stringify({ caseId: id, judge: data.JudgeName }),
+          });
+        }
+
+        if (data.fee_paid !== undefined && Number(data.fee_paid) > (currentCaseData.fee_paid || 0)) {
+          const diff = Number(data.fee_paid) - (currentCaseData.fee_paid || 0);
+          await addAppNotification({
+            title: `💰 Payment Received: ₹${diff.toLocaleString("en-IN")}`,
+            body: `Case: ${currentCaseData.CaseTitle || "Legal Matter"} (Total Paid: ₹${Number(data.fee_paid).toLocaleString("en-IN")})`,
+            category: "fee",
+            case_id: id,
+            action_type: "total_fee_payment",
+            data_json: JSON.stringify({ caseId: id, amount: diff }),
+          });
+        }
+      } catch (autoTleErr) {
+        console.warn(
+          "Could not auto-generate timeline events on updateCase:",
+          autoTleErr
+        );
+      }
+
       try {
         const updatedCase = await getCaseById(id);
         if (updatedCase) {
@@ -679,10 +976,14 @@ export const getSuggestionsForField = async (
   userId?: number | null
 ): Promise<{ id: number; name: string }[]> => {
   const db = await getDb();
-  const results = await db.getAllAsync<any>(
-    `SELECT DISTINCT ${fieldName} as name FROM Cases WHERE ${fieldName} IS NOT NULL AND user_id = ?`,
-    [userId]
-  );
+  let sql = `SELECT DISTINCT ${fieldName} as name FROM Cases WHERE ${fieldName} IS NOT NULL AND TRIM(${fieldName}) != ''`;
+  const params: any[] = [];
+  if (userId != null) {
+    sql += " AND user_id = ?";
+    params.push(userId);
+  }
+  sql += ` ORDER BY ${fieldName} ASC`;
+  const results = await db.getAllAsync<any>(sql, params);
   return results.map((row, index) => ({ id: index, name: row.name }));
 };
 
@@ -853,13 +1154,18 @@ export const getPoliceStations = async (
 // --- Document Draft Management ---
 
 export const saveDocumentDraft = async (
-  draft: DocumentDraft
+  draft: DocumentDraft | any
 ): Promise<void> => {
   const db = await getDb();
-  let content = draft.html_content;
-  let templateType = draft.template_type;
-  let isCustom = draft.is_custom_template ?? 0;
+  let content = draft.html_content !== undefined ? draft.html_content : draft.contentHtml;
+  let templateType = draft.template_type !== undefined ? draft.template_type : draft.templateType;
+  let isCustom = draft.is_custom_template !== undefined 
+    ? Number(draft.is_custom_template) 
+    : (draft.isCustomTemplate !== undefined ? Number(draft.isCustomTemplate) : 0);
   let title = draft.title || "Draft Document";
+  let caseId = draft.case_id !== undefined 
+    ? (draft.case_id ? Number(draft.case_id) : null) 
+    : (draft.caseId !== undefined ? (draft.caseId ? Number(draft.caseId) : null) : null);
 
   if (
     content === undefined ||
@@ -875,8 +1181,11 @@ export const saveDocumentDraft = async (
     if (!templateType) {
       templateType = existing?.template_type || "draft";
     }
-    if (draft.is_custom_template === undefined && existing?.is_custom_template !== undefined) {
+    if (draft.is_custom_template === undefined && draft.isCustomTemplate === undefined && existing?.is_custom_template !== undefined) {
       isCustom = existing.is_custom_template;
+    }
+    if (draft.case_id === undefined && draft.caseId === undefined && existing?.case_id !== undefined) {
+      caseId = existing.case_id;
     }
   }
 
@@ -885,13 +1194,13 @@ export const saveDocumentDraft = async (
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       draft.id,
-      draft.case_id ?? null,
+      caseId ?? null,
       title,
       templateType || "draft",
       content,
       isCustom,
       draft.created_at || new Date().toISOString(),
-      new Date().toISOString(),
+      draft.updated_at || new Date().toISOString(),
     ]
   );
 };
@@ -948,6 +1257,38 @@ export const deleteDocumentDraft = async (id: string): Promise<boolean> => {
     id,
   ]);
   return result.changes > 0;
+};
+
+export const getUniqueDraftTitle = async (
+  desiredTitle: string,
+  excludeDraftId?: string | null,
+  isCustomTemplate?: number | null
+): Promise<string> => {
+  const trimmed = desiredTitle.trim() || "Draft Document";
+  try {
+    const drafts = await getDocumentDrafts(undefined, isCustomTemplate, true);
+    const otherTitles = new Set(
+      drafts
+        .filter((d) => !excludeDraftId || d.id !== excludeDraftId)
+        .map((d) => d.title.toLowerCase().trim())
+    );
+
+    if (!otherTitles.has(trimmed.toLowerCase())) {
+      return trimmed;
+    }
+
+    const match = trimmed.match(/^(.*?)(?:\s*\((\d+)\))?$/);
+    const baseTitle = match && match[1] ? match[1].trim() : trimmed;
+
+    let counter = 1;
+    while (otherTitles.has(`${baseTitle.toLowerCase()} (${counter})`)) {
+      counter++;
+    }
+    return `${baseTitle} (${counter})`;
+  } catch (err) {
+    console.warn("Error resolving unique draft title:", err);
+    return trimmed;
+  }
 };
 
 // --- Financial & Dashboard Counts ---
@@ -1073,4 +1414,106 @@ export const getDraftRevisions = async (
     [draftId]
   );
 };
+
+export const getOverdueCases = async (userId?: number): Promise<CaseRow[]> => {
+  const db = await getDb();
+  const todayStr = getLocalDateString(new Date());
+  let sql = `SELECT * FROM Cases 
+             WHERE NextDate IS NOT NULL 
+               AND NextDate != '' 
+               AND NextDate != 'N/A' 
+               AND NextDate < ? 
+               AND (CaseStatus IS NULL OR CaseStatus != 'Closed')`;
+  const params: any[] = [todayStr];
+  if (userId !== undefined && userId !== null) {
+    sql += " AND user_id = ?";
+    params.push(userId);
+  }
+  sql += " ORDER BY NextDate DESC";
+  return db.getAllAsync<CaseRow>(sql, params);
+};
+
+export const getOverdueCasesCount = async (
+  userId?: number
+): Promise<number> => {
+  const cases = await getOverdueCases(userId);
+  return cases.length;
+};
+
+export const getUpcomingHearingsWithPendingFee = async (
+  daysAhead: number = 7,
+  userId?: number
+): Promise<CaseRow[]> => {
+  const db = await getDb();
+  const todayStr = getLocalDateString(new Date());
+  const futureDate = new Date();
+  futureDate.setDate(futureDate.getDate() + daysAhead);
+  const futureDateStr = getLocalDateString(futureDate);
+
+  let sql = `SELECT * FROM Cases 
+             WHERE NextDate >= ? 
+               AND NextDate <= ? 
+               AND (CaseStatus IS NULL OR CaseStatus != 'Closed')
+               AND COALESCE(total_fee, 0) > COALESCE(fee_paid, 0)`;
+  const params: any[] = [todayStr, futureDateStr];
+  if (userId !== undefined && userId !== null) {
+    sql += " AND user_id = ?";
+    params.push(userId);
+  }
+  sql += " ORDER BY NextDate ASC";
+  return db.getAllAsync<CaseRow>(sql, params);
+};
+
+export const getExpiringLimitationCases = async (
+  daysAhead: number = 30,
+  userId?: number
+): Promise<CaseRow[]> => {
+  const db = await getDb();
+  const todayStr = getLocalDateString(new Date());
+  const futureDate = new Date();
+  futureDate.setDate(futureDate.getDate() + daysAhead);
+  const futureDateStr = getLocalDateString(futureDate);
+
+  let sql = `SELECT * FROM Cases 
+             WHERE StatuteOfLimitations IS NOT NULL 
+               AND StatuteOfLimitations != '' 
+               AND StatuteOfLimitations != 'N/A'
+               AND StatuteOfLimitations >= ? 
+               AND StatuteOfLimitations <= ?
+               AND (CaseStatus IS NULL OR CaseStatus != 'Closed')`;
+  const params: any[] = [todayStr, futureDateStr];
+  if (userId !== undefined && userId !== null) {
+    sql += " AND user_id = ?";
+    params.push(userId);
+  }
+  sql += " ORDER BY StatuteOfLimitations ASC";
+  return db.getAllAsync<CaseRow>(sql, params);
+};
+
+export const getStaleCases = async (
+  daysInactive: number = 60,
+  userId?: number
+): Promise<CaseRow[]> => {
+  const db = await getDb();
+  const sixtyDaysAgo = new Date();
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - daysInactive);
+  const sixtyDaysAgoStr = sixtyDaysAgo.toISOString();
+  const todayStr = getLocalDateString(new Date());
+
+  let sql = `SELECT * FROM Cases 
+             WHERE updated_at < ? 
+               AND (NextDate IS NULL OR NextDate = '' OR NextDate = 'N/A' OR NextDate < ?)
+               AND (CaseStatus IS NULL OR CaseStatus != 'Closed')`;
+  const params: any[] = [sixtyDaysAgoStr, todayStr];
+  if (userId !== undefined && userId !== null) {
+    sql += " AND user_id = ?";
+    params.push(userId);
+  }
+  sql += " ORDER BY updated_at ASC";
+  return db.getAllAsync<CaseRow>(sql, params);
+};
+
+export { DocumentDraft } from "./schema";
+export * from "./appNotificationsDb";
+
 

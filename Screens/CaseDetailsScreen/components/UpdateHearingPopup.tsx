@@ -1,5 +1,5 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 import { ThemeContext } from "../../../Providers/ThemeProvider";
+import { parseUtcDate, parseLocalDate } from "../../../utils/commonFunctions";
 import speechRecognitionService from "../../../utils/speechRecognitionService";
 import ActionButton from "../../CommonComponents/ActionButton";
 
@@ -28,7 +29,20 @@ interface UpdateHearingPopupProps {
     paymentMode?: string,
     paymentNotes?: string
   ) => void;
+  currentNextDate?: string | Date | null;
 }
+
+const resolveInitialDate = (dateVal?: string | Date | null): Date => {
+  if (!dateVal) return new Date();
+  if (dateVal instanceof Date) {
+    return isNaN(dateVal.getTime()) ? new Date() : dateVal;
+  }
+  const parsed = parseUtcDate(dateVal) || parseLocalDate(String(dateVal));
+  if (parsed && !isNaN(parsed.getTime())) {
+    return parsed;
+  }
+  return new Date();
+};
 
 const QUICK_NOTES_BADGES = [
   "Arguments Heard",
@@ -48,17 +62,30 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
   visible,
   onClose,
   onSave,
+  currentNextDate,
 }) => {
   const { theme } = useContext(ThemeContext);
   const [notes, setNotes] = useState("");
   const [dateFeeToday, setDateFeeToday] = useState("");
   const [paymentMode, setPaymentMode] = useState("Cash");
   const [paymentNotes, setPaymentNotes] = useState("");
-  const [nextHearingDate, setNextHearingDate] = useState(new Date());
+  const [nextHearingDate, setNextHearingDate] = useState<Date>(() =>
+    resolveInitialDate(currentNextDate)
+  );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dictationLang, setDictationLang] = useState<"en" | "hi">("hi");
   const [isDictating, setIsDictating] = useState(false);
   const [baseNotesForDictation, setBaseNotesForDictation] = useState("");
+
+  useEffect(() => {
+    if (visible) {
+      setNextHearingDate(resolveInitialDate(currentNextDate));
+      setNotes("");
+      setDateFeeToday("");
+      setPaymentMode("Cash");
+      setPaymentNotes("");
+    }
+  }, [visible, currentNextDate]);
 
   const handleSave = () => {
     const dateFeePaidNum = dateFeeToday.trim()
@@ -397,26 +424,48 @@ const UpdateHearingPopup: React.FC<UpdateHearingPopupProps> = ({
 
             <TouchableOpacity
               onPress={() => setShowDatePicker(true)}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
               style={[
                 styles.dateTrigger,
                 {
-                  backgroundColor: theme.colors.inputBackground,
-                  borderColor: theme.colors.border,
+                  backgroundColor: "#DC2626",
+                  borderColor: "#B91C1C",
+                  borderWidth: 1.5,
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  shadowColor: "#DC2626",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 4,
+                  elevation: 4,
                 },
               ]}
             >
               <Icon
                 name="calendar-month-outline"
-                size={20}
-                color={theme.colors.primary}
+                size={22}
+                color="#FFFFFF"
                 style={{ marginRight: 8 }}
               />
               <Text
-                style={[styles.dateTriggerText, { color: theme.colors.text }]}
+                style={[
+                  styles.dateTriggerText,
+                  {
+                    color: "#FFFFFF",
+                    fontWeight: "bold",
+                    fontSize: 15,
+                    flex: 1,
+                  },
+                ]}
               >
                 Next Date: {nextHearingDate.toDateString()}
               </Text>
+              <Icon
+                name="calendar-edit"
+                size={18}
+                color="rgba(255, 255, 255, 0.85)"
+              />
             </TouchableOpacity>
 
             {showDatePicker && (

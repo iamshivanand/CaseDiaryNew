@@ -20,6 +20,9 @@ import {
   Text,
   Modal,
   ScrollView,
+  AppState,
+  BackHandler,
+  Dimensions,
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { v4 as uuidv4 } from "uuid";
@@ -30,7 +33,15 @@ import { LegalAutocompleteBar } from "./components/LegalAutocompleteBar";
 import { TableConfigModal } from "./components/TableConfigModal";
 import { ElementContextModal } from "./components/ElementContextModal";
 import OcrReviewModal from "./components/OcrReviewModal";
-import { saveDocumentDraft, getDocumentDraftById, getCaseById } from "../../DataBase";
+import {
+  saveDocumentDraft,
+  getDocumentDraftById,
+  getCaseById,
+  getCases,
+  uploadCaseDocument,
+  getUniqueDraftTitle,
+  CaseWithDetails,
+} from "../../DataBase";
 import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { HomeStackParamList } from "../../Types/navigationtypes";
@@ -41,6 +52,7 @@ import { compileLegalDocumentHtml } from "../../utils/documentTemplates";
 import { speechRecognitionService } from "../../utils/speechRecognitionService";
 import { createNamedPdfFile, shareNamedPdf } from "../../utils/fileShareHelper";
 import ActionButton from "../CommonComponents/ActionButton";
+import { useAdTrigger } from "../CommonComponents/AdManager";
 
 type TiptapEditDraftScreenRouteProp = RouteProp<HomeStackParamList, "TiptapEditDraft">;
 
@@ -48,12 +60,18 @@ interface EditorState {
   bold: boolean;
   italic: boolean;
   underline: boolean;
+  fontSize?: string;
+  hasSelection?: boolean;
   alignLeft: boolean;
   alignCenter: boolean;
   alignRight: boolean;
   alignJustify: boolean;
   orderedList: boolean;
   unorderedList: boolean;
+  h1?: boolean;
+  h2?: boolean;
+  h3?: boolean;
+  paragraph?: boolean;
 }
 
 const TiptapEditDraftScreen: React.FC = () => {
@@ -61,6 +79,7 @@ const TiptapEditDraftScreen: React.FC = () => {
   const route = useRoute<TiptapEditDraftScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
   const { t, locale } = useTranslation();
+  const { showAdWithPreload } = useAdTrigger();
   const styles = getStyles(theme);
 
   const {
@@ -72,6 +91,9 @@ const TiptapEditDraftScreen: React.FC = () => {
     language: initialLanguage,
   } = route.params || {};
 
+  const [activeCaseId, setActiveCaseId] = useState<number | null>(
+    caseId ? Number(caseId) : null
+  );
   const [docTemplateType, setDocTemplateType] = useState<string>(templateType || "draft");
   const [activeDraftId, setActiveDraftId] = useState<string>(initialDraftId || uuidv4());
   const [title, setTitle] = useState(
@@ -95,6 +117,10 @@ const TiptapEditDraftScreen: React.FC = () => {
     alignJustify: false,
     orderedList: false,
     unorderedList: false,
+    h1: false,
+    h2: false,
+    h3: false,
+    paragraph: true,
   });
 
   const [docStats, setDocStats] = useState({
@@ -103,9 +129,10 @@ const TiptapEditDraftScreen: React.FC = () => {
     estimatedPages: 1,
   });
 
-  // Page setup & Layout State
+  // Page setup & Layout State (Default 12pt / 1.2x matching standard MS Word legal drafting)
   const [font, setFont] = useState("Times New Roman");
-  const [lineHeight, setLineHeight] = useState("1.6");
+  const [fontSize, setFontSize] = useState("12");
+  const [lineHeight, setLineHeight] = useState("1.2");
   const [topMargin, setTopMargin] = useState(16);
   const [bottomMargin, setBottomMargin] = useState(16);
   const [leftMargin, setLeftMargin] = useState(36);
@@ -133,8 +160,38 @@ const TiptapEditDraftScreen: React.FC = () => {
   const [selectedElementType, setSelectedElementType] = useState<"table" | "signature" | null>(null);
   const [shapeModalVisible, setShapeModalVisible] = useState(false);
   const [isMoreMenuVisible, setIsMoreMenuVisible] = useState(false);
+  const [isExistingSavePromptVisible, setIsExistingSavePromptVisible] = useState(false);
   const [isSaveDialogVisible, setIsSaveDialogVisible] = useState(false);
+  const [isSaveAsMode, setIsSaveAsMode] = useState(false);
   const [saveDialogTitle, setSaveDialogTitle] = useState(title);
+
+  // Language content cache for zero-data-loss language toggling
+  const languageContentMapRef = useRef<{ [key: string]: string }>({
+    [docDraftLanguage]: initialHtml || "",
+  });
+  const lastSavedHtmlRef = useRef<string>(initialHtml || "");
+  const lastSavedTitleRef = useRef<string>(initialTitle || title || "");
+
+  // Case Picker Attachment State
+  const [isCasePickerVisible, setIsCasePickerVisible] = useState(false);
+  const [casePickerMode, setCasePickerMode] = useState<"save_draft" | "attach_pdf">("save_draft");
+  const [casesList, setCasesList] = useState<CaseWithDetails[]>([]);
+  const [caseSearchQuery, setCaseSearchQuery] = useState("");
+  const [generatedPdfUri, setGeneratedPdfUri] = useState<string | null>(null);
+  const [isAttachingCase, setIsAttachingCase] = useState(false);
+
+  // Filtered cases for search picker
+  const filteredCases = useMemo(() => {
+    if (!caseSearchQuery.trim()) return casesList;
+    const q = caseSearchQuery.toLowerCase();
+    return casesList.filter((c) => {
+      const matchTitle = c.CaseTitle?.toLowerCase().includes(q);
+      const matchNo = c.case_number?.toLowerCase().includes(q);
+      const matchCourt = c.CourtName?.toLowerCase().includes(q);
+      const matchOpp = c.OppositeParty?.toLowerCase().includes(q);
+      return matchTitle || matchNo || matchCourt || matchOpp;
+    });
+  }, [casesList, caseSearchQuery]);
 
   // OCR state
   const [ocrModalVisible, setOcrModalVisible] = useState(false);
@@ -155,7 +212,6 @@ const TiptapEditDraftScreen: React.FC = () => {
 
   // Voice dictation & Autocomplete state
   const [isDictating, setIsDictating] = useState(false);
-  const [liveSpeechPreview, setLiveSpeechPreview] = useState("");
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
 
   // Walkthrough tour state
@@ -165,6 +221,8 @@ const TiptapEditDraftScreen: React.FC = () => {
   const webViewRef = useRef<WebView>(null);
   const saveCallbackRef = useRef<((html: string) => void) | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasInitialLoadedRef = useRef(false);
+  const isNewUnsavedDraftRef = useRef(!initialDraftId);
 
   const formatMarginValue = (px: number, mode: "in" | "mm" | "px"): string => {
     if (mode === "in") return `${(px / 96).toFixed(2)} in`;
@@ -191,8 +249,8 @@ const TiptapEditDraftScreen: React.FC = () => {
       title: locale === "hi" ? "वॉइस-फर्स्ट ड्राफ्टिंग" : "Voice-First Legal Dictation",
       description:
         locale === "hi"
-          ? "निचले दाएं कोने में मौजूद फ्लोटिंग माइक पर टैप करें। बोलते समय लाइव विराम चिह्न और कानूनी स्निपेट्स तुरंत डालें।"
-          : "Tap the floating thumb mic at the bottom-right. While speaking, tap one-touch legal punctuation chips on the fly!",
+          ? "निचले दाएं कोने में मौजूद फ्लोटिंग माइक पर टैप करें और बोलते ही सीधे दस्तावेज़ में लिखें।"
+          : "Tap the floating mic at the bottom-right to instantly dictate legal text directly into your document.",
       icon: "mic-outline",
     },
     {
@@ -222,10 +280,11 @@ const TiptapEditDraftScreen: React.FC = () => {
   ];
 
   useEffect(() => {
+    let isMounted = true;
     const checkTourSeen = async () => {
       try {
         const seen = await AsyncStorage.getItem("@tiptap_editor_tour_seen");
-        if (seen !== "true") {
+        if (seen !== "true" && isMounted) {
           setShowTour(true);
         }
       } catch (e) {
@@ -233,7 +292,38 @@ const TiptapEditDraftScreen: React.FC = () => {
       }
     };
     checkTourSeen();
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  useEffect(() => {
+    const fetchExistingDraftIfNeeded = async () => {
+      if (initialDraftId) {
+        try {
+          const existing = await getDocumentDraftById(initialDraftId);
+          if (existing) {
+            if (existing.title && !initialTitle) {
+              setTitle(existing.title);
+            }
+            if (existing.template_type && !templateType) {
+              setDocTemplateType(existing.template_type);
+            }
+            if (existing.html_content && (!initialHtml || initialHtml === "")) {
+              setHtmlContent(existing.html_content);
+              postMessageToWebView({
+                type: "setContent",
+                html: existing.html_content,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("Could not pre-fetch draft:", e);
+        }
+      }
+    };
+    fetchExistingDraftIfNeeded();
+  }, [initialDraftId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -242,6 +332,95 @@ const TiptapEditDraftScreen: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  const handleOpenSaveDialog = useCallback(() => {
+    setIsSaveAsMode(false);
+    setSaveDialogTitle(title || `Draft ${new Date().toLocaleDateString("en-IN")}`);
+    setIsSaveDialogVisible(true);
+  }, [title]);
+
+  const handleSaveButtonPress = useCallback(() => {
+    if (!isNewUnsavedDraftRef.current && initialDraftId) {
+      // Existing saved draft: Show prompt with Save (Overwrite) vs Save As options
+      setIsExistingSavePromptVisible(true);
+    } else {
+      // New unsaved draft: Open standard Save destination dialog
+      handleOpenSaveDialog();
+    }
+  }, [initialDraftId, handleOpenSaveDialog]);
+
+  const handleBackPress = useCallback(() => {
+    if (hasUnsavedChanges) {
+      Alert.alert(
+        "Unsaved Changes",
+        "You have unsaved changes in this document. What would you like to do before leaving?",
+        [
+          {
+            text: "Save & Exit",
+            onPress: () => {
+              if (!isNewUnsavedDraftRef.current && initialDraftId) {
+                handleDirectOverwriteSave();
+              } else {
+                handleOpenSaveDialog();
+              }
+            },
+          },
+          {
+            text: "Discard Changes",
+            style: "destructive",
+            onPress: () => {
+              setHasUnsavedChanges(false);
+              navigation.goBack();
+            },
+          },
+          {
+            text: "Keep Editing",
+            style: "cancel",
+          },
+        ]
+      );
+      return true;
+    }
+    navigation.goBack();
+    return true;
+  }, [hasUnsavedChanges, navigation, handleOpenSaveDialog, initialDraftId]);
+
+  // Backgrounding & Navigation Auto-Save Listeners
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "background" || nextAppState === "inactive") {
+        if (!isNewUnsavedDraftRef.current) {
+          performSilentAutoSave();
+        }
+      }
+    });
+
+    const backAction = () => {
+      if (isExistingSavePromptVisible) {
+        setIsExistingSavePromptVisible(false);
+        return true;
+      }
+      if (isSaveDialogVisible) {
+        setIsSaveDialogVisible(false);
+        return true;
+      }
+      if (isCasePickerVisible) {
+        setIsCasePickerVisible(false);
+        return true;
+      }
+      if (isPageSetupVisible) {
+        setIsPageSetupVisible(false);
+        return true;
+      }
+      return handleBackPress();
+    };
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
+
+    return () => {
+      subscription.remove();
+      backHandler.remove();
+    };
+  }, [hasUnsavedChanges, handleBackPress, isExistingSavePromptVisible, isSaveDialogVisible, isCasePickerVisible, isPageSetupVisible]);
+
   // Load existing draft if draftId is provided and no initialHtml was passed
   useEffect(() => {
     const loadDraft = async () => {
@@ -249,20 +428,28 @@ const TiptapEditDraftScreen: React.FC = () => {
         try {
           const draft = await getDocumentDraftById(initialDraftId);
           if (draft) {
+            if (draft.case_id) {
+              setActiveCaseId(Number(draft.case_id));
+            }
             if (draft.title) {
               setTitle(draft.title);
               setSaveDialogTitle(draft.title);
+              lastSavedTitleRef.current = draft.title;
             }
             if (draft.template_type) {
               setDocTemplateType(draft.template_type);
             }
             if (draft.html_content) {
               setHtmlContent(draft.html_content);
+              lastSavedHtmlRef.current = draft.html_content;
+              languageContentMapRef.current[docDraftLanguage] = draft.html_content;
+
               const layoutMatch = draft.html_content.match(/<!-- CD_LAYOUT:(.*?) -->/);
               if (layoutMatch && layoutMatch[1]) {
                 try {
                   const layout = JSON.parse(layoutMatch[1]);
                   if (layout.font) setFont(layout.font);
+                  if (layout.fontSize) setFontSize(String(layout.fontSize));
                   if (layout.lineHeight) setLineHeight(layout.lineHeight);
                   if (layout.pageSize) setPageSize(layout.pageSize);
                   if (layout.topMargin !== undefined) setTopMargin(layout.topMargin);
@@ -283,7 +470,7 @@ const TiptapEditDraftScreen: React.FC = () => {
       }
     };
     loadDraft();
-  }, [initialDraftId, initialHtml]);
+  }, [initialDraftId, initialHtml, docDraftLanguage]);
 
   const postMessageToWebView = (message: object) => {
     const jsonLiteral = JSON.stringify(JSON.stringify(message));
@@ -299,6 +486,24 @@ const TiptapEditDraftScreen: React.FC = () => {
       setEditorState((prev) => ({ ...prev, italic: !prev.italic }));
     else if (command === "underline")
       setEditorState((prev) => ({ ...prev, underline: !prev.underline }));
+    else if (command === "toggleHeading") {
+      const lvl = Number(value);
+      setEditorState((prev) => ({
+        ...prev,
+        h1: lvl === 1 ? !prev.h1 : false,
+        h2: lvl === 2 ? !prev.h2 : false,
+        h3: lvl === 3 ? !prev.h3 : false,
+        paragraph: false,
+      }));
+    } else if (command === "setParagraph") {
+      setEditorState((prev) => ({
+        ...prev,
+        h1: false,
+        h2: false,
+        h3: false,
+        paragraph: true,
+      }));
+    }
 
     postMessageToWebView({
       type: "exec",
@@ -316,7 +521,8 @@ const TiptapEditDraftScreen: React.FC = () => {
     bMargin: number = bottomMargin,
     lMargin: number = leftMargin,
     rMargin: number = rightMargin,
-    lhSpace: number = letterheadSpace
+    lhSpace: number = letterheadSpace,
+    newFontSize: string = fontSize
   ) => {
     postMessageToWebView({
       type: "layout",
@@ -328,8 +534,37 @@ const TiptapEditDraftScreen: React.FC = () => {
       leftMargin: lMargin,
       rightMargin: rMargin,
       letterheadSpace: lhSpace,
+      fontSize: newFontSize,
     });
     markAsEditingAndScheduleAutoSave();
+  };
+
+  const AVAILABLE_FONT_SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24];
+
+  const handleIncreaseFontSize = () => {
+    const current = parseInt(fontSize, 10) || 14;
+    const next = AVAILABLE_FONT_SIZES.find((s) => s > current) || Math.min(32, current + 2);
+    const strNext = String(next);
+    setFontSize(strNext);
+    triggerFormat("setFontSize", strNext);
+  };
+
+  const handleDecreaseFontSize = () => {
+    const current = parseInt(fontSize, 10) || 14;
+    const reversed = [...AVAILABLE_FONT_SIZES].reverse();
+    const prev = reversed.find((s) => s < current) || Math.max(8, current - 2);
+    const strPrev = String(prev);
+    setFontSize(strPrev);
+    triggerFormat("setFontSize", strPrev);
+  };
+
+  const handleCycleFontSize = () => {
+    const current = parseInt(fontSize, 10) || 14;
+    const commonSizes = [12, 13, 14, 16, 18];
+    const nextIdx = (commonSizes.indexOf(current) + 1) % commonSizes.length;
+    const nextSize = String(commonSizes[nextIdx] || 14);
+    setFontSize(nextSize);
+    triggerFormat("setFontSize", nextSize);
   };
 
   // Helper to fetch latest HTML from WebView
@@ -360,20 +595,27 @@ const TiptapEditDraftScreen: React.FC = () => {
   // Auto-Save Mechanism (Silently saves to SQLite with current title/default name after 2s inactivity)
   const performSilentAutoSave = async () => {
     try {
+      if (isNewUnsavedDraftRef.current) {
+        // Do not silently create unnamed database rows for uncommitted new drafts
+        return;
+      }
       setSaveStatus("saving");
       const html = await getLatestHtml();
-      const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
+      const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, fontSize, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
       const contentWithMetadata = metadataComment + html;
 
       await saveDocumentDraft({
         id: activeDraftId,
-        caseId: caseId ? String(caseId) : undefined,
-        title: title || `Draft ${new Date().toLocaleDateString()}`,
-        templateType: docTemplateType || templateType || "draft",
-        contentHtml: contentWithMetadata,
-        updatedAt: new Date().toISOString(),
+        case_id: activeCaseId ?? (caseId ? Number(caseId) : null),
+        title: title || `Draft ${new Date().toLocaleDateString("en-IN")}`,
+        template_type: docTemplateType || templateType || "draft",
+        html_content: contentWithMetadata,
+        is_custom_template: 0,
+        updated_at: new Date().toISOString(),
       });
 
+      lastSavedHtmlRef.current = html;
+      lastSavedTitleRef.current = title;
       setHasUnsavedChanges(false);
       setSaveStatus("saved");
     } catch (e) {
@@ -385,12 +627,14 @@ const TiptapEditDraftScreen: React.FC = () => {
   const markAsEditingAndScheduleAutoSave = () => {
     setHasUnsavedChanges(true);
     setSaveStatus("editing");
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
+    if (!isNewUnsavedDraftRef.current) {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      autoSaveTimerRef.current = setTimeout(() => {
+        performSilentAutoSave();
+      }, 2000);
     }
-    autoSaveTimerRef.current = setTimeout(() => {
-      performSilentAutoSave();
-    }, 2000);
   };
 
   const handleFindText = (text: string) => {
@@ -443,15 +687,33 @@ const TiptapEditDraftScreen: React.FC = () => {
       if (data.type === "state") {
         if (data.state) {
           setEditorState(data.state);
+          if (data.state.fontSize) {
+            setFontSize(String(data.state.fontSize));
+          }
         }
         if (data.stats) {
           setDocStats(data.stats);
         }
         if (data.html) {
           setHtmlContent(data.html);
+          if (!hasInitialLoadedRef.current) {
+            hasInitialLoadedRef.current = true;
+            lastSavedHtmlRef.current = data.html;
+            languageContentMapRef.current[docDraftLanguage] = data.html;
+          } else {
+            // Check if document content has actually changed from the saved baseline
+            const isContentDifferent = data.html !== lastSavedHtmlRef.current;
+            const isTitleDifferent = (title || "").trim() !== (lastSavedTitleRef.current || "").trim();
+
+            if (isContentDifferent || isTitleDifferent) {
+              markAsEditingAndScheduleAutoSave();
+            } else if (!isNewUnsavedDraftRef.current) {
+              setHasUnsavedChanges(false);
+              setSaveStatus("saved");
+            }
+          }
         }
         setIsLoading(false);
-        markAsEditingAndScheduleAutoSave();
       } else if (data.type === "searchResult") {
         setSearchMatchCount(data.total || 0);
         setCurrentMatchIndex(data.current || 0);
@@ -475,15 +737,13 @@ const TiptapEditDraftScreen: React.FC = () => {
     }
   };
 
-  // 1. Voice-First Dictation Handlers with Universal Punctuation & Speech Assistant
+  // 1. Voice-First Dictation Handlers (Direct Instant Dictation)
   const toggleVoiceDictation = async () => {
     if (isDictating) {
       await speechRecognitionService.stopListening();
       setIsDictating(false);
-      setLiveSpeechPreview("");
     } else {
       setIsDictating(true);
-      setLiveSpeechPreview("Listening...");
       const dictationLocale =
         docDraftLanguage === "hi" || locale === "hi" ? "hi-IN" : "en-IN";
       const started = await speechRecognitionService.startListening(
@@ -491,11 +751,9 @@ const TiptapEditDraftScreen: React.FC = () => {
         {
           onStart: () => {
             setIsDictating(true);
-            setLiveSpeechPreview("Listening...");
           },
           onResult: (text) => {
             if (text) {
-              setLiveSpeechPreview(text);
               const processed = text
                 .replace(/\b(full stop|period)\b/gi, ".")
                 .replace(/\b(पूर्ण विराम)\b/gi, "।")
@@ -512,18 +770,15 @@ const TiptapEditDraftScreen: React.FC = () => {
           },
           onError: (err) => {
             setIsDictating(false);
-            setLiveSpeechPreview("");
             Alert.alert("Dictation Error", err || "Speech recognition error");
           },
           onEnd: () => {
             setIsDictating(false);
-            setLiveSpeechPreview("");
           },
         }
       );
       if (!started) {
         setIsDictating(false);
-        setLiveSpeechPreview("");
       }
     }
   };
@@ -633,135 +888,609 @@ const TiptapEditDraftScreen: React.FC = () => {
     Alert.alert("Imported", "Reviewed OCR text inserted into document editor.");
   };
 
-  // 3. User Explicit Save with Title Confirmation & Destination Options
-  const handleOpenSaveDialog = () => {
-    setSaveDialogTitle(title);
-    setIsSaveDialogVisible(true);
+  const openCasePicker = async (mode: "save_draft" | "attach_pdf", pdfUri?: string) => {
+    try {
+      setCasePickerMode(mode);
+      if (pdfUri) setGeneratedPdfUri(pdfUri);
+      const cases = await getCases();
+      setCasesList(cases || []);
+      setCaseSearchQuery("");
+      setIsCasePickerVisible(true);
+    } catch (e) {
+      console.warn("Failed to load cases for picker:", e);
+      Alert.alert("Error", "Could not load cases list.");
+    }
   };
 
-  const handleConfirmSave = async (destination: "case" | "standalone" | "template") => {
-    setIsSaving(true);
-    setIsSaveDialogVisible(false);
+  const handleSelectCaseForAttachment = async (selectedCase: CaseWithDetails) => {
+    setIsAttachingCase(true);
     try {
-      const finalTitle = saveDialogTitle.trim() || title;
-      setTitle(finalTitle);
+      const rawTitle = saveDialogTitle.trim() || title || "Legal Document";
+      if (casePickerMode === "save_draft") {
+        const finalTitle = await getUniqueDraftTitle(rawTitle, activeDraftId, 0);
+        setTitle(finalTitle);
+        const html = await getLatestHtml();
+        const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, fontSize, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
+        const contentWithMetadata = metadataComment + html;
+        await saveDocumentDraft({
+          id: activeDraftId,
+          case_id: Number(selectedCase.id),
+          title: finalTitle,
+          template_type: docTemplateType || templateType || "draft",
+          html_content: contentWithMetadata,
+          is_custom_template: 0,
+          updated_at: new Date().toISOString(),
+        });
+        isNewUnsavedDraftRef.current = false;
+        setHasUnsavedChanges(false);
+        setSaveStatus("saved");
+        setIsCasePickerVisible(false);
+        const titleMsg = finalTitle !== rawTitle ? ` (Saved as "${finalTitle}" to resolve name conflict)` : "";
+        Alert.alert(
+          "Draft Attached Successfully",
+          `This document has been linked to case "${selectedCase.CaseTitle || "Case"}".${titleMsg}`,
+          [{ text: "OK" }]
+        );
+      } else if (casePickerMode === "attach_pdf" && generatedPdfUri) {
+        await uploadCaseDocument({
+          caseId: Number(selectedCase.id),
+          originalFileName: `${rawTitle}.pdf`,
+          fileType: "application/pdf",
+          fileUri: generatedPdfUri,
+        });
+        setIsCasePickerVisible(false);
+        Alert.alert(
+          "PDF Attached to Case Documents",
+          `"${rawTitle}.pdf" has been saved directly into documents for "${selectedCase.CaseTitle || "Case"}".`,
+          [{ text: "OK" }]
+        );
+      }
+    } catch (err) {
+      console.error("Error attaching to case:", err);
+      Alert.alert("Error", "Failed to attach document to case.");
+    } finally {
+      setIsAttachingCase(false);
+    }
+  };
+
+  // Direct overwrite save for existing draft
+  const handleDirectOverwriteSave = async () => {
+    setIsExistingSavePromptVisible(false);
+    setIsSaving(true);
+    let finalSavedTitle = "";
+    let generatedPdfUri = "";
+
+    try {
+      const finalTitle = title.trim() || "Draft Document";
+      finalSavedTitle = finalTitle;
       const html = await getLatestHtml();
-      const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
+      const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, fontSize, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
       const contentWithMetadata = metadataComment + html;
 
+      const targetCaseId = activeCaseId ?? (caseId ? Number(caseId) : null);
       const effTemplateType = docTemplateType || templateType || "draft";
-      if (destination === "case") {
-        await saveDocumentDraft({
-          id: activeDraftId,
-          caseId: caseId ? String(caseId) : undefined,
-          title: finalTitle,
-          templateType: effTemplateType,
-          contentHtml: contentWithMetadata,
-          updatedAt: new Date().toISOString(),
-        });
-        Alert.alert("Success", "Draft saved to current case successfully!", [
-          { text: "OK", onPress: () => navigation.goBack() },
-        ]);
-      } else if (destination === "standalone") {
-        await saveDocumentDraft({
-          id: activeDraftId,
-          caseId: undefined,
-          title: finalTitle,
-          templateType: effTemplateType,
-          contentHtml: contentWithMetadata,
-          updatedAt: new Date().toISOString(),
-        });
-        Alert.alert("Success", "Standalone draft saved successfully!", [
-          { text: "OK", onPress: () => navigation.goBack() },
-        ]);
-      } else if (destination === "template") {
-        await saveDocumentDraft({
-          id: uuidv4(),
-          caseId: undefined,
-          title: `${finalTitle} (Template)`,
-          templateType: effTemplateType,
-          contentHtml: contentWithMetadata,
-          is_custom_template: 1,
-          updatedAt: new Date().toISOString(),
-        });
-        Alert.alert("Success", "Saved as a reusable custom template!", [
-          { text: "OK" },
-        ]);
-      }
+
+      await saveDocumentDraft({
+        id: activeDraftId,
+        case_id: targetCaseId,
+        title: finalTitle,
+        template_type: effTemplateType,
+        html_content: contentWithMetadata,
+        is_custom_template: 0,
+        updated_at: new Date().toISOString(),
+      });
+
+      lastSavedHtmlRef.current = html;
+      lastSavedTitleRef.current = finalTitle;
+      languageContentMapRef.current[docDraftLanguage] = html;
+      isNewUnsavedDraftRef.current = false;
       setHasUnsavedChanges(false);
       setSaveStatus("saved");
+
+      try {
+        generatedPdfUri = await generatePdfFile(html, finalTitle);
+      } catch (pdfErr) {
+        console.warn("Background PDF compilation warning:", pdfErr);
+      }
+
+      if (targetCaseId && generatedPdfUri) {
+        try {
+          await uploadCaseDocument({
+            originalFileName: `${finalTitle}.pdf`,
+            fileType: "application/pdf",
+            fileUri: generatedPdfUri,
+            caseId: targetCaseId,
+            userId: null,
+          });
+        } catch (e) {
+          console.warn("Auto-attach PDF to CaseDocuments:", e);
+        }
+      }
+
+      const showSaveSuccessAlert = () => {
+        Alert.alert(
+          "Document Saved",
+          `Changes to "${finalTitle}" have been successfully saved.`,
+          [
+            ...(generatedPdfUri
+              ? [
+                  {
+                    text: "Open / View PDF",
+                    onPress: () => {
+                      // @ts-ignore
+                      navigation.navigate("PdfViewer", {
+                        pdfUri: generatedPdfUri,
+                        title: finalTitle,
+                        returnToDraftsHub: !targetCaseId,
+                        returnToCaseId: targetCaseId,
+                      });
+                    },
+                  },
+                  {
+                    text: "Share PDF",
+                    onPress: async () => {
+                      try {
+                        await shareNamedPdf(generatedPdfUri, finalTitle, finalTitle);
+                      } finally {
+                        if (targetCaseId) {
+                          // @ts-ignore
+                          navigation.navigate("CaseDetails", {
+                            caseId: targetCaseId,
+                            scrollToDocs: true,
+                          });
+                        } else {
+                          // @ts-ignore
+                          navigation.navigate("DraftsHub", { tab: "drafts" });
+                        }
+                      }
+                    },
+                  },
+                ]
+              : []),
+            {
+              text: targetCaseId ? "Back to Case" : "Go to Drafts Hub",
+              onPress: () => {
+                if (targetCaseId) {
+                  // @ts-ignore
+                  navigation.navigate("CaseDetails", {
+                    caseId: targetCaseId,
+                    scrollToDocs: true,
+                  });
+                } else {
+                  // @ts-ignore
+                  navigation.navigate("DraftsHub", { tab: "drafts" });
+                }
+              },
+            },
+            {
+              text: "Keep Editing",
+              style: "cancel",
+            },
+          ]
+        );
+      };
+
+      try {
+        showAdWithPreload("rewarded", () => {
+          showSaveSuccessAlert();
+        });
+      } catch {
+        showSaveSuccessAlert();
+      }
     } catch (err) {
-      console.error("Error saving draft:", err);
-      Alert.alert("Error", "Failed to save document draft.");
+      console.error("Error overwriting draft in database:", err);
+      Alert.alert("Save Error", "Failed to update draft in database. Please check device storage.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // 4. Print & Export PDF Handler
-  const handleExportPdf = async () => {
+  const handleOpenSaveAs = () => {
+    setIsExistingSavePromptVisible(false);
+    setIsSaveAsMode(true);
+    setSaveDialogTitle(`${title} (Copy)`);
+    setIsSaveDialogVisible(true);
+  };
+
+  // 3. User Explicit Save with Title Confirmation & Destination Options
+  const handleConfirmSave = async (destination: "case" | "standalone" | "template") => {
+    setIsSaving(true);
+    setIsSaveDialogVisible(false);
+    let finalSavedTitle = "";
+    let generatedPdfUri = "";
+
+    try {
+      const rawTitle = saveDialogTitle.trim() || title || "Draft Document";
+      const isCustom = destination === "template" ? 1 : 0;
+      const targetDraftId = isSaveAsMode || destination === "template" ? uuidv4() : activeDraftId;
+      const effTemplateType = docTemplateType || templateType || "draft";
+
+      const finalTitle = await getUniqueDraftTitle(
+        rawTitle,
+        isSaveAsMode || destination === "template" ? null : activeDraftId,
+        isCustom
+      );
+      finalSavedTitle = finalTitle;
+      if (!isSaveAsMode) {
+        setTitle(finalTitle);
+      }
+
+      const html = await getLatestHtml();
+      const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, fontSize, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
+      const contentWithMetadata = metadataComment + html;
+
+      // 1. Atomic Save to SQLite Database
+      if (destination === "case") {
+        await saveDocumentDraft({
+          id: targetDraftId,
+          case_id: activeCaseId ?? (caseId ? Number(caseId) : null),
+          title: finalTitle,
+          template_type: effTemplateType,
+          html_content: contentWithMetadata,
+          is_custom_template: 0,
+          updated_at: new Date().toISOString(),
+        });
+      } else if (destination === "standalone") {
+        await saveDocumentDraft({
+          id: targetDraftId,
+          case_id: null,
+          title: finalTitle,
+          template_type: effTemplateType,
+          html_content: contentWithMetadata,
+          is_custom_template: 0,
+          updated_at: new Date().toISOString(),
+        });
+      } else if (destination === "template") {
+        await saveDocumentDraft({
+          id: targetDraftId,
+          case_id: null,
+          title: finalTitle,
+          template_type: effTemplateType,
+          html_content: contentWithMetadata,
+          is_custom_template: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      // Confirm save state immediately upon SQLite success
+      lastSavedHtmlRef.current = html;
+      lastSavedTitleRef.current = finalTitle;
+      languageContentMapRef.current[docDraftLanguage] = html;
+      if (!isSaveAsMode) {
+        setActiveDraftId(targetDraftId);
+      }
+      isNewUnsavedDraftRef.current = false;
+      setHasUnsavedChanges(false);
+      setSaveStatus("saved");
+
+      // 2. Auxiliary PDF Generation (isolated from database save)
+      try {
+        generatedPdfUri = await generatePdfFile(html, finalTitle);
+      } catch (pdfErr) {
+        console.warn("Background PDF compilation warning:", pdfErr);
+      }
+
+      const targetCaseId =
+        destination === "case" && (activeCaseId || caseId)
+          ? Number(activeCaseId || caseId)
+          : null;
+
+      if (targetCaseId && destination === "case" && generatedPdfUri) {
+        try {
+          await uploadCaseDocument({
+            originalFileName: `${finalTitle}.pdf`,
+            fileType: "application/pdf",
+            fileUri: generatedPdfUri,
+            caseId: targetCaseId,
+            userId: null,
+          });
+        } catch (e) {
+          console.warn("Auto-attach PDF to CaseDocuments:", e);
+        }
+      }
+
+      // 3. Prompt user with next actions
+      const showSaveSuccessAlert = () => {
+        Alert.alert(
+          "Document Saved Successfully",
+          `"${finalTitle}" has been saved to your Case Diary Drafts. What would you like to do next?`,
+          [
+            ...(generatedPdfUri
+              ? [
+                  {
+                    text: "Open / View PDF",
+                    onPress: () => {
+                      // @ts-ignore
+                      navigation.navigate("PdfViewer", {
+                        pdfUri: generatedPdfUri,
+                        title: finalTitle,
+                        returnToDraftsHub: !targetCaseId,
+                        returnToCaseId: targetCaseId,
+                        draftsHubParams: {
+                          tab: destination === "template" ? "templates" : "drafts",
+                        },
+                      });
+                    },
+                  },
+                  {
+                    text: "Share PDF",
+                    onPress: async () => {
+                      try {
+                        await shareNamedPdf(generatedPdfUri, finalTitle, finalTitle);
+                      } finally {
+                        if (targetCaseId) {
+                          // @ts-ignore
+                          navigation.navigate("CaseDetails", {
+                            caseId: targetCaseId,
+                            scrollToDocs: true,
+                          });
+                        } else {
+                          // @ts-ignore
+                          navigation.navigate("DraftsHub", {
+                            tab: destination === "template" ? "templates" : "drafts",
+                          });
+                        }
+                      }
+                    },
+                  },
+                ]
+              : []),
+            {
+              text: targetCaseId ? "Back to Case" : "Go to Drafts Hub",
+              onPress: () => {
+                if (targetCaseId) {
+                  // @ts-ignore
+                  navigation.navigate("CaseDetails", {
+                    caseId: targetCaseId,
+                    scrollToDocs: true,
+                  });
+                } else {
+                  // @ts-ignore
+                  navigation.navigate("DraftsHub", {
+                    tab: destination === "template" ? "templates" : "drafts",
+                  });
+                }
+              },
+            },
+          ]
+        );
+      };
+
+      try {
+        showAdWithPreload("rewarded", () => {
+          showSaveSuccessAlert();
+        });
+      } catch {
+        showSaveSuccessAlert();
+      }
+    } catch (err) {
+      console.error("Error saving draft to database:", err);
+      Alert.alert("Save Error", "Failed to save document draft into database. Please check device storage.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Generate printable PDF file helper
+  const generatePdfFile = async (
+    rawHtml: string,
+    docTitle: string
+  ): Promise<string> => {
+    const effectiveTopMargin = (topMargin || 24) + (letterheadSpace || 0);
+    const pageCssSize = pageSize === "legal" ? "8.5in 14in" : "A4 portrait";
+    const cleanBodyHtml = rawHtml
+      .replace(/<!-- CD_LAYOUT:(.*?) -->/g, "")
+      .replace(/<div id="red-margin-line".*?<\/div>/g, "")
+      .replace(/<div id="margin-guide-overlay".*?<\/div>/g, "")
+      .replace(/<div class="page-sheet-divider".*?<\/div>/g, "")
+      .replace(/<div class="court-running-header".*?<\/div>/g, "")
+      .replace(/<div class="court-running-footer".*?<\/div>/g, "");
+
+    const printHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          @page {
+            size: ${pageCssSize};
+            margin-top: ${effectiveTopMargin}px;
+            margin-bottom: ${bottomMargin || 16}px;
+            margin-left: ${leftMargin || 36}px;
+            margin-right: ${rightMargin || 16}px;
+          }
+          * {
+            box-sizing: border-box;
+          }
+          html, body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+            color: #111827;
+            font-family: '${font}', 'Times New Roman', Georgia, serif;
+            font-size: ${fontSize || 12}pt;
+            line-height: ${lineHeight || 1.2};
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          body {
+            box-sizing: border-box;
+          }
+          p {
+            margin: 0 0 4pt 0;
+            text-align: justify;
+            text-justify: inter-word;
+            word-wrap: break-word;
+            font-size: ${fontSize || 12}pt;
+            line-height: ${lineHeight || 1.2};
+          }
+          p.court-header, .court-header, h1.court-header {
+            text-align: center !important;
+            font-weight: bold;
+            font-size: ${Math.round((parseInt(fontSize, 10) || 12) * 1.2)}pt;
+            margin-bottom: 8pt;
+          }
+          p.title, .title, h1, h2 {
+            text-align: center !important;
+            font-weight: bold;
+            font-size: ${Math.round((parseInt(fontSize, 10) || 12) * 1.1)}pt;
+            margin: 8pt 0 4pt 0;
+          }
+          h3, h4 {
+            font-weight: bold;
+            font-size: ${fontSize || 12}pt;
+            margin: 6pt 0 3pt 0;
+          }
+          blockquote {
+            border-left: 3px solid #cbd5e1;
+            padding-left: 10pt;
+            margin: 6pt 0;
+            color: #475569;
+            font-style: italic;
+          }
+          ul, ol {
+            margin: 0 0 6pt 18pt;
+            padding: 0;
+          }
+          li {
+            margin-bottom: 3pt;
+          }
+          table, .editor-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8pt 0;
+            table-layout: fixed;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          table td, table th, .editor-table td, .editor-table th {
+            border: 1px solid #94a3b8;
+            padding: 4pt 6pt;
+            font-size: ${fontSize || 12}pt;
+            text-align: left;
+            vertical-align: top;
+            box-sizing: border-box;
+          }
+          table th, .editor-table th {
+            background-color: #f1f5f9;
+            font-weight: bold;
+          }
+          table.borderless-table, table.borderless-columns, .editor-table.borderless-table, .editor-table.borderless-columns,
+          table[style*="border: none"], table[style*="border:none"], table[style*="border: 0"], table[style*="border:0"] {
+            border: none !important;
+            margin: 4pt 0;
+          }
+          table.borderless-table td, table.borderless-columns td, table.borderless-table th, table.borderless-columns th,
+          .editor-table.borderless-table td, .editor-table.borderless-columns td, .editor-table.borderless-table th, .editor-table.borderless-columns th,
+          table[style*="border: none"] td, table[style*="border:none"] td, table[style*="border: 0"] td, table[style*="border:0"] td,
+          table[style*="border: none"] th, table[style*="border:none"] th, table[style*="border: 0"] th, table[style*="border:0"] th {
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            background-color: transparent !important;
+            padding: 2pt 4pt;
+          }
+          .signature-stamp {
+            max-height: 90px;
+            max-width: 220px;
+            margin: 12pt 0;
+            display: block;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .interactive-shape {
+            display: inline-block;
+            min-width: 120px;
+            min-height: 44px;
+            padding: 8pt 12pt;
+            margin: 10pt 0;
+            box-sizing: border-box;
+            position: relative;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .shape-rect {
+            border: 2px solid #374151;
+            background: #f9fafb;
+            border-radius: 4px;
+          }
+          .shape-circle {
+            border: 2px dashed #1e3a8a;
+            background: #eff6ff;
+            border-radius: 50%;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 100px;
+            min-height: 100px;
+          }
+          .shape-arrow {
+            border: 1.5px solid #2563eb;
+            background: #dbeafe;
+            color: #1e40af;
+            border-radius: 20px;
+            font-weight: 600;
+            text-align: center;
+          }
+          .shape-stamp {
+            border: 2px double #991b1b;
+            background: #fef2f2;
+            color: #991b1b;
+            font-weight: 700;
+            text-align: center;
+            border-radius: 4px;
+          }
+          .shape-seal {
+            border: 3px double #1e3a8a;
+            background: #eff6ff;
+            border-radius: 8px;
+            font-weight: 700;
+          }
+          .legal-placeholder {
+            background-color: rgba(254, 240, 138, 0.75);
+            border-bottom: 1.5px dashed #ca8a04;
+            padding: 0 3px;
+            border-radius: 2px;
+            font-weight: 500;
+            color: #1c1917;
+          }
+          .legal-page-break, .page-break, hr.page-break {
+            page-break-before: always !important;
+            break-before: page !important;
+            height: 0 !important;
+            margin: 0 !important;
+            border: none !important;
+            display: block !important;
+          }
+          .page-margin-guide, #red-margin-line, #margin-guide-overlay, .page-sheet-divider, .court-running-header, .court-running-footer {
+            display: none !important;
+          }
+        </style>
+      </head>
+      <body>
+        ${cleanBodyHtml}
+      </body>
+      </html>
+    `;
+    const isLegal = pageSize === "legal";
+    const { uri } = await Print.printToFileAsync({
+      html: printHtml,
+      width: isLegal ? 612 : 595,
+      height: isLegal ? 1008 : 842,
+    });
+
+    return await createNamedPdfFile(uri, docTitle);
+  };
+
+  // 4. Print & Export PDF Execution with Legal CSS Pagination & Styling
+  const executePdfExport = async () => {
     setIsExporting(true);
     try {
       const html = await getLatestHtml();
-      const effectiveTopMargin = (topMargin || 24) + (letterheadSpace || 0);
-      const pageCssSize = pageSize === "legal" ? "8.5in 14in" : "A4 portrait";
-      const cleanBodyHtml = html
-        .replace(/<!-- CD_LAYOUT:(.*?) -->/g, "")
-        .replace(/<div id="red-margin-line".*?<\/div>/g, "")
-        .replace(/<div id="margin-guide-overlay".*?<\/div>/g, "");
-
-      const printHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            @page {
-              size: ${pageCssSize};
-              margin: 0;
-            }
-            html, body {
-              margin: 0;
-              padding: 0;
-              background: #ffffff;
-              color: #000000;
-              font-family: '${font}', 'Times New Roman', serif;
-              font-size: 13pt;
-              line-height: ${lineHeight};
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            body {
-              padding-top: ${effectiveTopMargin}px;
-              padding-bottom: ${bottomMargin || 24}px;
-              padding-left: ${leftMargin || 55}px;
-              padding-right: ${rightMargin || 24}px;
-              box-sizing: border-box;
-            }
-            p { margin-bottom: 12pt; text-align: justify; text-justify: inter-word; word-wrap: break-word; }
-            p.court-header, .court-header { text-align: center !important; font-weight: bold; margin-bottom: 14pt; }
-            p.title, .title { text-align: center !important; font-weight: bold; font-size: 15pt; margin: 14pt 0; }
-            .editor-table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-            .editor-table td, .editor-table th { border: 1px solid #000; padding: 6pt; text-align: left; }
-            .legal-page-break, .page-break { page-break-before: always; break-before: page; }
-            .page-margin-guide, #red-margin-line, #margin-guide-overlay { display: none !important; }
-            .interactive-shape { page-break-inside: avoid; }
-          </style>
-        </head>
-        <body>
-          ${cleanBodyHtml}
-        </body>
-        </html>
-      `;
-      const isLegal = pageSize === "legal";
-      const { uri } = await Print.printToFileAsync({
-        html: printHtml,
-        width: isLegal ? 612 : 595,
-        height: isLegal ? 1008 : 842,
-      });
-
       const docTitle = title || "Draft Document";
-      const namedUri = await createNamedPdfFile(uri, docTitle);
+      const namedUri = await generatePdfFile(html, docTitle);
 
       setIsExporting(false);
       Alert.alert(docTitle, "Choose an action for this PDF:", [
@@ -782,32 +1511,42 @@ const TiptapEditDraftScreen: React.FC = () => {
           },
         },
         {
-          text: "Link to Case",
+          text: "Attach to Case Documents",
           onPress: async () => {
-            try {
-              const latestHtml = await getLatestHtml();
-              const metadataComment = `<!-- CD_LAYOUT:${JSON.stringify({ font, lineHeight, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, pageSize })} -->`;
-              const contentWithMetadata = metadataComment + latestHtml;
-              await saveDocumentDraft({
-                id: activeDraftId,
-                caseId: caseId ? String(caseId) : undefined,
-                title,
-                templateType: templateType,
-                contentHtml: contentWithMetadata,
-                updatedAt: new Date().toISOString(),
-              });
-              setHasUnsavedChanges(false);
-              // @ts-ignore
-              navigation.navigate("DraftsHub", {
-                draftId: activeDraftId,
-                action: "attach",
-              });
-            } catch (e) {
-              // @ts-ignore
-              navigation.navigate("DraftsHub", {
-                draftId: activeDraftId,
-                action: "attach",
-              });
+            if (caseId) {
+              Alert.alert(
+                "Attach PDF to Case",
+                "Do you want to attach this PDF to the current case or choose another case?",
+                [
+                  {
+                    text: "Current Case",
+                    onPress: async () => {
+                      try {
+                        setIsLoading(true);
+                        await uploadCaseDocument({
+                          caseId: Number(caseId),
+                          originalFileName: `${docTitle}.pdf`,
+                          fileType: "application/pdf",
+                          fileUri: namedUri,
+                        });
+                        Alert.alert("Attached", `"${docTitle}.pdf" has been saved into case documents.`);
+                      } catch (err) {
+                        console.error("Error attaching PDF:", err);
+                        Alert.alert("Error", "Failed to attach PDF to case.");
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    },
+                  },
+                  {
+                    text: "Choose Another Case",
+                    onPress: () => openCasePicker("attach_pdf", namedUri),
+                  },
+                  { text: "Cancel", style: "cancel" },
+                ]
+              );
+            } else {
+              openCasePicker("attach_pdf", namedUri);
             }
           },
         },
@@ -823,77 +1562,68 @@ const TiptapEditDraftScreen: React.FC = () => {
     }
   };
 
-  const handleToggleTemplateLanguage = React.useCallback(async () => {
-    const nextLang = docDraftLanguage === "en" ? "hi" : "en";
-
-    if (
-      docTemplateType &&
-      docTemplateType !== "draft" &&
-      docTemplateType !== "blank_page"
-    ) {
-      Alert.alert(
-        nextLang === "hi"
-          ? "हिन्दी प्रारूप लोड करें?"
-          : "Switch to English Template?",
-        nextLang === "hi"
-          ? "क्या आप इस विधिक प्रारूप को हिन्दी में बदलना चाहते हैं? केस विवरण स्वतः हिन्दी में भर दिए जाएंगे।"
-          : "Do you want to switch this template to English? Case details will be re-populated in English.",
-        [
-          { text: t("alert_cancel") || "Cancel", style: "cancel" },
-          {
-            text: nextLang === "hi" ? "हाँ, हिन्दी करें" : "Yes, Switch",
-            onPress: async () => {
-              try {
-                setIsLoading(true);
-                let caseData: any = {};
-                if (caseId) {
-                  caseData = (await getCaseById(caseId)) || {};
-                }
-                const advocateName =
-                  (await AsyncStorage.getItem("@advocate_name")) || "";
-                const advocateEnrollment =
-                  (await AsyncStorage.getItem("@advocate_enrollment")) || "";
-                const advocateAddress =
-                  (await AsyncStorage.getItem("@advocate_address")) || "";
-                const combinedData = {
-                  ...caseData,
-                  advocateName,
-                  advocateEnrollment,
-                  advocateAddress,
-                };
-                const newHtml = compileLegalDocumentHtml(
-                  docTemplateType,
-                  combinedData,
-                  nextLang === "hi"
-                );
-                setDocDraftLanguage(nextLang);
-                setHtmlContent(newHtml);
-                postMessageToWebView({ type: "load", html: newHtml });
-                postMessageToWebView({
-                  type: "setEditorLanguage",
-                  lang: nextLang,
-                });
-                speechRecognitionService?.setLanguage?.(
-                  nextLang === "hi" ? "hi-IN" : "en-IN"
-                );
-                setSaveStatus("saved");
-              } catch (err) {
-                console.error("Failed to switch template language:", err);
-              } finally {
-                setIsLoading(false);
-              }
-            },
-          },
-        ]
-      );
+  // Rewarded Ad trigger on Exporting PDF
+  const handleExportPdf = async () => {
+    if (showAdWithPreload) {
+      showAdWithPreload("rewarded", () => {
+        executePdfExport();
+      });
     } else {
-      setDocDraftLanguage(nextLang);
-      postMessageToWebView({ type: "setEditorLanguage", lang: nextLang });
-      speechRecognitionService?.setLanguage?.(
-        nextLang === "hi" ? "hi-IN" : "en-IN"
-      );
+      executePdfExport();
     }
-  }, [docDraftLanguage, docTemplateType, caseId, t]);
+  };
+
+  const handleToggleTemplateLanguage = useCallback(async () => {
+    const currentLang = docDraftLanguage;
+    const nextLang = currentLang === "en" ? "hi" : "en";
+
+    try {
+      setIsLoading(true);
+      // 1. Fetch latest HTML from WebView and cache current language content to prevent any data loss
+      const currentHtml = await getLatestHtml();
+      languageContentMapRef.current[currentLang] = currentHtml;
+
+      // 2. Check if next language content is already cached
+      let targetHtml = languageContentMapRef.current[nextLang];
+
+      if (!targetHtml) {
+        // Compile initial legal template for target language if not yet cached
+        let caseData: any = {};
+        if (caseId || activeCaseId) {
+          try {
+            caseData = (await getCaseById(Number(caseId || activeCaseId))) || {};
+          } catch (e) {}
+        }
+        const advocateName = (await AsyncStorage.getItem("@advocate_name")) || "";
+        const advocateEnrollment = (await AsyncStorage.getItem("@advocate_enrollment")) || "";
+        const advocateAddress = (await AsyncStorage.getItem("@advocate_address")) || "";
+        const combinedData = { ...caseData, advocateName, advocateEnrollment, advocateAddress };
+
+        targetHtml = compileLegalDocumentHtml(
+          docTemplateType || "blank_page",
+          combinedData,
+          nextLang === "hi"
+        );
+        languageContentMapRef.current[nextLang] = targetHtml;
+      }
+
+      // 3. Switch editor language state & load preserved HTML into TipTap editor
+      setDocDraftLanguage(nextLang);
+      setHtmlContent(targetHtml);
+      lastSavedHtmlRef.current = targetHtml;
+      postMessageToWebView({
+        type: "setContent",
+        html: targetHtml,
+      });
+      postMessageToWebView({ type: "setEditorLanguage", lang: nextLang });
+      speechRecognitionService?.setLanguage?.(nextLang === "hi" ? "hi-IN" : "en-IN");
+    } catch (err) {
+      console.error("Error toggling document language:", err);
+      Alert.alert("Error", "Failed to switch document language.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [docDraftLanguage, docTemplateType, caseId, activeCaseId]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -904,7 +1634,7 @@ const TiptapEditDraftScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.headerBackBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          onPress={() => navigation.goBack()}
+          onPress={handleBackPress}
         >
           <Ionicons name="arrow-back" size={22} color="#ffffff" />
         </TouchableOpacity>
@@ -966,11 +1696,20 @@ const TiptapEditDraftScreen: React.FC = () => {
           <Ionicons name="arrow-redo-outline" size={17} color="#cbd5e1" />
         </TouchableOpacity>
 
-        {/* Save Draft Button (Opens confirmation dialog) */}
+        {/* Page Setup Button */}
+        <TouchableOpacity
+          style={styles.headerActionBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+          onPress={() => setIsPageSetupVisible(true)}
+        >
+          <Ionicons name="settings-outline" size={17} color="#cbd5e1" />
+        </TouchableOpacity>
+
+        {/* Save Draft Button (Save Overwrite vs Save As) */}
         <TouchableOpacity
           style={[styles.headerActionBtn, { backgroundColor: "#2563eb", borderColor: "#3b82f6" }]}
           hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
-          onPress={handleOpenSaveDialog}
+          onPress={handleSaveButtonPress}
           disabled={isSaving}
         >
           {isSaving ? (
@@ -1060,129 +1799,139 @@ const TiptapEditDraftScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Segmented Ribbon Controller (Kept in top position below header with Clear Text Labels) */}
+      {/* Horizontally Scrollable Segmented Ribbon Header & Status Controller */}
       <View style={styles.ribbonHeader}>
-        <View style={styles.segmentedControl}>
-          <TouchableOpacity
-            style={[
-              styles.segmentedTab,
-              toolbarMode === "format" && styles.segmentedTabActive,
-            ]}
-            onPress={() => {
-              if (toolbarMode === "format") {
-                setIsRibbonCollapsed((prev) => !prev);
-              } else {
-                setToolbarMode("format");
-                setIsRibbonCollapsed(false);
-              }
-            }}
-          >
-            <Ionicons
-              name="text-outline"
-              size={13}
-              color={toolbarMode === "format" ? "#ffffff" : "#94a3b8"}
-              style={{ marginRight: 4 }}
-            />
-            <Text
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.ribbonHeaderScrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.segmentedControl}>
+            <TouchableOpacity
               style={[
-                styles.segmentedTabText,
-                toolbarMode === "format" && styles.segmentedTabTextActive,
+                styles.segmentedTab,
+                toolbarMode === "format" && styles.segmentedTabActive,
               ]}
+              onPress={() => {
+                if (toolbarMode === "format") {
+                  setIsRibbonCollapsed((prev) => !prev);
+                } else {
+                  setToolbarMode("format");
+                  setIsRibbonCollapsed(false);
+                }
+              }}
             >
-              Formatting
+              <Ionicons
+                name="text-outline"
+                size={13}
+                color={toolbarMode === "format" ? "#ffffff" : "#94a3b8"}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.segmentedTabText,
+                  toolbarMode === "format" && styles.segmentedTabTextActive,
+                ]}
+              >
+                Formatting
+              </Text>
+              <Ionicons
+                name={
+                  toolbarMode === "format"
+                    ? isRibbonCollapsed
+                      ? "chevron-forward"
+                      : "chevron-down"
+                    : "chevron-forward"
+                }
+                size={12}
+                color={toolbarMode === "format" ? "#ffffff" : "#94a3b8"}
+                style={{ marginLeft: 4 }}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.segmentedTab,
+                toolbarMode === "legal" && styles.segmentedTabActive,
+              ]}
+              onPress={() => {
+                if (toolbarMode === "legal") {
+                  setIsRibbonCollapsed((prev) => !prev);
+                } else {
+                  setToolbarMode("legal");
+                  setIsRibbonCollapsed(false);
+                }
+              }}
+            >
+              <Ionicons
+                name="briefcase-outline"
+                size={13}
+                color={toolbarMode === "legal" ? "#ffffff" : "#94a3b8"}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.segmentedTabText,
+                  toolbarMode === "legal" && styles.segmentedTabTextActive,
+                ]}
+              >
+                Legal Assist
+              </Text>
+              <Ionicons
+                name={
+                  toolbarMode === "legal"
+                    ? isRibbonCollapsed
+                      ? "chevron-forward"
+                      : "chevron-down"
+                    : "chevron-forward"
+                }
+                size={12}
+                color={toolbarMode === "legal" ? "#ffffff" : "#94a3b8"}
+                style={{ marginLeft: 4 }}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Prominent, Intuitive Page Setup Button in Sub-Header Strip */}
+          <TouchableOpacity
+            style={styles.hudChip}
+            onPress={() => setIsPageSetupVisible(true)}
+          >
+            <Ionicons name="document-text-outline" size={13} color="#60a5fa" />
+            <Text style={[styles.hudChipText, { color: "#93c5fd", fontWeight: "bold" }]}>
+              Page Setup ({pageSize === "legal" ? "Legal" : "A4"})
             </Text>
-            <Ionicons
-              name={
-                toolbarMode === "format"
-                  ? isRibbonCollapsed
-                    ? "chevron-forward"
-                    : "chevron-down"
-                  : "chevron-forward"
-              }
-              size={12}
-              color={toolbarMode === "format" ? "#ffffff" : "#94a3b8"}
-              style={{ marginLeft: 4 }}
-            />
           </TouchableOpacity>
 
+          {/* Live Auto-Save Status Pill (Tappable for immediate manual save) */}
           <TouchableOpacity
-            style={[
-              styles.segmentedTab,
-              toolbarMode === "legal" && styles.segmentedTabActive,
-            ]}
-            onPress={() => {
-              if (toolbarMode === "legal") {
-                setIsRibbonCollapsed((prev) => !prev);
-              } else {
-                setToolbarMode("legal");
-                setIsRibbonCollapsed(false);
-              }
-            }}
+            style={styles.headerStatusRow}
+            onPress={performSilentAutoSave}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
-            <Ionicons
-              name="briefcase-outline"
-              size={13}
-              color={toolbarMode === "legal" ? "#ffffff" : "#94a3b8"}
-              style={{ marginRight: 4 }}
-            />
-            <Text
+            <View
               style={[
-                styles.segmentedTabText,
-                toolbarMode === "legal" && styles.segmentedTabTextActive,
+                styles.statusDot,
+                {
+                  backgroundColor:
+                    saveStatus === "saved"
+                      ? "#10b981"
+                      : saveStatus === "saving"
+                      ? "#3b82f6"
+                      : "#f59e0b",
+                },
               ]}
-            >
-              Legal Assist
-            </Text>
-            <Ionicons
-              name={
-                toolbarMode === "legal"
-                  ? isRibbonCollapsed
-                    ? "chevron-forward"
-                    : "chevron-down"
-                  : "chevron-forward"
-              }
-              size={12}
-              color={toolbarMode === "legal" ? "#ffffff" : "#94a3b8"}
-              style={{ marginLeft: 4 }}
             />
+            <Text style={styles.headerStatusText}>
+              {saveStatus === "saved"
+                ? `Saved • ${pageSize === "legal" ? "Legal" : "A4"} • ${docStats.wordCount} words`
+                : saveStatus === "saving"
+                ? "Auto-saving..."
+                : "Editing... (Auto-saving)"}
+            </Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Live Auto-Save Status Pill */}
-        <TouchableOpacity
-          style={styles.headerStatusRow}
-          onPress={performSilentAutoSave}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-        >
-          <View
-            style={[
-              styles.statusDot,
-              {
-                backgroundColor:
-                  saveStatus === "saved"
-                    ? "#10b981"
-                    : saveStatus === "saving"
-                    ? "#3b82f6"
-                    : "#f59e0b",
-              },
-            ]}
-          />
-          <Text style={styles.headerStatusText}>
-            {saveStatus === "saved"
-              ? `Saved • ${pageSize === "legal" ? "Legal" : "A4"} • ${docStats.wordCount} words`
-              : saveStatus === "saving"
-              ? "Auto-saving..."
-              : "Editing... (Auto-saving)"}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.hudChip}
-          onPress={() => setIsPageSetupVisible(true)}
-        >
-          <Ionicons name="options-outline" size={13} color="#94a3b8" />
-          <Text style={styles.hudChipText}>Page Setup</Text>
-        </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {/* Ribbon Toolbars with Clear Text Labels */}
@@ -1195,6 +1944,67 @@ const TiptapEditDraftScreen: React.FC = () => {
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.ribbonContent}
             >
+              {/* Font Size Quick Stepper */}
+              <View style={styles.fontSizeRibbonGroup}>
+                <TouchableOpacity
+                  style={styles.fontSizeStepperBtn}
+                  onPress={handleDecreaseFontSize}
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                >
+                  <Ionicons name="remove" size={13} color="#334155" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.fontSizeDisplayPill}
+                  onPress={handleCycleFontSize}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.fontSizeDisplayText}>{fontSize} pt</Text>
+                  <Text style={styles.fontSizePillLabel}>Size</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.fontSizeStepperBtn}
+                  onPress={handleIncreaseFontSize}
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                >
+                  <Ionicons name="add" size={13} color="#334155" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Heading Levels & Text Styles for Specific Lines */}
+              <TouchableOpacity
+                style={[styles.labeledToolItem, editorState.h1 && styles.labeledToolItemActive]}
+                onPress={() => triggerFormat("toggleHeading", "1")}
+              >
+                <Text style={[styles.headingToolIcon, editorState.h1 && styles.headingToolIconActive]}>H1</Text>
+                <Text style={[styles.toolLabel, editorState.h1 && styles.toolLabelActive]}>Title</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.labeledToolItem, editorState.h2 && styles.labeledToolItemActive]}
+                onPress={() => triggerFormat("toggleHeading", "2")}
+              >
+                <Text style={[styles.headingToolIcon, editorState.h2 && styles.headingToolIconActive]}>H2</Text>
+                <Text style={[styles.toolLabel, editorState.h2 && styles.toolLabelActive]}>Heading</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.labeledToolItem, editorState.h3 && styles.labeledToolItemActive]}
+                onPress={() => triggerFormat("toggleHeading", "3")}
+              >
+                <Text style={[styles.headingToolIcon, editorState.h3 && styles.headingToolIconActive]}>H3</Text>
+                <Text style={[styles.toolLabel, editorState.h3 && styles.toolLabelActive]}>Subhead</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.labeledToolItem, editorState.paragraph && !editorState.h1 && !editorState.h2 && !editorState.h3 && styles.labeledToolItemActive]}
+                onPress={() => triggerFormat("setParagraph")}
+              >
+                <Ionicons name="text-outline" size={14} color={editorState.paragraph && !editorState.h1 && !editorState.h2 && !editorState.h3 ? "#2563eb" : "#334155"} />
+                <Text style={[styles.toolLabel, editorState.paragraph && !editorState.h1 && !editorState.h2 && !editorState.h3 && styles.toolLabelActive]}>Normal</Text>
+              </TouchableOpacity>
+
+              <View style={styles.toolbarDivider} />
+
               {/* Bold */}
               <TouchableOpacity
                 style={[styles.labeledToolItem, editorState.bold && styles.labeledToolItemActive]}
@@ -1253,11 +2063,11 @@ const TiptapEditDraftScreen: React.FC = () => {
 
               {/* Justify */}
               <TouchableOpacity
-                style={styles.labeledToolItem}
+                style={[styles.labeledToolItem, editorState.alignJustify && styles.labeledToolItemActive]}
                 onPress={() => triggerFormat("justifyFull")}
               >
-                <FontAwesome name="align-justify" size={14} color="#334155" />
-                <Text style={styles.toolLabel}>Justify</Text>
+                <FontAwesome name="align-justify" size={14} color={editorState.alignJustify ? "#2563eb" : "#334155"} />
+                <Text style={[styles.toolLabel, editorState.alignJustify && styles.toolLabelActive]}>Justify</Text>
               </TouchableOpacity>
 
               <View style={styles.toolbarDivider} />
@@ -1343,6 +2153,19 @@ const TiptapEditDraftScreen: React.FC = () => {
               >
                 <Ionicons name="shapes-outline" size={15} color="#334155" />
                 <Text style={styles.toolLabel}>Seals</Text>
+              </TouchableOpacity>
+
+              <View style={styles.toolbarDivider} />
+
+              {/* Intuitive Page Setup & Margins Tool directly in Formatting Ribbon */}
+              <TouchableOpacity
+                style={styles.labeledToolItem}
+                onPress={() => setIsPageSetupVisible(true)}
+              >
+                <Ionicons name="settings-outline" size={15} color="#2563eb" />
+                <Text style={[styles.toolLabel, { color: "#2563eb", fontWeight: "bold" }]}>
+                  Page Setup
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -1485,78 +2308,8 @@ const TiptapEditDraftScreen: React.FC = () => {
             keyboardDisplayRequiresUserAction={false}
           />
 
-          {/* Floating Smart Voice Dictation Assistant Island (Bottom-Right Thumb Reach) */}
+          {/* Floating Smart Voice Dictation Button (Direct Instant Dictation) */}
           <View style={styles.floatingDictationWrapper} pointerEvents="box-none">
-            {isDictating && (
-              <View style={styles.liveSpeechIsland}>
-                <View style={styles.speechHeaderRow}>
-                  <View style={styles.speechIndicatorPulse}>
-                    <Ionicons name="mic" size={14} color="#ffffff" />
-                  </View>
-                  <Text style={styles.speechStatusTitle}>
-                    {docDraftLanguage === "hi" ? "हिंदी डिक्टेशन सक्रिय" : "Dictating (English)..."}
-                  </Text>
-
-                  {/* Language Toggle Chip */}
-                  <TouchableOpacity
-                    style={styles.speechLangChip}
-                    onPress={() => {
-                      const nextLang = docDraftLanguage === "en" ? "hi" : "en";
-                      setDocDraftLanguage(nextLang);
-                      postMessageToWebView({ type: "setEditorLanguage", lang: nextLang });
-                    }}
-                  >
-                    <Text style={styles.speechLangText}>
-                      {docDraftLanguage === "en" ? "EN ➔ HI" : "HI ➔ EN"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {liveSpeechPreview !== "" && (
-                  <Text style={styles.speechLivePreviewText} numberOfLines={2}>
-                    "{liveSpeechPreview}"
-                  </Text>
-                )}
-
-                {/* Universal Legal Voice Punctuation & Helper Strip */}
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={styles.punctuationRow}
-                >
-                  {[
-                    { label: " , ", val: ", " },
-                    { label: docDraftLanguage === "hi" ? " । " : " . ", val: docDraftLanguage === "hi" ? "। " : ". " },
-                    { label: " ; ", val: "; " },
-                    { label: ' " ', val: '"' },
-                    { label: " ¶ New Para ", val: "\n\n" },
-                    { label: " § Section ", val: "§ " },
-                    { label: " v. ", val: " v. " },
-                    { label: " Next [__] ", cmd: "nextPlaceholder" },
-                    { label: " ⏹️ Stop ", action: toggleVoiceDictation },
-                  ].map((p, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={styles.punctuationChip}
-                      onPress={() => {
-                        if (p.action) {
-                          p.action();
-                        } else if (p.cmd) {
-                          triggerFormat(p.cmd);
-                        } else if (p.val) {
-                          triggerFormat("insertText", p.val);
-                        }
-                      }}
-                    >
-                      <Text style={styles.punctuationChipText}>{p.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            {/* Floating Thumb Mic Button */}
             <TouchableOpacity
               style={[
                 styles.floatingThumbMicBtn,
@@ -1674,6 +2427,16 @@ const TiptapEditDraftScreen: React.FC = () => {
                   cmd: "insertFilingIndexTable",
                 },
                 {
+                  title: "⚖️ 2-Column Split Block (No Borders)",
+                  desc: "Insert 2 independent columns for party details, comparative points, or side-by-side notes without visible table grid borders",
+                  cmd: "insertBorderlessColumns",
+                },
+                {
+                  title: "📊 3-Column Split Block (No Borders)",
+                  desc: "Insert 3 clean side-by-side borderless columns for tripartite comparisons or tabular notes",
+                  cmd: "insert3Columns",
+                },
+                {
                   title: "📬 Proof of Filing / Certificate of Service",
                   desc: "Formal service confirmation block with date and counsel signature line",
                   cmd: "insertCertificateOfService",
@@ -1696,6 +2459,60 @@ const TiptapEditDraftScreen: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Existing Document Save Options (Save vs Save As) */}
+      <Modal
+        visible={isExistingSavePromptVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsExistingSavePromptVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.saveDialogContent}>
+            <Text style={styles.saveDialogTitle}>Save Document</Text>
+            <Text style={styles.saveDialogSubtitle}>
+              You are editing an existing document. Choose an option to proceed:
+            </Text>
+
+            <View style={{ gap: 10, marginTop: 10 }}>
+              {/* Option 1: Just Save (Overwrite Previous) */}
+              <TouchableOpacity
+                style={[styles.saveDestOptionBtn, { backgroundColor: "#1e3a8a33", borderColor: "#3b82f6" }]}
+                onPress={handleDirectOverwriteSave}
+              >
+                <Ionicons name="checkmark-circle" size={22} color="#3b82f6" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.saveDestOptionTitle, { color: "#93c5fd" }]}>Save (Overwrite)</Text>
+                  <Text style={styles.saveDestOptionDesc}>
+                    Directly update and save changes to current draft in Case Diary
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Option 2: Save As (New Copy / Custom Template / Another Case) */}
+              <TouchableOpacity
+                style={styles.saveDestOptionBtn}
+                onPress={handleOpenSaveAs}
+              >
+                <Ionicons name="copy-outline" size={22} color="#a855f7" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.saveDestOptionTitle, { color: "#c084fc" }]}>Save As...</Text>
+                  <Text style={styles.saveDestOptionDesc}>
+                    Save as a new draft copy, reusable custom template, or link to another case
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.saveDialogCancelBtn}
+              onPress={() => setIsExistingSavePromptVisible(false)}
+            >
+              <Text style={styles.saveDialogCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Save Draft Dialog (Allows Renaming and Selecting Destination) */}
       <Modal
         visible={isSaveDialogVisible}
@@ -1705,7 +2522,9 @@ const TiptapEditDraftScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.saveDialogContent}>
-            <Text style={styles.saveDialogTitle}>Save Document Draft</Text>
+            <Text style={styles.saveDialogTitle}>
+              {isSaveAsMode ? "Save As New Document" : "Save Document Draft"}
+            </Text>
             <Text style={styles.saveDialogSubtitle}>
               Confirm title and choose where to save this document:
             </Text>
@@ -1719,20 +2538,56 @@ const TiptapEditDraftScreen: React.FC = () => {
             />
 
             <View style={{ gap: 10, marginTop: 14 }}>
-              <TouchableOpacity
-                style={styles.saveDestOptionBtn}
-                onPress={() => handleConfirmSave("case")}
-              >
-                <Ionicons name="briefcase-outline" size={18} color="#60a5fa" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.saveDestOptionTitle}>
-                    {caseId ? "Save to Current Case" : "Save as Case Draft"}
-                  </Text>
-                  <Text style={styles.saveDestOptionDesc}>
-                    Linked directly with your case timeline and filings
-                  </Text>
-                </View>
-              </TouchableOpacity>
+              {activeCaseId || caseId ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.saveDestOptionBtn}
+                    onPress={() => handleConfirmSave("case")}
+                  >
+                    <Ionicons name="briefcase-outline" size={18} color="#60a5fa" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.saveDestOptionTitle}>Save to Current Case</Text>
+                      <Text style={styles.saveDestOptionDesc}>
+                        Linked directly with this case timeline and filings
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.saveDestOptionBtn}
+                    onPress={() => {
+                      setIsSaveDialogVisible(false);
+                      openCasePicker("save_draft");
+                    }}
+                  >
+                    <Ionicons name="folder-outline" size={18} color="#38bdf8" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.saveDestOptionTitle, { color: "#38bdf8" }]}>
+                        Attach to Another Case...
+                      </Text>
+                      <Text style={styles.saveDestOptionDesc}>
+                        Choose a different case from your Case Diary
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity
+                  style={styles.saveDestOptionBtn}
+                  onPress={() => {
+                    setIsSaveDialogVisible(false);
+                    openCasePicker("save_draft");
+                  }}
+                >
+                  <Ionicons name="briefcase-outline" size={18} color="#60a5fa" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.saveDestOptionTitle}>Attach / Link to a Case...</Text>
+                    <Text style={styles.saveDestOptionDesc}>
+                      Select any case in your Case Diary to link this document
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity
                 style={styles.saveDestOptionBtn}
@@ -1771,6 +2626,100 @@ const TiptapEditDraftScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* Case Picker Modal (Instant Attachment to any Case) */}
+      <Modal
+        visible={isCasePickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsCasePickerVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.modalContent, { height: Dimensions.get("window").height * 0.75 }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.modalTitle}>
+                  {casePickerMode === "attach_pdf" ? "Attach PDF to Case" : "Link Draft to Case"}
+                </Text>
+                <Text style={styles.casePickerSubtitle}>
+                  {casePickerMode === "attach_pdf"
+                    ? "Select a case to save this PDF into its Case Documents"
+                    : "Select a case to link and store this document draft"}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsCasePickerVisible(false)}>
+                <Ionicons name="close" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Input */}
+            <View style={styles.casePickerSearchRow}>
+              <Ionicons name="search-outline" size={18} color="#94a3b8" />
+              <TextInput
+                style={styles.casePickerSearchInput}
+                placeholder="Search by case title, number, party..."
+                placeholderTextColor="#64748b"
+                value={caseSearchQuery}
+                onChangeText={setCaseSearchQuery}
+              />
+              {caseSearchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setCaseSearchQuery("")}>
+                  <Ionicons name="close-circle" size={16} color="#94a3b8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {isAttachingCase ? (
+              <View style={{ paddingVertical: 40, alignItems: "center" }}>
+                <ActivityIndicator size="large" color="#2563eb" />
+                <Text style={{ color: "#94a3b8", marginTop: 12, fontSize: 13 }}>
+                  Attaching document to case...
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                style={{ flex: 1, marginTop: 4 }}
+                contentContainerStyle={{ paddingBottom: 40, flexGrow: 1 }}
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled"
+              >
+                {filteredCases.length === 0 ? (
+                  <View style={{ paddingVertical: 30, alignItems: "center" }}>
+                    <Ionicons name="briefcase-outline" size={36} color="#475569" />
+                    <Text style={{ color: "#94a3b8", marginTop: 8, fontSize: 13 }}>
+                      No matching cases found
+                    </Text>
+                  </View>
+                ) : (
+                  filteredCases.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.casePickerCard}
+                      onPress={() => handleSelectCaseForAttachment(item)}
+                    >
+                      <View style={styles.casePickerIconBox}>
+                        <Ionicons name="briefcase" size={18} color="#60a5fa" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.casePickerTitle} numberOfLines={1}>
+                          {item.CaseTitle || "Untitled Case"}
+                        </Text>
+                        <Text style={styles.casePickerSubtitle2} numberOfLines={1}>
+                          {item.case_number ? `No: ${item.case_number}` : ""} {item.CourtName ? `• ${item.CourtName}` : ""}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={18} color="#64748b" />
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+            )}
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* More Options (•••) Bottom Sheet */}
@@ -1824,6 +2773,55 @@ const TiptapEditDraftScreen: React.FC = () => {
                   </Text>
                 </View>
               </TouchableOpacity>
+
+              {/* Reset to Default Template (Intentionally re-populate from case) */}
+              {docTemplateType && docTemplateType !== "draft" && docTemplateType !== "blank_page" && (
+                <TouchableOpacity
+                  style={styles.moreMenuRow}
+                  onPress={() => {
+                    setIsMoreMenuVisible(false);
+                    Alert.alert(
+                      "Reset & Re-populate Template?",
+                      "Are you sure? This will discard your current edits in this session and re-populate the standard template using the latest case data.",
+                      [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                          text: "Reset Template",
+                          style: "destructive",
+                          onPress: async () => {
+                            try {
+                              setIsLoading(true);
+                              let caseData: any = {};
+                              if (caseId) {
+                                caseData = (await getCaseById(caseId)) || {};
+                              }
+                              const advocateName = (await AsyncStorage.getItem("@advocate_name")) || "";
+                              const advocateEnrollment = (await AsyncStorage.getItem("@advocate_enrollment")) || "";
+                              const advocateAddress = (await AsyncStorage.getItem("@advocate_address")) || "";
+                              const combinedData = { ...caseData, advocateName, advocateEnrollment, advocateAddress };
+                              const freshHtml = compileLegalDocumentHtml(docTemplateType, combinedData, docDraftLanguage === "hi");
+                              setHtmlContent(freshHtml);
+                              postMessageToWebView({ type: "load", html: freshHtml });
+                            } catch (e) {
+                              console.error("Failed to reset template:", e);
+                            } finally {
+                              setIsLoading(false);
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                >
+                  <Ionicons name="refresh-circle-outline" size={20} color="#f59e0b" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.moreMenuRowTitle, { color: "#f59e0b" }]}>Re-populate Default Template</Text>
+                    <Text style={styles.moreMenuRowDesc}>
+                      Re-generate template fields from case details (replaces current edits)
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -1837,7 +2835,7 @@ const TiptapEditDraftScreen: React.FC = () => {
         onRequestClose={() => setIsPageSetupVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { height: Dimensions.get("window").height * 0.75 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Page Setup & Layout</Text>
               <TouchableOpacity onPress={() => setIsPageSetupVisible(false)}>
@@ -1846,9 +2844,9 @@ const TiptapEditDraftScreen: React.FC = () => {
             </View>
 
             <ScrollView
-              style={{ maxHeight: 400 }}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 16 }}
+              style={{ flex: 1 }}
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={{ paddingBottom: 36, flexGrow: 1 }}
             >
               {/* Font Selection */}
               <Text style={styles.modalLabel}>Font Family</Text>
@@ -1868,7 +2866,7 @@ const TiptapEditDraftScreen: React.FC = () => {
                       ]}
                       onPress={() => {
                         setFont(item.value);
-                        applyLayoutSettings(item.value, lineHeight, pageSize);
+                        applyLayoutSettings(item.value, lineHeight, pageSize, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, fontSize);
                       }}
                     >
                       <Text
@@ -1878,6 +2876,36 @@ const TiptapEditDraftScreen: React.FC = () => {
                         ]}
                       >
                         {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Font Size Selection */}
+              <Text style={[styles.modalLabel, { marginTop: 12 }]}>Base Font Size</Text>
+              <View style={styles.optionGroup}>
+                {["11", "12", "13", "14", "16", "18"].map((sz) => {
+                  const isSelected = fontSize === sz;
+                  return (
+                    <TouchableOpacity
+                      key={sz}
+                      style={[
+                        styles.optionButton,
+                        isSelected && styles.optionButtonActive,
+                      ]}
+                      onPress={() => {
+                        setFontSize(sz);
+                        applyLayoutSettings(font, lineHeight, pageSize, topMargin, bottomMargin, leftMargin, rightMargin, letterheadSpace, sz);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.optionText,
+                          isSelected && styles.optionTextActive,
+                        ]}
+                      >
+                        {sz} pt
                       </Text>
                     </TouchableOpacity>
                   );
@@ -2206,6 +3234,10 @@ const TiptapEditDraftScreen: React.FC = () => {
           });
           setTableConfigModalVisible(false);
         }}
+        onInsertBorderlessColumns={(cols) => {
+          triggerFormat(cols === 3 ? "insert3Columns" : "insertBorderlessColumns");
+          setTableConfigModalVisible(false);
+        }}
         onClose={() => setTableConfigModalVisible(false)}
       />
 
@@ -2220,6 +3252,9 @@ const TiptapEditDraftScreen: React.FC = () => {
         onAddColRight={() => triggerFormat("tableAddColRight")}
         onDeleteRow={() => triggerFormat("tableDeleteRow")}
         onDeleteCol={() => triggerFormat("tableDeleteCol")}
+        onToggleBorders={() => triggerFormat("toggleTableBorders")}
+        onAlignColumn={(align) => triggerFormat("tableAlignColumn", align)}
+        onAlignCell={(align) => triggerFormat("tableAlignCell", align)}
         onClose={() => setElementContextModalVisible(false)}
       />
 
@@ -2239,7 +3274,7 @@ const TiptapEditDraftScreen: React.FC = () => {
         onRequestClose={() => setIsSignatureListVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+          <View style={[styles.modalContent, { height: Dimensions.get("window").height * 0.75 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Insert Signature / Verification</Text>
               <TouchableOpacity onPress={() => setIsSignatureListVisible(false)}>
@@ -2349,7 +3384,7 @@ const TiptapEditDraftScreen: React.FC = () => {
         onRequestClose={() => setIsVocabularyVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
+          <View style={[styles.modalContent, { height: Dimensions.get("window").height * 0.75 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Legal Dictionary & Maxims</Text>
               <TouchableOpacity onPress={() => setIsVocabularyVisible(false)}>
@@ -2374,8 +3409,9 @@ const TiptapEditDraftScreen: React.FC = () => {
             </View>
 
             <ScrollView
-              contentContainerStyle={{ paddingBottom: 24 }}
-              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 40, flexGrow: 1 }}
+              showsVerticalScrollIndicator={true}
             >
               {LEGAL_VOCABULARY.filter(
                 (item) =>
@@ -2522,35 +3558,34 @@ const getStyles = (theme: any) =>
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: "#0f172a",
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      height: 48,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
       borderBottomWidth: 1,
-      borderBottomColor: "#1e293b",
+      borderBottomColor: "#334155",
+      zIndex: 20,
+      elevation: 6,
     },
     headerBackBtn: {
       padding: 6,
+      marginRight: 6,
     },
     headerTitleColumn: {
       flex: 1,
-      marginHorizontal: 6,
       justifyContent: "center",
     },
     headerTitleInput: {
       fontSize: 15,
       fontWeight: "bold",
       color: "#ffffff",
-      paddingVertical: 0,
-      paddingHorizontal: 0,
-      height: 28,
+      paddingVertical: 2,
     },
     headerStatusRow: {
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 12,
       backgroundColor: "#0f172a",
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 14,
       borderWidth: 1,
       borderColor: "#334155",
     },
@@ -2600,15 +3635,19 @@ const getStyles = (theme: any) =>
       color: "#fbbf24",
     },
     ribbonHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
       backgroundColor: "#1e293b",
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      height: 38,
+      height: 42,
       borderBottomWidth: 1,
       borderBottomColor: "#334155",
+      zIndex: 15,
+      elevation: 5,
+    },
+    ribbonHeaderScrollContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 8,
+      gap: 8,
+      minWidth: "100%",
     },
     segmentedControl: {
       flexDirection: "row",
@@ -2638,13 +3677,13 @@ const getStyles = (theme: any) =>
     hudChip: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 4,
+      gap: 5,
       backgroundColor: "#0f172a",
       paddingHorizontal: 10,
-      paddingVertical: 4,
+      paddingVertical: 5,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: "#334155",
+      borderColor: "#3b82f666",
     },
     hudChipText: {
       fontSize: 11,
@@ -2656,6 +3695,8 @@ const getStyles = (theme: any) =>
       borderBottomWidth: 1,
       borderBottomColor: "#cbd5e1",
       paddingVertical: 5,
+      zIndex: 10,
+      elevation: 4,
     },
     ribbonContent: {
       flexDirection: "row",
@@ -2688,6 +3729,53 @@ const getStyles = (theme: any) =>
     toolLabelActive: {
       color: "#2563eb",
       fontWeight: "700",
+    },
+    headingToolIcon: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: "#334155",
+    },
+    headingToolIconActive: {
+      color: "#2563eb",
+    },
+    fontSizeRibbonGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      height: 44,
+      backgroundColor: "#ffffff",
+      borderWidth: 1,
+      borderColor: "#cbd5e1",
+      borderRadius: 6,
+      paddingHorizontal: 4,
+      gap: 2,
+    },
+    fontSizeStepperBtn: {
+      width: 26,
+      height: 36,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 4,
+      backgroundColor: "#f1f5f9",
+    },
+    fontSizeDisplayPill: {
+      paddingHorizontal: 8,
+      height: 36,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 4,
+      backgroundColor: "#f8fafc",
+      minWidth: 46,
+    },
+    fontSizeDisplayText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: "#1e293b",
+    },
+    fontSizePillLabel: {
+      fontSize: 8,
+      color: "#64748b",
+      fontWeight: "600",
+      marginTop: -2,
     },
     toolbarDivider: {
       width: 1,
@@ -2794,8 +3882,6 @@ const getStyles = (theme: any) =>
       position: "absolute",
       right: 16,
       bottom: 20,
-      left: 16,
-      alignItems: "flex-end",
     },
     floatingThumbMicBtn: {
       width: 58,
@@ -2821,78 +3907,6 @@ const getStyles = (theme: any) =>
       fontWeight: "800",
       color: "#ffffff",
       marginTop: 1,
-    },
-    liveSpeechIsland: {
-      width: "100%",
-      backgroundColor: "#0f172aee",
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: "#3b82f6",
-      padding: 12,
-      marginBottom: 10,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 6,
-      elevation: 6,
-    },
-    speechHeaderRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 6,
-    },
-    speechIndicatorPulse: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      backgroundColor: "#ef4444",
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: 6,
-    },
-    speechStatusTitle: {
-      flex: 1,
-      fontSize: 12,
-      fontWeight: "bold",
-      color: "#ffffff",
-    },
-    speechLangChip: {
-      backgroundColor: "#2563eb",
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 10,
-    },
-    speechLangText: {
-      fontSize: 10,
-      fontWeight: "bold",
-      color: "#ffffff",
-    },
-    speechLivePreviewText: {
-      fontSize: 13,
-      color: "#93c5fd",
-      fontStyle: "italic",
-      marginBottom: 8,
-      lineHeight: 18,
-    },
-    punctuationRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      paddingVertical: 2,
-    },
-    punctuationChip: {
-      backgroundColor: "#1e293b",
-      paddingHorizontal: 9,
-      paddingVertical: 6,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: "#334155",
-    },
-    punctuationChipText: {
-      color: "#e2e8f0",
-      fontSize: 11,
-      fontWeight: "700",
     },
     macroCard: {
       backgroundColor: "#1e293b",
@@ -3006,7 +4020,8 @@ const getStyles = (theme: any) =>
       borderWidth: 1,
       borderColor: "#334155",
       padding: 20,
-      paddingBottom: Platform.OS === "ios" ? 40 : 20,
+      paddingBottom: Platform.OS === "ios" ? 40 : 28,
+      maxHeight: Dimensions.get("window").height * 0.88,
     },
     modalHeader: {
       flexDirection: "row",
@@ -3355,6 +4370,59 @@ const getStyles = (theme: any) =>
       fontSize: 11,
       color: "#cbd5e1",
       fontWeight: "500",
+    },
+    // Case Picker Modal Styles
+    casePickerSubtitle: {
+      fontSize: 11,
+      color: "#94a3b8",
+      marginTop: 2,
+    },
+    casePickerSearchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#1e293b",
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "#334155",
+      paddingHorizontal: 10,
+      height: 40,
+      marginVertical: 10,
+      gap: 8,
+    },
+    casePickerSearchInput: {
+      flex: 1,
+      fontSize: 13,
+      color: "#ffffff",
+      paddingVertical: 4,
+    },
+    casePickerCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#1e293b",
+      padding: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "#334155",
+      marginBottom: 8,
+      gap: 12,
+    },
+    casePickerIconBox: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: "#1e3a8a33",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    casePickerTitle: {
+      fontSize: 13,
+      fontWeight: "bold",
+      color: "#ffffff",
+      marginBottom: 2,
+    },
+    casePickerSubtitle2: {
+      fontSize: 11,
+      color: "#94a3b8",
     },
   });
 

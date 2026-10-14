@@ -1,27 +1,106 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export function formatDate(dateString) {
+/**
+ * Safely parses a date/time string from SQLite or API into a JavaScript Date.
+ * Handles SQLite's UTC timestamps (e.g. "2026-08-24 21:32:00" or "2026-08-24T21:32:00")
+ * which lack the trailing 'Z', ensuring they are properly parsed as UTC and converted
+ * to the user's local timezone.
+ */
+export function parseUtcDate(val: any): Date | null {
+  if (!val) return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+
+  if (typeof val !== "string") return null;
+  let str = val.trim();
+  if (!str) return null;
+
+  // If it's a pure date "YYYY-MM-DD" or "DD-MM-YYYY", parse as local calendar date
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str) || /^\d{2}-\d{2}-\d{4}$/.test(str)) {
+    return parseLocalDate(str);
+  }
+
+  // If it's SQLite datetime "YYYY-MM-DD HH:MM:SS(.SSS)"
+  if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}/.test(str)) {
+    str = str.replace(" ", "T") + "Z";
+  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(str)) {
+    // ISO string missing trailing Z or timezone offset
+    str = str + "Z";
+  }
+
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+export function formatDate(dateString: any): string {
   if (!dateString) {
     return "N/A";
   }
   try {
-    // If it's already in DD-MM-YYYY format, return as is
-    if (
-      typeof dateString === "string" &&
-      /^\d{2}-\d{2}-\d{4}$/.test(dateString.trim())
-    ) {
-      return dateString.trim();
+    if (dateString instanceof Date) {
+      if (isNaN(dateString.getTime())) return "Invalid Date";
+      const year = dateString.getFullYear();
+      const month = String(dateString.getMonth() + 1).padStart(2, "0");
+      const day = String(dateString.getDate()).padStart(2, "0");
+      return `${day}-${month}-${year}`;
     }
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
+    const str = String(dateString).trim();
+    // If it's already in DD-MM-YYYY format, return as is
+    if (/^\d{2}-\d{2}-\d{4}$/.test(str)) {
+      return str;
+    }
+    // If it's pure YYYY-MM-DD date without time (e.g. "2026-08-25")
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      const [year, month, day] = str.split("-");
+      return `${day}-${month}-${year}`;
+    }
+    const date = parseUtcDate(str);
+    if (!date || isNaN(date.getTime())) {
       return "Invalid Date";
     }
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(date.getUTCDate()).padStart(2, "0");
+    // Use device local calendar fields
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${day}-${month}-${year}`;
   } catch (error) {
     console.error("Error formatting date:", dateString, error);
+    return "Invalid Date";
+  }
+}
+
+/**
+ * Formats a timestamp/date to device local time (e.g., "02:30 PM")
+ */
+export function formatTime(dateStringOrDate: any): string {
+  if (!dateStringOrDate) return "";
+  try {
+    const d =
+      dateStringOrDate instanceof Date
+        ? dateStringOrDate
+        : parseUtcDate(dateStringOrDate);
+    if (!d || isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch (e) {
+    return "";
+  }
+}
+
+/**
+ * Formats a timestamp/date to device local date and time (e.g., "25-08-2026 • 02:30 PM")
+ */
+export function formatDateTime(dateStringOrDate: any): string {
+  if (!dateStringOrDate) return "N/A";
+  try {
+    const d = parseUtcDate(dateStringOrDate);
+    if (!d || isNaN(d.getTime())) return "Invalid Date";
+    const datePart = formatDate(d);
+    const timePart = formatTime(d);
+    return timePart ? `${datePart} • ${timePart}` : datePart;
+  } catch (e) {
     return "Invalid Date";
   }
 }

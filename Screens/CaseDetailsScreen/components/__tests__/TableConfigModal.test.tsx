@@ -26,7 +26,7 @@ describe("TableConfigModal", () => {
       />
     );
 
-    expect(getByText("Configure Court Table")).toBeTruthy();
+    expect(getByText("Insert Table or Columns")).toBeTruthy();
     expect(getByText("Will insert a 3 x 3 table with headers")).toBeTruthy();
   });
 
@@ -52,6 +52,27 @@ describe("TableConfigModal", () => {
     fireEvent.press(confirmBtn);
 
     expect(onInsertTable).toHaveBeenCalledWith(4, 3);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("should call onInsertBorderlessColumns when 2-column preset is pressed", () => {
+    const onInsertBorderless = jest.fn();
+    const onClose = jest.fn();
+
+    const { getByTestId } = render(
+      <TableConfigModal
+        visible
+        theme={mockTheme}
+        onInsertTable={jest.fn()}
+        onInsertBorderlessColumns={onInsertBorderless}
+        onClose={onClose}
+      />
+    );
+
+    const btn = getByTestId("insert-2col-preset-btn");
+    fireEvent.press(btn);
+
+    expect(onInsertBorderless).toHaveBeenCalledWith(2);
     expect(onClose).toHaveBeenCalled();
   });
 });

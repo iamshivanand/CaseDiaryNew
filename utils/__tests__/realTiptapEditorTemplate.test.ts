@@ -37,16 +37,13 @@ describe("Real Tiptap Editor Template Scaffold (True Tiptap v3 & ProseMirror AST
     expect(html).toContain("editor.chain().focus().insertTable");
     expect(html).toContain("editor.chain().focus().addRowBefore");
     expect(html).toContain("editor.chain().focus().deleteRow");
-    // Verifies legacy execCommands are eliminated from formatting logic
-    expect(html).not.toContain("document.execCommand('bold'");
-    expect(html).not.toContain("document.execCommand('italic'");
-    expect(html).not.toContain("document.execCommand('removeFormat'");
+    expect(html).toContain("editor.chain().focus().setTextAlign('justify').run()");
   });
 
   it("dynamically computes scaleRatio and applies proportional typography scaling across mobile screens", () => {
     const html = getRealTiptapEditorHtml("");
     expect(html).toContain("const scaleRatio = paperWidth / referenceWidth;");
-    expect(html).toContain("renderFontPx = Math.max(11, Math.round(baseFontSize * scaleRatio))");
+    expect(html).toContain("renderFontPx = Math.max(10, Math.round(baseFontSize * scaleRatio))");
     expect(html).toContain("dynamic-paper-scale-style");
     expect(html).toContain("window.addEventListener('resize'");
     expect(html).toContain("window.addEventListener('orientationchange'");

@@ -9,6 +9,7 @@ interface TableConfigModalProps {
   visible: boolean;
   theme: Theme;
   onInsertTable: (rows: number, cols: number) => void;
+  onInsertBorderlessColumns?: (cols: 2 | 3) => void;
   onClose: () => void;
 }
 
@@ -16,6 +17,7 @@ export const TableConfigModal: React.FC<TableConfigModalProps> = ({
   visible,
   theme,
   onInsertTable,
+  onInsertBorderlessColumns,
   onClose,
 }) => {
   const [rows, setRows] = useState(3);
@@ -23,6 +25,24 @@ export const TableConfigModal: React.FC<TableConfigModalProps> = ({
 
   const handleConfirm = () => {
     onInsertTable(rows, cols);
+    onClose();
+  };
+
+  const handleInsert2Col = () => {
+    if (onInsertBorderlessColumns) {
+      onInsertBorderlessColumns(2);
+    } else {
+      onInsertTable(1, 2);
+    }
+    onClose();
+  };
+
+  const handleInsert3Col = () => {
+    if (onInsertBorderlessColumns) {
+      onInsertBorderlessColumns(3);
+    } else {
+      onInsertTable(1, 3);
+    }
     onClose();
   };
 
@@ -44,16 +64,44 @@ export const TableConfigModal: React.FC<TableConfigModalProps> = ({
                 size={22}
                 color={theme.colors.primary}
               />
-              <Text style={styles.title}>Configure Court Table</Text>
+              <Text style={styles.title}>Insert Table or Columns</Text>
             </View>
             <TouchableOpacity onPress={onClose} testID="close-table-modal">
               <Ionicons name="close" size={22} color={theme.colors.subText} />
             </TouchableOpacity>
           </View>
 
+          {/* Quick Borderless Multi-Column Presets */}
+          <Text style={styles.sectionHeading}>QUICK MULTI-COLUMN (NO BORDERS)</Text>
+          <View style={styles.presetRow}>
+            <TouchableOpacity
+              style={styles.presetBtn}
+              onPress={handleInsert2Col}
+              testID="insert-2col-preset-btn"
+            >
+              <Ionicons name="browsers-outline" size={18} color={theme.colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.presetTitle}>2-Column Split</Text>
+                <Text style={styles.presetSub}>Memo of parties, signatures, grounds</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.presetBtn}
+              onPress={handleInsert3Col}
+              testID="insert-3col-preset-btn"
+            >
+              <Ionicons name="grid-outline" size={18} color={theme.colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.presetTitle}>3-Column Split</Text>
+                <Text style={styles.presetSub}>Tripartite details or 3-way notes</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[styles.sectionHeading, { marginTop: 14 }]}>CUSTOM COURT TABLE GRID</Text>
           <Text style={styles.subtitle}>
-            Select the number of rows and columns for your schedule or hearing
-            list:
+            Select rows and columns for schedules, document index, or evidence lists:
           </Text>
 
           {/* Rows Selector */}
@@ -120,7 +168,7 @@ export const TableConfigModal: React.FC<TableConfigModalProps> = ({
               onPress={handleConfirm}
               testID="confirm-insert-table-btn"
             >
-              <Text style={styles.insertText}>Insert Table</Text>
+              <Text style={styles.insertText}>Insert Grid</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -218,6 +266,39 @@ const getStyles = (theme: Theme) =>
       fontSize: 12,
       color: theme.colors.primary,
       fontWeight: "600",
+    },
+    sectionHeading: {
+      fontSize: 11,
+      fontWeight: "bold",
+      color: theme.colors.subText,
+      letterSpacing: 0.5,
+      marginBottom: 8,
+    },
+    presetRow: {
+      flexDirection: "column",
+      gap: 8,
+      marginBottom: 8,
+    },
+    presetBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      backgroundColor: theme.colors.inputBackground,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    presetTitle: {
+      fontSize: 13,
+      fontWeight: "bold",
+      color: theme.colors.text,
+    },
+    presetSub: {
+      fontSize: 11,
+      color: theme.colors.subText,
+      marginTop: 2,
     },
     actionRow: {
       flexDirection: "row",

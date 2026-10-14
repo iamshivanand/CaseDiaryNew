@@ -16,7 +16,8 @@ import {
   Platform,
   StyleSheet,
   ActivityIndicator,
-} from "react-native"; // Changed StyleSheet to RNStyleSheet
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Animatable from "react-native-animatable";
 import { v4 as uuidv4 } from "uuid";
 
@@ -43,6 +44,7 @@ import {
 import { getUserState } from "../../utils/locationService";
 import { PRIMARY_BLUE_COLOR_FOR_LOADER } from "../CaseDetailsScreen/CaseDetailsScreen";
 import ActionButton from "../CommonComponents/ActionButton";
+import { useAdTrigger } from "../CommonComponents/AdManager";
 import DatePickerField from "../CommonComponents/DatePickerField";
 import DropdownPicker from "../CommonComponents/DropdownPicker";
 import FormInput from "../CommonComponents/FormInput";
@@ -76,10 +78,12 @@ const deduplicateOptions = (options: DropdownOption[]): DropdownOption[] => {
 };
 
 const EditCaseScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute<EditCaseScreenRouteProp>();
-  const { theme } = useContext(ThemeContext); // Get theme
+  const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
+  const { recordCaseUpdateMilestone } = useAdTrigger();
   const styles = getEditCaseScreenStyles(theme); // Generate styles with theme
 
   const getOptionLabelKey = (label: string): string => {
@@ -742,6 +746,7 @@ const EditCaseScreen: React.FC = () => {
             await loadTimelineEvents(caseData.id); // Refresh timeline
           }
           if (overallSuccess) {
+            recordCaseUpdateMilestone();
             Alert.alert(t("alert_success"), t("editcase_success_saved"));
             navigation.goBack();
           } else {
@@ -1046,7 +1051,10 @@ const EditCaseScreen: React.FC = () => {
     /* ... JSX for the screen ... */
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.screen}
+      style={[
+        styles.screen,
+        { paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0) },
+      ]}
       keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 20}
     >
       <ScrollView

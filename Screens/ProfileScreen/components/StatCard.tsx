@@ -18,7 +18,7 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, unit }) => {
 
   return (
     <LinearGradient
-      colors={cardGradient}
+      colors={cardGradient as [string, string]}
       style={[
         styles.card,
         {

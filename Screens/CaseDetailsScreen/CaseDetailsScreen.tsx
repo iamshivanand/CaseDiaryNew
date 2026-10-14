@@ -10,6 +10,7 @@ import React, {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useState,
 } from "react";
 import {
@@ -30,6 +31,7 @@ import {
   LayoutAnimation,
   UIManager,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
 import DateRow from "./components/DateRow";
@@ -49,7 +51,6 @@ import {
 } from "../../Types/appTypes";
 import { HomeStackParamList } from "../../Types/navigationtypes";
 import { formatDate, getCurrentUserId } from "../../utils/commonFunctions";
-import { scheduleOverdueHearingNotification } from "../../utils/notificationScheduler";
 import {
   exportCaseToPdf,
   exportCaseHistoryToPdf,
@@ -73,6 +74,12 @@ type ListItemType =
   | { type: "noDocuments" }
   | { type: "timelineHeader" }
   | { type: "timelineEvent"; data: TimelineEvent; isLast: boolean; id: string }
+  | {
+      type: "timelinePagination";
+      visibleCount: number;
+      totalCount: number;
+      remainingCount: number;
+    }
   | { type: "noTimelineEvents" }
   | { type: "loadingDocuments" };
 
@@ -83,6 +90,7 @@ const SkeletonItem: React.FC<{ style: any; theme?: Theme }> = ({
   const opacity = React.useRef(new RNAnimated.Value(0.4)).current;
 
   React.useEffect(() => {
+    if (process.env.NODE_ENV === "test") return;
     const pulse = RNAnimated.loop(
       RNAnimated.sequence([
         RNAnimated.timing(opacity, {
@@ -114,24 +122,29 @@ const SkeletonItem: React.FC<{ style: any; theme?: Theme }> = ({
     />
   );
 };
-
-const CaseDetailsSkeleton: React.FC<{ theme: Theme }> = ({ theme }) => (
-  <ScrollView
-    showsVerticalScrollIndicator={false}
-    style={{ flex: 1, backgroundColor: theme.colors.background }}
-    contentContainerStyle={{ padding: 16 }}
-  >
-    {/* Skeleton Card 1: Case Spotlight */}
-    <View
+const CaseDetailsSkeleton: React.FC<{ theme: Theme }> = ({ theme }) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
       style={{
-        backgroundColor: theme.colors.cardBackground,
-        borderRadius: 16,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        marginBottom: 16,
+        flex: 1,
+        backgroundColor: theme.colors.background,
+        paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
       }}
+      contentContainerStyle={{ padding: 16 }}
     >
+      {/* Skeleton Card 1: Case Spotlight */}
+      <View
+        style={{
+          backgroundColor: theme.colors.cardBackground,
+          borderRadius: 16,
+          padding: 16,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+          marginBottom: 16,
+        }}
+      >
       <View
         style={{
           flexDirection: "row",
@@ -230,19 +243,23 @@ const CaseDetailsSkeleton: React.FC<{ theme: Theme }> = ({ theme }) => (
       </View>
     ))}
   </ScrollView>
-);
+  );
+};
 
 const CaseDetailsScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute<CaseDetailsScreenRouteProp>();
   const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
   const styles = getStyles(theme);
-  const { showAdWithPreload } = useAdTrigger();
+  const { showAdWithPreload, recordCaseUpdateMilestone } = useAdTrigger();
   const { caseId } = route.params;
   const [caseDetails, setCaseDetails] = useState<CaseData | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
+  const INITIAL_TIMELINE_LIMIT = 5;
+  const [timelineLimit, setTimelineLimit] = useState(INITIAL_TIMELINE_LIMIT);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
@@ -266,6 +283,14 @@ const CaseDetailsScreen: React.FC = () => {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
 
+  // Timeline Filter States
+  const [timelineCategory, setTimelineCategory] = useState<
+    "all" | "case_updates" | "payments"
+  >("all");
+  const [timelineSubFilter, setTimelineSubFilter] = useState<
+    "all_updates" | "hearings" | "status" | "judge_court" | "stage"
+  >("all_updates");
+
   // Date Fee Specific States
   const [showDateFeeModal, setShowDateFeeModal] = useState(false);
   const [editingDateFeeAmount, setEditingDateFeeAmount] = useState("");
@@ -285,6 +310,33 @@ const CaseDetailsScreen: React.FC = () => {
     notes: false,
     documents: true, // Default expanded
   });
+
+  const flatListRef = React.useRef<FlatList>(null);
+  const documentsSectionYRef = React.useRef<number>(0);
+
+  useEffect(() => {
+    if ((route.params as any)?.scrollToDocs) {
+      setExpandedSections((prev) => ({
+        ...prev,
+        documents: true,
+      }));
+      const timer = setTimeout(() => {
+        if (documentsSectionYRef.current > 0 && flatListRef.current) {
+          flatListRef.current.scrollToOffset({
+            offset: Math.max(0, documentsSectionYRef.current - 20),
+            animated: true,
+          });
+        }
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [(route.params as any)?.scrollToDocs]);
+
+  useEffect(() => {
+    if ((route.params as any)?.autoOpenHearingModal) {
+      setShowUpdateHearingModal(true);
+    }
+  }, [(route.params as any)?.autoOpenHearingModal]);
 
   const toggleSection = (sectionKey: string) => {
     if (
@@ -323,31 +375,10 @@ const CaseDetailsScreen: React.FC = () => {
 
   const loadCaseDetails = useCallback(async (caseId: number) => {
     console.log("Loading case details for caseId:", caseId);
-    const details = await getCaseById(caseId);
+    const details = await db.getCaseById(caseId);
     if (details) {
       console.log("Case details found:", details);
       setCaseDetails(details);
-
-      if (details.NextDate) {
-        try {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const parts = details.NextDate.split("-");
-          if (parts.length === 3) {
-            const hDate = new Date(
-              parseInt(parts[0], 10),
-              parseInt(parts[1], 10) - 1,
-              parseInt(parts[2], 10)
-            );
-            hDate.setHours(0, 0, 0, 0);
-            if (hDate.getTime() < today.getTime()) {
-              scheduleOverdueHearingNotification(details);
-            }
-          }
-        } catch (e) {
-          // ignore date parse errors
-        }
-      }
     } else {
       console.log("Case details not found for caseId:", caseId);
     }
@@ -360,7 +391,7 @@ const CaseDetailsScreen: React.FC = () => {
       try {
         const [fetchedDocs, fetchedTimelineEvents] = await Promise.all([
           db.getCaseDocuments(currentCaseId),
-          getCaseTimelineEventsByCaseId(currentCaseId),
+          db.getCaseTimelineEventsByCaseId(currentCaseId),
         ]);
         const uiDocs: Document[] = fetchedDocs.map((dbDoc) => ({
           id: dbDoc.id,
@@ -378,6 +409,10 @@ const CaseDetailsScreen: React.FC = () => {
             id: tle.id.toString(),
             date: tle.hearing_date,
             description: tle.notes,
+            event_type: (tle.event_type || "hearing_proceeding") as TimelineEventType,
+            amount: tle.amount,
+            payment_mode: tle.payment_mode,
+            created_at: tle.created_at,
           }))
         );
       } catch (error) {
@@ -417,17 +452,11 @@ const CaseDetailsScreen: React.FC = () => {
           Alert.alert(t("alert_error"), t("casedetails_err_load"));
           if (navigation.canGoBack()) navigation.goBack();
         } finally {
-          if (isActive) {
-            setIsLoading(false);
-          }
+          setIsLoading(false);
         }
       };
 
       fetchAllData();
-
-      return () => {
-        isActive = false;
-      };
     }, [caseId, navigation, loadDocumentsAndTimeline, loadCaseDetails, t])
   );
 
@@ -698,7 +727,10 @@ const CaseDetailsScreen: React.FC = () => {
 
           allEvents.forEach((ev) => {
             const evId = parseInt(ev.id.toString(), 10);
-            const evText = evId === eventId ? finalNotes : ev.description || "";
+            const evText =
+              evId === eventId
+                ? finalNotes
+                : (ev as any).notes || ev.description || "";
             const evType = ev.event_type;
 
             if (
@@ -815,7 +847,7 @@ const CaseDetailsScreen: React.FC = () => {
                 allEvents.forEach((ev) => {
                   const evId = parseInt(ev.id.toString(), 10);
                   if (evId === eventId) return;
-                  const evText = ev.description || "";
+                  const evText = (ev as any).notes || ev.description || "";
                   const evType = ev.event_type;
                   if (
                     evType === "date_fee_payment" ||
@@ -1196,6 +1228,7 @@ const CaseDetailsScreen: React.FC = () => {
       setShowUpdateHearingModal(false);
       await loadCaseDetails(caseIdToUpdate);
       await loadDocumentsAndTimeline(caseIdToUpdate);
+      recordCaseUpdateMilestone();
       Alert.alert(
         t("alert_success"),
         "Hearing date and fee payment details updated successfully."
@@ -1361,6 +1394,93 @@ const CaseDetailsScreen: React.FC = () => {
     }
   };
 
+  // Helper to categorize events
+  const isPaymentEvent = (ev: TimelineEvent) => {
+    const evT = ev.event_type || "";
+    const d = ev.description || "";
+    return (
+      evT === "date_fee_payment" ||
+      evT === "total_fee_payment" ||
+      evT === "date_fee_agreed" ||
+      evT === "total_fee_agreed" ||
+      d.includes("(Date Fee)") ||
+      d.includes("(Total Retainer)") ||
+      d.includes("Fee Payment Received") ||
+      d.includes("Recorded Payment") ||
+      d.includes("Fee Received") ||
+      d.includes("Fee Agreed") ||
+      d.includes("retainer fee")
+    );
+  };
+
+  const isHearingEvent = (ev: TimelineEvent) => {
+    const evT = ev.event_type || "";
+    const d = ev.description || "";
+    return (
+      evT === "hearing_scheduled" ||
+      evT === "hearing_adjourned" ||
+      evT === "hearing_proceeding" ||
+      d.includes("Hearing") ||
+      d.includes("hearing") ||
+      d.includes("adjourned") ||
+      d.includes("scheduled")
+    );
+  };
+
+  const isStatusEvent = (ev: TimelineEvent) => {
+    const evT = ev.event_type || "";
+    const d = ev.description || "";
+    return evT === "status_change" || d.includes("Case status changed");
+  };
+
+  const isJudgeOrCourtEvent = (ev: TimelineEvent) => {
+    const evT = ev.event_type || "";
+    const d = ev.description || "";
+    return (
+      evT === "judge_change" ||
+      evT === "court_change" ||
+      d.includes("Judge") ||
+      d.includes("Court")
+    );
+  };
+
+  const isStageEvent = (ev: TimelineEvent) => {
+    const evT = ev.event_type || "";
+    const d = ev.description || "";
+    return evT === "stage_change" || d.includes("Case stage");
+  };
+
+  // Counts for category badges
+  const totalEventsCount = timelineEvents.length;
+  const paymentEventsCount = useMemo(
+    () => timelineEvents.filter(isPaymentEvent).length,
+    [timelineEvents]
+  );
+  const caseUpdatesCount = totalEventsCount - paymentEventsCount;
+
+  // Filtered timeline events list
+  const filteredTimelineEvents = useMemo(() => {
+    return timelineEvents.filter((ev) => {
+      if (timelineCategory === "payments") {
+        return isPaymentEvent(ev);
+      }
+      if (timelineCategory === "case_updates") {
+        if (isPaymentEvent(ev)) return false;
+        if (timelineSubFilter === "hearings") return isHearingEvent(ev);
+        if (timelineSubFilter === "status") return isStatusEvent(ev);
+        if (timelineSubFilter === "judge_court") return isJudgeOrCourtEvent(ev);
+        if (timelineSubFilter === "stage") return isStageEvent(ev);
+        return true;
+      }
+      // "all" category
+      if (timelineSubFilter === "hearings") return isHearingEvent(ev);
+      if (timelineSubFilter === "status") return isStatusEvent(ev);
+      if (timelineSubFilter === "judge_court") return isJudgeOrCourtEvent(ev);
+      if (timelineSubFilter === "stage") return isStageEvent(ev);
+      return true;
+    });
+  }, [timelineEvents, timelineCategory, timelineSubFilter]);
+
   const listData: ListItemType[] = [];
   listData.push({ type: "summary", data: caseDetails });
 
@@ -1368,19 +1488,29 @@ const CaseDetailsScreen: React.FC = () => {
   if (isLoadingDocuments) {
     listData.push({ type: "loadingDocuments" });
   } else {
-    // We will render the DocumentUpload component directly, so we don't need to push documents here.
+    // Rendered directly
   }
 
   listData.push({ type: "timelineHeader" });
-  if (timelineEvents.length > 0) {
-    timelineEvents.forEach((event, index) =>
+  if (filteredTimelineEvents.length > 0) {
+    const visibleTimelineEvents = filteredTimelineEvents.slice(0, timelineLimit);
+    visibleTimelineEvents.forEach((event, index) =>
       listData.push({
         type: "timelineEvent",
         data: event,
-        isLast: index === timelineEvents.length - 1,
+        isLast: index === visibleTimelineEvents.length - 1 && filteredTimelineEvents.length <= timelineLimit,
         id: `tl-${event.id}`,
       })
     );
+
+    if (filteredTimelineEvents.length > INITIAL_TIMELINE_LIMIT) {
+      listData.push({
+        type: "timelinePagination",
+        visibleCount: visibleTimelineEvents.length,
+        totalCount: filteredTimelineEvents.length,
+        remainingCount: Math.max(0, filteredTimelineEvents.length - visibleTimelineEvents.length),
+      });
+    }
   } else {
     listData.push({ type: "noTimelineEvents" });
   }
@@ -1566,8 +1696,7 @@ const CaseDetailsScreen: React.FC = () => {
             style={{ padding: 16, backgroundColor: theme.colors.background }}
           >
             {/* CARD 1: HERO CASE & CLIENT SPOTLIGHT (STRICT GEOMETRIC ALIGNMENT) */}
-            <Animated.View
-              entering={FadeInDown.duration(400)}
+            <View
               style={{
                 backgroundColor: theme.colors.cardBackground,
                 borderRadius: 16,
@@ -1640,8 +1769,7 @@ const CaseDetailsScreen: React.FC = () => {
                     }}
                     numberOfLines={1}
                   >
-                    {t("casedetails_client_prefix")}
-                    {caseDetails.ClientName}
+                    Client: {caseDetails.ClientName}
                   </Text>
                 </View>
                 <View
@@ -1852,11 +1980,10 @@ const CaseDetailsScreen: React.FC = () => {
                   </Text>
                 </TouchableOpacity>
               </View>
-            </Animated.View>
+            </View>
 
             {/* CARD 2: NEXT HEARING & RETAINER FINANCIAL DASHBOARD */}
-            <Animated.View
-              entering={FadeInDown.delay(100).duration(400)}
+            <View
               style={{
                 backgroundColor: theme.colors.cardBackground,
                 borderRadius: 16,
@@ -2738,7 +2865,7 @@ const CaseDetailsScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
               </View>
-            </Animated.View>
+            </View>
 
             {/* 4. EXPANDABLE ACCORDIONS (INLINE ON SCREEN) */}
 
@@ -3732,6 +3859,9 @@ const CaseDetailsScreen: React.FC = () => {
 
             {/* ACCORDION 5: DOCUMENTS & ATTACHMENTS */}
             <View
+              onLayout={(e) => {
+                documentsSectionYRef.current = e.nativeEvent.layout.y;
+              }}
               style={{
                 backgroundColor: theme.colors.cardBackground,
                 borderRadius: 14,
@@ -4298,12 +4428,205 @@ const CaseDetailsScreen: React.FC = () => {
         );
       case "documentsHeader":
         return null;
-      case "timelineHeader":
+      case "timelineHeader": {
         return (
-          <View style={styles.timelineSection}>
-            <SectionHeader title={t("casedetails_sec_timeline")} />
+          <View style={[styles.timelineSection, { marginBottom: 12 }]}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <SectionHeader title={t("casedetails_sec_timeline")} />
+                <View
+                  style={{
+                    backgroundColor: theme.isDark ? "#1E1B4B" : "#EEF2FF",
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: theme.isDark ? "#4338CA" : "#C7D2FE",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: "700",
+                      color: theme.isDark ? "#A5B4FC" : "#4F46E5",
+                    }}
+                  >
+                    {totalEventsCount} Total
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Main Category Tabs */}
+            <View
+              style={{
+                flexDirection: "row",
+                backgroundColor: theme.isDark ? "#1E293B" : "#F1F5F9",
+                borderRadius: 12,
+                padding: 4,
+                marginBottom: 10,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setTimelineCategory("all")}
+                activeOpacity={0.7}
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  backgroundColor:
+                    timelineCategory === "all"
+                      ? theme.colors.primary
+                      : "transparent",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "700",
+                    color:
+                      timelineCategory === "all"
+                        ? "#ffffff"
+                        : theme.colors.textSecondary,
+                  }}
+                >
+                  All ({totalEventsCount})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setTimelineCategory("case_updates")}
+                activeOpacity={0.7}
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  backgroundColor:
+                    timelineCategory === "case_updates"
+                      ? theme.colors.primary
+                      : "transparent",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "700",
+                    color:
+                      timelineCategory === "case_updates"
+                        ? "#ffffff"
+                        : theme.colors.textSecondary,
+                  }}
+                >
+                  Updates ({caseUpdatesCount})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setTimelineCategory("payments")}
+                activeOpacity={0.7}
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  backgroundColor:
+                    timelineCategory === "payments"
+                      ? theme.colors.primary
+                      : "transparent",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "700",
+                    color:
+                      timelineCategory === "payments"
+                        ? "#ffffff"
+                        : theme.colors.textSecondary,
+                  }}
+                >
+                  Payments ({paymentEventsCount})
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Sub-Filters Chips (Available on All & Case Updates) */}
+            {timelineCategory !== "payments" && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 6, paddingVertical: 2 }}
+                style={{ marginBottom: 8 }}
+              >
+                {[
+                  { key: "all_updates", label: "All Events" },
+                  { key: "hearings", label: "📅 Hearings" },
+                  { key: "status", label: "🔄 Status" },
+                  { key: "judge_court", label: "⚖️ Judge & Court" },
+                  { key: "stage", label: "🎯 Stage" },
+                ].map((chip) => {
+                  const isSelected = timelineSubFilter === chip.key;
+                  return (
+                    <TouchableOpacity
+                      key={chip.key}
+                      onPress={() => setTimelineSubFilter(chip.key as any)}
+                      activeOpacity={0.7}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 16,
+                        backgroundColor: isSelected
+                          ? theme.isDark
+                            ? "#312E81"
+                            : "#EEF2FF"
+                          : theme.isDark
+                          ? "#1E293B"
+                          : "#F8FAFC",
+                        borderWidth: 1,
+                        borderColor: isSelected
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: isSelected ? "700" : "500",
+                          color: isSelected
+                            ? theme.colors.primary
+                            : theme.colors.textSecondary,
+                        }}
+                      >
+                        {chip.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
         );
+      }
       case "timelineEvent":
         return (
           <TimelineEventItem
@@ -4313,11 +4636,175 @@ const CaseDetailsScreen: React.FC = () => {
             onDeleteNotes={handlePromptDeleteTimelineNotes}
           />
         );
+      case "timelinePagination":
+        return (
+          <View
+            style={{
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+              marginHorizontal: 16,
+              marginBottom: 16,
+              borderRadius: 12,
+              backgroundColor: theme.colors.cardBackground,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.colors.textSecondary,
+                marginBottom: 10,
+                fontWeight: "500",
+              }}
+            >
+              Showing {item.visibleCount} of {item.totalCount} updates
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 8,
+                width: "100%",
+                justifyContent: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              {item.remainingCount > 0 && (
+                <TouchableOpacity
+                  onPress={() => setTimelineLimit((prev) => prev + 5)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingVertical: 9,
+                    paddingHorizontal: 14,
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Ionicons
+                    name="chevron-down"
+                    size={16}
+                    color="#FFFFFF"
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={{
+                      color: "#FFFFFF",
+                      fontWeight: "600",
+                      fontSize: 13,
+                    }}
+                  >
+                    Show More (+{Math.min(item.remainingCount, 5)})
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {item.remainingCount > 5 && (
+                <TouchableOpacity
+                  onPress={() => setTimelineLimit(item.totalCount)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingVertical: 9,
+                    paddingHorizontal: 14,
+                    backgroundColor: "rgba(99, 102, 241, 0.12)",
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: theme.colors.primary,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: theme.colors.primary,
+                      fontWeight: "600",
+                      fontSize: 13,
+                    }}
+                  >
+                    Show All ({item.totalCount})
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {item.visibleCount > INITIAL_TIMELINE_LIMIT && (
+                <TouchableOpacity
+                  onPress={() => setTimelineLimit(INITIAL_TIMELINE_LIMIT)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingVertical: 9,
+                    paddingHorizontal: 14,
+                    backgroundColor: theme.dark ? "#334155" : "#E2E8F0",
+                    borderRadius: 8,
+                  }}
+                >
+                  <Ionicons
+                    name="chevron-up"
+                    size={16}
+                    color={theme.colors.text}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={{
+                      color: theme.colors.text,
+                      fontWeight: "600",
+                      fontSize: 13,
+                    }}
+                  >
+                    Show Less
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        );
       case "noTimelineEvents":
         return (
-          <View style={styles.timelineSection}>
-            <Text style={styles.noItemsText}>
-              {t("casedetails_no_timeline")}
+          <View
+            style={[
+              styles.timelineSection,
+              {
+                paddingVertical: 24,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor:
+                  theme.colors.cardBackground ||
+                  (theme.isDark ? "#1E293B" : "#F8FAFC"),
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                marginTop: 4,
+                marginBottom: 16,
+              },
+            ]}
+          >
+            <Ionicons
+              name={
+                timelineCategory === "payments"
+                  ? "wallet-outline"
+                  : "calendar-outline"
+              }
+              size={32}
+              color={theme.colors.textSecondary}
+              style={{ opacity: 0.6, marginBottom: 8 }}
+            />
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "600",
+                color: theme.colors.textSecondary,
+                textAlign: "center",
+                paddingHorizontal: 20,
+              }}
+            >
+              {timelineCategory === "payments"
+                ? "No payment or fee events recorded yet."
+                : timelineSubFilter !== "all_updates"
+                ? `No events matching "${timelineSubFilter.replace("_", " ")}" filter.`
+                : t("casedetails_no_timeline")}
             </Text>
           </View>
         );
@@ -4331,15 +4818,25 @@ const CaseDetailsScreen: React.FC = () => {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: theme.colors.background,
+        paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
+      }}
+    >
       <FlatList
+        ref={flatListRef}
         data={listData}
         renderItem={renderListItem}
+        extraData={{ caseDetails, isLoading, documents, timelineEvents, timelineLimit, expandedSections }}
         keyExtractor={(item, index) => `${item.type}-${index}`}
         initialNumToRender={10}
         maxToRenderPerBatch={10}
         windowSize={5}
-        removeClippedSubviews={Platform.OS === "android"}
+        removeClippedSubviews={
+          Platform.OS === "android" && process.env.NODE_ENV !== "test"
+        }
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
       />
@@ -4862,6 +5359,7 @@ const CaseDetailsScreen: React.FC = () => {
         visible={showUpdateHearingModal}
         onClose={() => setShowUpdateHearingModal(false)}
         onSave={handleSaveHearingUpdate}
+        currentNextDate={caseDetails?.NextDate || caseDetails?.nextHearing}
       />
     </View>
   );

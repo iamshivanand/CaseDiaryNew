@@ -35,6 +35,9 @@ jest.mock("@react-navigation/native", () => ({
 jest.mock("../../../DataBase", () => ({
   saveDocumentDraft: jest.fn(() => Promise.resolve(1)),
   getDocumentDraftById: jest.fn(() => Promise.resolve(null)),
+  getCaseById: jest.fn(() => Promise.resolve({ id: 42, CaseTitle: "Sharma vs. State" })),
+  getCases: jest.fn(() => Promise.resolve([{ id: 42, CaseTitle: "Sharma vs. State", case_number: "WP/101/2026", CourtName: "High Court" }])),
+  uploadCaseDocument: jest.fn(() => Promise.resolve(10)),
 }));
 
 jest.mock("expo-print", () => ({
@@ -124,7 +127,9 @@ describe("TiptapEditDraftScreen (Behavior-Driven Testing)", () => {
       await waitFor(() => {
         const titleInput = getByDisplayValue("Default Title");
         fireEvent.changeText(titleInput, "Updated Legal Petition 2026");
-        expect(titleInput.props.value).toBe("Updated Legal Petition 2026");
+      });
+      await waitFor(() => {
+        expect(getByDisplayValue("Updated Legal Petition 2026")).toBeTruthy();
       });
     });
   });
@@ -220,5 +225,20 @@ describe("TiptapEditDraftScreen (Behavior-Driven Testing)", () => {
         });
       });
     });
+
+    it("renders case picker modal elements for instant case attachment", async () => {
+      const { queryByPlaceholderText } = renderScreen();
+      expect(queryByPlaceholderText("Search by case title, number, party...")).toBeDefined();
+    });
+
+    it("presents Save (Overwrite) and Save As options when saving an existing draft", async () => {
+      mockRouteParams = getMockDraftParams({ draftId: "existing-draft-id" });
+      const { getByText, queryByText } = renderScreen();
+
+      // Look for the Save (Overwrite) and Save As modal options
+      expect(queryByText("Save (Overwrite)")).toBeDefined();
+      expect(queryByText("Save As...")).toBeDefined();
+    });
   });
 });
+

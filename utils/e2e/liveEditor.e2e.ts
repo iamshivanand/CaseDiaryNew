@@ -47,7 +47,7 @@ function writeFixture(name: string, html: string): string {
 async function loadEditor(page: Page, initialHtml = ""): Promise<void> {
   const url = writeFixture(
     `test-${Date.now()}.html`,
-    getOfflineEditorHtml(initialHtml)
+    getRealTiptapEditorHtml(initialHtml)
   );
   await page.goto(url, { waitUntil: "domcontentloaded" });
   // Wait for the dynamic CSS injection (updateDynamicPaperRatio runs at 100ms)

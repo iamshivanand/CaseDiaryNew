@@ -44,7 +44,7 @@ export const getCaseTimelineEventsByCaseId = async (
   const db = await getDb();
   try {
     const sql =
-      "SELECT * FROM CaseTimeline WHERE case_id = ? ORDER BY hearing_date DESC, created_at DESC";
+      "SELECT * FROM CaseTimeline WHERE case_id = ? ORDER BY hearing_date DESC, created_at DESC, id DESC";
     return await db.getAllAsync<CaseTimelineRow>(sql, [caseId]);
   } catch (error) {
     console.error(

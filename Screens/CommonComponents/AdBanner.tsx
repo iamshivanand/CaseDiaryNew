@@ -95,7 +95,7 @@ const AdBanner: React.FC<AdBannerProps> = ({ containerStyle }) => {
         unitId={adUnitId}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
         requestOptions={{
-          requestNonPersonalizedAdsOnly: true,
+          requestNonPersonalizedAdsOnly: false,
         }}
         onAdLoaded={() => {
           setAdState("success");

@@ -114,6 +114,26 @@ describe("Database Module Tests", () => {
       expect(updateCaseSpy).toHaveBeenCalledWith(1, updates, testUserId);
     });
 
+    it("should automatically shift old NextDate to PreviousDate when NextDate is updated", async () => {
+      const uniqueId = `shift-test-${Date.now()}`;
+      const newCaseId = await dbFunctions.addCase({
+        uniqueId,
+        user_id: testUserId,
+        CaseTitle: "Shift Test Case",
+        NextDate: "2024-10-01",
+      });
+
+      expect(newCaseId).toBeTruthy();
+
+      await dbFunctions.updateCase(newCaseId!, {
+        NextDate: "2024-11-15",
+      });
+
+      const updated = await dbFunctions.getCaseById(newCaseId!);
+      expect(updated?.NextDate).toBe("2024-11-15");
+      expect(updated?.PreviousDate).toBe("2024-10-01");
+    });
+
     it("should delete a case", async () => {
       const deleteCaseSpy = jest.spyOn(dbFunctions, "deleteCase");
       await dbFunctions.deleteCase(1, testUserId);

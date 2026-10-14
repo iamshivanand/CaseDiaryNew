@@ -22,7 +22,7 @@ import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
 import { bulkInsertCases } from "../../utils/backupManager";
 import { checkDuplicateAndDiffCases } from "../../utils/caseMapper";
-import { getCurrentUserId } from "../../utils/commonFunctions";
+import { getCurrentUserId, formatDate } from "../../utils/commonFunctions";
 import { parseECourtsTxtFile, ParsedTextCase } from "../../utils/ecourtsParser";
 import ActionButton from "../CommonComponents/ActionButton";
 import { useAdTrigger } from "../CommonComponents/AdManager";

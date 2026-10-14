@@ -18,7 +18,9 @@ import {
   Alert,
 } from "react-native";
 import Animated, {
+  FadeIn,
   FadeInDown,
+  LinearTransition,
   useSharedValue,
   useAnimatedStyle,
   withSpring,
@@ -27,6 +29,8 @@ import Animated, {
 import * as db from "../../DataBase";
 import { useTranslation } from "../../Providers/LanguageProvider";
 import { ThemeContext } from "../../Providers/ThemeProvider";
+import { useToast } from "../../Providers/ToastContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CaseData, CaseDataScreen } from "../../Types/appTypes";
 import { CASE_UPDATED_EVENT } from "../../utils/caseEvents";
 import { mapCaseDbToScreen } from "../../utils/caseMapper";
@@ -40,40 +44,69 @@ import dbCacheManager from "../../utils/dbCacheManager";
 import { exportDailyCauseListToPdf } from "../../utils/pdfExporter";
 import { promptClientNotification } from "../../utils/whatsappNotifier";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
+import { VoiceCaseNoteModal } from "../CommonComponents/VoiceCaseNoteModal";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
 import { useAdTrigger } from "../CommonComponents/AdManager";
 import { CauseListCustomizerModal } from "../CommonComponents/CauseListCustomizerModal";
 import { SkeletonCard } from "../CommonComponents/SkeletonLoader";
 import SectionHeader from "../CommonComponents/SectionHeader";
 import VoiceSearchBar from "../CommonComponents/VoiceSearchBar";
+import NotificationBellButton from "../CommonComponents/NotificationBellButton";
+
+import { syncCasesToCloud } from "../../utils/cloudSyncService";
 
 const WelcomeCard = () => {
   const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
+  const navigation = useNavigation<any>();
   const [userName, setUserName] = useState("User");
+  const [isCloudLinked, setIsCloudLinked] = useState(false);
+  const [chamberName, setChamberName] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const today = new Date();
   const formattedDate = format(today, "eeee, MMMM d, yyyy");
 
+  const checkCloudStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem("@auth_token");
+      const chamber = await AsyncStorage.getItem("@chamber_name");
+      const user = await AsyncStorage.getItem("@user_name");
+      setIsCloudLinked(!!token);
+      setChamberName(chamber || null);
+      if (user) setUserName(user);
+    } catch (e) {
+      console.warn("Failed checking cloud status:", e);
+    }
+  };
+
   useEffect(() => {
-    const fetchUserName = async () => {
-      try {
-        const database = await db.getDb();
-        const userId = await AsyncStorage.getItem("@user_id");
-        if (userId) {
-          const profile = await db.getUserProfile(
-            database,
-            parseInt(userId, 10)
-          );
-          if (profile && profile.name) {
-            setUserName(profile.name);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching user name:", error);
-      }
-    };
-    fetchUserName();
+    checkCloudStatus();
   }, []);
+
+  const handleSyncPress = async () => {
+    if (!isCloudLinked) {
+      // Navigate to Login screen to link device
+      navigation.navigate("Login");
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const res = await syncCasesToCloud();
+      if (res.success) {
+        Alert.alert(
+          "Cloud Sync Complete",
+          `All courtroom cases are safely backed up to ${chamberName || "your Chamber"}!`
+        );
+      } else {
+        Alert.alert("Sync Issue", res.error || "Could not complete cloud sync.");
+      }
+    } catch (err: any) {
+      Alert.alert("Offline", "Working in offline mode. Cases remain saved locally.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const getGreeting = () => {
     const hours = new Date().getHours();
@@ -91,12 +124,12 @@ const WelcomeCard = () => {
   const greeting = getGreeting();
 
   const welcomeGradient = theme.dark
-    ? ["#312E81", "#0F172A"] // Premium dark Indigo-Slate gradient
-    : ["#6366F1", "#312E81"]; // Premium Indigo gradient for light mode
+    ? ["#312E81", "#0F172A"]
+    : ["#6366F1", "#312E81"];
 
   return (
     <LinearGradient
-      colors={welcomeGradient}
+      colors={welcomeGradient as [string, string]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
       style={[
@@ -106,14 +139,91 @@ const WelcomeCard = () => {
         },
       ]}
     >
-      <Text style={[styles.welcomeTitle, { color: "#FFFFFF" }]}>
-        {greeting.emoji} {greeting.text}, {userName}!
-      </Text>
-      <Text
-        style={[styles.welcomeSubtitle, { color: "rgba(255, 255, 255, 0.85)" }]}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+        }}
       >
-        {formattedDate}
-      </Text>
+        <View style={{ flex: 1, paddingRight: 10 }}>
+          <Text style={[styles.welcomeTitle, { color: "#FFFFFF" }]}>
+            {greeting.emoji} {greeting.text}, {userName}!
+          </Text>
+          <Text
+            style={[
+              styles.welcomeSubtitle,
+              { color: "rgba(255, 255, 255, 0.85)" },
+            ]}
+          >
+            {formattedDate}
+          </Text>
+
+          {/* Cloud Status Badge */}
+          <TouchableOpacity
+            onPress={handleSyncPress}
+            disabled={isSyncing}
+            activeOpacity={0.8}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: isCloudLinked
+                ? "rgba(16, 185, 129, 0.2)"
+                : "rgba(245, 158, 11, 0.25)",
+              borderColor: isCloudLinked
+                ? "rgba(16, 185, 129, 0.4)"
+                : "rgba(245, 158, 11, 0.5)",
+              borderWidth: 1,
+              borderRadius: 16,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              marginTop: 8,
+              alignSelf: "flex-start",
+            }}
+          >
+            {isSyncing ? (
+              <ActivityIndicator
+                size="small"
+                color="#FFFFFF"
+                style={{ marginRight: 6 }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 4,
+                  backgroundColor: isCloudLinked ? "#10B981" : "#F59E0B",
+                  marginRight: 6,
+                }}
+              />
+            )}
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 11,
+                fontWeight: "600",
+                letterSpacing: 0.2,
+              }}
+            >
+              {isSyncing
+                ? "Syncing Cases..."
+                : isCloudLinked
+                ? `Cloud Synced • ${chamberName || "Chamber"}`
+                : "Courtroom Offline Mode • Tap to Link Cloud"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <View
+          style={{
+            backgroundColor: "rgba(255, 255, 255, 0.2)",
+            borderRadius: 20,
+            padding: 2,
+          }}
+        >
+          <NotificationBellButton color="#FFFFFF" size={22} />
+        </View>
+      </View>
     </LinearGradient>
   );
 };
@@ -144,7 +254,7 @@ const QuickActionButton = ({
         scale.value = withSpring(1, { damping: 15, stiffness: 200 });
       }}
       onPress={onPress}
-      style={{ flex: 1, minWidth: "45%", margin: 6 }}
+      style={{ flex: 1 }}
     >
       <Animated.View
         style={[
@@ -167,24 +277,24 @@ const QuickActionButton = ({
           <View
             style={{
               position: "absolute",
-              top: 10,
-              right: 10,
+              top: 5,
+              right: 5,
               backgroundColor: badgeColor || "#EF4444",
-              minWidth: 22,
-              height: 22,
-              borderRadius: 11,
-              paddingHorizontal: 6,
+              minWidth: 18,
+              height: 18,
+              borderRadius: 9,
+              paddingHorizontal: 4,
               justifyContent: "center",
               alignItems: "center",
               zIndex: 10,
               shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
+              shadowOffset: { width: 0, height: 1 },
               shadowOpacity: 0.2,
-              shadowRadius: 3,
-              elevation: 4,
+              shadowRadius: 2,
+              elevation: 3,
             }}
           >
-            <Text style={{ color: "#FFFFFF", fontSize: 11, fontWeight: "800" }}>
+            <Text style={{ color: "#FFFFFF", fontSize: 9.5, fontWeight: "800" }}>
               {badgeCount > 99 ? "99+" : badgeCount}
             </Text>
           </View>
@@ -193,29 +303,29 @@ const QuickActionButton = ({
         {/* Subtle Background Watermark Icon */}
         <Ionicons
           name={icon}
-          size={64}
+          size={46}
           color={color}
           style={{
             position: "absolute",
-            right: -10,
-            bottom: -10,
+            right: -6,
+            bottom: -6,
             opacity: theme.dark ? 0.06 : 0.03,
           }}
         />
 
         <View
           style={{
-            width: 48,
-            height: 48,
-            borderRadius: 14,
+            width: 36,
+            height: 36,
+            borderRadius: 10,
             backgroundColor: `${color}12`,
             justifyContent: "center",
             alignItems: "center",
-            marginBottom: 10,
+            marginBottom: 6,
             zIndex: 2,
           }}
         >
-          <Ionicons name={icon} size={24} color={color} />
+          <Ionicons name={icon} size={19} color={color} />
         </View>
         <Text
           style={[
@@ -223,6 +333,7 @@ const QuickActionButton = ({
             { color: theme.colors.text, zIndex: 2 },
           ]}
           numberOfLines={2}
+          ellipsizeMode="tail"
         >
           {text}
         </Text>
@@ -239,25 +350,16 @@ const BackupReminderBanner = () => {
     const checkBackupStatus = async () => {
       try {
         const now = new Date();
-        const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-        // Weekly backup reminder is shown ONLY on weekends (Saturday/Sunday)
-        if (!isWeekend) {
-          setShowBanner(false);
-          return;
-        }
-
+        const todayStr = getLocalDateString(now);
         const lastBackup = await AsyncStorage.getItem("@last_backup_timestamp");
         if (!lastBackup) {
           setShowBanner(true);
           return;
         }
         const lastDate = new Date(lastBackup);
-        const diffDays = Math.floor(
-          (now.getTime() - lastDate.getTime()) / (1000 * 3600 * 24)
-        );
-        if (diffDays >= 5) {
+        const lastBackupDateStr = getLocalDateString(lastDate);
+        // Daily backup reminder is shown if not backed up today
+        if (todayStr !== lastBackupDateStr) {
           setShowBanner(true);
         } else {
           setShowBanner(false);
@@ -270,11 +372,6 @@ const BackupReminderBanner = () => {
   }, []);
 
   const handleBackupNow = async () => {
-    await AsyncStorage.setItem(
-      "@last_backup_timestamp",
-      new Date().toISOString()
-    );
-    setShowBanner(false);
     navigation.navigate("SettingsScreen" as any);
   };
 
@@ -299,21 +396,32 @@ const BackupReminderBanner = () => {
           flexDirection: "row",
           alignItems: "center",
           flex: 1,
-          marginRight: 8,
+          flexShrink: 1,
+          marginRight: 10,
         }}
       >
         <Ionicons
           name="shield-checkmark"
           size={24}
           color="#D97706"
-          style={{ marginRight: 10 }}
+          style={{ marginRight: 10, flexShrink: 0 }}
         />
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontWeight: "700", fontSize: 13, color: "#92400E" }}>
-            Weekly Backup Reminder
+        <View style={{ flex: 1, flexShrink: 1 }}>
+          <Text
+            style={{
+              fontWeight: "700",
+              fontSize: 13,
+              color: "#92400E",
+              marginBottom: 2,
+            }}
+          >
+            Daily Backup Reminder
           </Text>
-          <Text style={{ fontSize: 12, color: "#B45309" }}>
-            Keep your cases safe. Export a local backup now.
+          <Text
+            style={{ fontSize: 11.5, color: "#B45309", lineHeight: 15 }}
+            numberOfLines={2}
+          >
+            Keep your cases safe. Export a local backup daily.
           </Text>
         </View>
       </View>
@@ -321,9 +429,12 @@ const BackupReminderBanner = () => {
         onPress={handleBackupNow}
         style={{
           backgroundColor: "#D97706",
-          paddingHorizontal: 12,
-          paddingVertical: 6,
+          paddingHorizontal: 14,
+          paddingVertical: 7,
           borderRadius: 8,
+          flexShrink: 0,
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 12 }}>
@@ -335,6 +446,7 @@ const BackupReminderBanner = () => {
 };
 
 const QuickActionsGrid = () => {
+  const { theme } = useContext(ThemeContext);
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
   const [yesterdayCount, setYesterdayCount] = useState(0);
@@ -417,43 +529,54 @@ const QuickActionsGrid = () => {
   ];
 
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View style={{ marginBottom: 8 }}>
       <BackupReminderBanner />
-      <SectionHeader title={t("dash_quick_actions")} />
+      <View style={{ marginTop: 12, marginBottom: 10, paddingHorizontal: 2 }}>
+        <Text
+          style={[
+            styles.sectionTitle,
+            { color: theme.colors.text, marginTop: 0, marginBottom: 0 },
+          ]}
+        >
+          {t("dash_quick_actions")}
+        </Text>
+      </View>
       <View
         style={[
           styles.quickActionsContainer,
-          { flexWrap: "wrap", flexDirection: "row" },
+          { marginHorizontal: -4 },
         ]}
       >
-        {actions.map((action, index) => (
-          <Animated.View
+        {actions.map((action) => (
+          <View
             key={action.text}
-            entering={FadeInDown.delay(index * 30)
-              .springify()
-              .damping(20)
-              .stiffness(300)}
-            style={{ width: "50%" }}
+            style={{ width: "50%", padding: 4 }}
           >
             <QuickActionButton {...action} />
-          </Animated.View>
+          </View>
         ))}
       </View>
     </View>
   );
 };
 
-const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
+const AnimatedNewCaseCard = ({
+  caseDetails,
+  onUpdateHearingPress,
+  onLongPress,
+  index,
+}: any) => {
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 30)
-        .springify()
-        .damping(20)
-        .stiffness(300)}
+      entering={FadeInDown.duration(200)}
+      layout={LinearTransition.springify().damping(20)}
+      style={{ marginVertical: 2 }}
     >
       <NewCaseCard
         caseDetails={caseDetails}
         onUpdateHearingPress={onUpdateHearingPress}
+        onLongPress={onLongPress}
+        marginHorizontal={0}
       />
     </Animated.View>
   );
@@ -462,12 +585,15 @@ const AnimatedNewCaseCard = ({ caseDetails, onUpdateHearingPress, index }) => {
 const TodaysCasesSection = () => {
   const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const [todaysCases, setTodaysCases] = useState<CaseDataScreen[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<any>();
   const { showAdWithPreload } = useAdTrigger();
   const [isPopupVisible, setPopupVisible] = useState(false);
+  const [isNoteModalVisible, setNoteModalVisible] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseDataScreen | null>(null);
+  const [noteCase, setNoteCase] = useState<CaseDataScreen | null>(null);
   const [isCauseListModalVisible, setIsCauseListModalVisible] = useState(false);
 
   const fetchTodaysCases = async () => {
@@ -481,6 +607,10 @@ const TodaysCasesSection = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchTodaysCases();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -592,6 +722,13 @@ const TodaysCasesSection = () => {
 
       fetchTodaysCases();
 
+      const formattedNextDate = formatDate(getLocalDateString(nextHearingDate));
+      showToast({
+        title: "Hearing Updated",
+        message: `Next hearing set to ${formattedNextDate}`,
+        type: "success",
+      });
+
       setTimeout(() => {
         promptClientNotification(
           caseId,
@@ -657,7 +794,8 @@ const TodaysCasesSection = () => {
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: 12,
-          marginTop: 8,
+          marginTop: 18,
+          paddingHorizontal: 2,
         }}
       >
         <Text
@@ -670,6 +808,7 @@ const TodaysCasesSection = () => {
         </Text>
         {todaysCases.length > 0 && (
           <TouchableOpacity
+            testID="share-today-list-btn"
             onPress={handleShareCauseList}
             activeOpacity={0.9}
             style={{
@@ -706,9 +845,13 @@ const TodaysCasesSection = () => {
       ) : todaysCases.length > 0 ? (
         todaysCases.map((caseData, index) => (
           <AnimatedNewCaseCard
-            key={`${caseData.id}-${(caseData as any).updated_at || ""}-${(caseData as any).fee_paid || 0}-${(caseData as any).date_fee_collected || 0}-${(caseData as any).date_fee_paid || 0}-${(caseData as any).date_fee || 0}-${caseData.nextHearing || ""}`}
+            key={`today-case-${caseData.id || index}`}
             caseDetails={caseData}
             onUpdateHearingPress={() => handleUpdateHearing(caseData)}
+            onLongPress={() => {
+              setNoteCase(caseData);
+              setNoteModalVisible(true);
+            }}
             index={index}
           />
         ))
@@ -746,6 +889,7 @@ const TodaysCasesSection = () => {
         <UpdateHearingPopup
           visible={isPopupVisible}
           onClose={() => setPopupVisible(false)}
+          currentNextDate={selectedCase.NextDate || selectedCase.nextHearing}
           onSave={async (
             notes,
             nextHearingDate,
@@ -766,6 +910,41 @@ const TodaysCasesSection = () => {
           }
         />
       )}
+      {noteCase && (
+        <VoiceCaseNoteModal
+          visible={isNoteModalVisible}
+          caseId={parseInt(noteCase.id.toString(), 10)}
+          caseTitle={noteCase.title || "Legal Matter"}
+          existingNextHearingDate={noteCase.nextHearing}
+          onClose={() => {
+            setNoteModalVisible(false);
+            setNoteCase(null);
+          }}
+          onSave={async (data) => {
+            const caseId = parseInt(noteCase.id.toString(), 10);
+            if (isNaN(caseId)) return;
+            const nowIso = new Date().toISOString();
+            if (data.notes && data.notes.trim()) {
+              await db.addCaseTimelineEvent({
+                case_id: caseId,
+                hearing_date: nowIso,
+                notes: data.notes.trim(),
+                event_type: "hearing_note",
+              });
+            }
+            if (data.updateNextDate && data.nextHearingDate) {
+              await db.updateCase(
+                caseId,
+                { NextDate: data.nextHearingDate },
+                await getCurrentUserId()
+              );
+            }
+            setNoteModalVisible(false);
+            setNoteCase(null);
+            fetchTodaysCases();
+          }}
+        />
+      )}
       <CauseListCustomizerModal
         visible={isCauseListModalVisible}
         onClose={() => setIsCauseListModalVisible(false)}
@@ -778,6 +957,7 @@ const TodaysCasesSection = () => {
 
 const DashboardScreen = () => {
   const { theme } = useContext(ThemeContext);
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -803,12 +983,19 @@ const DashboardScreen = () => {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: theme.colors.background }]}
+    <View
+      style={[
+        styles.safeArea,
+        {
+          backgroundColor: theme.colors.background,
+          paddingTop: Math.max(insets.top, Platform.OS === "android" ? 10 : 0),
+        },
+      ]}
     >
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 110 }}
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
           <WelcomeCard />
@@ -823,14 +1010,13 @@ const DashboardScreen = () => {
           <TodaysCasesSection />
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? 25 : 0,
   },
   container: {
     flex: 1,
@@ -859,32 +1045,29 @@ const styles = StyleSheet.create({
   quickActionsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
   },
   quickAction: {
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    width: "48%",
-    minHeight: 115,
-    marginBottom: 12,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    minHeight: 88,
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 2,
   },
   quickActionIcon: {
-    fontSize: 24,
+    fontSize: 20,
   },
   quickActionText: {
-    fontSize: 13,
+    fontSize: 11.5,
     fontWeight: "600",
     textAlign: "center",
-    lineHeight: 16,
+    lineHeight: 15,
   },
 
   adLabel: {

@@ -182,3 +182,105 @@ export const SkeletonTemplateGrid: React.FC<{ count?: number }> = ({
   );
 };
 
+export const SkeletonProfile: React.FC = () => {
+  const { theme } = useContext(ThemeContext);
+  return (
+    <View style={{ padding: 16 }}>
+      {/* Profile Header Skeleton */}
+      <View
+        style={{
+          alignItems: "center",
+          paddingVertical: 20,
+          backgroundColor: theme.colors.cardBackground,
+          borderRadius: 20,
+          marginBottom: 16,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+        }}
+      >
+        <SkeletonItem
+          style={{
+            width: 90,
+            height: 90,
+            borderRadius: 45,
+            marginBottom: 14,
+          }}
+        />
+        <SkeletonItem
+          style={{
+            width: "50%",
+            height: 20,
+            borderRadius: 6,
+            marginBottom: 8,
+          }}
+        />
+        <SkeletonItem
+          style={{
+            width: "35%",
+            height: 14,
+            borderRadius: 4,
+            marginBottom: 12,
+          }}
+        />
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+          <SkeletonItem style={{ width: 70, height: 22, borderRadius: 11 }} />
+          <SkeletonItem style={{ width: 80, height: 22, borderRadius: 11 }} />
+        </View>
+      </View>
+
+      {/* Stats Cards Row Skeleton */}
+      <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+        <SkeletonItem style={{ flex: 1, height: 80, borderRadius: 14 }} />
+        <SkeletonItem style={{ flex: 1, height: 80, borderRadius: 14 }} />
+        <SkeletonItem style={{ flex: 1, height: 80, borderRadius: 14 }} />
+      </View>
+
+      {/* Profile Details Sections Skeleton */}
+      <View
+        style={{
+          backgroundColor: theme.colors.cardBackground,
+          borderRadius: 16,
+          padding: 16,
+          marginBottom: 16,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+        }}
+      >
+        <SkeletonItem
+          style={{ width: "30%", height: 16, borderRadius: 4, marginBottom: 12 }}
+        />
+        <SkeletonItem
+          style={{ width: "100%", height: 14, borderRadius: 4, marginBottom: 8 }}
+        />
+        <SkeletonItem
+          style={{ width: "90%", height: 14, borderRadius: 4, marginBottom: 8 }}
+        />
+        <SkeletonItem
+          style={{ width: "70%", height: 14, borderRadius: 4 }}
+        />
+      </View>
+
+      <View
+        style={{
+          backgroundColor: theme.colors.cardBackground,
+          borderRadius: 16,
+          padding: 16,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+        }}
+      >
+        <SkeletonItem
+          style={{ width: "40%", height: 16, borderRadius: 4, marginBottom: 14 }}
+        />
+        <SkeletonItem
+          style={{ width: "80%", height: 14, borderRadius: 4, marginBottom: 10 }}
+        />
+        <SkeletonItem
+          style={{ width: "65%", height: 14, borderRadius: 4 }}
+        />
+      </View>
+    </View>
+  );
+};
+
+

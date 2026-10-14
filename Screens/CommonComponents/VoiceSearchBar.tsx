@@ -48,16 +48,21 @@ export const VoiceSearchBar: React.FC<VoiceSearchBarProps> = ({
         dictationLocale,
         {
           onStart: () => setIsListening(true),
-          onResult: (text) => {
-            if (text) {
-              onChangeText(text.trim());
+          onFullResult: (fullTranscript) => {
+            if (fullTranscript) {
+              onChangeText(fullTranscript.trim());
             }
           },
           onError: (err) => {
             setIsListening(false);
             console.warn("Voice search error:", err);
           },
-          onEnd: () => setIsListening(false),
+          onEnd: () => {
+            setIsListening(false);
+            if (onSubmitEditing) {
+              onSubmitEditing();
+            }
+          },
         }
       );
 

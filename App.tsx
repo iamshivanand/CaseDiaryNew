@@ -5,11 +5,16 @@ import {
   Inter_700Bold,
 } from "@expo-google-fonts/inter";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { NavigationContainer } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  createNavigationContainerRef,
+} from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { CardStyleInterpolators } from "@react-navigation/stack";
 import * as Application from "expo-application";
 import Constants from "expo-constants";
+import * as Notifications from "expo-notifications";
+import * as ExpoSplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { useContext, useEffect, useState } from "react";
 import {
@@ -30,10 +35,13 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getDb } from "./DataBase";
+import { purgeOldAppNotifications } from "./DataBase/appNotificationsDb";
 import LanguageProvider from "./Providers/LanguageProvider";
 import OnboardingProvider from "./Providers/OnboardingProvider";
 import ThemeProvider, { ThemeContext } from "./Providers/ThemeProvider";
+import { ToastProvider } from "./Providers/ToastContext";
 import Routes from "./Routes/Routes";
 import { AdProvider, preloadAds } from "./Screens/CommonComponents/AdManager";
 import CustomAlertModal from "./Screens/CommonComponents/CustomAlertModal";
@@ -48,11 +56,18 @@ import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
 import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
 import SplashScreen from "./Screens/SplashScreen/SplashScreen";
 import { initializeAlertInterceptor } from "./utils/AlertManager";
+import {
+  handleNotificationDeepLink,
+  processInitialNotificationResponse,
+} from "./utils/deepLinkHandler";
 import { emitter } from "./utils/event-emitter";
 import { scheduleDailyMultiIntervalNotifications } from "./utils/notificationScheduler";
 
 // Initialize the global alert interceptor
 initializeAlertInterceptor();
+
+// Hide native splash immediately so React animated splash takes over from t = 0
+ExpoSplashScreen.hideAsync().catch(() => {});
 
 // Global production console stripping
 if (!__DEV__) {
@@ -61,6 +76,51 @@ if (!__DEV__) {
   console.warn = () => {};
   console.error = () => {};
 }
+
+export const navigationRef = createNavigationContainerRef<any>();
+
+const linking = {
+  prefixes: ["advocase://", "casediary://"],
+  config: {
+    screens: {
+      App: {
+        screens: {
+          MainApp: {
+            screens: {
+              Home: {
+                screens: {
+                  HomeScreen: "home",
+                  CaseDetails: "case/:caseId",
+                  AllCases: "cases",
+                  UndatedCases: "undated",
+                  YesterdaysCases: "yesterday",
+                  NotificationInbox: "notifications",
+                  DraftsHub: "drafts",
+                },
+              },
+              Search: {
+                screens: {
+                  SearchScreen: "search",
+                },
+              },
+              Calendar: {
+                screens: {
+                  CalendarScreen: "calendar",
+                },
+              },
+              Profile: {
+                screens: {
+                  ProfileScreen: "profile",
+                  SettingsScreen: "settings",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
 
 const Stack = createNativeStackNavigator();
 const OnboardingStack = createNativeStackNavigator();
@@ -132,9 +192,8 @@ function AppContent() {
   });
   const [loading, setLoading] = useState(true);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
-  const [isSplashscreenVisible, setSplashscreenVisible] = useState(true);
-  const translateY = useSharedValue(1000);
-
+  const [splashAnimationFinished, setSplashAnimationFinished] = useState(false);
+  const [inAppToast, setInAppToast] = useState<ToastNotification | null>(null);
   // Update check state variables
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(false);
@@ -145,11 +204,13 @@ function AppContent() {
   const [latestVersion, setLatestVersion] = useState("1.0.0");
   const [releaseNotes, setReleaseNotes] = useState("");
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateY: translateY.value }],
-    };
-  });
+  // Hide the native splash screen as soon as fonts are loaded so the JS animated splash takes over smoothly
+  useEffect(() => {
+    if (fontsLoaded) {
+      console.log("[SplashFlow] 1. Fonts loaded: Hiding native Android splash screen to reveal animated splash");
+      ExpoSplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded]);
 
   useEffect(() => {
     const initialize = async () => {
@@ -166,6 +227,9 @@ function AppContent() {
         ]);
         console.log("Database and core services initialized concurrently.");
         scheduleDailyMultiIntervalNotifications();
+        purgeOldAppNotifications(30).catch((e) =>
+          console.warn("Non-fatal error purging stale notifications:", e)
+        );
 
         // Check for updates asynchronously (does not block startup)
         const runUpdateCheck = async () => {
@@ -229,73 +293,6 @@ function AppContent() {
 
         if (isOnboarded) {
           setOnboardingComplete(true);
-          translateY.value = 0; // Immediately set to 0 to prevent hit-box unresponsiveness!
-        }
-
-        if (!isPremium && isOnboarded) {
-          let adShownOrFailed = false;
-
-          let unsubLoaded: (() => void) | null = null;
-          let unsubError: (() => void) | null = null;
-          let unsubClosed: (() => void) | null = null;
-
-          const cleanup = () => {
-            if (typeof unsubLoaded === "function") unsubLoaded();
-            if (typeof unsubError === "function") unsubError();
-            if (typeof unsubClosed === "function") unsubClosed();
-          };
-
-          const showOpenAd = () => {
-            if (adShownOrFailed) return;
-            adShownOrFailed = true;
-            try {
-              appOpenAd.show();
-            } catch (err) {
-              console.warn("Failed to show AppOpenAd:", err);
-              cleanup();
-              proceedToApp();
-            }
-          };
-
-          const proceedToApp = () => {
-            setSplashscreenVisible(false);
-          };
-
-          // Setup timeout for ad loading (max 1 second)
-          const timeoutId = setTimeout(() => {
-            if (!adShownOrFailed) {
-              console.log(
-                "AppOpenAd preload timeout reached. Proceeding to app."
-              );
-              adShownOrFailed = true;
-              cleanup();
-              proceedToApp();
-            }
-          }, 1000);
-
-          unsubLoaded = appOpenAd.addAdEventListener(AdEventType.LOADED, () => {
-            clearTimeout(timeoutId);
-            showOpenAd();
-          });
-
-          unsubError = appOpenAd.addAdEventListener(
-            AdEventType.ERROR,
-            (error) => {
-              clearTimeout(timeoutId);
-              console.warn("AppOpenAd failed to load:", error);
-              cleanup();
-              proceedToApp();
-            }
-          );
-
-          unsubClosed = appOpenAd.addAdEventListener(AdEventType.CLOSED, () => {
-            cleanup();
-            proceedToApp();
-          });
-
-          appOpenAd.load();
-        } else {
-          setSplashscreenVisible(false);
         }
       } catch (error) {
         console.error(
@@ -324,52 +321,73 @@ function AppContent() {
 
     const onOnboardingComplete = () => {
       setOnboardingComplete(true);
-      translateY.value = withTiming(0, { duration: 500 });
     };
 
     emitter.on("onboardingComplete", onOnboardingComplete);
 
+    const notificationSubscription =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        const actionId = response.actionIdentifier;
+        const content = response.notification.request.content;
+        const data = content.data;
+        handleNotificationDeepLink(navigationRef, data, actionId, content);
+      });
+
     return () => {
       emitter.off("onboardingComplete", onOnboardingComplete);
+      notificationSubscription.remove();
     };
   }, []);
 
-  if (isSplashscreenVisible || !fontsLoaded) {
-    return <SplashScreen />;
-  }
+  const isAppReady = Boolean(fontsLoaded && !loading);
 
-  if (loading) {
+  const handleSplashAnimationComplete = React.useCallback(() => {
+    setSplashAnimationFinished(true);
+  }, []);
+
+  if (!splashAnimationFinished) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
-      </View>
+      <SplashScreen
+        isReady={isAppReady}
+        startAnimation={Boolean(fontsLoaded)}
+        onAnimationComplete={handleSplashAnimationComplete}
+      />
     );
   }
 
+  console.log("[SplashFlow] 5. Rendering main application & Dashboard");
+
   return (
-    <>
-      <StatusBar style={theme.dark ? "light" : "dark"} />
-      <NavigationContainer>
-        <SafeAreaView
-          style={{
-            flex: 1,
-            backgroundColor: theme.colors.background,
-          }}
-        >
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {onboardingComplete ? (
-              <Stack.Screen name="App">
-                {(props) => (
-                  <Animated.View style={[{ flex: 1 }, animatedStyle]}>
-                    <Routes {...props} />
-                  </Animated.View>
-                )}
-              </Stack.Screen>
-            ) : (
-              <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
-            )}
-          </Stack.Navigator>
-        </SafeAreaView>
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <StatusBar
+        style={theme.dark ? "light" : "dark"}
+        backgroundColor={theme.colors.background}
+      />
+      <NavigationContainer
+        ref={navigationRef}
+        linking={linking}
+        onReady={() => {
+          processInitialNotificationResponse(navigationRef);
+        }}
+        theme={{
+          dark: theme.dark,
+          colors: {
+            primary: theme.colors.primary,
+            background: theme.colors.background,
+            card: theme.colors.cardBackground,
+            text: theme.colors.text,
+            border: theme.colors.border,
+            notification: theme.colors.primary,
+          },
+        }}
+      >
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {onboardingComplete ? (
+            <Stack.Screen name="App" component={Routes} />
+          ) : (
+            <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
+          )}
+        </Stack.Navigator>
       </NavigationContainer>
       <CustomAlertModal />
       <UpdateCheckModal
@@ -381,20 +399,24 @@ function AppContent() {
         releaseNotes={releaseNotes}
         latestVersion={latestVersion}
       />
-    </>
+    </View>
   );
 }
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <OnboardingProvider>
-          <AdProvider>
-            <AppContent />
-          </AdProvider>
-        </OnboardingProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <OnboardingProvider>
+            <AdProvider>
+              <ToastProvider>
+                <AppContent />
+              </ToastProvider>
+            </AdProvider>
+          </OnboardingProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
