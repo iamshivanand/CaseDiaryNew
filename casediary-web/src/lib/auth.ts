@@ -1,9 +1,20 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET =
-  process.env.JWT_SECRET ||
-  "advocase_casediary_super_secure_jwt_secret_key_2026";
+const getJwtSecret = (): string => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "FATAL SECURITY ERROR: JWT_SECRET environment variable is mandatory in production mode."
+      );
+    }
+    return "advocase_casediary_super_secure_jwt_secret_key_2026";
+  }
+  return secret;
+};
+
+const JWT_SECRET = getJwtSecret();
 
 export interface AuthTokenPayload {
   userId: string;

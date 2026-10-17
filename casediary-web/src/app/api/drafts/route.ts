@@ -11,10 +11,8 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get("id");
     const caseId = searchParams.get("case_id");
     const isTemplate = searchParams.get("is_template");
-    const chamberIdParam = searchParams.get("chamber_id");
     const search = searchParams.get("search");
-
-    const activeChamberId = authUser?.chamberId || chamberIdParam || "demo-chamber-id";
+    const activeChamberId = authUser?.chamberId || "demo-chamber-id";
 
     // Single draft lookup
     if (id) {
@@ -82,9 +80,9 @@ export async function POST(request: NextRequest) {
     const authUser = getAuthUser(request);
     const body = await request.json();
     const id = body.id || `draft-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
-    const effectiveChamberId = authUser?.chamberId || body.chamber_id || "demo-chamber-id";
-    const authorName = authUser?.name || body.author_name || "Adv. Rajesh Sharma";
-    const authorRole = authUser?.role || body.author_role || "Senior Advocate";
+    const effectiveChamberId = authUser?.chamberId || "demo-chamber-id";
+    const authorName = authUser?.name || "Adv. Rajesh Sharma";
+    const authorRole = authUser?.role || "Senior Advocate";
 
     // Check if draft already exists
     const existing = db
@@ -94,6 +92,13 @@ export async function POST(request: NextRequest) {
       .get();
 
     if (existing) {
+      if (existing.chamber_id !== effectiveChamberId && !existing.is_custom_template) {
+        return NextResponse.json(
+          { success: false, error: "Permission Denied: Cannot modify drafts belonging to another chamber roster." },
+          { status: 403 }
+        );
+      }
+
       const updated = db
         .update(schema.DocumentDrafts)
         .set({
@@ -112,7 +117,12 @@ export async function POST(request: NextRequest) {
           author_name: authorName,
           author_role: authorRole,
         })
-        .where(eq(schema.DocumentDrafts.id, id))
+        .where(
+          and(
+            eq(schema.DocumentDrafts.id, id),
+            eq(schema.DocumentDrafts.chamber_id, effectiveChamberId)
+          )
+        )
         .returning()
         .get();
 
@@ -152,6 +162,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const authUser = getAuthUser(request);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -159,14 +170,21 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Draft ID is required" }, { status: 400 });
     }
 
+    const effectiveChamberId = authUser?.chamberId || "demo-chamber-id";
+
     const deleted = db
       .delete(schema.DocumentDrafts)
-      .where(eq(schema.DocumentDrafts.id, id))
+      .where(
+        and(
+          eq(schema.DocumentDrafts.id, id),
+          eq(schema.DocumentDrafts.chamber_id, effectiveChamberId)
+        )
+      )
       .returning()
       .get();
 
     if (!deleted) {
-      return NextResponse.json({ success: false, error: "Draft not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Draft not found or access restricted" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, message: "Draft deleted successfully", deleted });

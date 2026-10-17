@@ -91,7 +91,14 @@ export async function POST(request: NextRequest) {
     const authUser = getAuthUser(request);
     const body = await request.json();
 
-    if (authUser && !isSeniorAdvocate(authUser)) {
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Authentication token required." },
+        { status: 401 }
+      );
+    }
+
+    if (!isSeniorAdvocate(authUser)) {
       return NextResponse.json(
         {
           success: false,

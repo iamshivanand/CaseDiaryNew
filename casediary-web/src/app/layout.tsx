@@ -6,6 +6,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/context/ToastContext";
+import { QueryProvider } from "@/providers/QueryProvider";
 import { AppLayoutWrapper } from "@/components/AppLayoutWrapper";
 
 const geistSans = Geist({
@@ -135,19 +136,21 @@ export default function RootLayout({
             `,
           }}
         />
-        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
       </head>
       <body
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} ${notoDevanagari.variable} antialiased bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-[100dvh] transition-colors duration-200`}
       >
+        <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
         <ThemeProvider>
           <AuthProvider>
-            <LanguageProvider>
-              <ToastProvider>
-                <AppLayoutWrapper>{children}</AppLayoutWrapper>
-              </ToastProvider>
-            </LanguageProvider>
+            <QueryProvider>
+              <LanguageProvider>
+                <ToastProvider>
+                  <AppLayoutWrapper>{children}</AppLayoutWrapper>
+                </ToastProvider>
+              </LanguageProvider>
+            </QueryProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -55,6 +55,7 @@ import PracticeAreasScreen from "./Screens/Onboarding/PracticeAreasScreen";
 import SetupProfileScreen from "./Screens/Onboarding/SetupProfileScreen";
 import UploadPhotoScreen from "./Screens/Onboarding/UploadPhotoScreen";
 import SplashScreen from "./Screens/SplashScreen/SplashScreen";
+import Login from "./Screens/LoginSignup/Login/Login";
 import { initializeAlertInterceptor } from "./utils/AlertManager";
 import {
   handleNotificationDeepLink,
@@ -155,6 +156,7 @@ const OnboardingNavigator = () => (
       name="DuplicateReview"
       component={DuplicateReviewScreen}
     />
+    <OnboardingStack.Screen name="Login" component={Login} />
   </OnboardingStack.Navigator>
 );
 

@@ -22,13 +22,12 @@ import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { formatDate } from "@/lib/utils";
 
 import { useLanguage } from "@/context/LanguageContext";
-import { apiFetch } from "@/lib/apiClient";
+import { useCases } from "@/hooks/useCases";
 
 export default function CasesDirectoryPage() {
   const { t, language } = useLanguage();
-  const [cases, setCases] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [selectedCaseForModal, setSelectedCaseForModal] = useState<any | null>(null);
@@ -36,57 +35,32 @@ export default function CasesDirectoryPage() {
   // Pagination states
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
 
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  const fetchCases = async () => {
-    // Abort in-flight request if user is typing fast
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.set("page", String(page));
-      params.set("limit", String(limit));
-      if (search.trim()) params.set("search", search.trim());
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      if (priorityFilter !== "all") params.set("priority", priorityFilter);
-
-      const res = await apiFetch(`/api/cases?${params.toString()}`, {
-        signal: controller.signal,
-      });
-      const json = await res.json();
-      if (json.success) {
-        setCases(json.cases);
-        setTotalCount(json.count || 0);
-        setTotalPages(json.totalPages || 1);
-      }
-    } catch (err: any) {
-      if (err.name !== "AbortError") {
-        console.error("Error loading cases:", err);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Debounce search input to eliminate spamming API calls on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, priorityFilter, limit]);
+  }, [debouncedSearch, statusFilter, priorityFilter, limit]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchCases();
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [search, statusFilter, priorityFilter, page, limit]);
+  // TanStack Query automatically deduplicates, caches in memory for 3 mins, and prevents duplicate API calls
+  const { data, isLoading: loading, refetch } = useCases({
+    page,
+    limit,
+    search: debouncedSearch,
+    status: statusFilter,
+    priority: priorityFilter,
+  });
+
+  const cases = data?.cases || [];
+  const totalCount = data?.count || 0;
+  const totalPages = data?.totalPages || 1;
 
   return (
     <ChamberAuthGuard featureName="Chamber Cases Directory">
@@ -361,7 +335,7 @@ export default function CasesDirectoryPage() {
             isOpen={!!selectedCaseForModal}
             onClose={() => setSelectedCaseForModal(null)}
             caseItem={selectedCaseForModal}
-            onSuccess={fetchCases}
+            onSuccess={() => refetch()}
           />
         )}
       </div>

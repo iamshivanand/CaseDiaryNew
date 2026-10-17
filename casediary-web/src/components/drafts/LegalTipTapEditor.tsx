@@ -60,6 +60,7 @@ import {
   Type,
   FileCheck,
   ShieldAlert,
+  ShieldCheck,
   ArrowRight,
   X,
   PanelLeftClose,
@@ -93,6 +94,8 @@ import SavedDraftsModal, { SavedDraftItem } from "./modals/SavedDraftsModal";
 import TemplatesLibraryModal, { TemplateItem } from "./modals/TemplatesLibraryModal";
 import SaveAsTemplateModal from "./modals/SaveAsTemplateModal";
 import { executeCourtPrint } from "./print/DraftPrintEngine";
+import { useDraftStore, DraftSnapshot } from "@/store/useDraftStore";
+import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
 
 interface CaseItem {
   id: number;
@@ -319,6 +322,54 @@ export default function LegalTipTapEditor({
   const [draftTitle, setDraftTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Hardware-Level Refresh Lock & Zustand Persistent Auto-Save
+  const draftStore = useDraftStore();
+  const [isEditorDirty, setIsEditorDirty] = useState(false);
+  const [pendingRecoveredDraft, setPendingRecoveredDraft] = useState<DraftSnapshot | null>(null);
+  const [lastAutosavedTime, setLastAutosavedTime] = useState<string | null>(null);
+
+  const draftStorageKey = useMemo(() => {
+    if (currentDraftId) return `draft_${currentDraftId}`;
+    return `draft_new_${selectedCaseId || "general"}_${selectedTemplate}`;
+  }, [currentDraftId, selectedCaseId, selectedTemplate]);
+
+  // Hardware-Level Refresh Lock (Intercepts accidental F5, Ctrl+R, back-swipe, closing tab)
+  useUnsavedChangesWarning(
+    isEditorDirty,
+    language === "en"
+      ? "You have unsaved changes in your legal petition. Leaving or refreshing will cause unsaved modifications to be lost. Do you want to stay?"
+      : "आपकी कानूनी याचिका में बिना सहेजे गए बदलाव हैं। पेज रीलोड करने पर बदलाव खो सकते हैं। क्या आप इसी पेज पर रहना चाहते हैं?"
+  );
+
+  // Check for auto-saved crash recovery draft on key change
+  useEffect(() => {
+    const cached = draftStore.getDraft(draftStorageKey);
+    if (cached?.content) {
+      setPendingRecoveredDraft(cached);
+    }
+  }, [draftStorageKey]);
+
+  // Debounced Auto-Save to Zustand Store (with persist)
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedAutosave = useCallback(
+    (htmlContent: string) => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = setTimeout(() => {
+        draftStore.saveDraft(draftStorageKey, {
+          content: htmlContent,
+          title: draftTitle,
+          caseId: selectedCaseId,
+          template: selectedTemplate,
+        });
+        setIsEditorDirty(true);
+        setLastAutosavedTime(
+          new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+        );
+      }, 1000);
+    },
+    [draftStorageKey, draftTitle, selectedCaseId, selectedTemplate, draftStore]
+  );
 
   // Collaboration: Mode Switcher (Editing vs Suggesting / Track Changes)
   const [editorMode, setEditorMode] = useState<"editing" | "suggesting">("editing");
@@ -893,6 +944,7 @@ export default function LegalTipTapEditor({
       // Debounced stats, outline, and pagination updates to guarantee completely lag-free drafting
       debouncedUpdateStatsAndOutline(editor);
       debouncedRecalculatePagination();
+      debouncedAutosave(editor.getHTML());
     },
   });
 
@@ -1278,6 +1330,9 @@ export default function LegalTipTapEditor({
         if (data.draft?.id) {
           setCurrentDraftId(data.draft.id);
         }
+        setIsEditorDirty(false);
+        draftStore.removeDraft(draftStorageKey);
+        setPendingRecoveredDraft(null);
         setSaveStatus("Saved to Chamber!");
         setTimeout(() => setSaveStatus(null), 3000);
       } else {
@@ -1592,6 +1647,66 @@ export default function LegalTipTapEditor({
             </div>
           </div>
         )}
+
+      {/* Hardware-Level Refresh Lock & Autosave Recovery Banner */}
+      {pendingRecoveredDraft ? (
+        <div className="mx-4 my-2 px-4 py-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between text-xs text-amber-900 dark:text-amber-200 animate-fade-in shadow-xs shrink-0">
+          <div className="flex items-center space-x-2">
+            <ShieldCheck className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>
+              <strong>{language === "en" ? "Crash Recovery Backup Available: " : "क्रैश रिकवरी बैकअप उपलब्ध: "}</strong>
+              {language === "en"
+                ? `Found auto-saved draft from ${new Date(pendingRecoveredDraft.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`
+                : `स्थानीय सहेजा समय: ${new Date(pendingRecoveredDraft.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (editor && pendingRecoveredDraft.content) {
+                  editor.commands.setContent(pendingRecoveredDraft.content);
+                  if (pendingRecoveredDraft.title) setDraftTitle(pendingRecoveredDraft.title);
+                  setPendingRecoveredDraft(null);
+                  setIsEditorDirty(true);
+                  setSaveStatus("Recovered draft restored!");
+                  setTimeout(() => setSaveStatus(null), 3000);
+                  requestAnimationFrame(() => recalculatePageBreaksAndSpacers());
+                }
+              }}
+              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold rounded-lg text-xs transition-colors cursor-pointer"
+            >
+              {language === "en" ? "Restore Backup" : "बैकअप लोड करें"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                draftStore.removeDraft(draftStorageKey);
+                setPendingRecoveredDraft(null);
+              }}
+              className="px-2 py-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 text-xs cursor-pointer"
+            >
+              {language === "en" ? "Discard" : "हटाएं"}
+            </button>
+          </div>
+        </div>
+      ) : isEditorDirty ? (
+        <div className="mx-4 my-1.5 px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center justify-between text-[11px] text-emerald-800 dark:text-emerald-300 shrink-0">
+          <div className="flex items-center space-x-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span>
+              {language === "en"
+                ? "Hardware Refresh Lock Active — Accidental F5, Ctrl+R, or tab close blocked."
+                : "हार्डवेयर रिफ्रेश लॉक सक्रिय — आकस्मिक F5, Ctrl+R या टैब बंद होना अवरुद्ध है।"}
+            </span>
+          </div>
+          {lastAutosavedTime && (
+            <span className="font-mono text-emerald-700/80 dark:text-emerald-400/80 text-[10px]">
+              {language === "en" ? `Auto-saved locally at ${lastAutosavedTime}` : `स्थानीय सहेजा: ${lastAutosavedTime}`}
+            </span>
+          )}
+        </div>
+      ) : null}
 
       {/* Studio Workspace Layout */}
       <div className="flex-1 min-h-0 flex overflow-hidden relative">

@@ -26,6 +26,8 @@ import {
 import { getDb } from "../../DataBase";
 import { reScheduleAllNotifications } from "../../utils/notificationScheduler";
 import { useAdTrigger } from "../CommonComponents/AdManager";
+import { logoutAdvocate, syncCasesToCloud } from "../../utils/cloudSyncService";
+import { emitter } from "../../utils/event-emitter";
 
 type SettingsScreenNavigationProp = any;
 
@@ -54,6 +56,72 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
   // Custom WhatsApp template states
   const [customWaTemplate, setCustomWaTemplate] = useState("");
   const [showWaTemplateModal, setShowWaTemplateModal] = useState(false);
+
+  // Chamber cloud account states
+  const [cloudToken, setCloudToken] = useState<string | null>(null);
+  const [chamberName, setChamberName] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const loadCloudStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem("@auth_token");
+      const chamber = await AsyncStorage.getItem("@chamber_name");
+      const user = await AsyncStorage.getItem("@user_name");
+      setCloudToken(token || null);
+      setChamberName(chamber || null);
+      setUserName(user || null);
+    } catch (e) {
+      console.warn("Could not check cloud status in Settings:", e);
+    }
+  };
+
+  useEffect(() => {
+    loadCloudStatus();
+    emitter.on("authChange", loadCloudStatus);
+    return () => {
+      emitter.off("authChange", loadCloudStatus);
+    };
+  }, []);
+
+  const handleCloudSync = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await syncCasesToCloud();
+      if (res.success) {
+        Alert.alert(
+          "Cloud Sync Complete",
+          `All courtroom cases are safely backed up to ${chamberName || "your Chamber"}!`
+        );
+      } else {
+        Alert.alert("Sync Issue", res.error || "Could not complete cloud sync.");
+      }
+    } catch (err: any) {
+      Alert.alert("Offline", "Working in offline mode. Cases remain saved locally.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Disconnect Chamber",
+      "Are you sure you want to log out of your Chamber on this device? Your local cases will remain safe in offline mode.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Log Out",
+          style: "destructive",
+          onPress: async () => {
+            await logoutAdvocate();
+            await loadCloudStatus();
+            emitter.emit("authChange");
+            Alert.alert("Logged Out", "Device disconnected from Chamber cloud.");
+          },
+        },
+      ]
+    );
+  };
 
   useEffect(() => {
     AsyncStorage.getItem("@whatsapp_custom_template").then((val) => {
@@ -416,6 +484,158 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   return (
     <ContainerComponent {...(containerProps as any)}>
+      {/* SECTION 0: ADVOCATE CHAMBER & CLOUD ACCOUNT */}
+      <View style={{ marginBottom: 20 }}>
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: "700",
+            color: theme.colors.textSecondary,
+            marginBottom: 8,
+            marginLeft: 4,
+            letterSpacing: 0.8,
+          }}
+        >
+          ADVOCATE CHAMBER & CLOUD
+        </Text>
+        <View
+          style={{
+            backgroundColor: theme.colors.cardBackground,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            padding: 16,
+          }}
+        >
+          {cloudToken ? (
+            <View>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: theme.dark ? "#1e293b" : "#f1f5f9",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginRight: 12,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                  }}
+                >
+                  <List.Icon icon="shield-check" color="#10b981" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: theme.colors.text }}>
+                      {userName || "Advocate"}
+                    </Text>
+                    <View
+                      style={{
+                        backgroundColor: "#10b98120",
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 6,
+                        marginLeft: 8,
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#10b981" }}>
+                        ACTIVE
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginTop: 2 }}>
+                    Chamber: {chamberName || "Solo Chamber"}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                <TouchableOpacity
+                  onPress={handleCloudSync}
+                  disabled={isSyncing}
+                  style={{
+                    flex: 1,
+                    backgroundColor: theme.colors.primary,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: "#ffffff", fontWeight: "700", fontSize: 13 }}>
+                    {isSyncing ? "Syncing..." : "Sync Cases Now"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleLogout}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: "#ef4444", fontWeight: "600", fontSize: 13 }}>
+                    Log Out
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: theme.dark ? "#1e293b" : "#f1f5f9",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginRight: 12,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                  }}
+                >
+                  <List.Icon icon="cloud-sync-outline" color={theme.colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: theme.colors.text }}>
+                    Connect Chamber Cloud
+                  </Text>
+                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>
+                    Sync courtroom cases to your Web Command Center and collaborate with your team.
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => navigation.navigate("Login")}
+                style={{
+                  backgroundColor: theme.colors.primary,
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={{ color: "#ffffff", fontWeight: "700", fontSize: 14 }}>
+                  Sign In or Create Chamber Account
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+
       {/* SECTION 1: PREFERENCES */}
       <View style={{ marginBottom: 20 }}>
         <Text

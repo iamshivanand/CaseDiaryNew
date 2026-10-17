@@ -40,6 +40,7 @@ import NotificationInboxScreen from "./Screens/Notifications/NotificationInboxSc
 import SettingsScreen from "./Screens/Settings/SettingsScreen";
 import UndatedCasesScreen from "./Screens/UndatedCases/UndatedCasesScreen";
 import YesterdaysCasesScreen from "./Screens/YesterdaysCases/YesterdaysCasesScreen";
+import Login from "./Screens/LoginSignup/Login/Login";
 
 // Import ParamList types
 import {
@@ -181,6 +182,11 @@ const HomeStack = () => {
         component={NotificationInboxScreen}
         options={{ headerShown: false }}
       />
+      <HomeStackNav.Screen
+        name="Login"
+        component={Login}
+        options={{ headerShown: true, title: "Chamber Account & Sync" }}
+      />
     </HomeStackNav.Navigator>
   );
 };
@@ -320,6 +326,11 @@ const ProfileStack = () => {
         component={ECourtsAppImportScreen}
         options={{ headerShown: true, title: "Import from eCourts App" }}
       />
+      <ProfileStackNav.Screen
+        name="Login"
+        component={Login}
+        options={{ headerShown: true, title: "Chamber Account & Sync" }}
+      />
       {/* Add AccountDetails screens here */}
     </ProfileStackNav.Navigator>
   );
@@ -393,6 +404,7 @@ const Appro: React.FC = () => {
             "DatabaseImportScreen",
             "PdfScanner",
             "PdfViewer",
+            "Login",
           ];
           const shouldHide = hideTabsOn.includes(routeName);
 

@@ -112,9 +112,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           parsed.token = savedToken;
         }
         setUser(parsed);
-        if (parsed.token) {
-          document.cookie = `advocase_token=${parsed.token}; path=/; max-age=2592000; SameSite=Lax`;
-        }
+        // Clear any legacy client-accessible cookie to favor server-side HttpOnly cookie
+        document.cookie = `advocase_token=; path=/; max-age=0; SameSite=Lax`;
         document.cookie = `advocase_session=true; path=/; max-age=2592000; SameSite=Lax`;
       } else {
         setUser(null);
@@ -142,6 +141,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = (userData: ChamberUser) => {
+    // Cancel any active Google One Tap / FedCM prompts in the corner
+    if (typeof window !== "undefined" && (window as any).google?.accounts?.id?.cancel) {
+      try {
+        (window as any).google.accounts.id.cancel();
+      } catch (e) {}
+    }
+
     // Purge any stale session state first to prevent cross-account credential leakage
     localStorage.removeItem("advocase_user");
     localStorage.removeItem("advocase_token");
@@ -153,10 +159,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("advocase_user", JSON.stringify(userData));
     if (userData.token) {
       localStorage.setItem("advocase_token", userData.token);
-      document.cookie = `advocase_token=${userData.token}; path=/; max-age=2592000; SameSite=Lax`;
     }
+    // Remove client-accessible token cookie so server HttpOnly cookie takes precedence
+    document.cookie = `advocase_token=; path=/; max-age=0; SameSite=Lax`;
     document.cookie = `advocase_session=true; path=/; max-age=2592000; SameSite=Lax`;
   };
+
+  // Ensure Google One Tap prompt never appears while user is authenticated
+  useEffect(() => {
+    if (user && typeof window !== "undefined" && (window as any).google?.accounts?.id?.cancel) {
+      try {
+        (window as any).google.accounts.id.cancel();
+      } catch (e) {}
+    }
+  }, [user]);
 
   const logout = () => {
     // Call server route to ensure cookies are invalidated on server & client

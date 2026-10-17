@@ -20,6 +20,42 @@ import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/context/ToastContext";
 import { apiFetch } from "@/lib/apiClient";
+import { useDraftStore } from "@/store/useDraftStore";
+import { useUnsavedChangesWarning } from "@/hooks/useUnsavedChangesWarning";
+import { RotateCcw, ShieldCheck } from "lucide-react";
+
+const INITIAL_FORM = {
+  CaseTitle: "",
+  ClientName: "",
+  OnBehalfOf: "Petitioner",
+  CNRNumber: "",
+  case_number: "",
+  case_year: new Date().getFullYear().toString(),
+  court_name: "",
+  case_type_name: "Criminal Bail Application",
+  JudgeName: "",
+  dateFiled: getTodayDateString(),
+  NextDate: "",
+  StatuteOfLimitations: "",
+  crime_number: "",
+  crime_year: new Date().getFullYear().toString(),
+  Undersection: "",
+  FirstParty: "",
+  OppositeParty: "",
+  Accussed: "",
+  ClientContactNumber: "",
+  OpposingCounsel: "",
+  OppositeAdvocate: "",
+  OppAdvocateContactNumber: "",
+  CaseStatus: "Open",
+  Priority: "Medium",
+  case_stage: "Filing / Initial Scrutiny",
+  total_fee: "",
+  fee_paid: "",
+  date_fee: "",
+  CaseDescription: "",
+  CaseNotes: "",
+};
 
 export default function AddNewCasePage() {
   const { t, language } = useLanguage();
@@ -28,38 +64,29 @@ export default function AddNewCasePage() {
   const [submitting, setSubmitting] = useState(false);
   const [lookups, setLookups] = useState<any>({ courts: [], caseTypes: [], districts: [], policeStations: [], stages: [] });
 
-  const [form, setForm] = useState({
-    CaseTitle: "",
-    ClientName: "",
-    OnBehalfOf: "Petitioner",
-    CNRNumber: "",
-    case_number: "",
-    case_year: new Date().getFullYear().toString(),
-    court_name: "",
-    case_type_name: "Criminal Bail Application",
-    JudgeName: "",
-    dateFiled: getTodayDateString(),
-    NextDate: "",
-    StatuteOfLimitations: "",
-    crime_number: "",
-    crime_year: new Date().getFullYear().toString(),
-    Undersection: "",
-    FirstParty: "",
-    OppositeParty: "",
-    Accussed: "",
-    ClientContactNumber: "",
-    OpposingCounsel: "",
-    OppositeAdvocate: "",
-    OppAdvocateContactNumber: "",
-    CaseStatus: "Open",
-    Priority: "Medium",
-    case_stage: "Filing / Initial Scrutiny",
-    total_fee: "",
-    fee_paid: "",
-    date_fee: "",
-    CaseDescription: "",
-    CaseNotes: "",
-  });
+  const draftStore = useDraftStore();
+  const [isDirty, setIsDirty] = useState(false);
+  const [form, setForm] = useState(INITIAL_FORM);
+
+  // Hardware-Level Refresh Lock (Intercepts accidental F5, Ctrl+R, back-swipe, tab close)
+  useUnsavedChangesWarning(
+    isDirty,
+    language === "en"
+      ? "You have unsaved case filing data. Refreshing or leaving will lose your changes. Do you want to stay on page?"
+      : "आपके पास बिना सहेजा गया केस डेटा है। पेज रीलोड करने पर डेटा मिट जाएगा। क्या आप इसी पेज पर रहना चाहते हैं?"
+  );
+
+  // Restore saved draft on mount if available
+  useEffect(() => {
+    const saved = draftStore.getDraft("new_case_form_draft");
+    if (saved?.formData && Object.keys(saved.formData).length > 0) {
+      setForm((prev) => ({
+        ...prev,
+        ...saved.formData,
+      }));
+      setIsDirty(true);
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/lookups")
@@ -67,8 +94,11 @@ export default function AddNewCasePage() {
       .then((data) => {
         if (data.success) {
           setLookups(data);
-          if (data.courts.length > 0) setForm((prev) => ({ ...prev, court_name: data.courts[0].name }));
-          if (data.caseTypes.length > 0) setForm((prev) => ({ ...prev, case_type_name: data.caseTypes[0].name }));
+          setForm((prev) => ({
+            ...prev,
+            court_name: prev.court_name || (data.courts.length > 0 ? data.courts[0].name : ""),
+            case_type_name: prev.case_type_name || (data.caseTypes.length > 0 ? data.caseTypes[0].name : "Criminal Bail Application"),
+          }));
         }
       })
       .catch((err) => console.error(err));
@@ -76,7 +106,21 @@ export default function AddNewCasePage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => {
+      const updated = { ...prev, [name]: value };
+      draftStore.saveDraft("new_case_form_draft", { formData: updated });
+      return updated;
+    });
+    setIsDirty(true);
+  };
+
+  const handleDiscardDraft = () => {
+    if (window.confirm(language === "en" ? "Discard this unsaved draft and reset form?" : "क्या आप यह ड्राफ्ट हटाकर फॉर्म रीसेट करना चाहते हैं?")) {
+      draftStore.removeDraft("new_case_form_draft");
+      setForm(INITIAL_FORM);
+      setIsDirty(false);
+      toast.info(language === "en" ? "Draft Discarded" : "ड्राफ्ट हटा दिया गया", language === "en" ? "Form has been reset." : "फॉर्म रीसेट हो गया है।");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,6 +144,11 @@ export default function AddNewCasePage() {
       if (!data.success) {
         throw new Error(data.error || "Failed to create case");
       }
+
+      // Success: Clear auto-saved draft & disengage refresh lock
+      draftStore.removeDraft("new_case_form_draft");
+      setIsDirty(false);
+
       toast.success(
         language === "en" ? "Case Added to Diary" : "मामला डायरी में दर्ज किया गया",
         `"${form.CaseTitle}" ${language === "en" ? "registered successfully in chamber." : "सफलतापूर्वक दर्ज किया गया।"}`
@@ -135,7 +184,35 @@ export default function AddNewCasePage() {
             </p>
           </div>
         </div>
+
+        {isDirty && (
+          <button
+            type="button"
+            onClick={handleDiscardDraft}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg border border-rose-200 dark:border-rose-900/40 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>{language === "en" ? "Reset Draft" : "ड्राफ्ट रीसेट"}</span>
+          </button>
+        )}
       </div>
+
+      {/* Hardware-level Refresh Lock & Auto-Save Banner */}
+      {isDirty && (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-700 dark:text-amber-400">
+          <div className="flex items-center space-x-2">
+            <ShieldCheck className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>
+              {language === "en"
+                ? "Hardware Refresh Lock Active — Draft auto-saved in local chamber cache."
+                : "हार्डवेयर रिफ्रेश लॉक सक्रिय — ड्राफ्ट स्थानीय चेंबर कैश में सुरक्षित है।"}
+            </span>
+          </div>
+          <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400/80">
+            {language === "en" ? "Protected against F5 & tab close" : "F5 व टैब बंद होने से सुरक्षित"}
+          </span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Section 1: Core Case Metadata */}

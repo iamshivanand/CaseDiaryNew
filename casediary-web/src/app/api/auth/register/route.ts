@@ -53,18 +53,21 @@ export async function POST(req: NextRequest) {
     // 2. Hash password
     const passwordHash = await hashPassword(password);
 
-    // 3. Create Chamber Organization
+    // 3. Create Chamber Organization (Default to 'solo' tier for public registration)
     const defaultChamberName = chamberName?.trim() || `${name.trim()}'s Law Chamber`;
-    const maxSeats = planTier === "firm_enterprise" ? 25 : planTier === "chamber_pro" ? 5 : 1;
+    // Prevent unauthenticated plan escalation: initial self-registration starts on 'solo'
+    const assignedTier = "solo";
+    const maxSeats = 1;
+    const storageLimitMb = 5120;
 
     const [newChamber] = await pgDb
       .insert(schema.chambers)
       .values({
         name: defaultChamberName,
-        plan_tier: planTier,
+        plan_tier: assignedTier,
         plan_status: "active",
         max_seats: maxSeats,
-        storage_limit_mb: planTier === "firm_enterprise" ? 51200 : planTier === "chamber_pro" ? 20480 : 5120,
+        storage_limit_mb: storageLimitMb,
       })
       .returning();
 
@@ -128,11 +131,14 @@ export async function POST(req: NextRequest) {
     response.cookies.set("advocase_token", token, {
       path: "/",
       maxAge: 2592000,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
     });
     response.cookies.set("advocase_session", "true", {
       path: "/",
       maxAge: 2592000,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
     });
 

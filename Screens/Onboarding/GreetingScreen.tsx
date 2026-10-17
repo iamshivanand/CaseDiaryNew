@@ -32,12 +32,23 @@ const GreetingScreen = ({ navigation }) => {
         />
         <TouchableOpacity
           onPress={() =>
-            navigation.navigate("ImportMigration", { isFromOnboarding: true })
+            navigation.navigate("Login", { isFromOnboarding: true })
           }
-          style={{ marginTop: 24, padding: 8 }}
+          style={{ marginTop: 20, padding: 8 }}
           activeOpacity={0.8}
         >
           <Text style={[styles.importLink, { color: theme.colors.primary }]}>
+            {t("onboarding_signin_link")}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate("ImportMigration", { isFromOnboarding: true })
+          }
+          style={{ marginTop: 8, padding: 8 }}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.importLink, { color: theme.colors.textSecondary }]}>
             {t("onboarding_import_link")}
           </Text>
         </TouchableOpacity>

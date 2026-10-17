@@ -43,6 +43,7 @@ import {
 import dbCacheManager from "../../utils/dbCacheManager";
 import { exportDailyCauseListToPdf } from "../../utils/pdfExporter";
 import { promptClientNotification } from "../../utils/whatsappNotifier";
+import { emitter } from "../../utils/event-emitter";
 import UpdateHearingPopup from "../CaseDetailsScreen/components/UpdateHearingPopup";
 import { VoiceCaseNoteModal } from "../CommonComponents/VoiceCaseNoteModal";
 import NewCaseCard from "../CasesList/components/NewCaseCard";
@@ -81,6 +82,10 @@ const WelcomeCard = () => {
 
   useEffect(() => {
     checkCloudStatus();
+    emitter.on("authChange", checkCloudStatus);
+    return () => {
+      emitter.off("authChange", checkCloudStatus);
+    };
   }, []);
 
   const handleSyncPress = async () => {

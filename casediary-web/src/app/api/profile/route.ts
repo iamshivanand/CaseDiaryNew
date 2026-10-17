@@ -1,10 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthUser } from "@/lib/auth";
+import { pgDb } from "@/db/pgClient";
+import * as pgSchema from "@/db/pgSchema";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const authUser = getAuthUser(request);
+
+    // 1. Authenticated Cloud User
+    if (authUser && authUser.userId && !authUser.isDemo) {
+      const [pgUser] = await pgDb
+        .select()
+        .from(pgSchema.users)
+        .where(eq(pgSchema.users.id, authUser.userId))
+        .limit(1);
+
+      if (pgUser) {
+        return NextResponse.json({
+          success: true,
+          user: pgUser,
+          profile: {
+            name: pgUser.name,
+            barCouncilNumber: pgUser.barCouncilNumber,
+            chamberAddress: pgUser.chamberAddress,
+            role: pgUser.role,
+            email: pgUser.email,
+            phone: pgUser.phone,
+          },
+        });
+      }
+    }
+
+    // 2. Demo Sandbox Profile
     const profile = db.select().from(schema.LawyerProfiles).get();
     const user = db.select().from(schema.Users).get();
 
@@ -23,7 +53,42 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
+    const authUser = getAuthUser(request);
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Authentication required to update advocate profile." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
+
+    // 1. Authenticated Cloud User
+    if (authUser.userId && !authUser.isDemo) {
+      const [updatedUser] = await pgDb
+        .update(pgSchema.users)
+        .set({
+          name: body.name || undefined,
+          barCouncilNumber: body.barCouncilNumber || undefined,
+          chamberAddress: body.chamberAddress || undefined,
+          phone: body.phone || undefined,
+          updated_at: new Date(),
+        })
+        .where(eq(pgSchema.users.id, authUser.userId))
+        .returning();
+
+      return NextResponse.json({
+        success: true,
+        user: updatedUser,
+        profile: {
+          name: updatedUser.name,
+          barCouncilNumber: updatedUser.barCouncilNumber,
+          chamberAddress: updatedUser.chamberAddress,
+        },
+      });
+    }
+
+    // 2. Demo Sandbox
     const existing = db.select().from(schema.LawyerProfiles).get();
 
     if (existing) {

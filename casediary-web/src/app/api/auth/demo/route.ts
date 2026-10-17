@@ -73,11 +73,14 @@ export async function POST(req: NextRequest) {
     res.cookies.set("advocase_token", token, {
       path: "/",
       maxAge: 2592000,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
     });
     res.cookies.set("advocase_session", "true", {
       path: "/",
       maxAge: 2592000,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
     });
 

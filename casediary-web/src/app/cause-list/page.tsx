@@ -17,37 +17,18 @@ import {
 import { formatDate, getTodayDateString, getTomorrowDateString } from "@/lib/utils";
 import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { useLanguage } from "@/context/LanguageContext";
-import { apiFetch } from "@/lib/apiClient";
+import { useCauseList } from "@/hooks/useCauseList";
 
 export default function CauseListPage() {
   const { t, language } = useLanguage();
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [printTimestamp, setPrintTimestamp] = useState("");
 
   useEffect(() => {
     setPrintTimestamp(new Date().toLocaleString(language === "en" ? "en-IN" : "hi-IN"));
   }, [language]);
 
-  const fetchCauseList = async (date: string) => {
-    setLoading(true);
-    try {
-      const res = await apiFetch(`/api/cause-list?date=${date}`);
-      const json = await res.json();
-      if (json.success) {
-        setData(json);
-      }
-    } catch (err) {
-      console.error("Error loading cause list:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCauseList(selectedDate);
-  }, [selectedDate]);
+  const { data, isLoading: loading } = useCauseList(selectedDate);
 
   const handlePrint = () => {
     window.print();

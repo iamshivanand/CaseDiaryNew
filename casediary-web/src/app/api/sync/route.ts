@@ -9,11 +9,18 @@ import * as sqliteSchema from "@/db/schema";
 export async function GET(req: NextRequest) {
   try {
     const authUser = getAuthUser(req);
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Authentication token required for sync." },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const since = searchParams.get("since"); // ISO date string
 
     // 1. CLOUD SYNC (PostgreSQL in Docker for Authenticated Advocates)
-    if (authUser && authUser.chamberId) {
+    if (authUser.chamberId && authUser.chamberId !== "demo-chamber-id") {
       const conditions: any[] = [
         eq(pgSchema.cases.chamber_id, authUser.chamberId),
       ];
@@ -27,9 +34,30 @@ export async function GET(req: NextRequest) {
         .where(and(...conditions))
         .orderBy(desc(pgSchema.cases.id));
 
+      // Strictly isolate timeline records to cases belonging to this chamber
       const cloudTimeline = await pgDb
-        .select()
+        .select({
+          id: pgSchema.case_timeline.id,
+          uniqueId: pgSchema.case_timeline.uniqueId,
+          case_unique_id: pgSchema.case_timeline.case_unique_id,
+          hearing_date: pgSchema.case_timeline.hearing_date,
+          notes: pgSchema.case_timeline.notes,
+          event_type: pgSchema.case_timeline.event_type,
+          amount: pgSchema.case_timeline.amount,
+          payment_mode: pgSchema.case_timeline.payment_mode,
+          created_at: pgSchema.case_timeline.created_at,
+        })
         .from(pgSchema.case_timeline)
+        .innerJoin(
+          pgSchema.cases,
+          eq(pgSchema.case_timeline.case_unique_id, pgSchema.cases.uniqueId)
+        )
+        .where(
+          and(
+            eq(pgSchema.cases.chamber_id, authUser.chamberId),
+            eq(pgSchema.case_timeline.is_deleted, false)
+          )
+        )
         .orderBy(desc(pgSchema.case_timeline.id));
 
       const cloudDrafts = await pgDb
@@ -48,18 +76,23 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 2. FALLBACK TO LOCAL SQLite
+    // 2. ISOLATED DEMO SANDBOX (Demo Profiles Only)
     const cases = sqliteDb
       .select()
       .from(sqliteSchema.Cases)
+      .where(eq(sqliteSchema.Cases.user_id, 1))
       .orderBy(desc(sqliteSchema.Cases.id))
       .all();
     const timeline = sqliteDb.select().from(sqliteSchema.CaseTimeline).all();
-    const drafts = sqliteDb.select().from(sqliteSchema.DocumentDrafts).all();
+    const drafts = sqliteDb
+      .select()
+      .from(sqliteSchema.DocumentDrafts)
+      .where(eq(sqliteSchema.DocumentDrafts.chamber_id, "demo-chamber-id"))
+      .all();
 
     return NextResponse.json({
       success: true,
-      source: "local_sqlite",
+      source: "demo_sandbox",
       syncedAt: new Date().toISOString(),
       cases,
       timeline,
@@ -77,13 +110,20 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const authUser = getAuthUser(req);
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Authentication token required for sync." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
 
     let insertedCount = 0;
     let updatedCount = 0;
 
-    // 1. CLOUD SYNC (PostgreSQL in Docker)
-    if (authUser && authUser.chamberId) {
+    // 1. CLOUD SYNC (PostgreSQL in Docker for Authenticated Chambers)
+    if (authUser.chamberId && authUser.chamberId !== "demo-chamber-id") {
       if (body.cases && Array.isArray(body.cases)) {
         for (const item of body.cases) {
           const uniqueId =
@@ -92,15 +132,20 @@ export async function POST(req: NextRequest) {
               Math.random() * 1000
             )}`;
 
-          // Check if case already exists in PostgreSQL
+          // Check if case already exists in PostgreSQL specifically within this chamber
           const existing = await pgDb
             .select()
             .from(pgSchema.cases)
-            .where(eq(pgSchema.cases.uniqueId, uniqueId))
+            .where(
+              and(
+                eq(pgSchema.cases.uniqueId, uniqueId),
+                eq(pgSchema.cases.chamber_id, authUser.chamberId)
+              )
+            )
             .limit(1);
 
           if (existing.length > 0) {
-            // Update existing case
+            // Update existing case strictly within the user's chamber
             await pgDb
               .update(pgSchema.cases)
               .set({
@@ -123,10 +168,15 @@ export async function POST(req: NextRequest) {
                     : existing[0].total_fee,
                 updated_at: new Date(),
               })
-              .where(eq(pgSchema.cases.uniqueId, uniqueId));
+              .where(
+                and(
+                  eq(pgSchema.cases.uniqueId, uniqueId),
+                  eq(pgSchema.cases.chamber_id, authUser.chamberId)
+                )
+              );
             updatedCount++;
           } else {
-            // Insert new case into PostgreSQL
+            // Insert new case into PostgreSQL scoped to this chamber
             await pgDb.insert(pgSchema.cases).values({
               uniqueId,
               chamber_id: authUser.chamberId,
@@ -174,7 +224,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. FALLBACK TO LOCAL SQLite
+    // 2. ISOLATED DEMO SANDBOX (Demo Profiles Only)
     if (body.cases && Array.isArray(body.cases)) {
       for (const item of body.cases) {
         const uniqueId =
@@ -183,7 +233,12 @@ export async function POST(req: NextRequest) {
         const existing = sqliteDb
           .select()
           .from(sqliteSchema.Cases)
-          .where(eq(sqliteSchema.Cases.uniqueId, uniqueId))
+          .where(
+            and(
+              eq(sqliteSchema.Cases.uniqueId, uniqueId),
+              eq(sqliteSchema.Cases.user_id, 1)
+            )
+          )
           .get();
 
         if (existing) {
@@ -194,7 +249,12 @@ export async function POST(req: NextRequest) {
               CaseStatus: item.CaseStatus || existing.CaseStatus,
               updated_at: new Date().toISOString(),
             })
-            .where(eq(sqliteSchema.Cases.uniqueId, uniqueId))
+            .where(
+              and(
+                eq(sqliteSchema.Cases.uniqueId, uniqueId),
+                eq(sqliteSchema.Cases.user_id, 1)
+              )
+            )
             .run();
           updatedCount++;
         } else {
@@ -202,6 +262,7 @@ export async function POST(req: NextRequest) {
             .insert(sqliteSchema.Cases)
             .values({
               uniqueId,
+              user_id: 1,
               CaseTitle: item.CaseTitle || "Imported Case",
               ClientName: item.ClientName || "",
               case_number: item.case_number || "",

@@ -23,6 +23,7 @@ import {
   Users,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import DOMPurify from "dompurify";
 
 export default function SharedCaseBriefPage() {
   const params = useParams();
@@ -500,7 +501,7 @@ export default function SharedCaseBriefPage() {
                     {d.html_content && (
                       <div
                         className="prose prose-invert prose-xs max-w-none bg-slate-900 p-4 rounded-lg border border-slate-800/80 max-h-60 overflow-y-auto"
-                        dangerouslySetInnerHTML={{ __html: d.html_content }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(d.html_content) }}
                       />
                     )}
                   </div>

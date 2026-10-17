@@ -67,6 +67,24 @@ export const importDatabaseBackup = async (): Promise<void> => {
     }
 
     const selectedFileUri = result.assets[0].uri;
+
+    // Validate SQLite magic header bytes before overwriting active database
+    try {
+      const header = await FileSystem.readAsStringAsync(selectedFileUri, {
+        length: 15,
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      if (!header.startsWith("SQLite format 3")) {
+        Alert.alert(
+          "Invalid Backup File",
+          "The selected file is not a valid CaseDiary SQLite database backup. Restore cancelled to prevent data corruption."
+        );
+        return;
+      }
+    } catch (headerErr) {
+      console.warn("Could not verify file header:", headerErr);
+    }
+
     const dbDir = FileSystem.documentDirectory + "SQLite/";
     const dbPath = dbDir + "CaseDiary.db";
 

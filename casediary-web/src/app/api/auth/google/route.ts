@@ -62,6 +62,34 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        // Strict Audience (aud) & Authorized Party (azp) Verification to prevent Confused Deputy attacks
+        const validClientIds = [
+          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_ANDROID_CLIENT_ID,
+        ].filter(Boolean) as string[];
+
+        if (validClientIds.length > 0) {
+          const tokenAud = Array.isArray(tokenInfo.aud) ? tokenInfo.aud : [tokenInfo.aud];
+          const tokenAzp = tokenInfo.azp;
+          const isAudValid = validClientIds.some((cid) => tokenAud.includes(cid) || tokenAzp === cid);
+
+          if (!isAudValid) {
+            console.warn("Security Alert: Google ID token audience mismatch", {
+              receivedAud: tokenInfo.aud,
+              receivedAzp: tokenInfo.azp,
+              validClientIds,
+            });
+            return NextResponse.json(
+              {
+                success: false,
+                error: "Google token audience mismatch. Unauthorized client.",
+              },
+              { status: 401 }
+            );
+          }
+        }
+
         verifiedEmail = tokenInfo.email.toLowerCase().trim();
         verifiedName = tokenInfo.name || verifiedEmail.split("@")[0];
         verifiedAvatar = tokenInfo.picture || "";
@@ -191,11 +219,14 @@ export async function POST(req: NextRequest) {
     response.cookies.set("advocase_token", appToken, {
       path: "/",
       maxAge: 2592000,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
     });
     response.cookies.set("advocase_session", "true", {
       path: "/",
       maxAge: 2592000,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
     });
 

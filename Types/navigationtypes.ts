@@ -55,6 +55,7 @@ export type HomeStackParamList = {
   SettingsScreen: undefined;
   Settings: undefined;
   NotificationInbox: { initialCategory?: string } | undefined;
+  Login: { isFromOnboarding?: boolean } | undefined;
 };
 
 // Stack for the "Search" Tab
@@ -84,6 +85,7 @@ export type ProfileStackParamList = {
   DuplicateReview: undefined;
   DatabaseImportScreen: undefined;
   ECourtsAppImport: undefined;
+  Login: { isFromOnboarding?: boolean } | undefined;
   // Example: AccountDetails: undefined;
 };
 

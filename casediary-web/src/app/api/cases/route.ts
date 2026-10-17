@@ -232,6 +232,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authUser = getAuthUser(request);
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Authentication token required." },
+        { status: 401 }
+      );
+    }
     const body = await request.json();
 
     const uniqueId =
@@ -243,7 +249,7 @@ export async function POST(request: NextRequest) {
     // ─────────────────────────────────────────────────────────────────────────────
     // 1. CLOUD POSTGRESQL (Authenticated Chamber)
     // ─────────────────────────────────────────────────────────────────────────────
-    if (authUser && authUser.chamberId && authUser.chamberId !== "demo-chamber-id") {
+    if (authUser.chamberId && authUser.chamberId !== "demo-chamber-id") {
       const [newCase] = await pgDb
         .insert(pgSchema.cases)
         .values({

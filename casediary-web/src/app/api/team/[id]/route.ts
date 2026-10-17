@@ -51,7 +51,14 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const authUser = getAuthUser(request);
-    if (authUser && !isSeniorAdvocate(authUser)) {
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Authentication token required." },
+        { status: 401 }
+      );
+    }
+
+    if (!isSeniorAdvocate(authUser)) {
       return NextResponse.json(
         {
           success: false,
@@ -124,7 +131,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const authUser = getAuthUser(request);
-    if (authUser && !isSeniorAdvocate(authUser)) {
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized. Authentication token required." },
+        { status: 401 }
+      );
+    }
+
+    if (!isSeniorAdvocate(authUser)) {
       return NextResponse.json(
         {
           success: false,

@@ -26,46 +26,32 @@ import { ChamberAuthGuard } from "@/components/ChamberAuthGuard";
 import { formatDate, formatINR } from "@/lib/utils";
 
 import { useLanguage } from "@/context/LanguageContext";
-import { apiFetch } from "@/lib/apiClient";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
+import { useCases } from "@/hooks/useCases";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function DashboardPage() {
   const { t, language } = useLanguage();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"today" | "tomorrow" | "yesterday" | "undated">("today");
-  const [stats, setStats] = useState<any>(null);
-  const [cases, setCases] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedCaseForModal, setSelectedCaseForModal] = useState<any | null>(null);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    try {
-      // Parallelize requests to prevent sequential network lag
-      const [statsRes, casesRes] = await Promise.all([
-        apiFetch("/api/stats"),
-        apiFetch(`/api/cases?filter=${activeTab}&limit=20`),
-      ]);
+  // Cached Chamber Stats (5 min memory freshness)
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
 
-      const [statsData, casesData] = await Promise.all([
-        statsRes.json(),
-        casesRes.json(),
-      ]);
+  // Cached Cases per tab (3 min memory freshness)
+  const { data: casesData, isLoading: casesLoading } = useCases({
+    filter: activeTab,
+    limit: 20,
+  });
 
-      if (statsData.success) {
-        setStats(statsData.stats);
-      }
-      if (casesData.success) {
-        setCases(casesData.cases);
-      }
-    } catch (err) {
-      console.error("Failed to load dashboard:", err);
-    } finally {
-      setLoading(false);
-    }
+  const cases = casesData?.cases || [];
+  const loading = statsLoading && casesLoading;
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["stats"] });
+    queryClient.invalidateQueries({ queryKey: ["cases"] });
   };
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [activeTab]);
 
   return (
     <ChamberAuthGuard featureName="Daily Court Diary & Cause List">
@@ -442,7 +428,7 @@ export default function DashboardPage() {
           isOpen={!!selectedCaseForModal}
           onClose={() => setSelectedCaseForModal(null)}
           caseItem={selectedCaseForModal}
-          onSuccess={fetchDashboardData}
+          onSuccess={handleRefresh}
         />
       )}
     </div>

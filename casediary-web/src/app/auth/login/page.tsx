@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -38,83 +38,236 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // If already authenticated, redirect straight to dashboard (no flash)
+  // If already authenticated, cancel any Google prompt and redirect straight to dashboard
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
+      if (typeof window !== "undefined" && (window as any).google?.accounts?.id?.cancel) {
+        try {
+          (window as any).google.accounts.id.cancel();
+        } catch (e) {}
+      }
       router.replace("/");
     }
   }, [isLoading, isAuthenticated, router]);
 
   const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleSdkReady, setGoogleSdkReady] = useState(false);
+  const gsiInitializedRef = useRef(false);
 
+  // 1. Detect Google OAuth 2.0 Web Redirection Token from URL hash
   useEffect(() => {
-    let attempts = 0;
-    const interval = setInterval(() => {
-      attempts++;
-      if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
-        clearInterval(interval);
-        try {
-          (window as any).google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: async (response: any) => {
-              if (response?.credential) {
-                setLoading(true);
-                const result = await loginWithGoogle(response.credential);
-                setLoading(false);
-                if (result.success && result.user) {
-                  toast.welcome({
-                    name: result.user.name || "Advocate",
-                    role: result.user.role || "Senior Advocate",
-                    isNewUser: result.isNewUser,
-                    chamberName: result.user.chamber?.name,
-                  });
-                  router.replace("/");
-                } else {
-                  toast.error(
-                    language === "en" ? "Sign-in Failed" : "साइन-इन विफल",
-                    result.error || (language === "en" ? "Google sign-in could not be completed." : "गूगल प्रमाणीकरण पूरा नहीं हो सका।")
-                  );
-                }
-              }
-            },
-            auto_select: false,
-            cancel_on_tap_outside: false,
-          });
+    if (typeof window === "undefined" || !window.location.hash) return;
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get("access_token");
+    const idToken = hashParams.get("id_token");
 
-          // 1. Render modern Google button
-          const btnEl = document.getElementById("googleSignInDiv");
-          if (btnEl) {
-            btnEl.innerHTML = "";
-            (window as any).google.accounts.id.renderButton(btnEl, {
-              theme: "outline",
-              size: "large",
-              type: "standard",
-              text: "signin_with",
-              shape: "pill",
-              width: 360,
-              logo_alignment: "left",
-            });
+    if (accessToken || idToken) {
+      setGoogleLoading(true);
+      window.history.replaceState(null, "", window.location.pathname);
+      loginWithGoogle(accessToken ? { accessToken } : (idToken as string)).then((result) => {
+        setGoogleLoading(false);
+        if (result.success && result.user) {
+          if (typeof window !== "undefined" && (window as any).google?.accounts?.id?.cancel) {
+            try {
+              (window as any).google.accounts.id.cancel();
+            } catch (e) {}
           }
+          toast.welcome({
+            name: result.user.name || "Advocate",
+            role: result.user.role || "Senior Advocate",
+            isNewUser: result.isNewUser,
+            chamberName: result.user.chamber?.name,
+          });
+          router.replace("/");
+        } else {
+          toast.error(
+            language === "en" ? "Sign-in Failed" : "साइन-इन विफल",
+            result.error || (language === "en" ? "Google authentication failed." : "गूगल प्रमाणीकरण पूरा नहीं हो सका।")
+          );
+        }
+      });
+    }
+  }, [router, loginWithGoogle, toast, language]);
 
-          // 2. Automatically launch Google One Tap floating card in the top-right corner
-          (window as any).google.accounts.id.prompt((notification: any) => {
-            if (notification?.isNotDisplayed?.()) {
-              console.info(
-                "Google One Tap not displayed reason:",
-                notification.getNotDisplayedReason()
+  // 2. Initialize Google Identity Services (GSI)
+  const initGsi = useCallback(() => {
+    if (typeof window === "undefined" || !(window as any).google?.accounts?.id) {
+      return false;
+    }
+    if (gsiInitializedRef.current) {
+      return true;
+    }
+
+    try {
+      // Cancel any outstanding FedCM credentials.get requests to prevent NotAllowedError
+      if (typeof (window as any).google?.accounts?.id?.cancel === "function") {
+        (window as any).google.accounts.id.cancel();
+      }
+
+      (window as any).google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: async (response: any) => {
+          if (response?.credential) {
+            setGoogleLoading(true);
+            const result = await loginWithGoogle(response.credential);
+            setGoogleLoading(false);
+            if (result.success && result.user) {
+              if (typeof window !== "undefined" && (window as any).google?.accounts?.id?.cancel) {
+                try {
+                  (window as any).google.accounts.id.cancel();
+                } catch (e) {}
+              }
+              toast.welcome({
+                name: result.user.name || "Advocate",
+                role: result.user.role || "Senior Advocate",
+                isNewUser: result.isNewUser,
+                chamberName: result.user.chamber?.name,
+              });
+              router.replace("/");
+            } else {
+              toast.error(
+                language === "en" ? "Sign-in Failed" : "साइन-इन विफल",
+                result.error || (language === "en" ? "Google sign-in could not be completed." : "गूगल प्रमाणीकरण पूरा नहीं हो सका।")
               );
             }
-          });
-        } catch (e) {
-          console.warn("Google SDK initialization warning:", e);
+          }
+        },
+        auto_select: false,
+        cancel_on_tap_outside: false,
+        use_fedcm_for_prompt: true,
+      });
+
+      const btnEl = document.getElementById("googleSignInDiv");
+      if (btnEl) {
+        btnEl.innerHTML = "";
+        (window as any).google.accounts.id.renderButton(btnEl, {
+          theme: "outline",
+          size: "large",
+          type: "standard",
+          text: "signin_with",
+          shape: "pill",
+          width: 320,
+          logo_alignment: "left",
+        });
+      }
+
+      // Note: We deliberately do NOT call google.accounts.id.prompt() here,
+      // as the button itself provides standard sign-in and prevents unwanted
+      // floating popups in the corner from lingering after login.
+
+      gsiInitializedRef.current = true;
+      setGoogleSdkReady(true);
+      return true;
+    } catch (e) {
+      console.warn("Google SDK initialization warning:", e);
+      return false;
+    }
+  }, [GOOGLE_CLIENT_ID, loginWithGoogle, router, toast, language]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if ((window as any).google?.accounts?.id) {
+      initGsi();
+      return () => {
+        if (typeof (window as any).google?.accounts?.id?.cancel === "function") {
+          (window as any).google.accounts.id.cancel();
         }
-      } else if (attempts > 30) {
+      };
+    }
+
+    // Dynamically inject script if not present
+    let script = document.querySelector('script[src="https://accounts.google.com/gsi/client"]') as HTMLScriptElement;
+    if (!script) {
+      script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+
+    const handleLoad = () => {
+      initGsi();
+    };
+    script.addEventListener("load", handleLoad);
+
+    // Fallback polling in case of hydration delay
+    let count = 0;
+    const interval = setInterval(() => {
+      count++;
+      if ((window as any).google?.accounts?.id) {
+        clearInterval(interval);
+        initGsi();
+      } else if (count > 25) {
         clearInterval(interval);
       }
     }, 200);
 
-    return () => clearInterval(interval);
-  }, [router, loginWithGoogle, GOOGLE_CLIENT_ID, toast, language]);
+    return () => {
+      script.removeEventListener("load", handleLoad);
+      clearInterval(interval);
+      if (typeof (window as any).google?.accounts?.id?.cancel === "function") {
+        (window as any).google.accounts.id.cancel();
+      }
+    };
+  }, [initGsi]);
+
+  // 3. Fallback Click Handler for Custom Google Sign-In Button
+  const handleCustomGoogleClick = () => {
+    if (googleLoading || loading) return;
+    setGoogleLoading(true);
+
+    // If Google tokenClient is available, use popup
+    if (typeof window !== "undefined" && (window as any).google?.accounts?.oauth2) {
+      try {
+        const client = (window as any).google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: "email profile openid",
+          callback: async (resp: any) => {
+            if (resp?.access_token) {
+              const result = await loginWithGoogle({ accessToken: resp.access_token });
+              setGoogleLoading(false);
+              if (result.success && result.user) {
+                toast.welcome({
+                  name: result.user.name || "Advocate",
+                  role: result.user.role || "Senior Advocate",
+                  isNewUser: result.isNewUser,
+                  chamberName: result.user.chamber?.name,
+                });
+                router.replace("/");
+              } else {
+                toast.error(
+                  language === "en" ? "Sign-in Failed" : "साइन-इन विफल",
+                  result.error || (language === "en" ? "Google sign-in could not be completed." : "गूगल प्रमाणीकरण पूरा नहीं हो सका।")
+                );
+              }
+            } else {
+              setGoogleLoading(false);
+            }
+          },
+          error_callback: () => {
+            setGoogleLoading(false);
+          },
+        });
+        client.requestAccessToken();
+        return;
+      } catch (e) {
+        console.warn("Token client initiation failed, falling back to direct OAuth redirect:", e);
+      }
+    }
+
+    // Direct Google OAuth 2.0 Web Redirection Fallback
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const redirectUri = `${origin}/auth/login`;
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
+      GOOGLE_CLIENT_ID
+    )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(
+      "email profile openid"
+    )}&prompt=select_account`;
+
+    window.location.href = authUrl;
+  };
 
   const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
@@ -407,20 +560,52 @@ export default function LoginPage() {
           </span>
         </div>
 
-        {/* Google Identity Services Official Button (Triggers 1-Tap & Modern Google Sign-In) */}
+        {/* Google Authentication (Official GSI with Instant Clickable Fallback) */}
         <div className="w-full flex flex-col items-center justify-center space-y-2">
           <div
             id="googleSignInDiv"
-            className="flex justify-center w-full min-h-[44px] items-center"
-          >
-            <div className="w-[320px] h-[40px] rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-center space-x-2 text-slate-400 text-xs shadow-2xs">
-              <svg className="w-3.5 h-3.5 animate-spin text-amber-500" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span>{language === "en" ? "Loading Google Sign-in..." : "गूगल साइन-इन लोड हो रहा है..."}</span>
-            </div>
-          </div>
+            className={`flex justify-center w-full min-h-[44px] items-center ${googleSdkReady ? "block" : "hidden"}`}
+          />
+          {!googleSdkReady && (
+            <button
+              type="button"
+              onClick={handleCustomGoogleClick}
+              disabled={googleLoading || loading}
+              className="w-[320px] h-[42px] rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center justify-center space-x-3 shadow-2xs hover:shadow-xs active:scale-98 transition-all cursor-pointer disabled:opacity-60"
+            >
+              {googleLoading ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin text-amber-500" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>{language === "en" ? "Connecting to Google..." : "गूगल से जुड़ रहा है..."}</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span>{language === "en" ? "Sign in with Google" : "गूगल से साइन इन करें"}</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {/* 1-Click Quick Demo Logins */}

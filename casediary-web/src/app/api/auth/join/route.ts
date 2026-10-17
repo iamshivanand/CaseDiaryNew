@@ -232,11 +232,14 @@ export async function POST(req: NextRequest) {
     response.cookies.set("advocase_token", authToken, {
       path: "/",
       maxAge: 2592000,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
     });
     response.cookies.set("advocase_session", "true", {
       path: "/",
       maxAge: 2592000,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
     });
 
